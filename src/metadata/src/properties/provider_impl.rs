@@ -1,11 +1,11 @@
 use std::sync::Arc;
+use std::sync::RwLock;
 
 use async_trait::async_trait;
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::Utc;
 use common::types::OptionalProperty;
-use tokio::sync::RwLock;
 
 use crate::error;
 use crate::error::MetadataError;
@@ -101,21 +101,12 @@ impl ProviderImpl {
         }
     }
 
-    async fn _get_by_name(
-        &self,
-        organization_id: u64,
-        project_id: u64,
-        name: &str,
-    ) -> Result<Property> {
-        match self
-            .idx
-            .get(make_index_key(
-                org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
-                IDX_NAME,
-                name,
-            ))
-            .await
-        {
+    fn _get_by_name(&self, organization_id: u64, project_id: u64, name: &str) -> Result<Property> {
+        match self.idx.get(make_index_key(
+            org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
+            IDX_NAME,
+            name,
+        )) {
             Err(MetadataError::Store(StoreError::KeyNotFound(_))) => {
                 Err(PropertyError::PropertyNotFound(error::Property {
                     organization_id,
@@ -131,7 +122,7 @@ impl ProviderImpl {
         }
     }
 
-    async fn _create(
+    fn _create(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -144,7 +135,7 @@ impl ProviderImpl {
             &req.name,
             req.display_name.clone(),
         );
-        match self.idx.check_insert_constraints(idx_keys.as_ref()).await {
+        match self.idx.check_insert_constraints(idx_keys.as_ref()) {
             Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
                 return Err(PropertyError::PropertyAlreadyExist(error::Property {
                     organization_id,
@@ -159,12 +150,9 @@ impl ProviderImpl {
             Ok(_) => {}
         }
 
-        let id = self
-            .store
-            .next_seq(make_id_seq_key(
-                org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
-            ))
-            .await?;
+        let id = self.store.next_seq(make_id_seq_key(
+            org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
+        ))?;
         let created_at = Utc::now();
 
         let prop = Property {
@@ -189,60 +177,53 @@ impl ProviderImpl {
         };
 
         let data = serialize(&prop)?;
-        self.store
-            .put(
-                make_data_value_key(
-                    org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes())
-                        .as_slice(),
-                    prop.id,
-                ),
-                &data,
-            )
-            .await?;
+        self.store.put(
+            make_data_value_key(
+                org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
+                prop.id,
+            ),
+            &data,
+        )?;
 
-        self.idx.insert(idx_keys.as_ref(), &data).await?;
+        self.idx.insert(idx_keys.as_ref(), &data)?;
         Ok(prop)
     }
 }
 
-#[async_trait]
 impl Provider for ProviderImpl {
-    async fn create(
+    fn create(
         &self,
         organization_id: u64,
         project_id: u64,
         req: CreatePropertyRequest,
     ) -> Result<Property> {
-        let _guard = self.guard.write().await;
-        self._create(organization_id, project_id, req).await
+        let _guard = self.guard.write().unwrap();
+        self._create(organization_id, project_id, req)
     }
 
-    async fn get_or_create(
+    fn get_or_create(
         &self,
         organization_id: u64,
         project_id: u64,
         req: CreatePropertyRequest,
     ) -> Result<Property> {
-        let _guard = self.guard.write().await;
-        match self
-            ._get_by_name(organization_id, project_id, req.name.as_str())
-            .await
-        {
+        let _guard = self.guard.write().unwrap();
+        match self._get_by_name(organization_id, project_id, req.name.as_str()) {
             Ok(event) => return Ok(event),
             Err(MetadataError::Property(PropertyError::PropertyNotFound(_))) => {}
             other => return other,
         }
 
-        self._create(organization_id, project_id, req).await
+        self._create(organization_id, project_id, req)
     }
 
-    async fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Property> {
+    fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Property> {
         let key = make_data_value_key(
             org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
             id,
         );
 
-        match self.store.get(&key).await? {
+        match self.store.get(&key)? {
             None => Err(PropertyError::PropertyNotFound(error::Property {
                 organization_id,
                 project_id,
@@ -255,36 +236,28 @@ impl Provider for ProviderImpl {
         }
     }
 
-    async fn get_by_name(
-        &self,
-        organization_id: u64,
-        project_id: u64,
-        name: &str,
-    ) -> Result<Property> {
-        let _guard = self.guard.read().await;
-        self._get_by_name(organization_id, project_id, name).await
+    fn get_by_name(&self, organization_id: u64, project_id: u64, name: &str) -> Result<Property> {
+        let _guard = self.guard.read();
+        self._get_by_name(organization_id, project_id, name)
     }
 
-    async fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Property>> {
+    fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Property>> {
         list(
             self.store.clone(),
             org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
         )
-        .await
     }
 
-    async fn update(
+    fn update(
         &self,
         organization_id: u64,
         project_id: u64,
         property_id: u64,
         req: UpdatePropertyRequest,
     ) -> Result<Property> {
-        let _guard = self.guard.write().await;
+        let _guard = self.guard.write().unwrap();
 
-        let prev_prop = self
-            .get_by_id(organization_id, project_id, property_id)
-            .await?;
+        let prev_prop = self.get_by_id(organization_id, project_id, property_id)?;
         let mut prop = prev_prop.clone();
 
         let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
@@ -322,7 +295,6 @@ impl Provider for ProviderImpl {
         match self
             .idx
             .check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())
-            .await
         {
             Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
                 return Err(PropertyError::PropertyAlreadyExist(error::Property {
@@ -373,46 +345,38 @@ impl Provider for ProviderImpl {
         }
 
         let data = serialize(&prop)?;
-        self.store
-            .put(
-                make_data_value_key(
-                    org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes())
-                        .as_slice(),
-                    prop.id,
-                ),
-                &data,
-            )
-            .await?;
+        self.store.put(
+            make_data_value_key(
+                org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
+                prop.id,
+            ),
+            &data,
+        )?;
 
         self.idx
-            .update(idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)
-            .await?;
+            .update(idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)?;
 
         Ok(prop)
     }
 
-    async fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Property> {
-        let _guard = self.guard.write().await;
-        let prop = self.get_by_id(organization_id, project_id, id).await?;
-        self.store
-            .delete(make_data_value_key(
-                org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
-                id,
-            ))
-            .await?;
+    fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Property> {
+        let _guard = self.guard.write().unwrap();
+        let prop = self.get_by_id(organization_id, project_id, id)?;
+        self.store.delete(make_data_value_key(
+            org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
+            id,
+        ))?;
 
-        self.idx
-            .delete(
-                index_keys(
-                    organization_id,
-                    project_id,
-                    &self.typ,
-                    &prop.name,
-                    prop.display_name.clone(),
-                )
-                .as_ref(),
+        self.idx.delete(
+            index_keys(
+                organization_id,
+                project_id,
+                &self.typ,
+                &prop.name,
+                prop.display_name.clone(),
             )
-            .await?;
+            .as_ref(),
+        )?;
         Ok(prop)
     }
 }

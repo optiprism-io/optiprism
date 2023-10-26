@@ -43,7 +43,7 @@ impl Store {
         Store { db }
     }
 
-    pub async fn put<K, V>(&self, key: K, value: V) -> Result<()>
+    pub fn put<K, V>(&self, key: K, value: V) -> Result<()>
     where
         K: AsRef<[u8]>,
         V: AsRef<[u8]>,
@@ -51,7 +51,7 @@ impl Store {
         Ok(self.db.put(key, value)?)
     }
 
-    pub async fn put_checked<K, V>(&self, key: K, value: V) -> Result<Option<Vec<u8>>>
+    pub fn put_checked<K, V>(&self, key: K, value: V) -> Result<Option<Vec<u8>>>
     where
         K: AsRef<[u8]> + Clone,
         V: AsRef<[u8]>,
@@ -65,7 +65,7 @@ impl Store {
         }
     }
 
-    pub async fn multi_put(&self, kv: Vec<KVBytes>) -> Result<()> {
+    pub fn multi_put(&self, kv: Vec<KVBytes>) -> Result<()> {
         let mut batch = WriteBatch::default();
         for (k, v) in kv.iter() {
             batch.put(k, v);
@@ -73,24 +73,24 @@ impl Store {
         Ok(self.db.write(batch)?)
     }
 
-    pub async fn get<K>(&self, key: K) -> Result<Option<Vec<u8>>>
+    pub fn get<K>(&self, key: K) -> Result<Option<Vec<u8>>>
     where K: AsRef<[u8]> {
         Ok(self.db.get(key)?)
     }
 
-    pub async fn multi_get<K: AsRef<[u8]>>(&self, keys: Vec<&K>) -> Result<Vec<Option<Vec<u8>>>> {
+    pub fn multi_get<K: AsRef<[u8]>>(&self, keys: Vec<&K>) -> Result<Vec<Option<Vec<u8>>>> {
         Ok(keys
             .iter()
             .map(|key| self.db.get(key))
             .collect::<std::result::Result<_, _>>()?)
     }
 
-    pub async fn delete<K>(&self, key: K) -> Result<()>
+    pub fn delete<K>(&self, key: K) -> Result<()>
     where K: AsRef<[u8]> + Clone {
         Ok(self.db.delete(key)?)
     }
 
-    pub async fn delete_checked<K>(&self, key: K) -> Result<Option<Vec<u8>>>
+    pub fn delete_checked<K>(&self, key: K) -> Result<Option<Vec<u8>>>
     where K: AsRef<[u8]> + Clone {
         match self.db.get(key.as_ref())? {
             None => Ok(None),
@@ -101,7 +101,7 @@ impl Store {
         }
     }
 
-    pub async fn multi_delete<K: AsRef<[u8]>>(&self, keys: Vec<&K>) -> Result<()> {
+    pub fn multi_delete<K: AsRef<[u8]>>(&self, keys: Vec<&K>) -> Result<()> {
         let mut batch = WriteBatch::default();
         for key in keys.iter() {
             batch.delete(key);
@@ -109,7 +109,7 @@ impl Store {
         Ok(self.db.write(batch)?)
     }
 
-    pub async fn list_prefix<K: AsRef<[u8]>>(&self, prefix: K) -> Result<Vec<KVBytes>> {
+    pub fn list_prefix<K: AsRef<[u8]>>(&self, prefix: K) -> Result<Vec<KVBytes>> {
         let prefix = prefix.as_ref();
         let iter = self.db.prefix_iterator(prefix);
         Ok(iter
@@ -126,7 +126,7 @@ impl Store {
             .collect::<std::result::Result<_, _>>()?)
     }
 
-    pub async fn next_seq<K: AsRef<[u8]>>(&self, key: K) -> Result<u64> {
+    pub fn next_seq<K: AsRef<[u8]>>(&self, key: K) -> Result<u64> {
         let id = self.db.get(key.as_ref())?;
         let result: u64 = match id {
             Some(v) => u64::from_le_bytes(v.try_into().unwrap()) + 1,

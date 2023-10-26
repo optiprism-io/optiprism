@@ -1,11 +1,11 @@
 use std::sync::Arc;
+use std::sync::RwLock;
 
 use async_trait::async_trait;
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::Utc;
 use common::types::OptionalProperty;
-use tokio::sync::RwLock;
 
 use super::CreateOrganizationRequest;
 use super::Organization;
@@ -50,13 +50,12 @@ impl ProviderImpl {
     }
 }
 
-#[async_trait]
 impl Provider for ProviderImpl {
-    async fn create(&self, req: CreateOrganizationRequest) -> Result<Organization> {
-        let _guard = self.guard.write().await;
+    fn create(&self, req: CreateOrganizationRequest) -> Result<Organization> {
+        let _guard = self.guard.write().unwrap();
 
         let idx_keys = index_keys(&req.name);
-        match self.idx.check_insert_constraints(idx_keys.as_ref()).await {
+        match self.idx.check_insert_constraints(idx_keys.as_ref()) {
             Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
                 return Err(OrganizationError::OrganizationAlreadyExist(
                     error::Organization::new_with_name(req.name),
@@ -68,7 +67,7 @@ impl Provider for ProviderImpl {
         }
 
         let created_at = Utc::now();
-        let id = self.store.next_seq(make_id_seq_key(NAMESPACE)).await?;
+        let id = self.store.next_seq(make_id_seq_key(NAMESPACE))?;
 
         let org = Organization {
             id,
@@ -80,19 +79,17 @@ impl Provider for ProviderImpl {
         };
 
         let data = serialize(&org)?;
-        self.store
-            .put(make_data_value_key(NAMESPACE, id), &data)
-            .await?;
+        self.store.put(make_data_value_key(NAMESPACE, id), &data)?;
 
-        self.idx.insert(idx_keys.as_ref(), &data).await?;
+        self.idx.insert(idx_keys.as_ref(), &data)?;
 
         Ok(org)
     }
 
-    async fn get_by_id(&self, id: u64) -> Result<Organization> {
+    fn get_by_id(&self, id: u64) -> Result<Organization> {
         let key = make_data_value_key(NAMESPACE, id);
 
-        match self.store.get(key).await? {
+        match self.store.get(key)? {
             None => Err(
                 OrganizationError::OrganizationNotFound(error::Organization::new_with_id(id))
                     .into(),
@@ -101,14 +98,14 @@ impl Provider for ProviderImpl {
         }
     }
 
-    async fn list(&self) -> Result<ListResponse<Organization>> {
-        list(self.store.clone(), NAMESPACE).await
+    fn list(&self) -> Result<ListResponse<Organization>> {
+        list(self.store.clone(), NAMESPACE)
     }
 
-    async fn update(&self, org_id: u64, req: UpdateOrganizationRequest) -> Result<Organization> {
-        let _guard = self.guard.write().await;
+    fn update(&self, org_id: u64, req: UpdateOrganizationRequest) -> Result<Organization> {
+        let _guard = self.guard.write().unwrap();
 
-        let prev_org = self.get_by_id(org_id).await?;
+        let prev_org = self.get_by_id(org_id)?;
 
         let mut org = prev_org.clone();
 
@@ -123,7 +120,6 @@ impl Provider for ProviderImpl {
         match self
             .idx
             .check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())
-            .await
         {
             Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
                 return Err(OrganizationError::OrganizationAlreadyExist(
@@ -140,24 +136,20 @@ impl Provider for ProviderImpl {
 
         let data = serialize(&org)?;
         self.store
-            .put(make_data_value_key(NAMESPACE, org.id), &data)
-            .await?;
+            .put(make_data_value_key(NAMESPACE, org.id), &data)?;
 
         self.idx
-            .update(idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)
-            .await?;
+            .update(idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)?;
 
         Ok(org)
     }
 
-    async fn delete(&self, id: u64) -> Result<Organization> {
-        let _guard = self.guard.write().await;
-        let org = self.get_by_id(id).await?;
-        self.store
-            .delete(make_data_value_key(NAMESPACE, id))
-            .await?;
+    fn delete(&self, id: u64) -> Result<Organization> {
+        let _guard = self.guard.write().unwrap();
+        let org = self.get_by_id(id)?;
+        self.store.delete(make_data_value_key(NAMESPACE, id))?;
 
-        self.idx.delete(index_keys(&org.name).as_ref()).await?;
+        self.idx.delete(index_keys(&org.name).as_ref())?;
 
         Ok(org)
     }

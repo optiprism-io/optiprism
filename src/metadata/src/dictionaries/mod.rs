@@ -7,23 +7,22 @@ pub use provider_impl::ProviderImpl;
 
 use crate::Result;
 
-#[async_trait]
 pub trait Provider: Sync + Send + Debug {
-    async fn get_key_or_create(
+    fn get_key_or_create(
         &self,
         organization_id: u64,
         project_id: u64,
         dict: &str,
         value: &str,
     ) -> Result<u64>;
-    async fn get_value(
+    fn get_value(
         &self,
         organization_id: u64,
         project_id: u64,
         dict: &str,
         key: u64,
     ) -> Result<String>;
-    async fn get_key(
+    fn get_key(
         &self,
         _organization_id: u64,
         _project_id: u64,

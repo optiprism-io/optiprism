@@ -1,8 +1,8 @@
 use std::sync::Arc;
+use std::sync::RwLock;
 
 use async_trait::async_trait;
 use bincode::serialize;
-use tokio::sync::RwLock;
 
 use crate::database::Column;
 use crate::database::Provider;
@@ -27,16 +27,15 @@ impl ProviderImpl {
         }
     }
 
-    pub async fn persist(&self, table: &Table) -> Result<()> {
+    pub fn persist(&self, table: &Table) -> Result<()> {
         let data = serialize(table)?;
-        self.store.put(NAMESPACE, data).await
+        self.store.put(NAMESPACE, data)
     }
 }
 
-#[async_trait]
 impl Provider for ProviderImpl {
-    async fn create_table(&self, table: Table) -> Result<()> {
-        let mut tables = self.tables.write().await;
+    fn create_table(&self, table: Table) -> Result<()> {
+        let mut tables = self.tables.write().unwrap();
         if tables.iter().any(|t| t.typ == table.typ) {
             return Err(MetadataError::Database(DatabaseError::TableAlreadyExists(
                 table.typ,
@@ -45,11 +44,11 @@ impl Provider for ProviderImpl {
 
         tables.push(table.clone());
 
-        self.persist(&table).await
+        self.persist(&table)
     }
 
-    async fn get_table(&self, table_type: TableRef) -> Result<Table> {
-        let tables = self.tables.read().await;
+    fn get_table(&self, table_type: TableRef) -> Result<Table> {
+        let tables = self.tables.read().unwrap();
         let table = tables.iter().find(|t| t.typ == table_type);
 
         match table {
@@ -60,8 +59,8 @@ impl Provider for ProviderImpl {
         }
     }
 
-    async fn add_column(&self, table_type: TableRef, col: Column) -> Result<()> {
-        let mut tables = self.tables.write().await;
+    fn add_column(&self, table_type: TableRef, col: Column) -> Result<()> {
+        let mut tables = self.tables.write().unwrap();
         let table =
             tables
                 .iter_mut()
@@ -78,6 +77,6 @@ impl Provider for ProviderImpl {
 
         table.columns.push(col.clone());
 
-        self.persist(table).await
+        self.persist(table)
     }
 }

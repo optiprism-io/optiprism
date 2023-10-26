@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::RwLock;
 
 use async_trait::async_trait;
 use bincode::deserialize;
@@ -8,7 +9,6 @@ use common::types::OptionalProperty;
 use rand::distributions::Alphanumeric;
 use rand::distributions::DistString;
 use rand::thread_rng;
-use tokio::sync::RwLock;
 
 use crate::error;
 use crate::error::MetadataError;
@@ -71,15 +71,14 @@ impl ProviderImpl {
     }
 }
 
-#[async_trait]
 impl Provider for ProviderImpl {
-    async fn create(&self, organization_id: u64, req: CreateProjectRequest) -> Result<Project> {
-        let _guard = self.guard.write().await;
+    fn create(&self, organization_id: u64, req: CreateProjectRequest) -> Result<Project> {
+        let _guard = self.guard.write().unwrap();
         let token = Alphanumeric.sample_string(&mut thread_rng(), 64);
 
         let idx_keys = index_keys(organization_id, &req.name, token.as_str());
 
-        match self.idx.check_insert_constraints(idx_keys.as_ref()).await {
+        match self.idx.check_insert_constraints(idx_keys.as_ref()) {
             Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
                 return Err(MetadataError::AlreadyExists(format!(
                     "project with name {:?}",
@@ -91,12 +90,9 @@ impl Provider for ProviderImpl {
         }
 
         let created_at = Utc::now();
-        let id = self
-            .store
-            .next_seq(make_id_seq_key(
-                org_ns(organization_id, NAMESPACE).as_slice(),
-            ))
-            .await?;
+        let id = self.store.next_seq(make_id_seq_key(
+            org_ns(organization_id, NAMESPACE).as_slice(),
+        ))?;
 
         let project = Project {
             id,
@@ -109,29 +105,27 @@ impl Provider for ProviderImpl {
             token,
         };
         let data = serialize(&project)?;
-        self.store
-            .put(
-                make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), project.id),
-                &data,
-            )
-            .await?;
+        self.store.put(
+            make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), project.id),
+            &data,
+        )?;
 
-        self.idx.insert(idx_keys.as_ref(), &data).await?;
+        self.idx.insert(idx_keys.as_ref(), &data)?;
 
         Ok(project)
     }
 
-    async fn get_by_id(&self, organization_id: u64, project_id: u64) -> Result<Project> {
+    fn get_by_id(&self, organization_id: u64, project_id: u64) -> Result<Project> {
         let key = make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), project_id);
 
-        match self.store.get(key).await? {
+        match self.store.get(key)? {
             None => Err(MetadataError::NotFound(format!("project {project_id}"))),
             Some(value) => Ok(deserialize(&value)?),
         }
     }
 
-    async fn get_by_token(&self, token: &str) -> Result<Project> {
-        match self.idx.get(index_token_key(token).unwrap()).await {
+    fn get_by_token(&self, token: &str) -> Result<Project> {
+        match self.idx.get(index_token_key(token).unwrap()) {
             Err(MetadataError::Store(StoreError::KeyNotFound(_))) => Err(MetadataError::NotFound(
                 format!("project with token {:?}", token),
             )),
@@ -140,23 +134,22 @@ impl Provider for ProviderImpl {
         }
     }
 
-    async fn list(&self, organization_id: u64) -> Result<ListResponse<Project>> {
+    fn list(&self, organization_id: u64) -> Result<ListResponse<Project>> {
         list(
             self.store.clone(),
             org_ns(organization_id, NAMESPACE).as_slice(),
         )
-        .await
     }
 
-    async fn update(
+    fn update(
         &self,
         organization_id: u64,
         project_id: u64,
         req: UpdateProjectRequest,
     ) -> Result<Project> {
-        let _guard = self.guard.write().await;
+        let _guard = self.guard.write().unwrap();
 
-        let prev_project = self.get_by_id(organization_id, project_id).await?;
+        let prev_project = self.get_by_id(organization_id, project_id)?;
         let mut project = prev_project.clone();
 
         let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
@@ -170,7 +163,6 @@ impl Provider for ProviderImpl {
         match self
             .idx
             .check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())
-            .await
         {
             Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
                 return Err(MetadataError::AlreadyExists(format!(
@@ -186,33 +178,27 @@ impl Provider for ProviderImpl {
         project.updated_by = Some(req.updated_by);
 
         let data = serialize(&project)?;
-        self.store
-            .put(
-                make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), project_id),
-                &data,
-            )
-            .await?;
+        self.store.put(
+            make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), project_id),
+            &data,
+        )?;
 
         self.idx
-            .update(idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)
-            .await?;
+            .update(idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)?;
 
         Ok(project)
     }
 
-    async fn delete(&self, organization_id: u64, project_id: u64) -> Result<Project> {
-        let _guard = self.guard.write().await;
-        let project = self.get_by_id(organization_id, project_id).await?;
-        self.store
-            .delete(make_data_value_key(
-                org_ns(organization_id, NAMESPACE).as_slice(),
-                project_id,
-            ))
-            .await?;
+    fn delete(&self, organization_id: u64, project_id: u64) -> Result<Project> {
+        let _guard = self.guard.write().unwrap();
+        let project = self.get_by_id(organization_id, project_id)?;
+        self.store.delete(make_data_value_key(
+            org_ns(organization_id, NAMESPACE).as_slice(),
+            project_id,
+        ))?;
 
         self.idx
-            .delete(index_keys(organization_id, &project.name, project.token.as_str()).as_ref())
-            .await?;
+            .delete(index_keys(organization_id, &project.name, project.token.as_str()).as_ref())?;
 
         Ok(project)
     }

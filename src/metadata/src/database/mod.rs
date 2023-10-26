@@ -11,11 +11,10 @@ use serde::Serialize;
 use crate::properties::DictionaryType;
 use crate::Result;
 
-#[async_trait]
 pub trait Provider: Sync + Send {
-    async fn create_table(&self, table: Table) -> Result<()>;
-    async fn get_table(&self, table_type: TableRef) -> Result<Table>;
-    async fn add_column(&self, table_type: TableRef, col: Column) -> Result<()>;
+    fn create_table(&self, table: Table) -> Result<()>;
+    fn get_table(&self, table_type: TableRef) -> Result<Table>;
+    fn add_column(&self, table_type: TableRef, col: Column) -> Result<()>;
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]

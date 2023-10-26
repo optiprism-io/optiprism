@@ -10,13 +10,8 @@ use serde::Serialize;
 use crate::metadata::ListResponse;
 use crate::Result;
 
-#[async_trait]
 pub trait Provider: Sync + Send {
-    async fn list(
-        &self,
-        organization_id: u64,
-        project_id: u64,
-    ) -> Result<ListResponse<CustomProperty>>;
+    fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<CustomProperty>>;
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]

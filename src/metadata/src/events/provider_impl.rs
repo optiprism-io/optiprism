@@ -1,11 +1,11 @@
 use std::sync::Arc;
+use std::sync::RwLock;
 
 use async_trait::async_trait;
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::Utc;
 use common::types::OptionalProperty;
-use tokio::sync::RwLock;
 
 use crate::error;
 use crate::error::EventError;
@@ -84,7 +84,7 @@ impl ProviderImpl {
         }
     }
 
-    async fn _create(
+    fn _create(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -97,7 +97,7 @@ impl ProviderImpl {
             req.display_name.clone(),
         );
 
-        match self.idx.check_insert_constraints(idx_keys.as_ref()).await {
+        match self.idx.check_insert_constraints(idx_keys.as_ref()) {
             Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
                 return Err(EventError::EventAlreadyExist(error::Event::new_with_name(
                     organization_id,
@@ -111,12 +111,9 @@ impl ProviderImpl {
         }
 
         let created_at = Utc::now();
-        let id = self
-            .store
-            .next_seq(make_id_seq_key(
-                org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
-            ))
-            .await?;
+        let id = self.store.next_seq(make_id_seq_key(
+            org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
+        ))?;
 
         let event = Event {
             id,
@@ -135,36 +132,25 @@ impl ProviderImpl {
             custom_properties: req.custom_properties,
         };
         let data = serialize(&event)?;
-        self.store
-            .put(
-                make_data_value_key(
-                    org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
-                    event.id,
-                ),
-                &data,
-            )
-            .await?;
+        self.store.put(
+            make_data_value_key(
+                org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
+                event.id,
+            ),
+            &data,
+        )?;
 
-        self.idx.insert(idx_keys.as_ref(), &data).await?;
+        self.idx.insert(idx_keys.as_ref(), &data)?;
 
         Ok(event)
     }
 
-    async fn _get_by_name(
-        &self,
-        organization_id: u64,
-        project_id: u64,
-        name: &str,
-    ) -> Result<Event> {
-        match self
-            .idx
-            .get(make_index_key(
-                org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
-                IDX_NAME,
-                name,
-            ))
-            .await
-        {
+    fn _get_by_name(&self, organization_id: u64, project_id: u64, name: &str) -> Result<Event> {
+        match self.idx.get(make_index_key(
+            org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
+            IDX_NAME,
+            name,
+        )) {
             Err(MetadataError::Store(StoreError::KeyNotFound(_))) => {
                 Err(EventError::EventNotFound(error::Event::new_with_name(
                     organization_id,
@@ -179,44 +165,40 @@ impl ProviderImpl {
     }
 }
 
-#[async_trait]
 impl Provider for ProviderImpl {
-    async fn create(
+    fn create(
         &self,
         organization_id: u64,
         project_id: u64,
         req: CreateEventRequest,
     ) -> Result<Event> {
-        let _guard = self.guard.write().await;
-        self._create(organization_id, project_id, req).await
+        let _guard = self.guard.write().unwrap();
+        self._create(organization_id, project_id, req)
     }
 
-    async fn get_or_create(
+    fn get_or_create(
         &self,
         organization_id: u64,
         project_id: u64,
         req: CreateEventRequest,
     ) -> Result<Event> {
-        let _guard = self.guard.write().await;
-        match self
-            ._get_by_name(organization_id, project_id, req.name.as_str())
-            .await
-        {
+        let _guard = self.guard.write().unwrap();
+        match self._get_by_name(organization_id, project_id, req.name.as_str()) {
             Ok(event) => return Ok(event),
             Err(MetadataError::Event(EventError::EventNotFound(_))) => {}
             other => return other,
         }
 
-        self._create(organization_id, project_id, req).await
+        self._create(organization_id, project_id, req)
     }
 
-    async fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event> {
+    fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event> {
         let key = make_data_value_key(
             org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
             id,
         );
 
-        match self.store.get(key).await? {
+        match self.store.get(key)? {
             None => Err(EventError::EventNotFound(error::Event::new_with_id(
                 organization_id,
                 project_id,
@@ -227,36 +209,28 @@ impl Provider for ProviderImpl {
         }
     }
 
-    async fn get_by_name(
-        &self,
-        organization_id: u64,
-        project_id: u64,
-        name: &str,
-    ) -> Result<Event> {
-        let _guard = self.guard.read().await;
-        self._get_by_name(organization_id, project_id, name).await
+    fn get_by_name(&self, organization_id: u64, project_id: u64, name: &str) -> Result<Event> {
+        let _guard = self.guard.read();
+        self._get_by_name(organization_id, project_id, name)
     }
 
-    async fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Event>> {
+    fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Event>> {
         list(
             self.store.clone(),
             org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
         )
-        .await
     }
 
-    async fn update(
+    fn update(
         &self,
         organization_id: u64,
         project_id: u64,
         event_id: u64,
         req: UpdateEventRequest,
     ) -> Result<Event> {
-        let _guard = self.guard.write().await;
+        let _guard = self.guard.write().unwrap();
 
-        let prev_event = self
-            .get_by_id(organization_id, project_id, event_id)
-            .await?;
+        let prev_event = self.get_by_id(organization_id, project_id, event_id)?;
         let mut event = prev_event.clone();
 
         let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
@@ -286,7 +260,6 @@ impl Provider for ProviderImpl {
         match self
             .idx
             .check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())
-            .await
         {
             Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
                 return Err(EventError::EventAlreadyExist(error::Event::new_with_id(
@@ -322,33 +295,28 @@ impl Provider for ProviderImpl {
         }
 
         let data = serialize(&event)?;
-        self.store
-            .put(
-                make_data_value_key(
-                    org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
-                    event.id,
-                ),
-                &data,
-            )
-            .await?;
+        self.store.put(
+            make_data_value_key(
+                org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
+                event.id,
+            ),
+            &data,
+        )?;
 
         self.idx
-            .update(idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)
-            .await?;
+            .update(idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)?;
         Ok(event)
     }
 
-    async fn attach_property(
+    fn attach_property(
         &self,
         organization_id: u64,
         project_id: u64,
         event_id: u64,
         prop_id: u64,
     ) -> Result<Event> {
-        let _guard = self.guard.write().await;
-        let mut event = self
-            .get_by_id(organization_id, project_id, event_id)
-            .await?;
+        let _guard = self.guard.write().unwrap();
+        let mut event = self.get_by_id(organization_id, project_id, event_id)?;
         event.properties = match event.properties {
             None => Some(vec![prop_id]),
             Some(props) => match props.iter().find(|x| prop_id == **x) {
@@ -366,29 +334,25 @@ impl Provider for ProviderImpl {
             },
         };
 
-        self.store
-            .put(
-                make_data_value_key(
-                    org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
-                    event.id,
-                ),
-                serialize(&event)?,
-            )
-            .await?;
+        self.store.put(
+            make_data_value_key(
+                org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
+                event.id,
+            ),
+            serialize(&event)?,
+        )?;
         Ok(event)
     }
 
-    async fn detach_property(
+    fn detach_property(
         &self,
         organization_id: u64,
         project_id: u64,
         event_id: u64,
         prop_id: u64,
     ) -> Result<Event> {
-        let _guard = self.guard.write().await;
-        let mut event = self
-            .get_by_id(organization_id, project_id, event_id)
-            .await?;
+        let _guard = self.guard.write().unwrap();
+        let mut event = self.get_by_id(organization_id, project_id, event_id)?;
         event.properties = match event.properties {
             None => {
                 return Err(EventError::PropertyNotFound(error::Property {
@@ -415,50 +379,41 @@ impl Provider for ProviderImpl {
             },
         };
 
-        self.store
-            .put(
-                make_data_value_key(
-                    org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
-                    event.id,
-                ),
-                serialize(&event)?,
-            )
-            .await?;
-        Ok(event)
-    }
-
-    async fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event> {
-        let _guard = self.guard.write().await;
-        let event = self.get_by_id(organization_id, project_id, id).await?;
-        self.store
-            .delete(make_data_value_key(
+        self.store.put(
+            make_data_value_key(
                 org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
-                id,
-            ))
-            .await?;
+                event.id,
+            ),
+            serialize(&event)?,
+        )?;
+        Ok(event)
+    }
 
-        self.idx
-            .delete(
-                index_keys(
-                    organization_id,
-                    project_id,
-                    &event.name,
-                    event.display_name.clone(),
-                )
-                .as_ref(),
+    fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event> {
+        let _guard = self.guard.write().unwrap();
+        let event = self.get_by_id(organization_id, project_id, id)?;
+        self.store.delete(make_data_value_key(
+            org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
+            id,
+        ))?;
+
+        self.idx.delete(
+            index_keys(
+                organization_id,
+                project_id,
+                &event.name,
+                event.display_name.clone(),
             )
-            .await?;
+            .as_ref(),
+        )?;
 
         Ok(event)
     }
 
-    async fn generate_record_id(&self, organization_id: u64, project_id: u64) -> Result<u64> {
-        let id = self
-            .store
-            .next_seq(make_id_seq_key(
-                org_proj_ns(organization_id, project_id, RECORDS_NAMESPACE).as_slice(),
-            ))
-            .await?;
+    fn generate_record_id(&self, organization_id: u64, project_id: u64) -> Result<u64> {
+        let id = self.store.next_seq(make_id_seq_key(
+            org_proj_ns(organization_id, project_id, RECORDS_NAMESPACE).as_slice(),
+        ))?;
 
         Ok(id)
     }

@@ -1,8 +1,10 @@
 use std::error;
 use std::result;
 use std::string::FromUtf8Error;
+use std::sync::PoisonError;
 
 use thiserror::Error;
+use tokio::sync::RwLockWriteGuard;
 
 use crate::database::Column;
 use crate::database::TableRef;
@@ -392,5 +394,5 @@ pub enum MetadataError {
     #[error("io {0}")]
     Io(#[from] std::io::Error),
     #[error("{0:?}")]
-    Other(#[from] Box<dyn error::Error + Sync + Send>),
+    Other(#[from] anyhow::Error),
 }

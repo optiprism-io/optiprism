@@ -64,22 +64,21 @@ pub struct UpdateReportRequest {
     pub query: OptionalProperty<Query>,
 }
 
-#[async_trait]
 pub trait Provider: Sync + Send {
-    async fn create(
+    fn create(
         &self,
         organization_id: u64,
         project_id: u64,
         req: CreateReportRequest,
     ) -> Result<Report>;
-    async fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Report>;
-    async fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Report>>;
-    async fn update(
+    fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Report>;
+    fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Report>>;
+    fn update(
         &self,
         organization_id: u64,
         project_id: u64,
         report_id: u64,
         req: UpdateReportRequest,
     ) -> Result<Report>;
-    async fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Report>;
+    fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Report>;
 }

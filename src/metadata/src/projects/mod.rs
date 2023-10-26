@@ -11,19 +11,18 @@ use serde::Serialize;
 use crate::metadata::ListResponse;
 use crate::Result;
 
-#[async_trait]
 pub trait Provider: Sync + Send {
-    async fn create(&self, organization_id: u64, req: CreateProjectRequest) -> Result<Project>;
-    async fn get_by_id(&self, organization_id: u64, project_id: u64) -> Result<Project>;
-    async fn get_by_token(&self, token: &str) -> Result<Project>;
-    async fn list(&self, organization_id: u64) -> Result<ListResponse<Project>>;
-    async fn update(
+    fn create(&self, organization_id: u64, req: CreateProjectRequest) -> Result<Project>;
+    fn get_by_id(&self, organization_id: u64, project_id: u64) -> Result<Project>;
+    fn get_by_token(&self, token: &str) -> Result<Project>;
+    fn list(&self, organization_id: u64) -> Result<ListResponse<Project>>;
+    fn update(
         &self,
         organization_id: u64,
         project_id: u64,
         req: UpdateProjectRequest,
     ) -> Result<Project>;
-    async fn delete(&self, organization_id: u64, project_id: u64) -> Result<Project>;
+    fn delete(&self, organization_id: u64, project_id: u64) -> Result<Project>;
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

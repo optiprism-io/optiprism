@@ -64,22 +64,21 @@ pub struct UpdateDashboardRequest {
     pub panels: OptionalProperty<Vec<Panel>>,
 }
 
-#[async_trait]
 pub trait Provider: Sync + Send {
-    async fn create(
+    fn create(
         &self,
         organization_id: u64,
         project_id: u64,
         req: CreateDashboardRequest,
     ) -> Result<Dashboard>;
-    async fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Dashboard>;
-    async fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Dashboard>>;
-    async fn update(
+    fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Dashboard>;
+    fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Dashboard>>;
+    fn update(
         &self,
         organization_id: u64,
         project_id: u64,
         dashboard_id: u64,
         req: UpdateDashboardRequest,
     ) -> Result<Dashboard>;
-    async fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Dashboard>;
+    fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Dashboard>;
 }

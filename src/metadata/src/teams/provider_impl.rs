@@ -1,11 +1,11 @@
 use std::sync::Arc;
+use std::sync::RwLock;
 
 use async_trait::async_trait;
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::Utc;
 use common::types::OptionalProperty;
-use tokio::sync::RwLock;
 
 use crate::error;
 use crate::error::MetadataError;
@@ -59,14 +59,13 @@ impl ProviderImpl {
     }
 }
 
-#[async_trait]
 impl Provider for ProviderImpl {
-    async fn create(&self, organization_id: u64, req: CreateTeamRequest) -> Result<Team> {
-        let _guard = self.guard.write().await;
+    fn create(&self, organization_id: u64, req: CreateTeamRequest) -> Result<Team> {
+        let _guard = self.guard.write().unwrap();
 
         let idx_keys = index_keys(organization_id, &req.name);
 
-        match self.idx.check_insert_constraints(idx_keys.as_ref()).await {
+        match self.idx.check_insert_constraints(idx_keys.as_ref()) {
             Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
                 return Err(TeamError::TeamAlreadyExist(error::Team::new_with_name(
                     organization_id,
@@ -79,12 +78,9 @@ impl Provider for ProviderImpl {
         }
 
         let created_at = Utc::now();
-        let id = self
-            .store
-            .next_seq(make_id_seq_key(
-                org_ns(organization_id, NAMESPACE).as_slice(),
-            ))
-            .await?;
+        let id = self.store.next_seq(make_id_seq_key(
+            org_ns(organization_id, NAMESPACE).as_slice(),
+        ))?;
 
         let team = Team {
             id,
@@ -96,22 +92,20 @@ impl Provider for ProviderImpl {
             name: req.name,
         };
         let data = serialize(&team)?;
-        self.store
-            .put(
-                make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), team.id),
-                &data,
-            )
-            .await?;
+        self.store.put(
+            make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), team.id),
+            &data,
+        )?;
 
-        self.idx.insert(idx_keys.as_ref(), &data).await?;
+        self.idx.insert(idx_keys.as_ref(), &data)?;
 
         Ok(team)
     }
 
-    async fn get_by_id(&self, organization_id: u64, team_id: u64) -> Result<Team> {
+    fn get_by_id(&self, organization_id: u64, team_id: u64) -> Result<Team> {
         let key = make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), team_id);
 
-        match self.store.get(key).await? {
+        match self.store.get(key)? {
             None => Err(TeamError::TeamNotFound(error::Team::new_with_id(
                 organization_id,
                 team_id,
@@ -121,23 +115,17 @@ impl Provider for ProviderImpl {
         }
     }
 
-    async fn list(&self, organization_id: u64) -> Result<ListResponse<Team>> {
+    fn list(&self, organization_id: u64) -> Result<ListResponse<Team>> {
         list(
             self.store.clone(),
             org_ns(organization_id, NAMESPACE).as_slice(),
         )
-        .await
     }
 
-    async fn update(
-        &self,
-        organization_id: u64,
-        team_id: u64,
-        req: UpdateTeamRequest,
-    ) -> Result<Team> {
-        let _guard = self.guard.write().await;
+    fn update(&self, organization_id: u64, team_id: u64, req: UpdateTeamRequest) -> Result<Team> {
+        let _guard = self.guard.write().unwrap();
 
-        let prev_team = self.get_by_id(organization_id, team_id).await?;
+        let prev_team = self.get_by_id(organization_id, team_id)?;
         let mut team = prev_team.clone();
 
         let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
@@ -151,7 +139,6 @@ impl Provider for ProviderImpl {
         match self
             .idx
             .check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())
-            .await
         {
             Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
                 return Err(TeamError::TeamAlreadyExist(error::Team::new_with_id(
@@ -168,33 +155,27 @@ impl Provider for ProviderImpl {
         team.updated_by = Some(req.updated_by);
 
         let data = serialize(&team)?;
-        self.store
-            .put(
-                make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), team_id),
-                &data,
-            )
-            .await?;
+        self.store.put(
+            make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), team_id),
+            &data,
+        )?;
 
         self.idx
-            .update(idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)
-            .await?;
+            .update(idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)?;
 
         Ok(team)
     }
 
-    async fn delete(&self, organization_id: u64, team_id: u64) -> Result<Team> {
-        let _guard = self.guard.write().await;
-        let team = self.get_by_id(organization_id, team_id).await?;
-        self.store
-            .delete(make_data_value_key(
-                org_ns(organization_id, NAMESPACE).as_slice(),
-                team_id,
-            ))
-            .await?;
+    fn delete(&self, organization_id: u64, team_id: u64) -> Result<Team> {
+        let _guard = self.guard.write().unwrap();
+        let team = self.get_by_id(organization_id, team_id)?;
+        self.store.delete(make_data_value_key(
+            org_ns(organization_id, NAMESPACE).as_slice(),
+            team_id,
+        ))?;
 
         self.idx
-            .delete(index_keys(organization_id, &team.name).as_ref())
-            .await?;
+            .delete(index_keys(organization_id, &team.name).as_ref())?;
 
         Ok(team)
     }

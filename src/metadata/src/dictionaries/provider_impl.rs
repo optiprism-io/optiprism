@@ -1,11 +1,11 @@
 use std::hash::Hash;
 use std::hash::Hasher;
 use std::sync::Arc;
+use std::sync::RwLock;
 
 use async_trait::async_trait;
 use byteorder::ByteOrder;
 use byteorder::LittleEndian;
-use tokio::sync::RwLock;
 
 use crate::dictionaries::Provider;
 use crate::error::DictionaryError;
@@ -55,9 +55,8 @@ impl ProviderImpl {
     }
 }
 
-#[async_trait]
 impl Provider for ProviderImpl {
-    async fn get_key_or_create(
+    fn get_key_or_create(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -65,32 +64,23 @@ impl Provider for ProviderImpl {
         value: &str,
     ) -> Result<u64> {
         // TODO investigate deadlock
-        // let a = self._guard.write().await;
+        // let a = self._guard.write().unwrap();
         match self
             .store
-            .get(make_value_key(organization_id, project_id, dict, value))
-            .await?
+            .get(make_value_key(organization_id, project_id, dict, value))?
         {
             None => {
-                let id = self
-                    .store
-                    .next_seq(make_id_seq_key(
-                        org_proj_ns(organization_id, project_id, dict_ns(dict).as_slice())
-                            .as_slice(),
-                    ))
-                    .await?;
-                self.store
-                    .put(
-                        make_key_key(organization_id, project_id, dict, id),
-                        value.as_bytes(),
-                    )
-                    .await?;
-                self.store
-                    .put(
-                        make_value_key(organization_id, project_id, dict, value),
-                        id.to_le_bytes().as_ref(),
-                    )
-                    .await?;
+                let id = self.store.next_seq(make_id_seq_key(
+                    org_proj_ns(organization_id, project_id, dict_ns(dict).as_slice()).as_slice(),
+                ))?;
+                self.store.put(
+                    make_key_key(organization_id, project_id, dict, id),
+                    value.as_bytes(),
+                )?;
+                self.store.put(
+                    make_value_key(organization_id, project_id, dict, value),
+                    id.to_le_bytes().as_ref(),
+                )?;
 
                 Ok(id)
             }
@@ -98,7 +88,7 @@ impl Provider for ProviderImpl {
         }
     }
 
-    async fn get_value(
+    fn get_value(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -106,7 +96,7 @@ impl Provider for ProviderImpl {
         key: u64,
     ) -> Result<String> {
         let store_key = make_key_key(organization_id, project_id, dict, key);
-        match self.store.get(store_key.as_slice()).await? {
+        match self.store.get(store_key.as_slice())? {
             None => Err(DictionaryError::KeyNotFound(DictionaryKey::new(
                 organization_id,
                 project_id,
@@ -118,7 +108,7 @@ impl Provider for ProviderImpl {
         }
     }
 
-    async fn get_key(
+    fn get_key(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -126,7 +116,7 @@ impl Provider for ProviderImpl {
         value: &str,
     ) -> Result<u64> {
         let store_key = make_value_key(organization_id, project_id, dict, value);
-        match self.store.get(store_key.as_slice()).await? {
+        match self.store.get(store_key.as_slice())? {
             None => Err(DictionaryError::ValueNotFound(DictionaryValue::new(
                 organization_id,
                 project_id,
@@ -170,42 +160,36 @@ impl SingleDictionaryProvider {
         }
     }
 
-    pub async fn get_key_or_create(&self, value: &str) -> Result<u64> {
-        self.provider
-            .get_key_or_create(
-                self.organization_id,
-                self.project_id,
-                self.dict.as_str(),
-                value,
-            )
-            .await
+    pub fn get_key_or_create(&self, value: &str) -> Result<u64> {
+        self.provider.get_key_or_create(
+            self.organization_id,
+            self.project_id,
+            self.dict.as_str(),
+            value,
+        )
     }
 
-    pub async fn get_value(&self, key: u64) -> Result<String> {
-        self.provider
-            .get_value(
-                self.organization_id,
-                self.project_id,
-                self.dict.as_str(),
-                key,
-            )
-            .await
+    pub fn get_value(&self, key: u64) -> Result<String> {
+        self.provider.get_value(
+            self.organization_id,
+            self.project_id,
+            self.dict.as_str(),
+            key,
+        )
     }
 
-    pub async fn get_key(
+    pub fn get_key(
         &self,
         _organization_id: u64,
         _project_id: u64,
         _dict: &str,
         value: &str,
     ) -> Result<u64> {
-        self.provider
-            .get_key(
-                self.organization_id,
-                self.project_id,
-                self.dict.as_str(),
-                value,
-            )
-            .await
+        self.provider.get_key(
+            self.organization_id,
+            self.project_id,
+            self.dict.as_str(),
+            value,
+        )
     }
 }
