@@ -29,7 +29,6 @@ use crate::store::path_helpers::make_data_value_key;
 use crate::store::path_helpers::make_id_seq_key;
 use crate::store::path_helpers::make_index_key;
 use crate::store::path_helpers::org_proj_ns;
-use crate::store::Store;
 use crate::Result;
 
 const IDX_NAME: &[u8] = b"name";

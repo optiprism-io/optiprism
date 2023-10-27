@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+use std::fmt::Formatter;
 use std::hash::Hash;
 use std::hash::Hasher;
 use std::sync::Arc;
@@ -15,7 +17,6 @@ use crate::error::Result;
 use crate::index::next_seq;
 use crate::store::path_helpers::make_id_seq_key;
 use crate::store::path_helpers::org_proj_ns;
-use crate::store::Store;
 
 const NAMESPACE: &[u8] = b"dictinaries";
 
@@ -48,6 +49,12 @@ pub struct ProviderImpl {
 impl ProviderImpl {
     pub fn new(db: Arc<TransactionDB>) -> Self {
         Self { db }
+    }
+}
+
+impl Debug for ProviderImpl {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.fmt(f)
     }
 }
 
@@ -117,6 +124,7 @@ impl Provider for ProviderImpl {
     }
 }
 
+#[derive(Debug)]
 pub struct SingleDictionaryProvider {
     organization_id: u64,
     project_id: u64,

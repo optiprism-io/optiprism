@@ -32,7 +32,7 @@ pub fn resolve_properties(
     // client family
     {
         let property =
-            block_on(props_prov.get_by_name(org_id, proj_id, types::USER_PROPERTY_CLIENT_FAMILY))?;
+            props_prov.get_by_name(org_id, proj_id, types::USER_PROPERTY_CLIENT_FAMILY)?;
 
         let prop = Property {
             property,
@@ -43,11 +43,8 @@ pub fn resolve_properties(
 
     // client version major
     if let Some(v) = client.user_agent.major {
-        let property = block_on(props_prov.get_by_name(
-            org_id,
-            proj_id,
-            types::USER_PROPERTY_CLIENT_VERSION_MAJOR,
-        ))?;
+        let property =
+            props_prov.get_by_name(org_id, proj_id, types::USER_PROPERTY_CLIENT_VERSION_MAJOR)?;
 
         let prop = Property {
             property,
@@ -58,11 +55,8 @@ pub fn resolve_properties(
 
     // client version minor
     if let Some(v) = client.user_agent.minor {
-        let property = block_on(props_prov.get_by_name(
-            org_id,
-            proj_id,
-            types::USER_PROPERTY_CLIENT_VERSION_MINOR,
-        ))?;
+        let property =
+            props_prov.get_by_name(org_id, proj_id, types::USER_PROPERTY_CLIENT_VERSION_MINOR)?;
 
         let prop = Property {
             property,
@@ -74,7 +68,7 @@ pub fn resolve_properties(
     // device family
     {
         let property =
-            block_on(props_prov.get_by_name(org_id, proj_id, types::USER_PROPERTY_DEVICE_FAMILY))?;
+            props_prov.get_by_name(org_id, proj_id, types::USER_PROPERTY_DEVICE_FAMILY)?;
 
         let prop = Property {
             property,
@@ -87,7 +81,7 @@ pub fn resolve_properties(
     // device brand
     if let Some(brand) = client.device.brand {
         let property =
-            block_on(props_prov.get_by_name(org_id, proj_id, types::USER_PROPERTY_DEVICE_BRAND))?;
+            props_prov.get_by_name(org_id, proj_id, types::USER_PROPERTY_DEVICE_BRAND)?;
 
         let prop = Property {
             property,
@@ -100,7 +94,7 @@ pub fn resolve_properties(
     // device brand
     if let Some(model) = client.device.model {
         let property =
-            block_on(props_prov.get_by_name(org_id, proj_id, types::USER_PROPERTY_DEVICE_MODEL))?;
+            props_prov.get_by_name(org_id, proj_id, types::USER_PROPERTY_DEVICE_MODEL)?;
 
         let prop = Property {
             property,
@@ -112,8 +106,7 @@ pub fn resolve_properties(
 
     // os family
     {
-        let property =
-            block_on(props_prov.get_by_name(org_id, proj_id, types::USER_PROPERTY_OS_FAMILY))?;
+        let property = props_prov.get_by_name(org_id, proj_id, types::USER_PROPERTY_OS_FAMILY)?;
 
         let prop = Property {
             property,
@@ -125,11 +118,8 @@ pub fn resolve_properties(
 
     // os major
     if let Some(v) = client.os.major {
-        let property = block_on(props_prov.get_by_name(
-            org_id,
-            proj_id,
-            types::USER_PROPERTY_OS_VERSION_MAJOR,
-        ))?;
+        let property =
+            props_prov.get_by_name(org_id, proj_id, types::USER_PROPERTY_OS_VERSION_MAJOR)?;
 
         let prop = Property {
             property,
@@ -141,11 +131,8 @@ pub fn resolve_properties(
 
     // os minor
     if let Some(v) = client.os.minor {
-        let property = block_on(props_prov.get_by_name(
-            org_id,
-            proj_id,
-            types::USER_PROPERTY_OS_VERSION_MINOR,
-        ))?;
+        let property =
+            props_prov.get_by_name(org_id, proj_id, types::USER_PROPERTY_OS_VERSION_MINOR)?;
 
         let prop = Property {
             property,
@@ -157,11 +144,8 @@ pub fn resolve_properties(
 
     // os major
     if let Some(v) = client.os.patch {
-        let property = block_on(props_prov.get_by_name(
-            org_id,
-            proj_id,
-            types::USER_PROPERTY_OS_VERSION_PATCH,
-        ))?;
+        let property =
+            props_prov.get_by_name(org_id, proj_id, types::USER_PROPERTY_OS_VERSION_PATCH)?;
 
         let prop = Property {
             property,
@@ -173,11 +157,8 @@ pub fn resolve_properties(
 
     // os major
     if let Some(v) = client.os.patch_minor {
-        let property = block_on(props_prov.get_by_name(
-            org_id,
-            proj_id,
-            types::USER_PROPERTY_OS_VERSION_PATCH_MINOR,
-        ))?;
+        let property =
+            props_prov.get_by_name(org_id, proj_id, types::USER_PROPERTY_OS_VERSION_PATCH_MINOR)?;
 
         let prop = Property {
             property,

@@ -40,7 +40,7 @@ impl Provider for ProviderImpl {
             teams: req.teams,
         };
 
-        let account = self.prov.create(md_req).await?;
+        let account = self.prov.create(md_req)?;
 
         account.try_into()
     }
@@ -48,12 +48,12 @@ impl Provider for ProviderImpl {
     async fn get_by_id(&self, ctx: Context, id: u64) -> Result<Account> {
         ctx.check_permission(Permission::ManageAccounts)?;
 
-        self.prov.get_by_id(id).await?.try_into()
+        self.prov.get_by_id(id)?.try_into()
     }
 
     async fn list(&self, ctx: Context) -> Result<ListResponse<Account>> {
         ctx.check_permission(Permission::ManageAccounts)?;
-        let resp = self.prov.list().await?;
+        let resp = self.prov.list()?;
         resp.try_into()
     }
 
@@ -82,7 +82,7 @@ impl Provider for ProviderImpl {
                 .insert(make_password_hash(password.as_str())?);
         }
 
-        let account = self.prov.update(account_id, md_req).await?;
+        let account = self.prov.update(account_id, md_req)?;
 
         account.try_into()
     }
@@ -90,6 +90,6 @@ impl Provider for ProviderImpl {
     async fn delete(&self, ctx: Context, id: u64) -> Result<Account> {
         ctx.check_permission(Permission::ManageAccounts)?;
 
-        self.prov.delete(id).await?.try_into()
+        self.prov.delete(id)?.try_into()
     }
 }

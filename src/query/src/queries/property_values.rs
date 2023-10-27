@@ -30,10 +30,9 @@ pub struct LogicalPlanBuilder {}
 
 macro_rules! property_col {
     ($ctx:expr,$md:expr,$input:expr,$prop_name:expr,$md_namespace:ident) => {{
-        let prop = $md
-            .$md_namespace
-            .get_by_name($ctx.organization_id, $ctx.project_id, $prop_name)
-            .await?;
+        let prop =
+            $md.$md_namespace
+                .get_by_name($ctx.organization_id, $ctx.project_id, $prop_name)?;
         let col_name = prop.column_name();
         let expr = col(col_name.as_str());
 
@@ -72,7 +71,7 @@ impl LogicalPlanBuilder {
     ) -> Result<LogicalPlan> {
         let input = match &req.event {
             Some(event) => LogicalPlan::Filter(PlanFilter::try_new(
-                event_expression(&ctx, &metadata, event).await?,
+                event_expression(&ctx, &metadata, event)?,
                 Arc::new(input),
             )?),
             None => input,
@@ -98,8 +97,7 @@ impl LogicalPlanBuilder {
                     &req.property,
                     &filter.operation,
                     filter.value.clone(),
-                )
-                .await?,
+                )?,
                 Arc::new(input),
             )?),
             None => input,

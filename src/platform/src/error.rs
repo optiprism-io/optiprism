@@ -10,19 +10,7 @@ use axum::response::Response;
 use axum::Json;
 use common::error::CommonError;
 use common::http::ApiError;
-use metadata::error::AccountError;
-use metadata::error::CustomEventError;
-use metadata::error::DashboardError;
-use metadata::error::DatabaseError;
-use metadata::error::DictionaryError;
-use metadata::error::EventError;
 use metadata::error::MetadataError;
-use metadata::error::OrganizationError;
-use metadata::error::ProjectError;
-use metadata::error::PropertyError;
-use metadata::error::ReportError;
-use metadata::error::StoreError;
-use metadata::error::TeamError;
 use query::error::QueryError;
 use serde::Serialize;
 use serde::Serializer;
@@ -101,72 +89,15 @@ impl PlatformError {
             PlatformError::Serde(err) => ApiError::bad_request(err.to_string()),
             PlatformError::Decimal(err) => ApiError::bad_request(err.to_string()),
             PlatformError::Metadata(err) => match err {
-                MetadataError::Database(err) => match err {
-                    DatabaseError::ColumnAlreadyExists(_) => ApiError::conflict(err.to_string()),
-                    DatabaseError::TableNotFound(_) => ApiError::not_found(err.to_string()),
-                    DatabaseError::TableAlreadyExists(_) => ApiError::conflict(err.to_string()),
-                },
-                MetadataError::Account(err) => match err {
-                    AccountError::AccountNotFound(_) => ApiError::not_found(err.to_string()),
-                    AccountError::AccountAlreadyExist(_) => ApiError::conflict(err.to_string()),
-                },
-                MetadataError::Organization(err) => match err {
-                    OrganizationError::OrganizationNotFound(_) => {
-                        ApiError::not_found(err.to_string())
-                    }
-                    OrganizationError::OrganizationAlreadyExist(_) => {
-                        ApiError::conflict(err.to_string())
-                    }
-                },
-                MetadataError::Project(err) => match err {
-                    ProjectError::ProjectNotFound(_) => ApiError::not_found(err.to_string()),
-                    ProjectError::ProjectAlreadyExist(_) => ApiError::conflict(err.to_string()),
-                },
-                MetadataError::Event(err) => match err {
-                    EventError::EventNotFound(_) => ApiError::not_found(err.to_string()),
-                    EventError::EventAlreadyExist(_) => ApiError::conflict(err.to_string()),
-                    EventError::PropertyNotFound(_) => ApiError::not_found(err.to_string()),
-                    EventError::PropertyAlreadyExist(_) => ApiError::conflict(err.to_string()),
-                },
-                MetadataError::Property(err) => match err {
-                    PropertyError::PropertyNotFound(_) => ApiError::not_found(err.to_string()),
-                    PropertyError::PropertyAlreadyExist(_) => ApiError::conflict(err.to_string()),
-                },
-                MetadataError::Dictionary(err) => match err {
-                    DictionaryError::KeyNotFound(_) => ApiError::not_found(err.to_string()),
-                    DictionaryError::ValueNotFound(_) => ApiError::not_found(err.to_string()),
-                },
-                MetadataError::Store(err) => match err {
-                    StoreError::KeyAlreadyExists(_) => ApiError::conflict(err.to_string()),
-                    StoreError::KeyNotFound(_) => ApiError::not_found(err.to_string()),
-                },
+                MetadataError::AlreadyExists(err) => ApiError::conflict(err.to_string()),
+                MetadataError::NotFound(err) => ApiError::not_found(err.to_string()),
+                MetadataError::Internal(err) => ApiError::internal(err.to_string()),
+                MetadataError::BadRequest(err) => ApiError::bad_request(err.to_string()),
                 MetadataError::RocksDb(err) => ApiError::internal(err.to_string()),
                 MetadataError::FromUtf8(err) => ApiError::internal(err.to_string()),
                 MetadataError::Bincode(err) => ApiError::internal(err.to_string()),
                 MetadataError::Io(err) => ApiError::internal(err.to_string()),
-                MetadataError::Other(_) => ApiError::internal(err.to_string()),
-                MetadataError::CustomEvent(err) => match err {
-                    CustomEventError::EventNotFound(_) => ApiError::not_found(err.to_string()),
-                    CustomEventError::EventAlreadyExist(_) => ApiError::conflict(err.to_string()),
-                    CustomEventError::RecursionLevelExceeded(_) => {
-                        ApiError::bad_request(err.to_string())
-                    }
-                    CustomEventError::DuplicateEvent => ApiError::conflict(err.to_string()),
-                    CustomEventError::EmptyEvents => ApiError::bad_request(err.to_string()),
-                },
-                MetadataError::Team(err) => match err {
-                    TeamError::TeamNotFound(_) => ApiError::not_found(err.to_string()),
-                    TeamError::TeamAlreadyExist(_) => ApiError::conflict(err.to_string()),
-                },
-                MetadataError::Dashboard(err) => match err {
-                    DashboardError::DashboardNotFound(_) => ApiError::not_found(err.to_string()),
-                },
-                MetadataError::Report(err) => match err {
-                    ReportError::ReportNotFound(_) => ApiError::not_found(err.to_string()),
-                },
-                MetadataError::AlreadyExists(err) => ApiError::conflict(err.to_string()),
-                MetadataError::NotFound(err) => ApiError::not_found(err.to_string()),
-                MetadataError::Internal(err) => ApiError::internal(err.to_string()),
+                MetadataError::Other(err) => ApiError::internal(err.to_string()),
             },
             PlatformError::Query(err) => match err {
                 QueryError::Internal(err) => ApiError::internal(err),

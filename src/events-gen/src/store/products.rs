@@ -66,7 +66,7 @@ pub struct ProductProvider {
 }
 
 impl ProductProvider {
-    pub async fn try_new_from_csv<R: io::Read>(
+    pub fn try_new_from_csv<R: io::Read>(
         org_id: u64,
         proj_id: u64,
         rng: &mut ThreadRng,
@@ -86,37 +86,33 @@ impl ProductProvider {
 
             let product = Product {
                 id: id + 1,
-                name: dicts
-                    .get_key_or_create(org_id, proj_id, "event_product_name", rec.name.as_str())
-                    .await?,
-                category: dicts
-                    .get_key_or_create(
-                        org_id,
-                        proj_id,
-                        "event_product_category",
-                        rec.category.as_str(),
-                    )
-                    .await?,
+                name: dicts.get_key_or_create(
+                    org_id,
+                    proj_id,
+                    "event_product_name",
+                    rec.name.as_str(),
+                )?,
+                category: dicts.get_key_or_create(
+                    org_id,
+                    proj_id,
+                    "event_product_category",
+                    rec.category.as_str(),
+                )?,
                 subcategory: rec
                     .subcategory
                     .map(|v| {
-                        block_on(dicts.get_key_or_create(
+                        dicts.get_key_or_create(
                             org_id,
                             proj_id,
                             "event_product_subcategory",
                             v.as_str(),
-                        ))
+                        )
                     })
                     .transpose()?,
                 brand: rec
                     .brand
                     .map(|v| {
-                        block_on(dicts.get_key_or_create(
-                            org_id,
-                            proj_id,
-                            "event_product_brand",
-                            v.as_str(),
-                        ))
+                        dicts.get_key_or_create(org_id, proj_id, "event_product_brand", v.as_str())
                     })
                     .transpose()?,
                 price: rec.price,
@@ -201,10 +197,9 @@ impl ProductProvider {
         product.rating_sum += rating;
     }
 
-    pub async fn string_name(&self, key: u64) -> Result<String> {
+    pub fn string_name(&self, key: u64) -> Result<String> {
         Ok(self
             .dicts
-            .get_value(self.org_id, self.proj_id, "event_product_name", key)
-            .await?)
+            .get_value(self.org_id, self.proj_id, "event_product_name", key)?)
     }
 }

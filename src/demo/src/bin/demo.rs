@@ -43,7 +43,6 @@ use metadata::organizations::CreateOrganizationRequest;
 use metadata::projects::CreateProjectRequest;
 use metadata::properties::DictionaryType;
 use metadata::properties::Type;
-use metadata::store::Store;
 use metadata::MetadataProvider;
 use platform::auth;
 use platform::auth::password::make_password_hash;
@@ -123,7 +122,7 @@ async fn main() -> Result<(), anyhow::Error> {
     };
     debug!("metadata path: {:?}", md_path);
 
-    let store = Arc::new(Store::new(md_path.clone()));
+    let store = Arc::new(metadata::rocksdb::new(md_path.clone())?);
     let md = Arc::new(MetadataProvider::try_new(store)?);
 
     if let Some(ui_path) = &args.ui_path {
@@ -137,57 +136,45 @@ async fn main() -> Result<(), anyhow::Error> {
 
     info!("creating org structure and admin account...");
     {
-        let admin = md
-            .accounts
-            .create(CreateAccountRequest {
-                created_by: None,
-                password_hash: make_password_hash("admin")?,
-                email: "admin@email.com".to_string(),
-                first_name: Some("admin".to_string()),
-                last_name: None,
-                role: Some(Role::Admin),
-                organizations: None,
-                projects: None,
-                teams: None,
-            })
-            .await?;
+        let admin = md.accounts.create(CreateAccountRequest {
+            created_by: None,
+            password_hash: make_password_hash("admin")?,
+            email: "admin@email.com".to_string(),
+            first_name: Some("admin".to_string()),
+            last_name: None,
+            role: Some(Role::Admin),
+            organizations: None,
+            projects: None,
+            teams: None,
+        })?;
 
-        let org = md
-            .organizations
-            .create(CreateOrganizationRequest {
-                created_by: admin.id,
-                name: "Test Organization".to_string(),
-            })
-            .await?;
+        let org = md.organizations.create(CreateOrganizationRequest {
+            created_by: admin.id,
+            name: "Test Organization".to_string(),
+        })?;
 
-        let proj1 = md
-            .projects
-            .create(org.id, CreateProjectRequest {
-                created_by: admin.id,
-                name: "Test Project".to_string(),
-            })
-            .await?;
+        let proj1 = md.projects.create(org.id, CreateProjectRequest {
+            created_by: admin.id,
+            name: "Test Project".to_string(),
+        })?;
 
-        let _user = md
-            .accounts
-            .create(CreateAccountRequest {
-                created_by: Some(admin.id),
-                password_hash: make_password_hash("test")?,
-                email: "user@test.com".to_string(),
-                first_name: Some("user".to_string()),
-                last_name: None,
-                role: None,
-                organizations: Some(vec![(org.id, OrganizationRole::Member)]),
-                projects: Some(vec![(proj1.id, ProjectRole::Member)]),
-                teams: None,
-            })
-            .await?;
+        let _user = md.accounts.create(CreateAccountRequest {
+            created_by: Some(admin.id),
+            password_hash: make_password_hash("test")?,
+            email: "user@test.com".to_string(),
+            first_name: Some("user".to_string()),
+            last_name: None,
+            role: None,
+            organizations: Some(vec![(org.id, OrganizationRole::Member)]),
+            projects: Some(vec![(proj1.id, ProjectRole::Member)]),
+            teams: None,
+        })?;
     }
 
     let partitions = match &args.command {
         Some(cmd) => match cmd {
-            Commands::Shop(shop) => gen_store(&args, shop, &md).await?,
-            Commands::Test { .. } => gen_test(&args, &md).await?,
+            Commands::Shop(shop) => gen_store(&args, shop, &md)?,
+            Commands::Test { .. } => gen_test(&args, &md)?,
         },
         _ => unreachable!(),
     };
@@ -246,13 +233,13 @@ async fn main() -> Result<(), anyhow::Error> {
     Ok(svc.serve().await?)
 }
 
-async fn gen_test(args: &Cli, md: &Arc<MetadataProvider>) -> anyhow::Result<Vec<Vec<RecordBatch>>> {
+fn gen_test(args: &Cli, md: &Arc<MetadataProvider>) -> anyhow::Result<Vec<Vec<RecordBatch>>> {
     info!("starting sample data generation...");
     let partitions = args.partitions.unwrap_or_else(num_cpus::get);
-    test::gen(partitions, args.batch_size, md, 1, 1).await
+    test::gen(partitions, args.batch_size, md, 1, 1)
 }
 
-async fn gen_store(
+fn gen_store(
     args: &Cli,
     cmd_args: &Shop,
     md: &Arc<MetadataProvider>,
@@ -305,7 +292,7 @@ async fn gen_store(
         partitions: args.partitions.unwrap_or_else(num_cpus::get),
     };
 
-    let result = shop::gen(md, store_cfg).await?;
+    let result = shop::gen(md, store_cfg)?;
     let mut rows: usize = 0;
     for partition in result.iter() {
         for batch in partition.iter() {
@@ -345,8 +332,8 @@ fn write_parquet(
             .progress_chars("#>-"),
     );
 
-    let event_props = block_on(md.event_properties.list(org_id, project_id))?.data;
-    let user_props = block_on(md.user_properties.list(org_id, project_id))?.data;
+    let event_props = md.event_properties.list(org_id, project_id)?.data;
+    let user_props = md.user_properties.list(org_id, project_id)?.data;
     let mut out_fields = vec![];
     for field in schema.fields().iter() {
         if field.name().starts_with("event_") {
@@ -417,12 +404,12 @@ fn write_parquet(
                             for v in arr {
                                 if let Some(i) = v {
                                     // TODO make dict cache
-                                    let s = block_on(md.dictionaries.get_value(
+                                    let s = md.dictionaries.get_value(
                                         org_id,
                                         project_id,
                                         field.name(),
                                         i as u64,
-                                    ))?;
+                                    )?;
                                     b.append_value(s);
                                 } else {
                                     b.append_null();
@@ -438,12 +425,12 @@ fn write_parquet(
                                 .unwrap();
                             for v in arr {
                                 if let Some(i) = v {
-                                    let s = block_on(md.dictionaries.get_value(
+                                    let s = md.dictionaries.get_value(
                                         org_id,
                                         project_id,
                                         field.name(),
                                         i as u64,
-                                    ))?;
+                                    )?;
                                     b.append_value(s);
                                 } else {
                                     b.append_null();
@@ -459,12 +446,12 @@ fn write_parquet(
                                 .unwrap();
                             for v in arr {
                                 if let Some(i) = v {
-                                    let s = block_on(md.dictionaries.get_value(
+                                    let s = md.dictionaries.get_value(
                                         org_id,
                                         project_id,
                                         field.name(),
                                         i as u64,
-                                    ))?;
+                                    )?;
                                     b.append_value(s);
                                 } else {
                                     b.append_null();
@@ -480,12 +467,12 @@ fn write_parquet(
                                 .unwrap();
                             for v in arr {
                                 if let Some(i) = v {
-                                    let s = block_on(md.dictionaries.get_value(
+                                    let s = md.dictionaries.get_value(
                                         org_id,
                                         project_id,
                                         field.name(),
                                         i,
-                                    ))?;
+                                    )?;
                                     b.append_value(s);
                                 } else {
                                     b.append_null();

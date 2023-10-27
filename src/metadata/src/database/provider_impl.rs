@@ -29,7 +29,6 @@ use crate::store::path_helpers::list;
 use crate::store::path_helpers::make_data_value_key;
 use crate::store::path_helpers::make_id_seq_key;
 use crate::store::path_helpers::make_index_key;
-use crate::store::Store;
 use crate::Result;
 
 const NAMESPACE: &[u8] = b"database/tables";
@@ -70,7 +69,7 @@ impl ProviderImpl {
 }
 
 impl Provider for ProviderImpl {
-    fn create(&self, req: CreateTableRequest) -> Result<Table> {
+    fn create_table(&self, req: CreateTableRequest) -> Result<Table> {
         let tx = self.db.transaction();
         let idx_keys = index_keys(&req.typ);
         check_insert_constraints(&tx, idx_keys.as_ref())?;
@@ -88,12 +87,12 @@ impl Provider for ProviderImpl {
         Ok(tbl)
     }
 
-    fn get_by_id(&self, id: u64) -> Result<Table> {
+    fn get_table_by_id(&self, id: u64) -> Result<Table> {
         let tx = self.db.transaction();
         self._get_by_id(&tx, id)
     }
 
-    fn get_by_ref(&self, typ: TableRef) -> Result<Table> {
+    fn get_table(&self, typ: TableRef) -> Result<Table> {
         let tx = self.db.transaction();
         self._get_by_ref(&tx, &typ)
     }
@@ -103,9 +102,9 @@ impl Provider for ProviderImpl {
         list(&tx, NAMESPACE)
     }
 
-    fn add_column(&self, typ: &TableRef, col: Column) -> Result<()> {
+    fn add_column(&self, typ: TableRef, col: Column) -> Result<()> {
         let tx = self.db.transaction();
-        let mut tbl = self._get_by_ref(&tx, typ)?;
+        let mut tbl = self._get_by_ref(&tx, &typ)?;
         if tbl
             .columns
             .iter()
@@ -133,7 +132,7 @@ impl Provider for ProviderImpl {
         Ok(())
     }
 
-    fn update(&self, table_id: u64, req: UpdateTableRequest) -> Result<Table> {
+    fn update_table(&self, table_id: u64, req: UpdateTableRequest) -> Result<Table> {
         let tx = self.db.transaction();
 
         let prev_table = self._get_by_id(&tx, table_id)?;
@@ -153,7 +152,7 @@ impl Provider for ProviderImpl {
         Ok(table)
     }
 
-    fn delete(&self, id: u64) -> Result<Table> {
+    fn delete_table(&self, id: u64) -> Result<Table> {
         let tx = self.db.transaction();
         let tbl = self._get_by_id(&tx, id)?;
         tx.delete(make_data_value_key(NAMESPACE, id))?;

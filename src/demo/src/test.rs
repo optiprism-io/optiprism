@@ -29,9 +29,10 @@ use chrono::Utc;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 use metadata::database::Column;
+use metadata::database::CreateTableRequest;
 use metadata::database::Table;
 use metadata::database::TableRef;
-use metadata::error::DatabaseError;
+use metadata::error::MetadataError;
 use metadata::properties::DataType;
 use metadata::properties::DictionaryType;
 use metadata::properties::Type;
@@ -118,7 +119,7 @@ impl Builders {
     }
 }
 
-pub async fn gen(
+pub fn gen(
     partitions: usize,
     batch_size: usize,
     md: &Arc<MetadataProvider>,
@@ -139,8 +140,7 @@ pub async fn gen(
             dict: None,
         },
         &mut cols,
-    )
-    .await?;
+    )?;
 
     create_property(
         md,
@@ -154,8 +154,7 @@ pub async fn gen(
             dict: None,
         },
         &mut cols,
-    )
-    .await?;
+    )?;
 
     create_property(
         md,
@@ -169,8 +168,7 @@ pub async fn gen(
             dict: Some(DictionaryType::UInt64),
         },
         &mut cols,
-    )
-    .await?;
+    )?;
 
     let props = vec![
         ("i_8", DataType::Int8),
@@ -203,28 +201,31 @@ pub async fn gen(
                 dict: None,
             },
             &mut cols,
-        )
-        .await?;
+        )?;
     }
 
-    create_event(md, org_id, proj_id, "event".to_string()).await?;
-    let table = Table {
+    create_event(md, org_id, proj_id, "event".to_string())?;
+    let table = CreateTableRequest {
         typ: TableRef::Events(org_id, proj_id),
-        columns: cols,
+        columns: cols.clone(),
     };
     md.dictionaries
-        .get_key_or_create(1, 1, "event_event", "event")
-        .await?;
+        .get_key_or_create(1, 1, "event_event", "event")?;
 
-    match md.database.create_table(table.clone()).await {
-        Ok(_)
-        | Err(metadata::error::MetadataError::Database(DatabaseError::TableAlreadyExists(_))) => {}
+    match md.database.create_table(table.clone()) {
+        Ok(_) | Err(MetadataError::AlreadyExists(_)) => {}
         Err(err) => return Err(err.into()),
     };
 
     let now = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0)
         .unwrap()
         .duration_trunc(Duration::days(1))?;
+    let table = Table {
+        id: 1,
+        typ: TableRef::Events(org_id, proj_id),
+        columns: cols,
+    };
+
     let schema = table.arrow_schema();
 
     let mut res = vec![Vec::new(); partitions];

@@ -79,7 +79,7 @@ impl Scenario {
         }
     }
 
-    pub async fn run(&mut self) -> Result<Vec<Vec<RecordBatch>>> {
+    pub fn run(&mut self) -> Result<Vec<Vec<RecordBatch>>> {
         let mut result: Vec<Vec<RecordBatch>> =
             vec![Vec::with_capacity(self.batch_size); self.partitions];
         let mut batch_builders: Vec<RecordBatchBuilder> = Vec::with_capacity(self.partitions);
@@ -186,8 +186,7 @@ impl Scenario {
                             Action::ViewProduct,
                             Intention::BuyCertainProduct(product),
                         ) => {
-                            state.search_query =
-                                Some(self.products.string_name(product.name).await?);
+                            state.search_query = Some(self.products.string_name(product.name)?);
                             state.selected_product = Some(product);
                         }
                         (Some(Action::SearchProduct), Action::ViewProduct, _) => {
@@ -198,7 +197,7 @@ impl Scenario {
                                 if self.rng.gen::<f64>() < self.products.product_weights[idx] {
                                     state.selected_product = Some(product);
                                     state.search_query =
-                                        Some(self.products.string_name(product.name).await?);
+                                        Some(self.products.string_name(product.name)?);
                                     break;
                                 }
                             }

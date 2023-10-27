@@ -554,7 +554,7 @@ impl custom_properties::Provider for CustomProperties {
 pub struct Database {}
 
 impl database::Provider for Database {
-    fn create(&self, req: CreateTableRequest) -> Result<Table> {
+    fn create_table(&self, req: CreateTableRequest) -> Result<Table> {
         Ok(Table {
             id: 1,
             typ: TableRef::Events(1, 1),
@@ -567,7 +567,7 @@ impl database::Provider for Database {
         })
     }
 
-    fn get_by_id(&self, id: u64) -> Result<Table> {
+    fn get_table_by_id(&self, id: u64) -> Result<Table> {
         Ok(Table {
             id: 1,
             typ: TableRef::Events(1, 1),
@@ -580,7 +580,7 @@ impl database::Provider for Database {
         })
     }
 
-    fn get_by_ref(&self, typ: TableRef) -> Result<Table> {
+    fn get_table(&self, typ: TableRef) -> Result<Table> {
         Ok(Table {
             id: 1,
             typ: TableRef::Events(1, 1),
@@ -609,15 +609,15 @@ impl database::Provider for Database {
         })
     }
 
-    fn add_column(&self, _table_type: &TableRef, _col: Column) -> Result<()> {
+    fn add_column(&self, _table_type: TableRef, _col: Column) -> Result<()> {
         Ok(())
     }
 
-    fn update(&self, table_id: u64, req: UpdateTableRequest) -> Result<Table> {
+    fn update_table(&self, table_id: u64, req: UpdateTableRequest) -> Result<Table> {
         todo!()
     }
 
-    fn delete(&self, id: u64) -> Result<Table> {
+    fn delete_table(&self, id: u64) -> Result<Table> {
         todo!()
     }
 }

@@ -33,11 +33,7 @@ pub fn resolve_properties(
     if let Some(country) = city.country {
         if let Some(names) = country.names {
             if let Some(name) = names.get("en") {
-                let prop = block_on(props_prov.get_by_name(
-                    org_id,
-                    proj_id,
-                    types::USER_PROPERTY_COUNTRY,
-                ))?;
+                let prop = props_prov.get_by_name(org_id, proj_id, types::USER_PROPERTY_COUNTRY)?;
 
                 let prop = Property {
                     property: prop,
@@ -51,8 +47,7 @@ pub fn resolve_properties(
     if let Some(city) = city.city {
         if let Some(names) = city.names {
             if let Some(name) = names.get("en") {
-                let prop =
-                    block_on(props_prov.get_by_name(org_id, proj_id, types::USER_PROPERTY_CITY))?;
+                let prop = props_prov.get_by_name(org_id, proj_id, types::USER_PROPERTY_CITY)?;
 
                 let prop = Property {
                     property: prop,

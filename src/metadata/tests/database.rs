@@ -30,14 +30,14 @@ fn test_database() -> Result<()> {
         columns: vec![],
     };
     // create table
-    assert!(db.create(req.clone()).is_ok());
+    assert!(db.create_table(req.clone()).is_ok());
     // table already exists
-    assert!(db.create(req.clone()).is_err());
+    assert!(db.create_table(req.clone()).is_err());
 
     // un-existent table
-    assert!(db.get_by_ref(TableRef::System("nx".to_string())).is_err());
+    assert!(db.get_table(TableRef::System("nx".to_string())).is_err());
     // get table by name
-    assert_eq!(db.get_by_ref(table.typ.clone())?, table);
+    assert_eq!(db.get_table(table.typ.clone())?, table);
 
     let col = Column {
         name: "c1".to_string(),

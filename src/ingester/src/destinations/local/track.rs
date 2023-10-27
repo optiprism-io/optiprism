@@ -58,12 +58,12 @@ fn property_to_value(
 ) -> Result<Value> {
     let val = if prop.is_dictionary {
         if let PropValue::String(str_v) = &event_prop.value {
-            let dict_id = block_on(dict.get_key_or_create(
+            let dict_id = dict.get_key_or_create(
                 ctx.organization_id.unwrap(),
                 ctx.project_id.unwrap(),
                 prop.column_name().as_str(),
                 str_v.as_str(),
-            ))?;
+            )?;
             match prop.dictionary_type.clone().unwrap() {
                 DictionaryType::UInt8 => Value::UInt8(dict_id as u8),
                 DictionaryType::UInt16 => Value::UInt16(dict_id as u16),
@@ -127,15 +127,13 @@ impl Destination<Track> for Local {
             COLUMN_EVENT.to_string(),
             Value::UInt16(event_id as u16),
         ));
-        let event_res = block_on(
-            self.event_properties
-                .list(ctx.organization_id.unwrap(), ctx.project_id.unwrap()),
-        )?;
+        let event_res = self
+            .event_properties
+            .list(ctx.organization_id.unwrap(), ctx.project_id.unwrap())?;
 
-        let user_res = block_on(
-            self.user_properties
-                .list(ctx.organization_id.unwrap(), ctx.project_id.unwrap()),
-        )?;
+        let user_res = self
+            .user_properties
+            .list(ctx.organization_id.unwrap(), ctx.project_id.unwrap())?;
 
         let event_props = req
             .resolved_properties

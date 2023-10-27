@@ -78,8 +78,7 @@ impl Provider for ProviderImpl {
             self.metadata.clone(),
             self.input.clone(),
             es.clone(),
-        )
-        .await?;
+        )?;
 
         // let plan = LogicalPlanBuilder::from(plan).explain(true, true)?.build()?;
 

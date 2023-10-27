@@ -8,7 +8,6 @@ use crate::custom_properties::Provider;
 use crate::metadata::ListResponse;
 use crate::store::path_helpers::list;
 use crate::store::path_helpers::org_proj_ns;
-use crate::store::Store;
 use crate::Result;
 
 const NAMESPACE: &[u8] = b"custom_events";

@@ -7,7 +7,6 @@ use serde::de::DeserializeOwned;
 
 use crate::metadata::ListResponse;
 use crate::metadata::ResponseMetadata;
-use crate::store::Store;
 use crate::Result;
 
 pub fn org_proj_ns(organization_id: u64, project_id: u64, ns: &[u8]) -> Vec<u8> {
