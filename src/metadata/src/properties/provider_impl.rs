@@ -24,7 +24,6 @@ use crate::properties::Property;
 use crate::properties::Provider;
 use crate::properties::Type;
 use crate::properties::UpdatePropertyRequest;
-use crate::store::index::hash_map::HashMap;
 use crate::store::path_helpers::list;
 use crate::store::path_helpers::make_data_value_key;
 use crate::store::path_helpers::make_id_seq_key;
@@ -109,13 +108,34 @@ impl ProviderImpl {
         project_id: u64,
         name: &str,
     ) -> Result<Property> {
-        let data = get_index(make_index_key(
-            org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
-            IDX_NAME,
-            name,
-        ))?;
+        let data = get_index(
+            &tx,
+            make_index_key(
+                org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
+                IDX_NAME,
+                name,
+            ),
+        )?;
 
         Ok(deserialize(&data)?)
+    }
+
+    fn _get_by_id(
+        &self,
+        tx: &Transaction<TransactionDB>,
+        organization_id: u64,
+        project_id: u64,
+        id: u64,
+    ) -> Result<Property> {
+        let key = make_data_value_key(
+            org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
+            id,
+        );
+
+        match tx.get(key)? {
+            None => Err(MetadataError::NotFound("property not found".to_string())),
+            Some(value) => Ok(deserialize(&value)?),
+        }
     }
 
     fn _create(
@@ -186,7 +206,10 @@ impl Provider for ProviderImpl {
         req: CreatePropertyRequest,
     ) -> Result<Property> {
         let tx = self.db.transaction();
-        self._create(&tx, organization_id, project_id, req)
+        let ret = self._create(&tx, organization_id, project_id, req)?;
+        tx.commit()?;
+
+        Ok(ret)
     }
 
     fn get_or_create(
@@ -201,21 +224,16 @@ impl Provider for ProviderImpl {
             Err(MetadataError::NotFound(_)) => {}
             other => return other,
         }
+        let ret = self._create(&tx, organization_id, project_id, req)?;
 
-        self._create(&tx, organization_id, project_id, req)
+        tx.commit()?;
+
+        Ok(ret)
     }
 
     fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Property> {
         let tx = self.db.transaction();
-        let key = make_data_value_key(
-            org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
-            id,
-        );
-
-        match tx.get(key)? {
-            None => Err(MetadataError::NotFound("property not found".to_string())),
-            Some(value) => Ok(deserialize(&value)?),
-        }
+        self._get_by_id(&tx, organization_id, project_id, id)
     }
 
     fn get_by_name(&self, organization_id: u64, project_id: u64, name: &str) -> Result<Property> {
@@ -321,13 +339,13 @@ impl Provider for ProviderImpl {
         )?;
 
         update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)?;
-
+        tx.commit()?;
         Ok(prop)
     }
 
     fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Property> {
         let tx = self.db.transaction();
-        let prop = self._get_by_id(organization_id, project_id, id)?;
+        let prop = self._get_by_id(&tx, organization_id, project_id, id)?;
         tx.delete(make_data_value_key(
             org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
             id,
@@ -344,6 +362,7 @@ impl Provider for ProviderImpl {
             )
             .as_ref(),
         )?;
+        tx.commit()?;
         Ok(prop)
     }
 }

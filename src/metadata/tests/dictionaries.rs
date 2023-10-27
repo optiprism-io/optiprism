@@ -11,8 +11,8 @@ fn test_dictionaries() -> Result<()> {
     let mut path = temp_dir();
     path.push(format!("{}.db", Uuid::new_v4()));
 
-    let store = Arc::new(Store::new(path));
-    let dicts: Box<dyn Provider> = Box::new(ProviderImpl::new(store.clone()));
+    let db = Arc::new(metadata::rocksdb::new(path).unwrap());
+    let dicts: Box<dyn Provider> = Box::new(ProviderImpl::new(db.clone()));
 
     assert!(dicts.get_key(1, 1, "d1", "v1").is_err());
     assert!(dicts.get_value(1, 1, "d1", 1).is_err());

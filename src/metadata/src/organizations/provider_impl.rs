@@ -22,7 +22,6 @@ use crate::index::update_index;
 use crate::metadata::ListResponse;
 use crate::organizations::Provider;
 use crate::organizations::UpdateOrganizationRequest;
-use crate::store::index::hash_map::HashMap;
 use crate::store::path_helpers::list;
 use crate::store::path_helpers::make_data_value_key;
 use crate::store::path_helpers::make_id_seq_key;
@@ -85,7 +84,7 @@ impl Provider for ProviderImpl {
         tx.put(make_data_value_key(NAMESPACE, id), &data)?;
 
         insert_index(&tx, idx_keys.as_ref(), &data)?;
-
+        tx.commit()?;
         Ok(org)
     }
 
@@ -125,7 +124,7 @@ impl Provider for ProviderImpl {
         tx.put(make_data_value_key(NAMESPACE, org.id), &data)?;
 
         update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)?;
-
+        tx.commit()?;
         Ok(org)
     }
 
@@ -136,7 +135,7 @@ impl Provider for ProviderImpl {
         tx.delete(make_data_value_key(NAMESPACE, id))?;
 
         delete_index(&tx, index_keys(&org.name).as_ref())?;
-
+        tx.commit()?;
         Ok(org)
     }
 }

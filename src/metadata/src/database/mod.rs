@@ -109,6 +109,8 @@ impl TableRef {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateTableRequest {
     pub typ: TableRef,
     pub columns: Vec<Column>,

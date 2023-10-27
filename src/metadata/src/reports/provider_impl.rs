@@ -92,7 +92,7 @@ impl Provider for ProviderImpl {
             ),
             &data,
         )?;
-
+        tx.commit()?;
         Ok(report)
     }
 
@@ -118,7 +118,7 @@ impl Provider for ProviderImpl {
         req: UpdateReportRequest,
     ) -> Result<Report> {
         let tx = self.db.transaction();
-        let prev_report = self._get_by_id(organization_id, project_id, report_id)?;
+        let prev_report = self._get_by_id(&tx, organization_id, project_id, report_id)?;
         let mut report = prev_report.clone();
 
         report.updated_at = Some(Utc::now());
@@ -144,7 +144,7 @@ impl Provider for ProviderImpl {
             ),
             &data,
         )?;
-
+        tx.commit()?;
         Ok(report)
     }
 
@@ -155,7 +155,7 @@ impl Provider for ProviderImpl {
             org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
             id,
         ))?;
-
+        tx.commit()?;
         Ok(report)
     }
 }

@@ -143,7 +143,7 @@ impl Provider for ProviderImpl {
             ),
             &data,
         )?;
-
+        tx.commit()?;
         Ok(dashboard)
     }
 
@@ -154,7 +154,7 @@ impl Provider for ProviderImpl {
             org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
             id,
         ))?;
-
+        tx.commit()?;
         Ok(dashboard)
     }
 }

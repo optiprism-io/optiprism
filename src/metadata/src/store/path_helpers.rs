@@ -52,10 +52,10 @@ pub fn list<'a, T>(tx: &Transaction<TransactionDB>, ns: &[u8]) -> Result<ListRes
 where T: DeserializeOwned {
     let prefix = make_data_key(ns);
 
-    let list = store
-        .list_prefix("")?
-        .iter()
+    let list = tx
+        .prefix_iterator("")
         .filter_map(|x| {
+            let x = x.unwrap();
             if x.0.len() < prefix.len() || !prefix.as_slice().cmp(&x.0[..prefix.len()]).is_eq() {
                 return None;
             }

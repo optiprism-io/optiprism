@@ -25,7 +25,6 @@ use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
 use crate::metadata::ListResponse;
-use crate::store::index::hash_map::HashMap;
 use crate::store::path_helpers::list;
 use crate::store::path_helpers::make_data_value_key;
 use crate::store::path_helpers::make_id_seq_key;
@@ -66,7 +65,7 @@ impl ProviderImpl {
             &tx,
             make_index_key(NAMESPACE, IDX_REF, typ.to_string().as_str()).to_vec(),
         )?;
-        Ok(deserialize(&data)?)
+        Ok(deserialize::<Table>(&data)?)
     }
 }
 
@@ -85,6 +84,7 @@ impl Provider for ProviderImpl {
         let data = serialize(&tbl)?;
         tx.put(make_data_value_key(NAMESPACE, tbl.id), &data)?;
         insert_index(&tx, idx_keys.as_ref(), &data)?;
+        tx.commit()?;
         Ok(tbl)
     }
 
@@ -106,10 +106,30 @@ impl Provider for ProviderImpl {
     fn add_column(&self, typ: &TableRef, col: Column) -> Result<()> {
         let tx = self.db.transaction();
         let mut tbl = self._get_by_ref(&tx, typ)?;
+        if tbl
+            .columns
+            .iter()
+            .find(|c| {
+                println!("{} == {}", c.name, col.name);
+                c.name == col.name
+            })
+            .is_some()
+        {
+            return Err(MetadataError::NotFound(format!(
+                "column {} not found",
+                col.name
+            )));
+        }
         tbl.columns.push(col);
         let data = serialize(&tbl)?;
         tx.put(make_data_value_key(NAMESPACE, tbl.id), &data)?;
-
+        let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
+        let mut idx_prev_keys: Vec<Option<Vec<u8>>> = Vec::new();
+        idx_prev_keys.push(index_ref_key(&tbl.typ));
+        idx_keys.push(index_ref_key(&tbl.typ));
+        update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)?;
+        println!("{:?}", tbl.columns);
+        tx.commit()?;
         Ok(())
     }
 
@@ -129,6 +149,7 @@ impl Provider for ProviderImpl {
         let data = serialize(&table)?;
         tx.put(make_data_value_key(NAMESPACE, table.id), &data)?;
         update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)?;
+        tx.commit()?;
         Ok(table)
     }
 
@@ -138,7 +159,7 @@ impl Provider for ProviderImpl {
         tx.delete(make_data_value_key(NAMESPACE, id))?;
 
         delete_index(&tx, index_keys(&tbl.typ).as_ref())?;
-
+        tx.commit()?;
         Ok(tbl)
     }
 }

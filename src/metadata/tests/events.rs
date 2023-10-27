@@ -15,8 +15,8 @@ fn test_events() -> Result<()> {
     let mut path = temp_dir();
     path.push(format!("{}.db", Uuid::new_v4()));
 
-    let store = Arc::new(Store::new(path));
-    let events: Box<dyn Provider> = Box::new(ProviderImpl::new(store.clone()));
+    let db = Arc::new(metadata::rocksdb::new(path).unwrap());
+    let events: Box<dyn Provider> = Box::new(ProviderImpl::new(db.clone()));
     let create_event_req = CreateEventRequest {
         created_by: 0,
         tags: Some(vec![]),

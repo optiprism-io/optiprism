@@ -73,12 +73,10 @@ pub fn delete_index(tx: &Transaction<TransactionDB>, keys: &[Option<Vec<u8>>]) -
     Ok(())
 }
 
-pub fn get_index<K>(tx: &Transaction<TransactionDB>, key: Vec<u8>) -> Result<Vec<u8>>
+pub fn get_index<K>(tx: &Transaction<TransactionDB>, key: K) -> Result<Vec<u8>>
 where K: AsRef<[u8]> {
     match tx.get(key.as_ref())? {
-        None => {
-            Err(MetadataError::AlreadyExists(String::from_utf8(key.as_ref().to_owned())?).into())
-        }
+        None => Err(MetadataError::NotFound(String::from_utf8(key.as_ref().to_owned())?).into()),
         Some(v) => Ok(v),
     }
 }

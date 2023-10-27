@@ -23,7 +23,6 @@ use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
 use crate::metadata::ListResponse;
-use crate::store::index::hash_map::HashMap;
 use crate::store::path_helpers::list;
 use crate::store::path_helpers::make_data_value_key;
 use crate::store::path_helpers::make_id_seq_key;
@@ -75,7 +74,7 @@ impl Provider for ProviderImpl {
         tx.put(make_data_value_key(NAMESPACE, account.id), &data)?;
 
         insert_index(&tx, idx_keys.as_ref(), &data)?;
-
+        tx.commit()?;
         Ok(account)
     }
 
@@ -133,7 +132,7 @@ impl Provider for ProviderImpl {
         tx.put(make_data_value_key(NAMESPACE, account.id), &data)?;
 
         update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)?;
-
+        tx.commit()?;
         Ok(account)
     }
 
@@ -143,7 +142,7 @@ impl Provider for ProviderImpl {
         tx.delete(make_data_value_key(NAMESPACE, id))?;
 
         delete_index(&tx, index_keys(&account.email).as_ref())?;
-
+        tx.commit()?;
         Ok(account)
     }
 }

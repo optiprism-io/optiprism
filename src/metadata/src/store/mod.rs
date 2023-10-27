@@ -1,4 +1,3 @@
-pub mod index;
 pub mod path_helpers;
 
 use std::path::Path;

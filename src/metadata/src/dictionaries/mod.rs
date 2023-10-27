@@ -7,7 +7,7 @@ pub use provider_impl::ProviderImpl;
 
 use crate::Result;
 
-pub trait Provider: Sync + Send + Debug {
+pub trait Provider: Sync + Send {
     fn get_key_or_create(
         &self,
         organization_id: u64,

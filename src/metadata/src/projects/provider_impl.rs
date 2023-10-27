@@ -9,17 +9,23 @@ use common::types::OptionalProperty;
 use rand::distributions::Alphanumeric;
 use rand::distributions::DistString;
 use rand::thread_rng;
-use rocksdb::{Transaction, TransactionDB};
+use rocksdb::Transaction;
+use rocksdb::TransactionDB;
 
 use crate::error;
 use crate::error::MetadataError;
-use crate::index::{check_insert_constraints, check_update_constraints, delete_index, get_index, insert_index, next_seq, update_index};
+use crate::index::check_insert_constraints;
+use crate::index::check_update_constraints;
+use crate::index::delete_index;
+use crate::index::get_index;
+use crate::index::insert_index;
+use crate::index::next_seq;
+use crate::index::update_index;
 use crate::metadata::ListResponse;
 use crate::projects::CreateProjectRequest;
 use crate::projects::Project;
 use crate::projects::Provider;
 use crate::projects::UpdateProjectRequest;
-use crate::store::index::hash_map::HashMap;
 use crate::store::path_helpers::list;
 use crate::store::path_helpers::make_data_value_key;
 use crate::store::path_helpers::make_id_seq_key;
@@ -37,7 +43,7 @@ fn index_keys(organization_id: u64, name: &str, token: &str) -> Vec<Option<Vec<u
         index_name_key(organization_id, name),
         index_token_key(token),
     ]
-        .to_vec()
+    .to_vec()
 }
 
 fn index_name_key(organization_id: u64, name: &str) -> Option<Vec<u8>> {
@@ -47,7 +53,7 @@ fn index_name_key(organization_id: u64, name: &str) -> Option<Vec<u8>> {
             IDX_NAME,
             name,
         )
-            .to_vec(),
+        .to_vec(),
     )
 }
 
@@ -64,7 +70,12 @@ impl ProviderImpl {
         ProviderImpl { db }
     }
 
-    fn _get_by_id(&self, tx: &Transaction<TransactionDB>, organization_id: u64, project_id: u64) -> Result<Project> {
+    fn _get_by_id(
+        &self,
+        tx: &Transaction<TransactionDB>,
+        organization_id: u64,
+        project_id: u64,
+    ) -> Result<Project> {
         let key = make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), project_id);
 
         match tx.get(key)? {
@@ -84,9 +95,10 @@ impl Provider for ProviderImpl {
         check_insert_constraints(&tx, idx_keys.as_ref())?;
 
         let created_at = Utc::now();
-        let id = next_seq(&tx, make_id_seq_key(
-            org_ns(organization_id, NAMESPACE).as_slice(),
-        ))?;
+        let id = next_seq(
+            &tx,
+            make_id_seq_key(org_ns(organization_id, NAMESPACE).as_slice()),
+        )?;
 
         let project = Project {
             id,
@@ -105,7 +117,7 @@ impl Provider for ProviderImpl {
         )?;
 
         insert_index(&tx, idx_keys.as_ref(), &data)?;
-
+        tx.commit()?;
         Ok(project)
     }
 
@@ -116,17 +128,14 @@ impl Provider for ProviderImpl {
 
     fn get_by_token(&self, token: &str) -> Result<Project> {
         let tx = self.db.transaction();
-        let data = get_index(&tx,index_token_key(token).unwrap())?;
-        Ok(deserialize(&data)?)
+        let data = get_index(&tx, index_token_key(token).unwrap())?;
+        Ok(deserialize::<Project>(&data)?)
     }
 
     fn list(&self, organization_id: u64) -> Result<ListResponse<Project>> {
         let tx = self.db.transaction();
 
-        list(
-            &tx,
-            org_ns(organization_id, NAMESPACE).as_slice(),
-        )
+        list(&tx, org_ns(organization_id, NAMESPACE).as_slice())
     }
 
     fn update(
@@ -136,7 +145,6 @@ impl Provider for ProviderImpl {
         req: UpdateProjectRequest,
     ) -> Result<Project> {
         let tx = self.db.transaction();
-
 
         let prev_project = self._get_by_id(&tx, organization_id, project_id)?;
         let mut project = prev_project.clone();
@@ -149,7 +157,7 @@ impl Provider for ProviderImpl {
             project.name = name.to_owned();
         }
 
-        check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())?
+        check_update_constraints(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref())?;
 
         project.updated_at = Some(Utc::now());
         project.updated_by = Some(req.updated_by);
@@ -161,18 +169,21 @@ impl Provider for ProviderImpl {
         )?;
 
         update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)?;
-
+        tx.commit()?;
         Ok(project)
     }
 
     fn delete(&self, organization_id: u64, project_id: u64) -> Result<Project> {
         let tx = self.db.transaction();
 
-        let project = self._get_by_id(&tx,organization_id,project_id)?;
+        let project = self._get_by_id(&tx, organization_id, project_id)?;
         tx.delete(make_data_value_key(NAMESPACE, project_id))?;
 
-        delete_index(&tx, index_keys(organization_id,&project.name,&project.token).as_ref())?;
-
+        delete_index(
+            &tx,
+            index_keys(organization_id, &project.name, &project.token).as_ref(),
+        )?;
+        tx.commit()?;
         Ok(project)
     }
 }

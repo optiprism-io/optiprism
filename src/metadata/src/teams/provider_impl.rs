@@ -18,7 +18,6 @@ use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
 use crate::metadata::ListResponse;
-use crate::store::index::hash_map::HashMap;
 use crate::store::path_helpers::list;
 use crate::store::path_helpers::make_data_value_key;
 use crate::store::path_helpers::make_id_seq_key;
@@ -105,7 +104,7 @@ impl Provider for ProviderImpl {
         )?;
 
         insert_index(&tx, idx_keys.as_ref(), &data)?;
-
+        tx.commit()?;
         Ok(team)
     }
 
@@ -147,7 +146,7 @@ impl Provider for ProviderImpl {
         )?;
 
         update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)?;
-
+        tx.commit()?;
         Ok(team)
     }
 
@@ -161,7 +160,7 @@ impl Provider for ProviderImpl {
         ))?;
 
         delete_index(&tx, index_keys(organization_id, &team.name).as_ref())?;
-
+        tx.commit()?;
         Ok(team)
     }
 }

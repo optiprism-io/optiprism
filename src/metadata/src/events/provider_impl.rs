@@ -23,7 +23,6 @@ use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
 use crate::metadata::ListResponse;
-use crate::store::index::hash_map::HashMap;
 use crate::store::path_helpers::list;
 use crate::store::path_helpers::make_data_value_key;
 use crate::store::path_helpers::make_id_seq_key;
@@ -171,7 +170,7 @@ impl ProviderImpl {
             ),
         )?;
 
-        deserialize(&data)?
+        Ok(deserialize(&data)?)
     }
 }
 
@@ -183,7 +182,9 @@ impl Provider for ProviderImpl {
         req: CreateEventRequest,
     ) -> Result<Event> {
         let tx = self.db.transaction();
-        self._create(&tx, organization_id, project_id, req)
+        let ret = self._create(&tx, organization_id, project_id, req);
+        tx.commit()?;
+        ret
     }
 
     fn get_or_create(
@@ -199,7 +200,9 @@ impl Provider for ProviderImpl {
             other => return other,
         }
 
-        self._create(&tx, organization_id, project_id, req)
+        let ret = self._create(&tx, organization_id, project_id, req);
+        tx.commit()?;
+        ret
     }
 
     fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event> {
@@ -289,6 +292,7 @@ impl Provider for ProviderImpl {
         )?;
 
         update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)?;
+        tx.commit()?;
         Ok(event)
     }
 
@@ -321,6 +325,7 @@ impl Provider for ProviderImpl {
             ),
             serialize(&event)?,
         )?;
+        tx.commit()?;
         Ok(event)
     }
 
@@ -354,6 +359,7 @@ impl Provider for ProviderImpl {
             ),
             serialize(&event)?,
         )?;
+        tx.commit()?;
         Ok(event)
     }
 
@@ -375,7 +381,7 @@ impl Provider for ProviderImpl {
             )
             .as_ref(),
         )?;
-
+        tx.commit()?;
         Ok(event)
     }
 

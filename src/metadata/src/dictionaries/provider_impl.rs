@@ -41,7 +41,6 @@ fn make_value_key(organization_id: u64, project_id: u64, dict: &str, value: &str
     .concat()
 }
 
-#[derive(Debug)]
 pub struct ProviderImpl {
     db: Arc<TransactionDB>,
 }
@@ -61,7 +60,7 @@ impl Provider for ProviderImpl {
         value: &str,
     ) -> Result<u64> {
         let tx = self.db.transaction();
-        match tx.get(make_value_key(organization_id, project_id, dict, value))? {
+        let res = match tx.get(make_value_key(organization_id, project_id, dict, value))? {
             None => {
                 let id = next_seq(
                     &tx,
@@ -82,7 +81,9 @@ impl Provider for ProviderImpl {
                 Ok(id)
             }
             Some(key) => Ok(LittleEndian::read_u64(key.as_slice())),
-        }
+        };
+        tx.commit()?;
+        res
     }
 
     fn get_value(
@@ -116,7 +117,6 @@ impl Provider for ProviderImpl {
     }
 }
 
-#[derive(Debug)]
 pub struct SingleDictionaryProvider {
     organization_id: u64,
     project_id: u64,

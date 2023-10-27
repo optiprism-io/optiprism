@@ -37,8 +37,10 @@ use crate::dashboards::Panel;
 use crate::dashboards::UpdateDashboardRequest;
 use crate::database;
 use crate::database::Column;
+use crate::database::CreateTableRequest;
 use crate::database::Table;
 use crate::database::TableRef;
+use crate::database::UpdateTableRequest;
 use crate::dictionaries;
 use crate::events;
 use crate::events::CreateEventRequest;
@@ -552,12 +554,9 @@ impl custom_properties::Provider for CustomProperties {
 pub struct Database {}
 
 impl database::Provider for Database {
-    fn create_table(&self, _table: Table) -> Result<()> {
-        Ok(())
-    }
-
-    fn get_table(&self, _table_type: TableRef) -> Result<Table> {
+    fn create(&self, req: CreateTableRequest) -> Result<Table> {
         Ok(Table {
+            id: 1,
             typ: TableRef::Events(1, 1),
             columns: vec![Column::new(
                 "col".to_string(),
@@ -568,8 +567,58 @@ impl database::Provider for Database {
         })
     }
 
-    fn add_column(&self, _table_type: TableRef, _col: Column) -> Result<()> {
+    fn get_by_id(&self, id: u64) -> Result<Table> {
+        Ok(Table {
+            id: 1,
+            typ: TableRef::Events(1, 1),
+            columns: vec![Column::new(
+                "col".to_string(),
+                DataType::UInt8,
+                true,
+                Some(DictionaryType::UInt64),
+            )],
+        })
+    }
+
+    fn get_by_ref(&self, typ: TableRef) -> Result<Table> {
+        Ok(Table {
+            id: 1,
+            typ: TableRef::Events(1, 1),
+            columns: vec![Column::new(
+                "col".to_string(),
+                DataType::UInt8,
+                true,
+                Some(DictionaryType::UInt64),
+            )],
+        })
+    }
+
+    fn list(&self) -> Result<ListResponse<Table>> {
+        Ok(ListResponse {
+            data: vec![Table {
+                id: 1,
+                typ: TableRef::Events(1, 1),
+                columns: vec![Column::new(
+                    "col".to_string(),
+                    DataType::UInt8,
+                    true,
+                    Some(DictionaryType::UInt64),
+                )],
+            }],
+            meta: ResponseMetadata { next: None },
+        })
+    }
+
+    fn add_column(&self, _table_type: &TableRef, _col: Column) -> Result<()> {
         Ok(())
+    }
+
+    fn update(&self, table_id: u64, req: UpdateTableRequest) -> Result<Table> {
+        todo!()
+    }
+
+    fn delete(&self, id: u64) -> Result<Table> {
+        todo!()
     }
 }
 #[derive(Debug)]

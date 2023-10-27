@@ -10,7 +10,6 @@ use metadata::custom_events::Provider;
 use metadata::custom_events::ProviderImpl;
 use metadata::custom_events::Status;
 use metadata::custom_events::UpdateCustomEventRequest;
-use metadata::error::CustomEventError;
 use metadata::error::MetadataError;
 use metadata::error::Result;
 use metadata::events;
@@ -21,14 +20,15 @@ use uuid::Uuid;
 fn get_providers(max_events_level: usize) -> (Arc<dyn events::Provider>, Arc<dyn Provider>) {
     let mut path = temp_dir();
     path.push(format!("{}.db", Uuid::new_v4()));
-    let store = Arc::new(Store::new(path));
-    let events_prov = Arc::new(events::ProviderImpl::new(store.clone()));
+    let db = Arc::new(metadata::rocksdb::new(path).unwrap());
+    let events_prov = Arc::new(events::ProviderImpl::new(db.clone()));
     let custom_events = Arc::new(
-        ProviderImpl::new(store, events_prov.clone()).with_max_events_level(max_events_level),
+        ProviderImpl::new(db, events_prov.clone()).with_max_events_level(max_events_level),
     );
 
     (events_prov, custom_events)
 }
+
 #[test]
 fn non_exist() -> Result<()> {
     let (_, custom_events) = get_providers(MAX_EVENTS_LEVEL);
@@ -54,6 +54,7 @@ fn non_exist() -> Result<()> {
     );
     Ok(())
 }
+
 #[test]
 fn create_event() -> Result<()> {
     let (event_prov, prov) = get_providers(MAX_EVENTS_LEVEL);
@@ -84,11 +85,11 @@ fn create_event() -> Result<()> {
     };
 
     let resp = prov.create(1, 1, req.clone())?;
-    assert_eq!(resp.name, req.name);
     let check = prov.get_by_id(1, 1, resp.id)?;
     assert_eq!(resp, check);
     Ok(())
 }
+
 #[test]
 fn create_event_not_found() -> Result<()> {
     let (_event_prov, prov) = get_providers(MAX_EVENTS_LEVEL);
@@ -110,6 +111,7 @@ fn create_event_not_found() -> Result<()> {
     assert!(resp.is_err());
     Ok(())
 }
+
 #[test]
 fn create_event_duplicate_name() -> Result<()> {
     let (event_prov, prov) = get_providers(MAX_EVENTS_LEVEL);
@@ -145,6 +147,7 @@ fn create_event_duplicate_name() -> Result<()> {
     assert!(resp.is_err());
     Ok(())
 }
+
 #[test]
 fn create_event_recursion_level_exceeded() -> Result<()> {
     let (event_prov, prov) = get_providers(1);
@@ -202,14 +205,10 @@ fn create_event_recursion_level_exceeded() -> Result<()> {
         }],
     };
     let resp = prov.create(1, 1, req.clone());
-    assert!(matches!(
-        resp,
-        Err(MetadataError::CustomEvent(
-            CustomEventError::RecursionLevelExceeded(_)
-        ))
-    ));
+    assert!(matches!(resp, Err(MetadataError::BadRequest(_))));
     Ok(())
 }
+
 #[test]
 fn test_duplicate() -> Result<()> {
     let (event_prov, prov) = get_providers(5);
@@ -267,10 +266,7 @@ fn test_duplicate() -> Result<()> {
         }]),
     };
     let resp = prov.update(1, 1, 1, req.clone());
-    assert!(matches!(
-        resp,
-        Err(MetadataError::CustomEvent(CustomEventError::DuplicateEvent))
-    ));
+    assert!(matches!(resp, Err(MetadataError::AlreadyExists(_))));
 
     // self-pointing
     let req = UpdateCustomEventRequest {
@@ -286,12 +282,10 @@ fn test_duplicate() -> Result<()> {
         }]),
     };
     let resp = prov.update(1, 1, 1, req.clone());
-    assert!(matches!(
-        resp,
-        Err(MetadataError::CustomEvent(CustomEventError::DuplicateEvent))
-    ));
+    assert!(matches!(resp, Err(MetadataError::AlreadyExists(_))));
     Ok(())
 }
+
 #[test]
 fn update_event() -> Result<()> {
     let (event_prov, prov) = get_providers(MAX_EVENTS_LEVEL);

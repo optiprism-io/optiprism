@@ -21,8 +21,8 @@ fn test_reports() -> Result<()> {
     let mut path = temp_dir();
     path.push(format!("{}.db", Uuid::new_v4()));
 
-    let store = Arc::new(Store::new(path));
-    let reports: Box<dyn Provider> = Box::new(ProviderImpl::new(store.clone()));
+    let db = Arc::new(metadata::rocksdb::new(path).unwrap());
+    let reports: Box<dyn Provider> = Box::new(ProviderImpl::new(db.clone()));
     let create_report_req = CreateReportRequest {
         created_by: 0,
         tags: Some(vec![]),
