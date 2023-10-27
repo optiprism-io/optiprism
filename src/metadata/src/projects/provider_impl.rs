@@ -9,11 +9,11 @@ use common::types::OptionalProperty;
 use rand::distributions::Alphanumeric;
 use rand::distributions::DistString;
 use rand::thread_rng;
+use rocksdb::{Transaction, TransactionDB};
 
 use crate::error;
 use crate::error::MetadataError;
-use crate::error::ProjectError;
-use crate::error::StoreError;
+use crate::index::{check_insert_constraints, check_update_constraints, delete_index, get_index, insert_index, next_seq, update_index};
 use crate::metadata::ListResponse;
 use crate::projects::CreateProjectRequest;
 use crate::projects::Project;
@@ -37,7 +37,7 @@ fn index_keys(organization_id: u64, name: &str, token: &str) -> Vec<Option<Vec<u
         index_name_key(organization_id, name),
         index_token_key(token),
     ]
-    .to_vec()
+        .to_vec()
 }
 
 fn index_name_key(organization_id: u64, name: &str) -> Option<Vec<u8>> {
@@ -47,7 +47,7 @@ fn index_name_key(organization_id: u64, name: &str) -> Option<Vec<u8>> {
             IDX_NAME,
             name,
         )
-        .to_vec(),
+            .to_vec(),
     )
 }
 
@@ -56,41 +56,35 @@ fn index_token_key(token: &str) -> Option<Vec<u8>> {
 }
 
 pub struct ProviderImpl {
-    store: Arc<Store>,
-    idx: HashMap,
-    guard: RwLock<()>,
+    db: Arc<TransactionDB>,
 }
 
 impl ProviderImpl {
-    pub fn new(kv: Arc<Store>) -> Self {
-        ProviderImpl {
-            store: kv.clone(),
-            idx: HashMap::new(kv),
-            guard: RwLock::new(()),
+    pub fn new(db: Arc<TransactionDB>) -> Self {
+        ProviderImpl { db }
+    }
+
+    fn _get_by_id(&self, tx: &Transaction<TransactionDB>, organization_id: u64, project_id: u64) -> Result<Project> {
+        let key = make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), project_id);
+
+        match tx.get(key)? {
+            None => Err(MetadataError::NotFound(format!("project {project_id}"))),
+            Some(value) => Ok(deserialize(&value)?),
         }
     }
 }
 
 impl Provider for ProviderImpl {
     fn create(&self, organization_id: u64, req: CreateProjectRequest) -> Result<Project> {
-        let _guard = self.guard.write().unwrap();
+        let tx = self.db.transaction();
         let token = Alphanumeric.sample_string(&mut thread_rng(), 64);
 
         let idx_keys = index_keys(organization_id, &req.name, token.as_str());
 
-        match self.idx.check_insert_constraints(idx_keys.as_ref()) {
-            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
-                return Err(MetadataError::AlreadyExists(format!(
-                    "project with name {:?}",
-                    req.name
-                )));
-            }
-            Err(other) => return Err(other),
-            Ok(_) => {}
-        }
+        check_insert_constraints(&tx, idx_keys.as_ref())?;
 
         let created_at = Utc::now();
-        let id = self.store.next_seq(make_id_seq_key(
+        let id = next_seq(&tx, make_id_seq_key(
             org_ns(organization_id, NAMESPACE).as_slice(),
         ))?;
 
@@ -105,38 +99,32 @@ impl Provider for ProviderImpl {
             token,
         };
         let data = serialize(&project)?;
-        self.store.put(
+        tx.put(
             make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), project.id),
             &data,
         )?;
 
-        self.idx.insert(idx_keys.as_ref(), &data)?;
+        insert_index(&tx, idx_keys.as_ref(), &data)?;
 
         Ok(project)
     }
 
     fn get_by_id(&self, organization_id: u64, project_id: u64) -> Result<Project> {
-        let key = make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), project_id);
-
-        match self.store.get(key)? {
-            None => Err(MetadataError::NotFound(format!("project {project_id}"))),
-            Some(value) => Ok(deserialize(&value)?),
-        }
+        let tx = self.db.transaction();
+        self._get_by_id(&tx, organization_id, project_id)
     }
 
     fn get_by_token(&self, token: &str) -> Result<Project> {
-        match self.idx.get(index_token_key(token).unwrap()) {
-            Err(MetadataError::Store(StoreError::KeyNotFound(_))) => Err(MetadataError::NotFound(
-                format!("project with token {:?}", token),
-            )),
-            Err(other) => Err(other),
-            Ok(data) => Ok(deserialize(&data)?),
-        }
+        let tx = self.db.transaction();
+        let data = get_index(&tx,index_token_key(token).unwrap())?;
+        Ok(deserialize(&data)?)
     }
 
     fn list(&self, organization_id: u64) -> Result<ListResponse<Project>> {
+        let tx = self.db.transaction();
+
         list(
-            self.store.clone(),
+            &tx,
             org_ns(organization_id, NAMESPACE).as_slice(),
         )
     }
@@ -147,9 +135,10 @@ impl Provider for ProviderImpl {
         project_id: u64,
         req: UpdateProjectRequest,
     ) -> Result<Project> {
-        let _guard = self.guard.write().unwrap();
+        let tx = self.db.transaction();
 
-        let prev_project = self.get_by_id(organization_id, project_id)?;
+
+        let prev_project = self._get_by_id(&tx, organization_id, project_id)?;
         let mut project = prev_project.clone();
 
         let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
@@ -160,45 +149,29 @@ impl Provider for ProviderImpl {
             project.name = name.to_owned();
         }
 
-        match self
-            .idx
-            .check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())
-        {
-            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
-                return Err(MetadataError::AlreadyExists(format!(
-                    "project {:?}",
-                    req.name
-                )));
-            }
-            Err(other) => return Err(other),
-            Ok(_) => {}
-        }
+        check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())?
 
         project.updated_at = Some(Utc::now());
         project.updated_by = Some(req.updated_by);
 
         let data = serialize(&project)?;
-        self.store.put(
+        tx.put(
             make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), project_id),
             &data,
         )?;
 
-        self.idx
-            .update(idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)?;
+        update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)?;
 
         Ok(project)
     }
 
     fn delete(&self, organization_id: u64, project_id: u64) -> Result<Project> {
-        let _guard = self.guard.write().unwrap();
-        let project = self.get_by_id(organization_id, project_id)?;
-        self.store.delete(make_data_value_key(
-            org_ns(organization_id, NAMESPACE).as_slice(),
-            project_id,
-        ))?;
+        let tx = self.db.transaction();
 
-        self.idx
-            .delete(index_keys(organization_id, &project.name, project.token.as_str()).as_ref())?;
+        let project = self._get_by_id(&tx,organization_id,project_id)?;
+        tx.delete(make_data_value_key(NAMESPACE, project_id))?;
+
+        delete_index(&tx, index_keys(organization_id,&project.name,&project.token).as_ref())?;
 
         Ok(project)
     }

@@ -18,8 +18,11 @@ pub enum MetadataError {
     AlreadyExists(String),
     #[error("not found {0:?}")]
     NotFound(String),
+    #[error("bad request {0:?}")]
+    BadRequest(String),
     #[error("internal: {0:?}")]
     Internal(String),
+    #[error("rocksdb: {0:?}")]
     RocksDb(#[from] rocksdb::Error),
     #[error("from utf {0:?}")]
     FromUtf8(#[from] FromUtf8Error),

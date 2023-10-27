@@ -6,13 +6,19 @@ use bincode::deserialize;
 use bincode::serialize;
 use chrono::Utc;
 use common::types::OptionalProperty;
+use rocksdb::Transaction;
+use rocksdb::TransactionDB;
 
 use super::CreateOrganizationRequest;
 use super::Organization;
 use crate::error;
 use crate::error::MetadataError;
-use crate::error::OrganizationError;
-use crate::error::StoreError;
+use crate::index::check_insert_constraints;
+use crate::index::check_update_constraints;
+use crate::index::delete_index;
+use crate::index::insert_index;
+use crate::index::next_seq;
+use crate::index::update_index;
 use crate::metadata::ListResponse;
 use crate::organizations::Provider;
 use crate::organizations::UpdateOrganizationRequest;
@@ -23,6 +29,7 @@ use crate::store::path_helpers::make_id_seq_key;
 use crate::store::path_helpers::make_index_key;
 use crate::store::Store;
 use crate::Result;
+
 const NAMESPACE: &[u8] = b"organizations";
 const IDX_NAME: &[u8] = b"name";
 
@@ -35,39 +42,35 @@ fn index_name_key(name: &str) -> Option<Vec<u8>> {
 }
 
 pub struct ProviderImpl {
-    store: Arc<Store>,
-    idx: HashMap,
-    guard: RwLock<()>,
+    db: Arc<TransactionDB>,
 }
 
 impl ProviderImpl {
-    pub fn new(kv: Arc<Store>) -> Self {
-        ProviderImpl {
-            store: kv.clone(),
-            idx: HashMap::new(kv),
-            guard: RwLock::new(()),
+    pub fn new(db: Arc<TransactionDB>) -> Self {
+        ProviderImpl { db }
+    }
+
+    pub fn _get_by_id(&self, tx: &Transaction<TransactionDB>, id: u64) -> Result<Organization> {
+        let key = make_data_value_key(NAMESPACE, id);
+
+        match tx.get(key)? {
+            None => Err(MetadataError::NotFound(
+                "organization not found".to_string(),
+            )),
+            Some(value) => Ok(deserialize(&value)?),
         }
     }
 }
 
 impl Provider for ProviderImpl {
     fn create(&self, req: CreateOrganizationRequest) -> Result<Organization> {
-        let _guard = self.guard.write().unwrap();
+        let tx = self.db.transaction();
 
         let idx_keys = index_keys(&req.name);
-        match self.idx.check_insert_constraints(idx_keys.as_ref()) {
-            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
-                return Err(OrganizationError::OrganizationAlreadyExist(
-                    error::Organization::new_with_name(req.name),
-                )
-                .into());
-            }
-            Err(other) => return Err(other),
-            Ok(_) => {}
-        }
+        check_insert_constraints(&tx, idx_keys.as_ref())?;
 
         let created_at = Utc::now();
-        let id = self.store.next_seq(make_id_seq_key(NAMESPACE))?;
+        let id = next_seq(&tx, make_id_seq_key(NAMESPACE))?;
 
         let org = Organization {
             id,
@@ -79,33 +82,29 @@ impl Provider for ProviderImpl {
         };
 
         let data = serialize(&org)?;
-        self.store.put(make_data_value_key(NAMESPACE, id), &data)?;
+        tx.put(make_data_value_key(NAMESPACE, id), &data)?;
 
-        self.idx.insert(idx_keys.as_ref(), &data)?;
+        insert_index(&tx, idx_keys.as_ref(), &data)?;
 
         Ok(org)
     }
 
     fn get_by_id(&self, id: u64) -> Result<Organization> {
-        let key = make_data_value_key(NAMESPACE, id);
+        let tx = self.db.transaction();
 
-        match self.store.get(key)? {
-            None => Err(
-                OrganizationError::OrganizationNotFound(error::Organization::new_with_id(id))
-                    .into(),
-            ),
-            Some(value) => Ok(deserialize(&value)?),
-        }
+        self._get_by_id(&tx, id)
     }
 
     fn list(&self) -> Result<ListResponse<Organization>> {
-        list(self.store.clone(), NAMESPACE)
+        let tx = self.db.transaction();
+
+        list(&tx, NAMESPACE)
     }
 
     fn update(&self, org_id: u64, req: UpdateOrganizationRequest) -> Result<Organization> {
-        let _guard = self.guard.write().unwrap();
+        let tx = self.db.transaction();
 
-        let prev_org = self.get_by_id(org_id)?;
+        let prev_org = self._get_by_id(&tx, org_id)?;
 
         let mut org = prev_org.clone();
 
@@ -117,39 +116,26 @@ impl Provider for ProviderImpl {
             org.name = name.to_owned();
         }
 
-        match self
-            .idx
-            .check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())
-        {
-            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
-                return Err(OrganizationError::OrganizationAlreadyExist(
-                    error::Organization::new_with_id(org_id),
-                )
-                .into());
-            }
-            Err(other) => return Err(other),
-            Ok(_) => {}
-        }
+        check_update_constraints(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref())?;
 
         org.updated_at = Some(Utc::now());
         org.updated_by = Some(req.updated_by);
 
         let data = serialize(&org)?;
-        self.store
-            .put(make_data_value_key(NAMESPACE, org.id), &data)?;
+        tx.put(make_data_value_key(NAMESPACE, org.id), &data)?;
 
-        self.idx
-            .update(idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)?;
+        update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)?;
 
         Ok(org)
     }
 
     fn delete(&self, id: u64) -> Result<Organization> {
-        let _guard = self.guard.write().unwrap();
-        let org = self.get_by_id(id)?;
-        self.store.delete(make_data_value_key(NAMESPACE, id))?;
+        let tx = self.db.transaction();
 
-        self.idx.delete(index_keys(&org.name).as_ref())?;
+        let org = self._get_by_id(&tx, id)?;
+        tx.delete(make_data_value_key(NAMESPACE, id))?;
+
+        delete_index(&tx, index_keys(&org.name).as_ref())?;
 
         Ok(org)
     }

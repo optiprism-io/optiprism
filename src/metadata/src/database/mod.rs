@@ -8,13 +8,18 @@ pub use provider_impl::ProviderImpl;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::metadata::ListResponse;
 use crate::properties::DictionaryType;
 use crate::Result;
 
 pub trait Provider: Sync + Send {
-    fn create_table(&self, table: Table) -> Result<()>;
-    fn get_table(&self, table_type: TableRef) -> Result<Table>;
-    fn add_column(&self, table_type: TableRef, col: Column) -> Result<()>;
+    fn create(&self, req: CreateTableRequest) -> Result<Table>;
+    fn get_by_id(&self, id: u64) -> Result<Table>;
+    fn get_by_ref(&self, typ: TableRef) -> Result<Table>;
+    fn list(&self) -> Result<ListResponse<Table>>;
+    fn add_column(&self, typ: &TableRef, col: Column) -> Result<()>;
+    fn update(&self, table_id: u64, req: UpdateTableRequest) -> Result<Table>;
+    fn delete(&self, id: u64) -> Result<Table>;
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -24,8 +29,19 @@ pub enum TableRef {
     System(String),
 }
 
+impl ToString for TableRef {
+    fn to_string(&self) -> String {
+        match self {
+            TableRef::Events(org, proj) => format!("events_{}_{}", org, proj),
+            TableRef::Users(org, proj) => format!("users_{}_{}", org, proj),
+            TableRef::System(name) => format!("system_{}", name),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Table {
+    pub id: u64,
     pub typ: TableRef,
     pub columns: Vec<Column>,
 }
@@ -91,4 +107,14 @@ impl TableRef {
             TableRef::System(name) => format!("system({name})"),
         }
     }
+}
+
+pub struct CreateTableRequest {
+    pub typ: TableRef,
+    pub columns: Vec<Column>,
+}
+
+pub struct UpdateTableRequest {
+    pub typ: TableRef,
+    pub columns: Vec<Column>,
 }

@@ -6,12 +6,13 @@ use std::sync::RwLock;
 use async_trait::async_trait;
 use byteorder::ByteOrder;
 use byteorder::LittleEndian;
+use rocksdb::Transaction;
+use rocksdb::TransactionDB;
 
 use crate::dictionaries::Provider;
-use crate::error::DictionaryError;
-use crate::error::DictionaryKey;
-use crate::error::DictionaryValue;
+use crate::error::MetadataError;
 use crate::error::Result;
+use crate::index::next_seq;
 use crate::store::path_helpers::make_id_seq_key;
 use crate::store::path_helpers::org_proj_ns;
 use crate::store::Store;
@@ -42,16 +43,12 @@ fn make_value_key(organization_id: u64, project_id: u64, dict: &str, value: &str
 
 #[derive(Debug)]
 pub struct ProviderImpl {
-    store: Arc<Store>,
-    _guard: RwLock<()>,
+    db: Arc<TransactionDB>,
 }
 
 impl ProviderImpl {
-    pub fn new(store: Arc<Store>) -> Self {
-        Self {
-            store,
-            _guard: RwLock::new(()),
-        }
+    pub fn new(db: Arc<TransactionDB>) -> Self {
+        Self { db }
     }
 }
 
@@ -63,21 +60,21 @@ impl Provider for ProviderImpl {
         dict: &str,
         value: &str,
     ) -> Result<u64> {
-        // TODO investigate deadlock
-        // let a = self._guard.write().unwrap();
-        match self
-            .store
-            .get(make_value_key(organization_id, project_id, dict, value))?
-        {
+        let tx = self.db.transaction();
+        match tx.get(make_value_key(organization_id, project_id, dict, value))? {
             None => {
-                let id = self.store.next_seq(make_id_seq_key(
-                    org_proj_ns(organization_id, project_id, dict_ns(dict).as_slice()).as_slice(),
-                ))?;
-                self.store.put(
+                let id = next_seq(
+                    &tx,
+                    make_id_seq_key(
+                        org_proj_ns(organization_id, project_id, dict_ns(dict).as_slice())
+                            .as_slice(),
+                    ),
+                )?;
+                tx.put(
                     make_key_key(organization_id, project_id, dict, id),
                     value.as_bytes(),
                 )?;
-                self.store.put(
+                tx.put(
                     make_value_key(organization_id, project_id, dict, value),
                     id.to_le_bytes().as_ref(),
                 )?;
@@ -95,15 +92,10 @@ impl Provider for ProviderImpl {
         dict: &str,
         key: u64,
     ) -> Result<String> {
+        let tx = self.db.transaction();
         let store_key = make_key_key(organization_id, project_id, dict, key);
-        match self.store.get(store_key.as_slice())? {
-            None => Err(DictionaryError::KeyNotFound(DictionaryKey::new(
-                organization_id,
-                project_id,
-                dict.to_string(),
-                key,
-            ))
-            .into()),
+        match tx.get(store_key.as_slice())? {
+            None => Err(MetadataError::NotFound("key not found".to_string())),
             Some(value) => Ok(String::from_utf8(value)?),
         }
     }
@@ -115,15 +107,10 @@ impl Provider for ProviderImpl {
         dict: &str,
         value: &str,
     ) -> Result<u64> {
+        let tx = self.db.transaction();
         let store_key = make_value_key(organization_id, project_id, dict, value);
-        match self.store.get(store_key.as_slice())? {
-            None => Err(DictionaryError::ValueNotFound(DictionaryValue::new(
-                organization_id,
-                project_id,
-                dict.to_string(),
-                value.to_string(),
-            ))
-            .into()),
+        match tx.get(store_key.as_slice())? {
+            None => Err(MetadataError::NotFound("key not found".to_string())),
             Some(key) => Ok(LittleEndian::read_u64(key.as_slice())),
         }
     }

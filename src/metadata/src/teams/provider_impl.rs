@@ -6,11 +6,17 @@ use bincode::deserialize;
 use bincode::serialize;
 use chrono::Utc;
 use common::types::OptionalProperty;
+use rocksdb::Transaction;
+use rocksdb::TransactionDB;
 
 use crate::error;
 use crate::error::MetadataError;
-use crate::error::StoreError;
-use crate::error::TeamError;
+use crate::index::check_insert_constraints;
+use crate::index::check_update_constraints;
+use crate::index::delete_index;
+use crate::index::insert_index;
+use crate::index::next_seq;
+use crate::index::update_index;
 use crate::metadata::ListResponse;
 use crate::store::index::hash_map::HashMap;
 use crate::store::path_helpers::list;
@@ -44,43 +50,44 @@ fn index_name_key(organization_id: u64, name: &str) -> Option<Vec<u8>> {
 }
 
 pub struct ProviderImpl {
-    store: Arc<Store>,
-    idx: HashMap,
-    guard: RwLock<()>,
+    db: Arc<TransactionDB>,
 }
 
 impl ProviderImpl {
-    pub fn new(kv: Arc<Store>) -> Self {
-        ProviderImpl {
-            store: kv.clone(),
-            idx: HashMap::new(kv),
-            guard: RwLock::new(()),
+    pub fn new(db: Arc<TransactionDB>) -> Self {
+        ProviderImpl { db }
+    }
+
+    fn _get_by_id(
+        &self,
+        tx: &Transaction<TransactionDB>,
+        organization_id: u64,
+        team_id: u64,
+    ) -> Result<Team> {
+        let key = make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), team_id);
+
+        match tx.get(key)? {
+            None => Err(MetadataError::NotFound(
+                "custom event not found".to_string(),
+            )),
+            Some(value) => Ok(deserialize(&value)?),
         }
     }
 }
 
 impl Provider for ProviderImpl {
     fn create(&self, organization_id: u64, req: CreateTeamRequest) -> Result<Team> {
-        let _guard = self.guard.write().unwrap();
+        let tx = self.db.transaction();
 
         let idx_keys = index_keys(organization_id, &req.name);
 
-        match self.idx.check_insert_constraints(idx_keys.as_ref()) {
-            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
-                return Err(TeamError::TeamAlreadyExist(error::Team::new_with_name(
-                    organization_id,
-                    req.name,
-                ))
-                .into());
-            }
-            Err(other) => return Err(other),
-            Ok(_) => {}
-        }
+        check_insert_constraints(&tx, idx_keys.as_ref())?;
 
         let created_at = Utc::now();
-        let id = self.store.next_seq(make_id_seq_key(
-            org_ns(organization_id, NAMESPACE).as_slice(),
-        ))?;
+        let id = next_seq(
+            &tx,
+            make_id_seq_key(org_ns(organization_id, NAMESPACE).as_slice()),
+        )?;
 
         let team = Team {
             id,
@@ -92,40 +99,32 @@ impl Provider for ProviderImpl {
             name: req.name,
         };
         let data = serialize(&team)?;
-        self.store.put(
+        tx.put(
             make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), team.id),
             &data,
         )?;
 
-        self.idx.insert(idx_keys.as_ref(), &data)?;
+        insert_index(&tx, idx_keys.as_ref(), &data)?;
 
         Ok(team)
     }
 
     fn get_by_id(&self, organization_id: u64, team_id: u64) -> Result<Team> {
-        let key = make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), team_id);
+        let tx = self.db.transaction();
 
-        match self.store.get(key)? {
-            None => Err(TeamError::TeamNotFound(error::Team::new_with_id(
-                organization_id,
-                team_id,
-            ))
-            .into()),
-            Some(value) => Ok(deserialize(&value)?),
-        }
+        self._get_by_id(&tx, organization_id, team_id)
     }
 
     fn list(&self, organization_id: u64) -> Result<ListResponse<Team>> {
-        list(
-            self.store.clone(),
-            org_ns(organization_id, NAMESPACE).as_slice(),
-        )
+        let tx = self.db.transaction();
+
+        list(&tx, org_ns(organization_id, NAMESPACE).as_slice())
     }
 
     fn update(&self, organization_id: u64, team_id: u64, req: UpdateTeamRequest) -> Result<Team> {
-        let _guard = self.guard.write().unwrap();
+        let tx = self.db.transaction();
 
-        let prev_team = self.get_by_id(organization_id, team_id)?;
+        let prev_team = self._get_by_id(&tx, organization_id, team_id)?;
         let mut team = prev_team.clone();
 
         let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
@@ -136,46 +135,32 @@ impl Provider for ProviderImpl {
             team.name = name.to_owned();
         }
 
-        match self
-            .idx
-            .check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())
-        {
-            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
-                return Err(TeamError::TeamAlreadyExist(error::Team::new_with_id(
-                    organization_id,
-                    team_id,
-                ))
-                .into());
-            }
-            Err(other) => return Err(other),
-            Ok(_) => {}
-        }
+        check_update_constraints(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref())?;
 
         team.updated_at = Some(Utc::now());
         team.updated_by = Some(req.updated_by);
 
         let data = serialize(&team)?;
-        self.store.put(
+        tx.put(
             make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), team_id),
             &data,
         )?;
 
-        self.idx
-            .update(idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)?;
+        update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)?;
 
         Ok(team)
     }
 
     fn delete(&self, organization_id: u64, team_id: u64) -> Result<Team> {
-        let _guard = self.guard.write().unwrap();
-        let team = self.get_by_id(organization_id, team_id)?;
-        self.store.delete(make_data_value_key(
+        let tx = self.db.transaction();
+
+        let team = self._get_by_id(&tx, organization_id, team_id)?;
+        tx.delete(make_data_value_key(
             org_ns(organization_id, NAMESPACE).as_slice(),
             team_id,
         ))?;
 
-        self.idx
-            .delete(index_keys(organization_id, &team.name).as_ref())?;
+        delete_index(&tx, index_keys(organization_id, &team.name).as_ref())?;
 
         Ok(team)
     }

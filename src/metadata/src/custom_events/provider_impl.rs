@@ -9,6 +9,8 @@ use common::query::EventRef;
 use common::types::OptionalProperty;
 use futures::future::BoxFuture;
 use futures::future::FutureExt;
+use rocksdb::Transaction;
+use rocksdb::TransactionDB;
 
 use crate::custom_events::CreateCustomEventRequest;
 use crate::custom_events::CustomEvent;
@@ -16,10 +18,15 @@ use crate::custom_events::Event;
 use crate::custom_events::Provider;
 use crate::custom_events::UpdateCustomEventRequest;
 use crate::error;
-use crate::error::CustomEventError;
 use crate::error::MetadataError;
-use crate::error::StoreError;
 use crate::events;
+use crate::index::check_insert_constraints;
+use crate::index::check_update_constraints;
+use crate::index::delete_index;
+use crate::index::get_index;
+use crate::index::insert_index;
+use crate::index::next_seq;
+use crate::index::update_index;
 use crate::metadata::ListResponse;
 use crate::store::index::hash_map::HashMap;
 use crate::store::path_helpers::list;
@@ -50,30 +57,24 @@ fn index_name_key(organization_id: u64, project_id: u64, name: &str) -> Option<V
 }
 
 pub struct ProviderImpl {
-    store: Arc<Store>,
+    db: Arc<TransactionDB>,
     events: Arc<dyn events::Provider>,
-    idx: HashMap,
-    guard: RwLock<()>,
     max_events_level: usize,
 }
 
 impl ProviderImpl {
-    pub fn new(kv: Arc<Store>, events: Arc<dyn events::Provider>) -> Self {
+    pub fn new(db: Arc<TransactionDB>, events: Arc<dyn events::Provider>) -> Self {
         ProviderImpl {
-            store: kv.clone(),
+            db,
             events,
-            idx: HashMap::new(kv),
-            guard: RwLock::new(()),
             max_events_level: MAX_EVENTS_LEVEL,
         }
     }
 
     pub fn with_max_events_level(self, max_events_level: usize) -> Self {
         Self {
-            store: self.store,
+            db: self.db,
             events: self.events,
-            idx: self.idx,
-            guard: self.guard,
             max_events_level,
         }
     }
@@ -87,7 +88,10 @@ impl ProviderImpl {
         ids: &'a mut Vec<u64>,
     ) -> Result<()> {
         if level > self.max_events_level {
-            return Err(CustomEventError::RecursionLevelExceeded(self.max_events_level).into());
+            return Err(MetadataError::BadRequest(format!(
+                "max level exceeded: {}",
+                self.max_events_level
+            )));
         }
 
         for event in events.iter() {
@@ -101,7 +105,9 @@ impl ProviderImpl {
                 }
                 EventRef::Custom(id) => {
                     if ids.contains(id) {
-                        return Err(CustomEventError::DuplicateEvent.into());
+                        return Err(MetadataError::AlreadyExists(
+                            "custom event already exist".to_string(),
+                        ));
                     }
                     let custom_event = self.get_by_id(organization_id, project_id, *id)?;
                     ids.push(custom_event.id);
@@ -118,6 +124,26 @@ impl ProviderImpl {
 
         Ok(())
     }
+
+    fn _get_by_id(
+        &self,
+        tx: &Transaction<TransactionDB>,
+        organization_id: u64,
+        project_id: u64,
+        id: u64,
+    ) -> Result<CustomEvent> {
+        let key = make_data_value_key(
+            org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
+            id,
+        );
+
+        match tx.get(key)? {
+            None => Err(MetadataError::NotFound(
+                "custom event not found".to_string(),
+            )),
+            Some(value) => Ok(deserialize(&value)?),
+        }
+    }
 }
 
 impl Provider for ProviderImpl {
@@ -127,10 +153,8 @@ impl Provider for ProviderImpl {
         project_id: u64,
         req: CreateCustomEventRequest,
     ) -> Result<CustomEvent> {
-        let _guard = self.guard.write().unwrap();
-
         if req.events.is_empty() {
-            return Err(CustomEventError::EmptyEvents.into());
+            return Err(MetadataError::BadRequest("empty events".to_string()));
         }
 
         let mut ids = Vec::new();
@@ -138,21 +162,14 @@ impl Provider for ProviderImpl {
 
         let idx_keys = index_keys(organization_id, project_id, &req.name);
 
-        match self.idx.check_insert_constraints(idx_keys.as_ref()) {
-            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
-                return Err(CustomEventError::EventAlreadyExist(
-                    error::CustomEvent::new_with_name(organization_id, project_id, req.name),
-                )
-                .into());
-            }
-            Err(other) => return Err(other),
-            Ok(_) => {}
-        }
+        let tx = self.db.transaction();
+        check_insert_constraints(&tx, idx_keys.as_ref())?;
 
         let created_at = Utc::now();
-        let id = self.store.next_seq(make_id_seq_key(
-            org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
-        ))?;
+        let id = next_seq(
+            &tx,
+            make_id_seq_key(org_proj_ns(organization_id, project_id, NAMESPACE).as_slice()),
+        )?;
 
         let event = CustomEvent {
             id,
@@ -169,7 +186,7 @@ impl Provider for ProviderImpl {
             events: req.events,
         };
         let data = serialize(&event)?;
-        self.store.put(
+        self.db.put(
             make_data_value_key(
                 org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
                 event.id,
@@ -177,28 +194,15 @@ impl Provider for ProviderImpl {
             &data,
         )?;
 
-        self.idx.insert(idx_keys.as_ref(), &data)?;
+        insert_index(&tx, idx_keys.as_ref(), &data)?;
 
         Ok(event)
     }
 
     fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<CustomEvent> {
-        let key = make_data_value_key(
-            org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
-            id,
-        );
+        let tx = self.db.transaction();
 
-        match self.store.get(key)? {
-            None => Err(
-                CustomEventError::EventNotFound(error::CustomEvent::new_with_id(
-                    organization_id,
-                    project_id,
-                    id,
-                ))
-                .into(),
-            ),
-            Some(value) => Ok(deserialize(&value)?),
-        }
+        self._get_by_id(&tx, organization_id, project_id, id)
     }
 
     fn get_by_name(
@@ -207,27 +211,22 @@ impl Provider for ProviderImpl {
         project_id: u64,
         name: &str,
     ) -> Result<CustomEvent> {
-        match self.idx.get(make_index_key(
-            org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
-            IDX_NAME,
-            name,
-        )) {
-            Err(MetadataError::Store(StoreError::KeyNotFound(name))) => Err(
-                CustomEventError::EventNotFound(error::CustomEvent::new_with_name(
-                    organization_id,
-                    project_id,
-                    name,
-                ))
-                .into(),
+        let tx = self.db.transaction();
+        let data = get_index(
+            &tx,
+            make_index_key(
+                org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
+                IDX_NAME,
+                name,
             ),
-            Err(other) => Err(other),
-            Ok(data) => Ok(deserialize(&data)?),
-        }
+        )?;
+        Ok(deserialize(&data)?)
     }
 
     fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<CustomEvent>> {
+        let tx = self.db.transaction();
         list(
-            self.store.clone(),
+            &tx,
             org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
         )
     }
@@ -239,9 +238,9 @@ impl Provider for ProviderImpl {
         event_id: u64,
         req: UpdateCustomEventRequest,
     ) -> Result<CustomEvent> {
-        let _guard = self.guard.write().unwrap();
+        let tx = self.db.transaction();
 
-        let prev_event = self.get_by_id(organization_id, project_id, event_id)?;
+        let prev_event = self._get_by_id(&tx, organization_id, project_id, event_id)?;
         let mut event = prev_event.clone();
 
         let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
@@ -256,23 +255,7 @@ impl Provider for ProviderImpl {
             event.name = name.to_owned();
         }
 
-        match self
-            .idx
-            .check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())
-        {
-            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
-                return Err(
-                    CustomEventError::EventAlreadyExist(error::CustomEvent::new_with_id(
-                        organization_id,
-                        project_id,
-                        event_id,
-                    ))
-                    .into(),
-                );
-            }
-            Err(other) => return Err(other),
-            Ok(_) => {}
-        }
+        check_update_constraints(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref())?;
 
         event.updated_at = Some(Utc::now());
         event.updated_by = Some(req.updated_by);
@@ -291,7 +274,7 @@ impl Provider for ProviderImpl {
 
         if let OptionalProperty::Some(events) = req.events {
             if events.is_empty() {
-                return Err(CustomEventError::EmptyEvents.into());
+                return Err(MetadataError::BadRequest("empty events".to_string()));
             }
 
             let mut ids = vec![event.id];
@@ -301,7 +284,7 @@ impl Provider for ProviderImpl {
         }
 
         let data = serialize(&event)?;
-        self.store.put(
+        tx.put(
             make_data_value_key(
                 org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
                 event.id,
@@ -309,21 +292,22 @@ impl Provider for ProviderImpl {
             &data,
         )?;
 
-        self.idx
-            .update(idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)?;
+        update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)?;
         Ok(event)
     }
 
     fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<CustomEvent> {
-        let _guard = self.guard.write().unwrap();
-        let event = self.get_by_id(organization_id, project_id, id)?;
-        self.store.delete(make_data_value_key(
+        let tx = self.db.transaction();
+        let event = self._get_by_id(&tx, organization_id, project_id, id)?;
+        tx.delete(make_data_value_key(
             org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
             id,
         ))?;
 
-        self.idx
-            .delete(index_keys(organization_id, project_id, &event.name).as_ref())?;
+        delete_index(
+            &tx,
+            index_keys(organization_id, project_id, &event.name).as_ref(),
+        )?;
 
         Ok(event)
     }

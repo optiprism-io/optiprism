@@ -6,11 +6,18 @@ use bincode::deserialize;
 use bincode::serialize;
 use chrono::Utc;
 use common::types::OptionalProperty;
+use rocksdb::Transaction;
+use rocksdb::TransactionDB;
 
 use crate::error;
 use crate::error::MetadataError;
-use crate::error::PropertyError;
-use crate::error::StoreError;
+use crate::index::check_insert_constraints;
+use crate::index::check_update_constraints;
+use crate::index::delete_index;
+use crate::index::get_index;
+use crate::index::insert_index;
+use crate::index::next_seq;
+use crate::index::update_index;
 use crate::metadata::ListResponse;
 use crate::properties::CreatePropertyRequest;
 use crate::properties::Property;
@@ -76,54 +83,44 @@ fn index_display_name_key(
 }
 
 pub struct ProviderImpl {
-    store: Arc<Store>,
-    idx: HashMap,
-    guard: RwLock<()>,
+    db: Arc<TransactionDB>,
     typ: Type,
 }
 
 impl ProviderImpl {
-    pub fn new_user(kv: Arc<Store>) -> Self {
+    pub fn new_user(db: Arc<TransactionDB>) -> Self {
         ProviderImpl {
-            store: kv.clone(),
-            idx: HashMap::new(kv),
-            guard: RwLock::new(()),
+            db,
             typ: Type::User,
         }
     }
 
-    pub fn new_event(kv: Arc<Store>) -> Self {
+    pub fn new_event(db: Arc<TransactionDB>) -> Self {
         ProviderImpl {
-            store: kv.clone(),
-            idx: HashMap::new(kv),
-            guard: RwLock::new(()),
+            db,
             typ: Type::Event,
         }
     }
 
-    fn _get_by_name(&self, organization_id: u64, project_id: u64, name: &str) -> Result<Property> {
-        match self.idx.get(make_index_key(
+    fn _get_by_name(
+        &self,
+        tx: &Transaction<TransactionDB>,
+        organization_id: u64,
+        project_id: u64,
+        name: &str,
+    ) -> Result<Property> {
+        let data = get_index(make_index_key(
             org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
             IDX_NAME,
             name,
-        )) {
-            Err(MetadataError::Store(StoreError::KeyNotFound(_))) => {
-                Err(PropertyError::PropertyNotFound(error::Property {
-                    organization_id,
-                    project_id,
-                    event_id: None,
-                    property_id: None,
-                    property_name: Some(name.to_string()),
-                })
-                .into())
-            }
-            Err(other) => Err(other),
-            Ok(data) => Ok(deserialize(&data)?),
-        }
+        ))?;
+
+        Ok(deserialize(&data)?)
     }
 
     fn _create(
         &self,
+        tx: &Transaction<TransactionDB>,
         organization_id: u64,
         project_id: u64,
         req: CreatePropertyRequest,
@@ -135,24 +132,15 @@ impl ProviderImpl {
             &req.name,
             req.display_name.clone(),
         );
-        match self.idx.check_insert_constraints(idx_keys.as_ref()) {
-            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
-                return Err(PropertyError::PropertyAlreadyExist(error::Property {
-                    organization_id,
-                    project_id,
-                    event_id: None,
-                    property_id: None,
-                    property_name: Some(req.name),
-                })
-                .into());
-            }
-            Err(other) => return Err(other),
-            Ok(_) => {}
-        }
 
-        let id = self.store.next_seq(make_id_seq_key(
-            org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
-        ))?;
+        check_insert_constraints(&tx, idx_keys.as_ref())?;
+
+        let id = next_seq(
+            &tx,
+            make_id_seq_key(
+                org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
+            ),
+        )?;
         let created_at = Utc::now();
 
         let prop = Property {
@@ -177,7 +165,7 @@ impl ProviderImpl {
         };
 
         let data = serialize(&prop)?;
-        self.store.put(
+        tx.put(
             make_data_value_key(
                 org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
                 prop.id,
@@ -185,7 +173,7 @@ impl ProviderImpl {
             &data,
         )?;
 
-        self.idx.insert(idx_keys.as_ref(), &data)?;
+        insert_index(&tx, idx_keys.as_ref(), &data)?;
         Ok(prop)
     }
 }
@@ -197,8 +185,8 @@ impl Provider for ProviderImpl {
         project_id: u64,
         req: CreatePropertyRequest,
     ) -> Result<Property> {
-        let _guard = self.guard.write().unwrap();
-        self._create(organization_id, project_id, req)
+        let tx = self.db.transaction();
+        self._create(&tx, organization_id, project_id, req)
     }
 
     fn get_or_create(
@@ -207,43 +195,38 @@ impl Provider for ProviderImpl {
         project_id: u64,
         req: CreatePropertyRequest,
     ) -> Result<Property> {
-        let _guard = self.guard.write().unwrap();
-        match self._get_by_name(organization_id, project_id, req.name.as_str()) {
+        let tx = self.db.transaction();
+        match self._get_by_name(&tx, organization_id, project_id, req.name.as_str()) {
             Ok(event) => return Ok(event),
-            Err(MetadataError::Property(PropertyError::PropertyNotFound(_))) => {}
+            Err(MetadataError::NotFound(_)) => {}
             other => return other,
         }
 
-        self._create(organization_id, project_id, req)
+        self._create(&tx, organization_id, project_id, req)
     }
 
     fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Property> {
+        let tx = self.db.transaction();
         let key = make_data_value_key(
             org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
             id,
         );
 
-        match self.store.get(&key)? {
-            None => Err(PropertyError::PropertyNotFound(error::Property {
-                organization_id,
-                project_id,
-                event_id: None,
-                property_id: Some(id),
-                property_name: None,
-            })
-            .into()),
+        match tx.get(key)? {
+            None => Err(MetadataError::NotFound("property not found".to_string())),
             Some(value) => Ok(deserialize(&value)?),
         }
     }
 
     fn get_by_name(&self, organization_id: u64, project_id: u64, name: &str) -> Result<Property> {
-        let _guard = self.guard.read();
-        self._get_by_name(organization_id, project_id, name)
+        let tx = self.db.transaction();
+        self._get_by_name(&tx, organization_id, project_id, name)
     }
 
     fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Property>> {
+        let tx = self.db.transaction();
         list(
-            self.store.clone(),
+            &tx,
             org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
         )
     }
@@ -255,7 +238,7 @@ impl Provider for ProviderImpl {
         property_id: u64,
         req: UpdatePropertyRequest,
     ) -> Result<Property> {
-        let _guard = self.guard.write().unwrap();
+        let tx = self.db.transaction();
 
         let prev_prop = self.get_by_id(organization_id, project_id, property_id)?;
         let mut prop = prev_prop.clone();
@@ -292,23 +275,7 @@ impl Provider for ProviderImpl {
             ));
             prop.display_name = display_name.to_owned();
         }
-        match self
-            .idx
-            .check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())
-        {
-            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
-                return Err(PropertyError::PropertyAlreadyExist(error::Property {
-                    organization_id,
-                    project_id,
-                    event_id: None,
-                    property_id: Some(property_id),
-                    property_name: None,
-                })
-                .into());
-            }
-            Err(other) => return Err(other),
-            Ok(_) => {}
-        }
+        check_update_constraints(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref())?;
 
         prop.updated_at = Some(Utc::now());
         prop.updated_by = Some(req.updated_by);
@@ -345,7 +312,7 @@ impl Provider for ProviderImpl {
         }
 
         let data = serialize(&prop)?;
-        self.store.put(
+        tx.put(
             make_data_value_key(
                 org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
                 prop.id,
@@ -353,21 +320,21 @@ impl Provider for ProviderImpl {
             &data,
         )?;
 
-        self.idx
-            .update(idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)?;
+        update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)?;
 
         Ok(prop)
     }
 
     fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Property> {
-        let _guard = self.guard.write().unwrap();
-        let prop = self.get_by_id(organization_id, project_id, id)?;
-        self.store.delete(make_data_value_key(
+        let tx = self.db.transaction();
+        let prop = self._get_by_id(organization_id, project_id, id)?;
+        tx.delete(make_data_value_key(
             org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
             id,
         ))?;
 
-        self.idx.delete(
+        delete_index(
+            &tx,
             index_keys(
                 organization_id,
                 project_id,

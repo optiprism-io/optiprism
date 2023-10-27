@@ -99,7 +99,6 @@ impl Provider for ProviderImpl {
         let tx = self.db.transaction();
 
         let prev_account = self._get_by_id(&tx, account_id)?;
-
         let mut account = prev_account.clone();
 
         let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
