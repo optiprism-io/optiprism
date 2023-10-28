@@ -62,11 +62,8 @@ fn resolve_property(
         dictionary_type,
     };
 
-    let prop = block_on(properties.get_or_create(
-        ctx.organization_id.unwrap(),
-        ctx.project_id.unwrap(),
-        req,
-    ))?;
+    let prop =
+        properties.get_or_create(ctx.organization_id.unwrap(), ctx.project_id.unwrap(), req)?;
     Ok(Property {
         property: prop,
         value: val.to_owned().into(),
@@ -118,24 +115,24 @@ impl Executor<Track> {
     }
 
     pub fn execute(&mut self, ctx: &RequestContext, mut req: Track) -> Result<()> {
-        let project = block_on(self.projects.get_by_token(ctx.token.as_str()))?;
+        let project = self.projects.get_by_token(ctx.token.as_str())?;
         let mut ctx = ctx.to_owned();
         ctx.organization_id = Some(project.organization_id);
         ctx.project_id = Some(project.id);
 
         let user_id = match (&req.user_id, &req.anonymous_id) {
-            (Some(user_id), None) => block_on(self.dicts.get_key_or_create(
+            (Some(user_id), None) => self.dicts.get_key_or_create(
                 ctx.organization_id.unwrap(),
                 ctx.project_id.unwrap(),
                 DICT_USERS,
                 user_id.as_str(),
-            ))?,
-            (None, Some(user_id)) => block_on(self.dicts.get_key_or_create(
+            )?,
+            (None, Some(user_id)) => self.dicts.get_key_or_create(
                 ctx.organization_id.unwrap(),
                 ctx.project_id.unwrap(),
                 DICT_USERS,
                 user_id.as_str(),
-            ))?,
+            )?,
             _ => {
                 return Err(IngesterError::BadRequest(
                     "user_id or anonymous_id must be set".to_string(),
@@ -177,16 +174,15 @@ impl Executor<Track> {
             custom_properties: None,
         };
 
-        let md_event = block_on(self.events.get_or_create(
+        let md_event = self.events.get_or_create(
             ctx.organization_id.unwrap(),
             ctx.project_id.unwrap(),
             event_req,
-        ))?;
-
-        let record_id = block_on(
-            self.events
-                .generate_record_id(ctx.organization_id.unwrap(), ctx.project_id.unwrap()),
         )?;
+
+        let record_id = self
+            .events
+            .generate_record_id(ctx.organization_id.unwrap(), ctx.project_id.unwrap())?;
         let event = Event {
             record_id,
             event: md_event,
@@ -230,7 +226,7 @@ impl Executor<Identify> {
 
     pub fn execute(&mut self, ctx: &RequestContext, mut req: Identify) -> Result<()> {
         let mut ctx = ctx.to_owned();
-        let project = block_on(self.projects.get_by_token(ctx.token.as_str()))?;
+        let project = self.projects.get_by_token(ctx.token.as_str())?;
         let mut ctx = ctx.to_owned();
         ctx.organization_id = Some(project.organization_id);
         ctx.project_id = Some(project.id);

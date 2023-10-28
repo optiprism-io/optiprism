@@ -62,20 +62,17 @@ impl Provider for ProviderImpl {
         let password_hash = make_password_hash(req.password.as_str())
             .map_err(|err| err.wrap_into(AuthError::InvalidPasswordHashing))?;
 
-        let account = self
-            .accounts
-            .create(CreateAccountRequest {
-                created_by: None,
-                password_hash,
-                email: req.email,
-                first_name: req.first_name,
-                last_name: req.last_name,
-                role: None,
-                organizations: None,
-                projects: None,
-                teams: None,
-            })
-            .await?;
+        let account = self.accounts.create(CreateAccountRequest {
+            created_by: None,
+            password_hash,
+            email: req.email,
+            first_name: req.first_name,
+            last_name: req.last_name,
+            role: None,
+            organizations: None,
+            projects: None,
+            teams: None,
+        })?;
 
         let tokens = self.make_tokens(account.id)?;
 
@@ -88,7 +85,6 @@ impl Provider for ProviderImpl {
         let account = self
             .accounts
             .get_by_email(&req.email)
-            .await
             .map_err(|_err| AuthError::InvalidCredentials)?;
 
         verify_password(

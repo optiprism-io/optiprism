@@ -43,7 +43,6 @@ use metadata::organizations::CreateOrganizationRequest;
 use metadata::projects::CreateProjectRequest;
 use metadata::properties::DictionaryType;
 use metadata::properties::Type;
-use metadata::store::Store;
 use metadata::MetadataProvider;
 use parquet::arrow::ArrowWriter;
 use parquet::basic::Compression;
@@ -128,56 +127,44 @@ async fn main() -> Result<(), anyhow::Error> {
         );
     }
 
-    let store = Arc::new(Store::new(md_path.clone()));
+    let store = Arc::new(metadata::rocksdb::new(md_path.clone())?);
     let md = Arc::new(MetadataProvider::try_new(store)?);
 
     info!("creating org structure and admin account...");
     {
-        let admin = md
-            .accounts
-            .create(CreateAccountRequest {
-                created_by: None,
-                password_hash: make_password_hash("admin")?,
-                email: "admin@email.com".to_string(),
-                first_name: Some("admin".to_string()),
-                last_name: None,
-                role: Some(Role::Admin),
-                organizations: None,
-                projects: None,
-                teams: None,
-            })
-            .await?;
+        let admin = md.accounts.create(CreateAccountRequest {
+            created_by: None,
+            password_hash: make_password_hash("admin")?,
+            email: "admin@email.com".to_string(),
+            first_name: Some("admin".to_string()),
+            last_name: None,
+            role: Some(Role::Admin),
+            organizations: None,
+            projects: None,
+            teams: None,
+        })?;
 
-        let org = md
-            .organizations
-            .create(CreateOrganizationRequest {
-                created_by: admin.id,
-                name: "Test Organization".to_string(),
-            })
-            .await?;
+        let org = md.organizations.create(CreateOrganizationRequest {
+            created_by: admin.id,
+            name: "Test Organization".to_string(),
+        })?;
 
-        let proj1 = md
-            .projects
-            .create(org.id, CreateProjectRequest {
-                created_by: admin.id,
-                name: "Test Project".to_string(),
-            })
-            .await?;
+        let proj1 = md.projects.create(org.id, CreateProjectRequest {
+            created_by: admin.id,
+            name: "Test Project".to_string(),
+        })?;
 
-        let _user = md
-            .accounts
-            .create(CreateAccountRequest {
-                created_by: Some(admin.id),
-                password_hash: make_password_hash("test")?,
-                email: "user@test.com".to_string(),
-                first_name: Some("user".to_string()),
-                last_name: None,
-                role: None,
-                organizations: Some(vec![(org.id, OrganizationRole::Member)]),
-                projects: Some(vec![(proj1.id, ProjectRole::Member)]),
-                teams: None,
-            })
-            .await?;
+        let _user = md.accounts.create(CreateAccountRequest {
+            created_by: Some(admin.id),
+            password_hash: make_password_hash("test")?,
+            email: "user@test.com".to_string(),
+            first_name: Some("user".to_string()),
+            last_name: None,
+            role: None,
+            organizations: Some(vec![(org.id, OrganizationRole::Member)]),
+            projects: Some(vec![(proj1.id, ProjectRole::Member)]),
+            teams: None,
+        })?;
     }
 
     debug!("metadata path: {:?}", md_path);
@@ -217,10 +204,9 @@ async fn main() -> Result<(), anyhow::Error> {
         md.dictionaries.clone(),
         File::open(args.demo_data_path.join("products.csv"))
             .map_err(|err| EventsGenError::Internal(format!("can't open products.csv: {err}")))?,
-    )
-    .await?;
+    )?;
     info!("creating entities...");
-    let schema = Arc::new(create_entities(org_id, project_id, &md).await?);
+    let schema = Arc::new(create_entities(org_id, project_id, &md)?);
 
     info!("creating generator...");
     let gen_cfg = generator::Config {
@@ -241,15 +227,14 @@ async fn main() -> Result<(), anyhow::Error> {
     for event in all::<Event>() {
         let md_event = md
             .events
-            .get_by_name(org_id, project_id, event.to_string().as_str())
-            .await?;
+            .get_by_name(org_id, project_id, event.to_string().as_str())?;
         events_map.insert(event, md_event.id);
-        block_on(md.dictionaries.get_key_or_create(
+        md.dictionaries.get_key_or_create(
             org_id,
             project_id,
             "event_event",
             event.to_string().as_str(),
-        ))?;
+        )?;
     }
 
     info!("generating events...");
@@ -265,7 +250,7 @@ async fn main() -> Result<(), anyhow::Error> {
     };
 
     let mut scenario = Scenario::new(run_cfg);
-    let partitions = scenario.run().await?;
+    let partitions = scenario.run()?;
 
     let mut rows: usize = 0;
     let mut data_size_bytes: usize = 0;
@@ -308,8 +293,8 @@ async fn main() -> Result<(), anyhow::Error> {
             .progress_chars("#>-"),
     );
 
-    let event_props = block_on(md.event_properties.list(org_id, project_id))?.data;
-    let user_props = block_on(md.user_properties.list(org_id, project_id))?.data;
+    let event_props = md.event_properties.list(org_id, project_id)?.data;
+    let user_props = md.user_properties.list(org_id, project_id)?.data;
     let mut out_fields = vec![];
     for field in schema.fields().iter() {
         if field.name().starts_with("event_") {
@@ -381,12 +366,12 @@ async fn main() -> Result<(), anyhow::Error> {
 
                             for v in arr {
                                 if let Some(i) = v {
-                                    let s = block_on(md.dictionaries.get_value(
+                                    let s = md.dictionaries.get_value(
                                         org_id,
                                         project_id,
                                         field.name(),
                                         i as u64,
-                                    ))?;
+                                    )?;
                                     b.append_value(s);
                                 } else {
                                     b.append_null();
@@ -402,12 +387,12 @@ async fn main() -> Result<(), anyhow::Error> {
                                 .unwrap();
                             for v in arr {
                                 if let Some(i) = v {
-                                    let s = block_on(md.dictionaries.get_value(
+                                    let s = md.dictionaries.get_value(
                                         org_id,
                                         project_id,
                                         field.name(),
                                         i as u64,
-                                    ))?;
+                                    )?;
                                     b.append_value(s);
                                 } else {
                                     b.append_null();
@@ -423,12 +408,12 @@ async fn main() -> Result<(), anyhow::Error> {
                                 .unwrap();
                             for v in arr {
                                 if let Some(i) = v {
-                                    let s = block_on(md.dictionaries.get_value(
+                                    let s = md.dictionaries.get_value(
                                         org_id,
                                         project_id,
                                         field.name(),
                                         i as u64,
-                                    ))?;
+                                    )?;
                                     b.append_value(s);
                                 } else {
                                     b.append_null();
@@ -444,12 +429,12 @@ async fn main() -> Result<(), anyhow::Error> {
                                 .unwrap();
                             for v in arr {
                                 if let Some(i) = v {
-                                    let s = block_on(md.dictionaries.get_value(
+                                    let s = md.dictionaries.get_value(
                                         org_id,
                                         project_id,
                                         field.name(),
                                         i,
-                                    ))?;
+                                    )?;
                                     b.append_value(s);
                                 } else {
                                     b.append_null();

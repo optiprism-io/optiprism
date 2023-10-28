@@ -157,7 +157,8 @@ macro_rules! decode_array {
             match v {
                 None => result.append_null(),
                 Some(key) => {
-                    let value = block_on($dict.get_value(key as u64))
+                    let value = $dict
+                        .get_value(key as u64)
                         .map_err(|err| ArrowError::ExternalError(Box::new(err)))
                         .unwrap();
                     result.append_value(value);

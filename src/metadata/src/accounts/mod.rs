@@ -14,14 +14,13 @@ use serde::Serialize;
 use crate::metadata::ListResponse;
 use crate::Result;
 
-#[async_trait]
 pub trait Provider: Sync + Send {
-    async fn create(&self, req: CreateAccountRequest) -> Result<Account>;
-    async fn get_by_id(&self, id: u64) -> Result<Account>;
-    async fn get_by_email(&self, email: &str) -> Result<Account>;
-    async fn list(&self) -> Result<ListResponse<Account>>;
-    async fn update(&self, account_id: u64, req: UpdateAccountRequest) -> Result<Account>;
-    async fn delete(&self, id: u64) -> Result<Account>;
+    fn create(&self, req: CreateAccountRequest) -> Result<Account>;
+    fn get_by_id(&self, id: u64) -> Result<Account>;
+    fn get_by_email(&self, email: &str) -> Result<Account>;
+    fn list(&self) -> Result<ListResponse<Account>>;
+    fn update(&self, account_id: u64, req: UpdateAccountRequest) -> Result<Account>;
+    fn delete(&self, id: u64) -> Result<Account>;
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]

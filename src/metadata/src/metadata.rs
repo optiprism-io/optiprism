@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -14,7 +15,6 @@ use crate::organizations;
 use crate::projects;
 use crate::properties;
 use crate::reports;
-use crate::store::Store;
 use crate::stub;
 use crate::Result;
 
@@ -34,21 +34,21 @@ pub struct MetadataProvider {
 }
 
 impl MetadataProvider {
-    pub fn try_new(store: Arc<Store>) -> Result<Self> {
-        let events = Arc::new(events::ProviderImpl::new(store.clone()));
+    pub fn try_new(db: Arc<TransactionDB>) -> Result<Self> {
+        let events = Arc::new(events::ProviderImpl::new(db.clone()));
         Ok(MetadataProvider {
-            dashboards: Arc::new(dashboards::ProviderImpl::new(store.clone())),
-            reports: Arc::new(reports::ProviderImpl::new(store.clone())),
+            dashboards: Arc::new(dashboards::ProviderImpl::new(db.clone())),
+            reports: Arc::new(reports::ProviderImpl::new(db.clone())),
             events: events.clone(),
-            custom_events: Arc::new(custom_events::ProviderImpl::new(store.clone(), events)),
-            event_properties: Arc::new(properties::ProviderImpl::new_event(store.clone())),
-            user_properties: Arc::new(properties::ProviderImpl::new_user(store.clone())),
-            custom_properties: Arc::new(custom_properties::ProviderImpl::new(store.clone())),
-            organizations: Arc::new(organizations::ProviderImpl::new(store.clone())),
-            projects: Arc::new(projects::ProviderImpl::new(store.clone())),
-            accounts: Arc::new(accounts::ProviderImpl::new(store.clone())),
-            database: Arc::new(database::ProviderImpl::new(store.clone())),
-            dictionaries: Arc::new(dictionaries::ProviderImpl::new(store)),
+            custom_events: Arc::new(custom_events::ProviderImpl::new(db.clone(), events)),
+            event_properties: Arc::new(properties::ProviderImpl::new_event(db.clone())),
+            user_properties: Arc::new(properties::ProviderImpl::new_user(db.clone())),
+            custom_properties: Arc::new(custom_properties::ProviderImpl::new(db.clone())),
+            organizations: Arc::new(organizations::ProviderImpl::new(db.clone())),
+            projects: Arc::new(projects::ProviderImpl::new(db.clone())),
+            accounts: Arc::new(accounts::ProviderImpl::new(db.clone())),
+            database: Arc::new(database::ProviderImpl::new(db.clone())),
+            dictionaries: Arc::new(dictionaries::ProviderImpl::new(db)),
         })
     }
 

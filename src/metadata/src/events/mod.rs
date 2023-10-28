@@ -11,47 +11,45 @@ use serde::Serialize;
 use crate::metadata::ListResponse;
 use crate::Result;
 
-#[async_trait]
 pub trait Provider: Sync + Send {
-    async fn create(
+    fn create(
         &self,
         organization_id: u64,
         project_id: u64,
         req: CreateEventRequest,
     ) -> Result<Event>;
-    async fn get_or_create(
+    fn get_or_create(
         &self,
         organization_id: u64,
         project_id: u64,
         req: CreateEventRequest,
     ) -> Result<Event>;
-    async fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event>;
-    async fn get_by_name(&self, organization_id: u64, project_id: u64, name: &str)
-    -> Result<Event>;
-    async fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Event>>;
-    async fn update(
+    fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event>;
+    fn get_by_name(&self, organization_id: u64, project_id: u64, name: &str) -> Result<Event>;
+    fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Event>>;
+    fn update(
         &self,
         organization_id: u64,
         project_id: u64,
         event_id: u64,
         req: UpdateEventRequest,
     ) -> Result<Event>;
-    async fn attach_property(
+    fn attach_property(
         &self,
         organization_id: u64,
         project_id: u64,
         event_id: u64,
         prop_id: u64,
     ) -> Result<Event>;
-    async fn detach_property(
+    fn detach_property(
         &self,
         organization_id: u64,
         project_id: u64,
         event_id: u64,
         prop_id: u64,
     ) -> Result<Event>;
-    async fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event>;
-    async fn generate_record_id(&self, organization_id: u64, project_id: u64) -> Result<u64>;
+    fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event>;
+    fn generate_record_id(&self, organization_id: u64, project_id: u64) -> Result<u64>;
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]

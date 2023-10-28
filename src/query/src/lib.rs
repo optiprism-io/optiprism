@@ -347,6 +347,7 @@ pub mod test_util {
     use datafusion_expr::LogicalPlanBuilder;
     use metadata::database;
     use metadata::database::Column;
+    use metadata::database::CreateTableRequest;
     use metadata::database::Table;
     use metadata::database::TableRef;
     use metadata::events;
@@ -354,7 +355,6 @@ pub mod test_util {
     use metadata::properties::CreatePropertyRequest;
     use metadata::properties::Property;
     use metadata::properties::Type;
-    use metadata::store::Store;
     use metadata::MetadataProvider;
     use uuid::Uuid;
 
@@ -366,7 +366,7 @@ pub mod test_util {
         org_id: u64,
         proj_id: u64,
     ) -> Result<LogicalPlan> {
-        let table = db.get_table(TableRef::Events(org_id, proj_id)).await?;
+        let table = db.get_table(TableRef::Events(org_id, proj_id))?;
         let schema = table.arrow_schema();
 
         let options = CsvReadOptions::new();
@@ -394,28 +394,26 @@ pub mod test_util {
         Ok(LogicalPlanBuilder::empty(false).build()?)
     }
 
-    pub async fn create_property(
+    pub fn create_property(
         md: &Arc<MetadataProvider>,
         org_id: u64,
         proj_id: u64,
         req: CreatePropertyRequest,
     ) -> Result<Property> {
         let prop = match req.typ {
-            Type::Event => md.event_properties.create(org_id, proj_id, req).await?,
-            Type::User => md.user_properties.create(org_id, proj_id, req).await?,
+            Type::Event => md.event_properties.create(org_id, proj_id, req)?,
+            Type::User => md.user_properties.create(org_id, proj_id, req)?,
         };
 
-        md.database
-            .add_column(
-                TableRef::Events(org_id, proj_id),
-                Column::new(
-                    prop.column_name(),
-                    prop.data_type.clone().into(),
-                    prop.nullable,
-                    prop.dictionary_type.clone(),
-                ),
-            )
-            .await?;
+        md.database.add_column(
+            TableRef::Events(org_id, proj_id),
+            Column::new(
+                prop.column_name(),
+                prop.data_type.clone().into(),
+                prop.nullable,
+                prop.dictionary_type.clone(),
+            ),
+        )?;
 
         Ok(prop)
     }
@@ -425,46 +423,38 @@ pub mod test_util {
         org_id: u64,
         proj_id: u64,
     ) -> Result<()> {
-        md.database
-            .create_table(Table {
-                typ: TableRef::Events(org_id, proj_id),
-                columns: vec![],
-            })
-            .await?;
+        md.database.create_table(CreateTableRequest {
+            typ: TableRef::Events(org_id, proj_id),
+            columns: vec![],
+        })?;
 
-        md.database
-            .add_column(
-                TableRef::Events(org_id, proj_id),
-                Column::new(
-                    event_fields::USER_ID.to_string(),
-                    DataType::Int64,
-                    false,
-                    None,
-                ),
-            )
-            .await?;
-        md.database
-            .add_column(
-                TableRef::Events(org_id, proj_id),
-                Column::new(
-                    event_fields::CREATED_AT.to_string(),
-                    DataType::Timestamp(arrow::datatypes::TimeUnit::Nanosecond, None),
-                    false,
-                    None,
-                ),
-            )
-            .await?;
-        md.database
-            .add_column(
-                TableRef::Events(org_id, proj_id),
-                Column::new(
-                    event_fields::EVENT.to_string(),
-                    DataType::UInt16,
-                    false,
-                    None,
-                ),
-            )
-            .await?;
+        md.database.add_column(
+            TableRef::Events(org_id, proj_id),
+            Column::new(
+                event_fields::USER_ID.to_string(),
+                DataType::Int64,
+                false,
+                None,
+            ),
+        )?;
+        md.database.add_column(
+            TableRef::Events(org_id, proj_id),
+            Column::new(
+                event_fields::CREATED_AT.to_string(),
+                DataType::Timestamp(arrow::datatypes::TimeUnit::Nanosecond, None),
+                false,
+                None,
+            ),
+        )?;
+        md.database.add_column(
+            TableRef::Events(org_id, proj_id),
+            Column::new(
+                event_fields::EVENT.to_string(),
+                DataType::UInt16,
+                false,
+                None,
+            ),
+        )?;
 
         // create user props
 
@@ -482,25 +472,20 @@ pub mod test_util {
             is_array: false,
             is_dictionary: false,
             dictionary_type: Some(properties::DictionaryType::UInt8),
-        })
-        .await?;
+        })?;
 
-        md.dictionaries
-            .get_key_or_create(
-                org_id,
-                proj_id,
-                country_prop.column_name().as_str(),
-                "spain",
-            )
-            .await?;
-        md.dictionaries
-            .get_key_or_create(
-                org_id,
-                proj_id,
-                country_prop.column_name().as_str(),
-                "german",
-            )
-            .await?;
+        md.dictionaries.get_key_or_create(
+            org_id,
+            proj_id,
+            country_prop.column_name().as_str(),
+            "spain",
+        )?;
+        md.dictionaries.get_key_or_create(
+            org_id,
+            proj_id,
+            country_prop.column_name().as_str(),
+            "german",
+        )?;
         create_property(&md, org_id, proj_id, CreatePropertyRequest {
             created_by: 0,
             tags: None,
@@ -515,8 +500,7 @@ pub mod test_util {
             is_dictionary: false,
             dictionary_type: None,
             is_system: false,
-        })
-        .await?;
+        })?;
 
         create_property(&md, org_id, proj_id, CreatePropertyRequest {
             created_by: 0,
@@ -532,8 +516,7 @@ pub mod test_util {
             is_array: false,
             is_dictionary: false,
             dictionary_type: None,
-        })
-        .await?;
+        })?;
 
         // create events
         md.events
@@ -547,8 +530,7 @@ pub mod test_util {
                 properties: None,
                 custom_properties: None,
                 is_system: false,
-            })
-            .await?;
+            })?;
 
         md.events
             .create(org_id, proj_id, events::CreateEventRequest {
@@ -561,8 +543,7 @@ pub mod test_util {
                 properties: None,
                 custom_properties: None,
                 is_system: false,
-            })
-            .await?;
+            })?;
 
         // create event props
         create_property(&md, org_id, proj_id, CreatePropertyRequest {
@@ -579,8 +560,7 @@ pub mod test_util {
             is_dictionary: false,
             dictionary_type: None,
             is_system: false,
-        })
-        .await?;
+        })?;
 
         create_property(&md, org_id, proj_id, CreatePropertyRequest {
             created_by: 0,
@@ -596,8 +576,7 @@ pub mod test_util {
             is_dictionary: false,
             dictionary_type: None,
             is_system: false,
-        })
-        .await?;
+        })?;
 
         Ok(())
     }
@@ -606,7 +585,7 @@ pub mod test_util {
         let mut path = temp_dir();
         path.push(format!("{}.db", Uuid::new_v4()));
 
-        let store = Arc::new(Store::new(path));
+        let store = Arc::new(metadata::rocksdb::new(path)?);
         Ok(Arc::new(MetadataProvider::try_new(store)?))
     }
 }

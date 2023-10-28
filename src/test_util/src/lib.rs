@@ -15,7 +15,7 @@ use metadata::properties::Property;
 use metadata::properties::Type;
 use metadata::MetadataProvider;
 
-pub async fn create_event(
+pub fn create_event(
     md: &Arc<MetadataProvider>,
     org_id: u64,
     proj_id: u64,
@@ -33,8 +33,7 @@ pub async fn create_event(
             is_system: false,
             properties: None,
             custom_properties: None,
-        })
-        .await?)
+        })?)
 }
 
 pub struct CreatePropertyMainRequest {
@@ -45,7 +44,7 @@ pub struct CreatePropertyMainRequest {
     pub dict: Option<DictionaryType>,
 }
 
-pub async fn create_property(
+pub fn create_property(
     md: &Arc<MetadataProvider>,
     org_id: u64,
     proj_id: u64,
@@ -68,10 +67,7 @@ pub async fn create_property(
         dictionary_type: main_req.dict.clone(),
     };
 
-    let prop = md
-        .event_properties
-        .get_or_create(org_id, proj_id, req)
-        .await?;
+    let prop = md.event_properties.get_or_create(org_id, proj_id, req)?;
 
     let dt = match main_req.data_type {
         DataType::String => arrow::datatypes::DataType::Utf8,

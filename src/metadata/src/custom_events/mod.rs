@@ -13,39 +13,25 @@ use serde::Serialize;
 use crate::metadata::ListResponse;
 use crate::Result;
 
-#[async_trait]
 pub trait Provider: Sync + Send {
-    async fn create(
+    fn create(
         &self,
         organization_id: u64,
         project_id: u64,
         req: CreateCustomEventRequest,
     ) -> Result<CustomEvent>;
-    async fn get_by_id(
-        &self,
-        organization_id: u64,
-        project_id: u64,
-        id: u64,
-    ) -> Result<CustomEvent>;
-    async fn get_by_name(
-        &self,
-        organization_id: u64,
-        project_id: u64,
-        name: &str,
-    ) -> Result<CustomEvent>;
-    async fn list(
-        &self,
-        organization_id: u64,
-        project_id: u64,
-    ) -> Result<ListResponse<CustomEvent>>;
-    async fn update(
+    fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<CustomEvent>;
+    fn get_by_name(&self, organization_id: u64, project_id: u64, name: &str)
+    -> Result<CustomEvent>;
+    fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<CustomEvent>>;
+    fn update(
         &self,
         organization_id: u64,
         project_id: u64,
         event_id: u64,
         req: UpdateCustomEventRequest,
     ) -> Result<CustomEvent>;
-    async fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<CustomEvent>;
+    fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<CustomEvent>;
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]

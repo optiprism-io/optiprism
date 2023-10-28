@@ -16,14 +16,13 @@ use metadata::reports::Type;
 use metadata::reports::UpdateReportRequest;
 use metadata::store::Store;
 use uuid::Uuid;
-
-#[tokio::test]
-async fn test_reports() -> Result<()> {
+#[test]
+fn test_reports() -> Result<()> {
     let mut path = temp_dir();
     path.push(format!("{}.db", Uuid::new_v4()));
 
-    let store = Arc::new(Store::new(path));
-    let reports: Box<dyn Provider> = Box::new(ProviderImpl::new(store.clone()));
+    let db = Arc::new(metadata::rocksdb::new(path).unwrap());
+    let reports: Box<dyn Provider> = Box::new(ProviderImpl::new(db.clone()));
     let create_report_req = CreateReportRequest {
         created_by: 0,
         tags: Some(vec![]),
@@ -71,27 +70,22 @@ async fn test_reports() -> Result<()> {
     };
 
     // try to get, delete, update unexisting report
-    assert!(reports.get_by_id(1, 1, 1).await.is_err());
-    assert!(reports.delete(1, 1, 1).await.is_err());
-    assert!(
-        reports
-            .update(1, 1, 1, update_report_req.clone())
-            .await
-            .is_err()
-    );
+    assert!(reports.get_by_id(1, 1, 1).is_err());
+    assert!(reports.delete(1, 1, 1).is_err());
+    assert!(reports.update(1, 1, 1, update_report_req.clone()).is_err());
 
-    let res = reports.create(1, 1, create_report_req.clone()).await?;
+    let res = reports.create(1, 1, create_report_req.clone())?;
     assert_eq!(res.id, 1);
     // check existence by id
-    assert_eq!(reports.get_by_id(1, 1, 1).await?.id, 1);
+    assert_eq!(reports.get_by_id(1, 1, 1)?.id, 1);
 
-    reports.update(1, 1, 1, update_report_req.clone()).await?;
-    assert_eq!(reports.list(1, 1).await?.data[0].id, 1);
+    reports.update(1, 1, 1, update_report_req.clone())?;
+    assert_eq!(reports.list(1, 1)?.data[0].id, 1);
 
     // delete reports
-    assert_eq!(reports.delete(1, 1, 1).await?.id, 1);
+    assert_eq!(reports.delete(1, 1, 1)?.id, 1);
 
     // reports should gone now
-    assert!(reports.get_by_id(1, 1, 1).await.is_err());
+    assert!(reports.get_by_id(1, 1, 1).is_err());
     Ok(())
 }

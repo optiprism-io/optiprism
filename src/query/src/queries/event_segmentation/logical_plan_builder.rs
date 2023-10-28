@@ -85,15 +85,11 @@ macro_rules! breakdowns_to_dicts {
 
 macro_rules! dictionary_prop_to_col {
     ($self:expr, $md_namespace:ident, $prop_name:expr,  $decode_cols:expr) => {{
-        let prop = $self
-            .metadata
-            .$md_namespace
-            .get_by_name(
-                $self.ctx.organization_id,
-                $self.ctx.project_id,
-                $prop_name.as_str(),
-            )
-            .await?;
+        let prop = $self.metadata.$md_namespace.get_by_name(
+            $self.ctx.organization_id,
+            $self.ctx.project_id,
+            $prop_name.as_str(),
+        )?;
         if !prop.is_dictionary {
             continue;
         }
@@ -113,7 +109,7 @@ macro_rules! dictionary_prop_to_col {
 
 impl LogicalPlanBuilder {
     /// creates logical plan for event segmentation
-    pub async fn build(
+    pub fn build(
         ctx: Context,
         metadata: Arc<MetadataProvider>,
         input: LogicalPlan,
@@ -134,7 +130,7 @@ impl LogicalPlanBuilder {
                 for conditions in segment.conditions {
                     let mut and: Option<SegmentExpr> = None;
                     for condition in conditions {
-                        let expr = builder.build_segment_condition(&condition).await?;
+                        let expr = builder.build_segment_condition(&condition)?;
                         and = match and {
                             None => Some(expr),
                             Some(e) => Some(SegmentExpr::And(Box::new(e), Box::new(expr))),
@@ -166,17 +162,15 @@ impl LogicalPlanBuilder {
 
         // build main query
         let mut input = match events.len() {
-            1 => {
-                builder
-                    .build_event_logical_plan(input.clone(), 0, segment_inputs)
-                    .await?
-            }
+            1 => builder.build_event_logical_plan(input.clone(), 0, segment_inputs)?,
             _ => {
                 let mut inputs: Vec<LogicalPlan> = vec![];
                 for idx in 0..events.len() {
-                    let input = builder
-                        .build_event_logical_plan(input.clone(), idx, segment_inputs.clone())
-                        .await?;
+                    let input = builder.build_event_logical_plan(
+                        input.clone(),
+                        idx,
+                        segment_inputs.clone(),
+                    )?;
 
                     inputs.push(input);
                 }
@@ -188,12 +182,12 @@ impl LogicalPlanBuilder {
             }
         };
 
-        input = builder.decode_dictionaries(input).await?;
+        input = builder.decode_dictionaries(input)?;
 
         Ok(input)
     }
 
-    async fn build_segment_condition(&self, condition: &SegmentCondition) -> Result<SegmentExpr> {
+    fn build_segment_condition(&self, condition: &SegmentCondition) -> Result<SegmentExpr> {
         let expr = match condition {
             SegmentCondition::HasPropertyValue { .. } => unimplemented!(),
             SegmentCondition::HadPropertyValue {
@@ -203,13 +197,13 @@ impl LogicalPlanBuilder {
                 time,
             } => {
                 let property = PropertyRef::User(property_name.to_owned());
-                let filter = executor::block_on(property_expression(
+                let filter = property_expression(
                     &self.ctx,
                     &self.metadata,
                     &property,
                     operation,
                     value.to_owned(),
-                ))?;
+                )?;
 
                 SegmentExpr::Count {
                     filter,
@@ -226,13 +220,10 @@ impl LogicalPlanBuilder {
                 aggregate,
             } => {
                 // event expression
-                let mut event_expr = event_expression(&self.ctx, &self.metadata, event).await?;
+                let mut event_expr = event_expression(&self.ctx, &self.metadata, event)?;
                 // apply event filters
                 if let Some(filters) = &filters {
-                    event_expr = and(
-                        event_expr.clone(),
-                        self.event_filters_expression(filters).await?,
-                    )
+                    event_expr = and(event_expr.clone(), self.event_filters_expression(filters)?)
                 }
                 match aggregate {
                     DidEventAggregate::Count {
@@ -256,8 +247,7 @@ impl LogicalPlanBuilder {
                         time,
                     } => SegmentExpr::Aggregate {
                         filter: event_expr,
-                        predicate: property_col(&self.ctx, &self.metadata, property)
-                            .await?
+                        predicate: property_col(&self.ctx, &self.metadata, property)?
                             .try_into_col()?,
                         ts_col: Column::from_qualified_name(event_fields::CREATED_AT),
                         time_range: time.into(),
@@ -276,7 +266,7 @@ impl LogicalPlanBuilder {
         Ok(expr)
     }
 
-    async fn decode_dictionaries(&self, input: LogicalPlan) -> Result<LogicalPlan> {
+    fn decode_dictionaries(&self, input: LogicalPlan) -> Result<LogicalPlan> {
         let mut cols_hash: HashMap<PropertyRef, ()> = HashMap::new();
         let mut decode_cols: Vec<(Column, Arc<SingleDictionaryProvider>)> = Vec::new();
 
@@ -299,18 +289,15 @@ impl LogicalPlanBuilder {
         }))
     }
 
-    async fn build_event_logical_plan(
+    fn build_event_logical_plan(
         &self,
         input: LogicalPlan,
         event_id: usize,
         segment_inputs: Option<Vec<LogicalPlan>>,
     ) -> Result<LogicalPlan> {
-        let input = self
-            .build_filter_logical_plan(input.clone(), &self.es.events[event_id])
-            .await?;
-        let (mut input, group_expr) = self
-            .build_aggregate_logical_plan(input, &self.es.events[event_id], segment_inputs)
-            .await?;
+        let input = self.build_filter_logical_plan(input.clone(), &self.es.events[event_id])?;
+        let (mut input, group_expr) =
+            self.build_aggregate_logical_plan(input, &self.es.events[event_id], segment_inputs)?;
 
         // unpivot aggregate values into value column
         if self.ctx.format != Format::Compact {
@@ -382,11 +369,7 @@ impl LogicalPlanBuilder {
     }
 
     /// builds filter plan
-    async fn build_filter_logical_plan(
-        &self,
-        input: LogicalPlan,
-        event: &Event,
-    ) -> Result<LogicalPlan> {
+    fn build_filter_logical_plan(&self, input: LogicalPlan, event: &Event) -> Result<LogicalPlan> {
         let cur_time = self.ctx.cur_time;
         // let cur_time = match &self.es.interval_unit {
         // TimeIntervalUnit::Second => self
@@ -421,16 +404,16 @@ impl LogicalPlanBuilder {
         // event expression
         expr = and(
             expr,
-            event_expression(&self.ctx, &self.metadata, &event.event).await?,
+            event_expression(&self.ctx, &self.metadata, &event.event)?,
         );
         // apply event filters
         if let Some(filters) = &event.filters {
-            expr = and(expr.clone(), self.event_filters_expression(filters).await?)
+            expr = and(expr.clone(), self.event_filters_expression(filters)?)
         }
 
         // global event filters
         if let Some(filters) = &self.es.filters {
-            expr = and(expr.clone(), self.event_filters_expression(filters).await?);
+            expr = and(expr.clone(), self.event_filters_expression(filters)?);
         }
 
         // global filter
@@ -438,7 +421,7 @@ impl LogicalPlanBuilder {
     }
 
     // builds logical plan for aggregate
-    async fn build_aggregate_logical_plan(
+    fn build_aggregate_logical_plan(
         &self,
         input: LogicalPlan,
         event: &Event,
@@ -465,14 +448,14 @@ impl LogicalPlanBuilder {
         // event groups
         if let Some(breakdowns) = &event.breakdowns {
             for breakdown in breakdowns.iter() {
-                group_expr.push(self.breakdown_expr(breakdown).await?);
+                group_expr.push(self.breakdown_expr(breakdown)?);
             }
         }
 
         // common groups
         if let Some(breakdowns) = &self.es.breakdowns {
             for breakdown in breakdowns.iter() {
-                group_expr.push(self.breakdown_expr(breakdown).await?);
+                group_expr.push(self.breakdown_expr(breakdown)?);
             }
         }
 
@@ -522,12 +505,7 @@ impl LogicalPlanBuilder {
                     filter: None,
                     inner_fn: aggregate_per_group.into(),
                     outer_fn: aggregate.into(),
-                    predicate: executor::block_on(property_col(
-                        &self.ctx,
-                        &self.metadata,
-                        property,
-                    ))?
-                    .try_into_col()?,
+                    predicate: property_col(&self.ctx, &self.metadata, property)?.try_into_col()?,
                     groups: Some(group_expr.clone()),
                     partition_col: col(event_fields::USER_ID).try_into_col()?,
                 },
@@ -538,12 +516,7 @@ impl LogicalPlanBuilder {
                     filter: None,
                     groups: Some(group_expr.clone()),
                     partition_col: col(event_fields::USER_ID).try_into_col()?,
-                    predicate: executor::block_on(property_col(
-                        &self.ctx,
-                        &self.metadata,
-                        property,
-                    ))?
-                    .try_into_col()?,
+                    predicate: property_col(&self.ctx, &self.metadata, property)?.try_into_col()?,
                     agg: aggregate.into(),
                 },
                 Query::QueryFormula { .. } => unimplemented!(),
@@ -570,7 +543,7 @@ impl LogicalPlanBuilder {
     }
 
     /// builds event filters expression
-    async fn event_filters_expression(&self, filters: &[EventFilter]) -> Result<Expr> {
+    fn event_filters_expression(&self, filters: &[EventFilter]) -> Result<Expr> {
         // iterate over filters
         let filters_exprs = filters
             .iter()
@@ -581,13 +554,13 @@ impl LogicalPlanBuilder {
                         property,
                         operation,
                         value,
-                    } => executor::block_on(property_expression(
+                    } => property_expression(
                         &self.ctx,
                         &self.metadata,
                         property,
                         operation,
                         value.to_owned(),
-                    )),
+                    ),
                 }
             })
             .collect::<Result<Vec<Expr>>>()?;
@@ -600,11 +573,11 @@ impl LogicalPlanBuilder {
     }
 
     // builds breakdown expression
-    async fn breakdown_expr(&self, breakdown: &Breakdown) -> Result<Expr> {
+    fn breakdown_expr(&self, breakdown: &Breakdown) -> Result<Expr> {
         match breakdown {
             Breakdown::Property(prop_ref) => match prop_ref {
                 PropertyRef::User(_prop_name) | PropertyRef::Event(_prop_name) => {
-                    let prop_col = property_col(&self.ctx, &self.metadata, prop_ref).await?;
+                    let prop_col = property_col(&self.ctx, &self.metadata, prop_ref)?;
                     Ok(prop_col)
                 }
                 PropertyRef::Custom(_) => unimplemented!(),

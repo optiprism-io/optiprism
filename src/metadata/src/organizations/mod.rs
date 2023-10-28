@@ -10,13 +10,13 @@ use serde::Serialize;
 
 use crate::metadata::ListResponse;
 use crate::Result;
-#[async_trait]
+
 pub trait Provider: Sync + Send {
-    async fn create(&self, req: CreateOrganizationRequest) -> Result<Organization>;
-    async fn get_by_id(&self, id: u64) -> Result<Organization>;
-    async fn list(&self) -> Result<ListResponse<Organization>>;
-    async fn update(&self, org_id: u64, req: UpdateOrganizationRequest) -> Result<Organization>;
-    async fn delete(&self, id: u64) -> Result<Organization>;
+    fn create(&self, req: CreateOrganizationRequest) -> Result<Organization>;
+    fn get_by_id(&self, id: u64) -> Result<Organization>;
+    fn list(&self) -> Result<ListResponse<Organization>>;
+    fn update(&self, org_id: u64, req: UpdateOrganizationRequest) -> Result<Organization>;
+    fn delete(&self, id: u64) -> Result<Organization>;
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

@@ -33,24 +33,21 @@ impl Provider for ProviderImpl {
     ) -> Result<Event> {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::ManageSchema)?;
 
-        let event = self
-            .prov
-            .create(
-                organization_id,
-                project_id,
-                metadata::events::CreateEventRequest {
-                    created_by: ctx.account_id.unwrap(),
-                    tags: request.tags,
-                    name: request.name,
-                    display_name: request.display_name,
-                    description: request.description,
-                    status: request.status.into(),
-                    is_system: request.is_system,
-                    properties: None,
-                    custom_properties: None,
-                },
-            )
-            .await?;
+        let event = self.prov.create(
+            organization_id,
+            project_id,
+            metadata::events::CreateEventRequest {
+                created_by: ctx.account_id.unwrap(),
+                tags: request.tags,
+                name: request.name,
+                display_name: request.display_name,
+                description: request.description,
+                status: request.status.into(),
+                is_system: request.is_system,
+                properties: None,
+                custom_properties: None,
+            },
+        )?;
 
         event.try_into()
     }
@@ -65,8 +62,7 @@ impl Provider for ProviderImpl {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::ViewSchema)?;
 
         self.prov
-            .get_by_id(organization_id, project_id, id)
-            .await?
+            .get_by_id(organization_id, project_id, id)?
             .try_into()
     }
 
@@ -79,10 +75,7 @@ impl Provider for ProviderImpl {
     ) -> Result<Event> {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::ViewSchema)?;
 
-        let event = self
-            .prov
-            .get_by_name(organization_id, project_id, name)
-            .await?;
+        let event = self.prov.get_by_name(organization_id, project_id, name)?;
 
         event.try_into()
     }
@@ -94,7 +87,7 @@ impl Provider for ProviderImpl {
         project_id: u64,
     ) -> Result<ListResponse<Event>> {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::ViewSchema)?;
-        let resp = self.prov.list(organization_id, project_id).await?;
+        let resp = self.prov.list(organization_id, project_id)?;
 
         resp.try_into()
     }
@@ -120,8 +113,7 @@ impl Provider for ProviderImpl {
 
         let event = self
             .prov
-            .update(organization_id, project_id, event_id, md_req)
-            .await?;
+            .update(organization_id, project_id, event_id, md_req)?;
 
         event.try_into()
     }
@@ -137,8 +129,7 @@ impl Provider for ProviderImpl {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::ManageSchema)?;
 
         self.prov
-            .attach_property(organization_id, project_id, event_id, prop_id)
-            .await?
+            .attach_property(organization_id, project_id, event_id, prop_id)?
             .try_into()
     }
 
@@ -153,8 +144,7 @@ impl Provider for ProviderImpl {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::ManageSchema)?;
 
         self.prov
-            .detach_property(organization_id, project_id, event_id, prop_id)
-            .await?
+            .detach_property(organization_id, project_id, event_id, prop_id)?
             .try_into()
     }
 
@@ -168,8 +158,7 @@ impl Provider for ProviderImpl {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::DeleteSchema)?;
 
         self.prov
-            .delete(organization_id, project_id, id)
-            .await?
+            .delete(organization_id, project_id, id)?
             .try_into()
     }
 }

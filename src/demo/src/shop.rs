@@ -33,7 +33,7 @@ pub struct Config<R> {
     pub partitions: usize,
 }
 
-pub async fn gen<R>(
+pub fn gen<R>(
     md: &Arc<MetadataProvider>,
     cfg: Config<R>,
 ) -> Result<Vec<Vec<RecordBatch>>, anyhow::Error>
@@ -57,10 +57,9 @@ where
         &mut rng,
         cfg.md.dictionaries.clone(),
         cfg.products_rdr,
-    )
-    .await?;
+    )?;
     info!("creating entities...");
-    let schema = Arc::new(create_entities(cfg.org_id, cfg.project_id, &cfg.md).await?);
+    let schema = Arc::new(create_entities(cfg.org_id, cfg.project_id, &cfg.md)?);
 
     info!("creating generator...");
     let gen_cfg = generator::Config {
@@ -79,18 +78,13 @@ where
 
     let mut events_map: HashMap<Event, u64> = HashMap::default();
     for event in all::<Event>() {
-        let md_event = cfg
-            .md
-            .events
-            .get_by_name(cfg.org_id, cfg.project_id, event.to_string().as_str())
-            .await?;
+        let md_event =
+            cfg.md
+                .events
+                .get_by_name(cfg.org_id, cfg.project_id, event.to_string().as_str())?;
         events_map.insert(event, md_event.id);
-        block_on(md.dictionaries.get_key_or_create(
-            1,
-            1,
-            "event_event",
-            event.to_string().as_str(),
-        ))?;
+        md.dictionaries
+            .get_key_or_create(1, 1, "event_event", event.to_string().as_str())?;
     }
 
     info!("generating events...");
@@ -106,7 +100,7 @@ where
     };
 
     let mut scenario = Scenario::new(run_cfg);
-    let result = scenario.run().await?;
+    let result = scenario.run()?;
 
     Ok(result)
 }

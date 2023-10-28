@@ -49,7 +49,6 @@ use metadata::properties::DataType;
 use metadata::properties::DictionaryType;
 use metadata::properties::Provider;
 use metadata::properties::Status;
-use metadata::store::Store;
 use metadata::MetadataProvider;
 use service::tracing::TracingCliArgs;
 use store::RowValue;
@@ -82,7 +81,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     info!("starting http instance...");
 
-    let store = Arc::new(Store::new(args.md_path.clone()));
+    let store = Arc::new(metadata::rocksdb::new(args.md_path.clone())?);
     let user_props = Arc::new(properties::ProviderImpl::new_user(store.clone()));
 
     // todo move somewhere else
@@ -104,60 +103,52 @@ async fn main() -> Result<(), anyhow::Error> {
             USER_PROPERTY_CITY,
         ];
         for prop in props {
-            let _ = user_props
-                .create(1, 1, CreatePropertyRequest {
-                    created_by: 1,
-                    tags: None,
-                    name: prop.to_string(),
-                    description: None,
-                    display_name: None,
-                    typ: properties::Type::User,
-                    data_type: DataType::String,
-                    status: Status::Enabled,
-                    is_system: true,
-                    nullable: false,
-                    is_array: false,
-                    is_dictionary: true,
-                    dictionary_type: Some(DictionaryType::UInt64),
-                })
-                .await;
+            let _ = user_props.create(1, 1, CreatePropertyRequest {
+                created_by: 1,
+                tags: None,
+                name: prop.to_string(),
+                description: None,
+                display_name: None,
+                typ: properties::Type::User,
+                data_type: DataType::String,
+                status: Status::Enabled,
+                is_system: true,
+                nullable: false,
+                is_array: false,
+                is_dictionary: true,
+                dictionary_type: Some(DictionaryType::UInt64),
+            });
         }
 
         let accs = Arc::new(metadata::accounts::ProviderImpl::new(store.clone()));
-        let admin = accs
-            .create(CreateAccountRequest {
-                created_by: None,
-                password_hash: "sdf".to_string(),
-                email: "admin@email.com".to_string(),
-                first_name: Some("admin".to_string()),
-                last_name: None,
-                role: Some(Role::Admin),
-                organizations: None,
-                projects: None,
-                teams: None,
-            })
-            .await;
+        let admin = accs.create(CreateAccountRequest {
+            created_by: None,
+            password_hash: "sdf".to_string(),
+            email: "admin@email.com".to_string(),
+            first_name: Some("admin".to_string()),
+            last_name: None,
+            role: Some(Role::Admin),
+            organizations: None,
+            projects: None,
+            teams: None,
+        });
         match admin {
             Ok(admin) => {
                 let orgs = Arc::new(metadata::organizations::ProviderImpl::new(store.clone()));
 
-                let org = orgs
-                    .create(CreateOrganizationRequest {
-                        created_by: admin.id,
-                        name: "Test Organization".to_string(),
-                    })
-                    .await;
+                let org = orgs.create(CreateOrganizationRequest {
+                    created_by: admin.id,
+                    name: "Test Organization".to_string(),
+                });
 
                 match org {
                     Ok(org) => {
                         let projects =
                             Arc::new(metadata::projects::ProviderImpl::new(store.clone()));
-                        _ = projects
-                            .create(org.id, CreateProjectRequest {
-                                created_by: admin.id,
-                                name: "Test Project".to_string(),
-                            })
-                            .await;
+                        _ = projects.create(org.id, CreateProjectRequest {
+                            created_by: admin.id,
+                            name: "Test Project".to_string(),
+                        });
                     }
                     Err(_) => {}
                 }
@@ -171,7 +162,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let projects = Arc::new(projects::ProviderImpl::new(store.clone()));
     let dicts = Arc::new(dictionaries::ProviderImpl::new(store.clone()));
 
-    let proj = block_on(projects.get_by_id(1, 1))?;
+    let proj = projects.get_by_id(1, 1)?;
     debug!("project token: {}", proj.token);
     let mut track_transformers = Vec::new();
     let ua_parser = UserAgentParser::from_file(File::open(args.ua_db_path.clone())?)

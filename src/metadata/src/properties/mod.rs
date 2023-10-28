@@ -17,36 +17,30 @@ use serde::Serialize;
 use crate::metadata::ListResponse;
 use crate::Result;
 
-#[async_trait]
 pub trait Provider: Sync + Send {
-    async fn create(
+    fn create(
         &self,
         organization_id: u64,
         project_id: u64,
         req: CreatePropertyRequest,
     ) -> Result<Property>;
-    async fn get_or_create(
+    fn get_or_create(
         &self,
         organization_id: u64,
         project_id: u64,
         req: CreatePropertyRequest,
     ) -> Result<Property>;
-    async fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Property>;
-    async fn get_by_name(
-        &self,
-        organization_id: u64,
-        project_id: u64,
-        name: &str,
-    ) -> Result<Property>;
-    async fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Property>>;
-    async fn update(
+    fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Property>;
+    fn get_by_name(&self, organization_id: u64, project_id: u64, name: &str) -> Result<Property>;
+    fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Property>>;
+    fn update(
         &self,
         organization_id: u64,
         project_id: u64,
         property_id: u64,
         req: UpdatePropertyRequest,
     ) -> Result<Property>;
-    async fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Property>;
+    fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Property>;
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]

@@ -1,59 +1,73 @@
 use std::sync::Arc;
+use std::sync::RwLock;
 
 use async_trait::async_trait;
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::Utc;
 use common::types::OptionalProperty;
-use tokio::sync::RwLock;
+use rocksdb::Transaction;
+use rocksdb::TransactionDB;
 
 use crate::dashboards::CreateDashboardRequest;
 use crate::dashboards::Dashboard;
 use crate::dashboards::Provider;
 use crate::dashboards::UpdateDashboardRequest;
 use crate::error;
-use crate::error::DashboardError;
+use crate::error::MetadataError;
+use crate::index::next_seq;
 use crate::metadata::ListResponse;
 use crate::store::path_helpers::list;
 use crate::store::path_helpers::make_data_value_key;
 use crate::store::path_helpers::make_id_seq_key;
 use crate::store::path_helpers::org_proj_ns;
-use crate::store::Store;
 use crate::Result;
 
 const NAMESPACE: &[u8] = b"dashboards";
 
 pub struct ProviderImpl {
-    store: Arc<Store>,
-    guard: RwLock<()>,
+    db: Arc<TransactionDB>,
 }
 
 impl ProviderImpl {
-    pub fn new(kv: Arc<Store>) -> Self {
-        ProviderImpl {
-            store: kv,
-            guard: RwLock::new(()),
+    pub fn new(db: Arc<TransactionDB>) -> Self {
+        ProviderImpl { db }
+    }
+
+    fn _get_by_id(
+        &self,
+        tx: &Transaction<TransactionDB>,
+        organization_id: u64,
+        project_id: u64,
+        id: u64,
+    ) -> Result<Dashboard> {
+        let key = make_data_value_key(
+            org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
+            id,
+        );
+
+        match tx.get(key)? {
+            None => Err(MetadataError::NotFound(
+                "custom event not found".to_string(),
+            )),
+            Some(value) => Ok(deserialize(&value)?),
         }
     }
 }
 
-#[async_trait]
 impl Provider for ProviderImpl {
-    async fn create(
+    fn create(
         &self,
         organization_id: u64,
         project_id: u64,
         req: CreateDashboardRequest,
     ) -> Result<Dashboard> {
-        let _guard = self.guard.write().await;
-
+        let tx = self.db.transaction();
         let created_at = Utc::now();
-        let id = self
-            .store
-            .next_seq(make_id_seq_key(
-                org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
-            ))
-            .await?;
+        let id = next_seq(
+            &tx,
+            make_id_seq_key(org_proj_ns(organization_id, project_id, NAMESPACE).as_slice()),
+        )?;
 
         let dashboard = Dashboard {
             id,
@@ -68,58 +82,41 @@ impl Provider for ProviderImpl {
             panels: req.panels,
         };
         let data = serialize(&dashboard)?;
-        self.store
-            .put(
-                make_data_value_key(
-                    org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
-                    dashboard.id,
-                ),
-                &data,
-            )
-            .await?;
+        tx.put(
+            make_data_value_key(
+                org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
+                dashboard.id,
+            ),
+            &data,
+        )?;
 
         Ok(dashboard)
     }
 
-    async fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Dashboard> {
-        let key = make_data_value_key(
-            org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
-            id,
-        );
+    fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Dashboard> {
+        let tx = self.db.transaction();
 
-        match self.store.get(key).await? {
-            None => Err(
-                DashboardError::DashboardNotFound(error::Dashboard::new_with_id(
-                    organization_id,
-                    project_id,
-                    id,
-                ))
-                .into(),
-            ),
-            Some(value) => Ok(deserialize(&value)?),
-        }
+        self._get_by_id(&tx, organization_id, project_id, id)
     }
 
-    async fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Dashboard>> {
+    fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Dashboard>> {
+        let tx = self.db.transaction();
         list(
-            self.store.clone(),
+            &tx,
             org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
         )
-        .await
     }
 
-    async fn update(
+    fn update(
         &self,
         organization_id: u64,
         project_id: u64,
         dashboard_id: u64,
         req: UpdateDashboardRequest,
     ) -> Result<Dashboard> {
-        let _guard = self.guard.write().await;
+        let tx = self.db.transaction();
 
-        let prev_dashboard = self
-            .get_by_id(organization_id, project_id, dashboard_id)
-            .await?;
+        let prev_dashboard = self._get_by_id(&tx, organization_id, project_id, dashboard_id)?;
         let mut dashboard = prev_dashboard.clone();
 
         dashboard.updated_at = Some(Utc::now());
@@ -138,29 +135,25 @@ impl Provider for ProviderImpl {
         }
 
         let data = serialize(&dashboard)?;
-        self.store
-            .put(
-                make_data_value_key(
-                    org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
-                    dashboard.id,
-                ),
-                &data,
-            )
-            .await?;
-
+        tx.put(
+            make_data_value_key(
+                org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
+                dashboard.id,
+            ),
+            &data,
+        )?;
+        tx.commit()?;
         Ok(dashboard)
     }
 
-    async fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Dashboard> {
-        let _guard = self.guard.write().await;
-        let dashboard = self.get_by_id(organization_id, project_id, id).await?;
-        self.store
-            .delete(make_data_value_key(
-                org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
-                id,
-            ))
-            .await?;
-
+    fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Dashboard> {
+        let tx = self.db.transaction();
+        let dashboard = self._get_by_id(&tx, organization_id, project_id, id)?;
+        tx.delete(make_data_value_key(
+            org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
+            id,
+        ))?;
+        tx.commit()?;
         Ok(dashboard)
     }
 }

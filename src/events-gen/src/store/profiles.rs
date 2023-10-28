@@ -76,24 +76,12 @@ impl ProfileProvider {
                     country: rec
                         .country
                         .map(|v| {
-                            block_on(dicts.get_key_or_create(
-                                org_id,
-                                proj_id,
-                                "user_country",
-                                v.as_str(),
-                            ))
+                            dicts.get_key_or_create(org_id, proj_id, "user_country", v.as_str())
                         })
                         .transpose()?,
                     city: rec
                         .city
-                        .map(|v| {
-                            block_on(dicts.get_key_or_create(
-                                org_id,
-                                proj_id,
-                                "user_city",
-                                v.as_str(),
-                            ))
-                        })
+                        .map(|v| dicts.get_key_or_create(org_id, proj_id, "user_city", v.as_str()))
                         .transpose()?,
                 };
                 result.push(geo);
@@ -117,45 +105,28 @@ impl ProfileProvider {
                     device: rec
                         .device
                         .map(|v| {
-                            block_on(dicts.get_key_or_create(
-                                org_id,
-                                proj_id,
-                                "user_device",
-                                v.as_str(),
-                            ))
+                            dicts.get_key_or_create(org_id, proj_id, "user_device", v.as_str())
                         })
                         .transpose()?,
                     device_category: rec
                         .device_category
                         .map(|v| {
-                            block_on(dicts.get_key_or_create(
+                            dicts.get_key_or_create(
                                 org_id,
                                 proj_id,
                                 "user_device_category",
                                 v.as_str(),
-                            ))
+                            )
                         })
                         .transpose()?,
                     os: rec
                         .os
-                        .map(|v| {
-                            block_on(dicts.get_key_or_create(
-                                org_id,
-                                proj_id,
-                                "user_os",
-                                v.as_str(),
-                            ))
-                        })
+                        .map(|v| dicts.get_key_or_create(org_id, proj_id, "user_os", v.as_str()))
                         .transpose()?,
                     os_version: rec
                         .os_version
                         .map(|v| {
-                            block_on(dicts.get_key_or_create(
-                                org_id,
-                                proj_id,
-                                "user_os_version",
-                                v.as_str(),
-                            ))
+                            dicts.get_key_or_create(org_id, proj_id, "user_os_version", v.as_str())
                         })
                         .transpose()?,
                 };

@@ -37,8 +37,10 @@ use crate::dashboards::Panel;
 use crate::dashboards::UpdateDashboardRequest;
 use crate::database;
 use crate::database::Column;
+use crate::database::CreateTableRequest;
 use crate::database::Table;
 use crate::database::TableRef;
+use crate::database::UpdateTableRequest;
 use crate::dictionaries;
 use crate::events;
 use crate::events::CreateEventRequest;
@@ -102,41 +104,39 @@ impl Accounts {
     }
 }
 
-#[async_trait]
 impl accounts::Provider for Accounts {
-    async fn create(&self, _req: CreateAccountRequest) -> Result<Account> {
+    fn create(&self, _req: CreateAccountRequest) -> Result<Account> {
         Ok(Accounts::account())
     }
 
-    async fn get_by_id(&self, _id: u64) -> Result<Account> {
+    fn get_by_id(&self, _id: u64) -> Result<Account> {
         Ok(Accounts::account())
     }
 
-    async fn get_by_email(&self, _email: &str) -> Result<Account> {
+    fn get_by_email(&self, _email: &str) -> Result<Account> {
         Ok(Accounts::account())
     }
 
-    async fn list(&self) -> Result<ListResponse<Account>> {
+    fn list(&self) -> Result<ListResponse<Account>> {
         Ok(ListResponse {
             data: vec![Accounts::account()],
             meta: ResponseMetadata { next: None },
         })
     }
 
-    async fn update(&self, _account_id: u64, _req: UpdateAccountRequest) -> Result<Account> {
+    fn update(&self, _account_id: u64, _req: UpdateAccountRequest) -> Result<Account> {
         Ok(Self::account())
     }
 
-    async fn delete(&self, _id: u64) -> Result<Account> {
+    fn delete(&self, _id: u64) -> Result<Account> {
         Ok(Self::account())
     }
 }
 
 pub struct Dashboards {}
 
-#[async_trait]
 impl dashboards::Provider for Dashboards {
-    async fn create(
+    fn create(
         &self,
         _organization_id: u64,
         _project_id: u64,
@@ -145,27 +145,18 @@ impl dashboards::Provider for Dashboards {
         Ok(Dashboards::dashboard())
     }
 
-    async fn get_by_id(
-        &self,
-        _organization_id: u64,
-        _project_id: u64,
-        _id: u64,
-    ) -> Result<Dashboard> {
+    fn get_by_id(&self, _organization_id: u64, _project_id: u64, _id: u64) -> Result<Dashboard> {
         Ok(Dashboards::dashboard())
     }
 
-    async fn list(
-        &self,
-        _organization_id: u64,
-        _project_id: u64,
-    ) -> Result<ListResponse<Dashboard>> {
+    fn list(&self, _organization_id: u64, _project_id: u64) -> Result<ListResponse<Dashboard>> {
         Ok(ListResponse {
             data: vec![Dashboards::dashboard()],
             meta: ResponseMetadata { next: None },
         })
     }
 
-    async fn update(
+    fn update(
         &self,
         _organization_id: u64,
         _project_id: u64,
@@ -175,7 +166,7 @@ impl dashboards::Provider for Dashboards {
         Ok(Dashboards::dashboard())
     }
 
-    async fn delete(&self, _organization_id: u64, _project_id: u64, _id: u64) -> Result<Dashboard> {
+    fn delete(&self, _organization_id: u64, _project_id: u64, _id: u64) -> Result<Dashboard> {
         Ok(Dashboards::dashboard())
     }
 }
@@ -206,9 +197,8 @@ impl Dashboards {
 
 pub struct Reports {}
 
-#[async_trait]
 impl reports::Provider for Reports {
-    async fn create(
+    fn create(
         &self,
         _organization_id: u64,
         _project_id: u64,
@@ -217,18 +207,18 @@ impl reports::Provider for Reports {
         Ok(Reports::report())
     }
 
-    async fn get_by_id(&self, _organization_id: u64, _project_id: u64, _id: u64) -> Result<Report> {
+    fn get_by_id(&self, _organization_id: u64, _project_id: u64, _id: u64) -> Result<Report> {
         Ok(Reports::report())
     }
 
-    async fn list(&self, _organization_id: u64, _project_id: u64) -> Result<ListResponse<Report>> {
+    fn list(&self, _organization_id: u64, _project_id: u64) -> Result<ListResponse<Report>> {
         Ok(ListResponse {
             data: vec![Reports::report()],
             meta: ResponseMetadata { next: None },
         })
     }
 
-    async fn update(
+    fn update(
         &self,
         _organization_id: u64,
         _project_id: u64,
@@ -238,7 +228,7 @@ impl reports::Provider for Reports {
         Ok(Reports::report())
     }
 
-    async fn delete(&self, _organization_id: u64, _project_id: u64, _id: u64) -> Result<Report> {
+    fn delete(&self, _organization_id: u64, _project_id: u64, _id: u64) -> Result<Report> {
         Ok(Reports::report())
     }
 }
@@ -308,9 +298,8 @@ impl CustomEvents {
     }
 }
 
-#[async_trait]
 impl custom_events::Provider for CustomEvents {
-    async fn create(
+    fn create(
         &self,
         _organization_id: u64,
         _project_id: u64,
@@ -319,16 +308,11 @@ impl custom_events::Provider for CustomEvents {
         Ok(CustomEvents::custom_event())
     }
 
-    async fn get_by_id(
-        &self,
-        _organization_id: u64,
-        _project_id: u64,
-        _id: u64,
-    ) -> Result<CustomEvent> {
+    fn get_by_id(&self, _organization_id: u64, _project_id: u64, _id: u64) -> Result<CustomEvent> {
         Ok(CustomEvents::custom_event())
     }
 
-    async fn get_by_name(
+    fn get_by_name(
         &self,
         _organization_id: u64,
         _project_id: u64,
@@ -337,18 +321,14 @@ impl custom_events::Provider for CustomEvents {
         Ok(CustomEvents::custom_event())
     }
 
-    async fn list(
-        &self,
-        _organization_id: u64,
-        _project_id: u64,
-    ) -> Result<ListResponse<CustomEvent>> {
+    fn list(&self, _organization_id: u64, _project_id: u64) -> Result<ListResponse<CustomEvent>> {
         Ok(ListResponse {
             data: vec![CustomEvents::custom_event()],
             meta: ResponseMetadata { next: None },
         })
     }
 
-    async fn update(
+    fn update(
         &self,
         _organization_id: u64,
         _project_id: u64,
@@ -358,12 +338,7 @@ impl custom_events::Provider for CustomEvents {
         Ok(CustomEvents::custom_event())
     }
 
-    async fn delete(
-        &self,
-        _organization_id: u64,
-        _project_id: u64,
-        _id: u64,
-    ) -> Result<CustomEvent> {
+    fn delete(&self, _organization_id: u64, _project_id: u64, _id: u64) -> Result<CustomEvent> {
         Ok(CustomEvents::custom_event())
     }
 }
@@ -391,9 +366,8 @@ impl Events {
     }
 }
 
-#[async_trait]
 impl events::Provider for Events {
-    async fn create(
+    fn create(
         &self,
         _organization_id: u64,
         _project_id: u64,
@@ -402,7 +376,7 @@ impl events::Provider for Events {
         Ok(Events::event())
     }
 
-    async fn get_or_create(
+    fn get_or_create(
         &self,
         _organization_id: u64,
         _project_id: u64,
@@ -411,27 +385,22 @@ impl events::Provider for Events {
         Ok(Events::event())
     }
 
-    async fn get_by_id(&self, _organization_id: u64, _project_id: u64, _id: u64) -> Result<Event> {
+    fn get_by_id(&self, _organization_id: u64, _project_id: u64, _id: u64) -> Result<Event> {
         Ok(Events::event())
     }
 
-    async fn get_by_name(
-        &self,
-        _organization_id: u64,
-        _project_id: u64,
-        _name: &str,
-    ) -> Result<Event> {
+    fn get_by_name(&self, _organization_id: u64, _project_id: u64, _name: &str) -> Result<Event> {
         Ok(Events::event())
     }
 
-    async fn list(&self, _organization_id: u64, _project_id: u64) -> Result<ListResponse<Event>> {
+    fn list(&self, _organization_id: u64, _project_id: u64) -> Result<ListResponse<Event>> {
         Ok(ListResponse {
             data: vec![Events::event()],
             meta: ResponseMetadata { next: None },
         })
     }
 
-    async fn update(
+    fn update(
         &self,
         _organization_id: u64,
         _project_id: u64,
@@ -441,7 +410,7 @@ impl events::Provider for Events {
         Ok(Events::event())
     }
 
-    async fn attach_property(
+    fn attach_property(
         &self,
         _organization_id: u64,
         _project_id: u64,
@@ -451,7 +420,7 @@ impl events::Provider for Events {
         Ok(Events::event())
     }
 
-    async fn detach_property(
+    fn detach_property(
         &self,
         _organization_id: u64,
         _project_id: u64,
@@ -461,11 +430,11 @@ impl events::Provider for Events {
         Ok(Events::event())
     }
 
-    async fn delete(&self, _organization_id: u64, _project_id: u64, _id: u64) -> Result<Event> {
+    fn delete(&self, _organization_id: u64, _project_id: u64, _id: u64) -> Result<Event> {
         Ok(Events::event())
     }
 
-    async fn generate_record_id(&self, organization_id: u64, project_id: u64) -> Result<u64> {
+    fn generate_record_id(&self, organization_id: u64, project_id: u64) -> Result<u64> {
         unreachable!()
     }
 }
@@ -497,9 +466,8 @@ impl Properties {
     }
 }
 
-#[async_trait]
 impl properties::Provider for Properties {
-    async fn create(
+    fn create(
         &self,
         _organization_id: u64,
         _project_id: u64,
@@ -508,7 +476,7 @@ impl properties::Provider for Properties {
         Ok(Properties::property())
     }
 
-    async fn get_or_create(
+    fn get_or_create(
         &self,
         _organization_id: u64,
         _project_id: u64,
@@ -517,16 +485,11 @@ impl properties::Provider for Properties {
         Ok(Properties::property())
     }
 
-    async fn get_by_id(
-        &self,
-        _organization_id: u64,
-        _project_id: u64,
-        _id: u64,
-    ) -> Result<Property> {
+    fn get_by_id(&self, _organization_id: u64, _project_id: u64, _id: u64) -> Result<Property> {
         Ok(Properties::property())
     }
 
-    async fn get_by_name(
+    fn get_by_name(
         &self,
         _organization_id: u64,
         _project_id: u64,
@@ -535,18 +498,14 @@ impl properties::Provider for Properties {
         Ok(Properties::property())
     }
 
-    async fn list(
-        &self,
-        _organization_id: u64,
-        _project_id: u64,
-    ) -> Result<ListResponse<Property>> {
+    fn list(&self, _organization_id: u64, _project_id: u64) -> Result<ListResponse<Property>> {
         Ok(ListResponse {
             data: vec![Properties::property()],
             meta: ResponseMetadata { next: None },
         })
     }
 
-    async fn update(
+    fn update(
         &self,
         _organization_id: u64,
         _project_id: u64,
@@ -556,7 +515,7 @@ impl properties::Provider for Properties {
         Ok(Properties::property())
     }
 
-    async fn delete(&self, _organization_id: u64, _project_id: u64, _id: u64) -> Result<Property> {
+    fn delete(&self, _organization_id: u64, _project_id: u64, _id: u64) -> Result<Property> {
         Ok(Properties::property())
     }
 }
@@ -579,9 +538,8 @@ impl CustomProperties {
     }
 }
 
-#[async_trait]
 impl custom_properties::Provider for CustomProperties {
-    async fn list(
+    fn list(
         &self,
         _organization_id: u64,
         _project_id: u64,
@@ -595,14 +553,10 @@ impl custom_properties::Provider for CustomProperties {
 
 pub struct Database {}
 
-#[async_trait]
 impl database::Provider for Database {
-    async fn create_table(&self, _table: Table) -> Result<()> {
-        Ok(())
-    }
-
-    async fn get_table(&self, _table_type: TableRef) -> Result<Table> {
+    fn create_table(&self, req: CreateTableRequest) -> Result<Table> {
         Ok(Table {
+            id: 1,
             typ: TableRef::Events(1, 1),
             columns: vec![Column::new(
                 "col".to_string(),
@@ -613,16 +567,65 @@ impl database::Provider for Database {
         })
     }
 
-    async fn add_column(&self, _table_type: TableRef, _col: Column) -> Result<()> {
+    fn get_table_by_id(&self, id: u64) -> Result<Table> {
+        Ok(Table {
+            id: 1,
+            typ: TableRef::Events(1, 1),
+            columns: vec![Column::new(
+                "col".to_string(),
+                DataType::UInt8,
+                true,
+                Some(DictionaryType::UInt64),
+            )],
+        })
+    }
+
+    fn get_table(&self, typ: TableRef) -> Result<Table> {
+        Ok(Table {
+            id: 1,
+            typ: TableRef::Events(1, 1),
+            columns: vec![Column::new(
+                "col".to_string(),
+                DataType::UInt8,
+                true,
+                Some(DictionaryType::UInt64),
+            )],
+        })
+    }
+
+    fn list(&self) -> Result<ListResponse<Table>> {
+        Ok(ListResponse {
+            data: vec![Table {
+                id: 1,
+                typ: TableRef::Events(1, 1),
+                columns: vec![Column::new(
+                    "col".to_string(),
+                    DataType::UInt8,
+                    true,
+                    Some(DictionaryType::UInt64),
+                )],
+            }],
+            meta: ResponseMetadata { next: None },
+        })
+    }
+
+    fn add_column(&self, _table_type: TableRef, _col: Column) -> Result<()> {
         Ok(())
+    }
+
+    fn update_table(&self, table_id: u64, req: UpdateTableRequest) -> Result<Table> {
+        todo!()
+    }
+
+    fn delete_table(&self, id: u64) -> Result<Table> {
+        todo!()
     }
 }
 #[derive(Debug)]
 pub struct Dictionaries {}
 
-#[async_trait]
 impl dictionaries::Provider for Dictionaries {
-    async fn get_key_or_create(
+    fn get_key_or_create(
         &self,
         _organization_id: u64,
         _project_id: u64,
@@ -632,7 +635,7 @@ impl dictionaries::Provider for Dictionaries {
         Ok(1)
     }
 
-    async fn get_value(
+    fn get_value(
         &self,
         _organization_id: u64,
         _project_id: u64,
@@ -642,7 +645,7 @@ impl dictionaries::Provider for Dictionaries {
         Ok("v".to_string())
     }
 
-    async fn get_key(
+    fn get_key(
         &self,
         _organization_id: u64,
         _project_id: u64,
@@ -668,28 +671,27 @@ impl Organizations {
     }
 }
 
-#[async_trait]
 impl organizations::Provider for Organizations {
-    async fn create(&self, _req: CreateOrganizationRequest) -> Result<Organization> {
+    fn create(&self, _req: CreateOrganizationRequest) -> Result<Organization> {
         Ok(Organizations::org())
     }
 
-    async fn get_by_id(&self, _id: u64) -> Result<Organization> {
+    fn get_by_id(&self, _id: u64) -> Result<Organization> {
         Ok(Organizations::org())
     }
 
-    async fn list(&self) -> Result<ListResponse<Organization>> {
+    fn list(&self) -> Result<ListResponse<Organization>> {
         Ok(ListResponse {
             data: vec![Organizations::org()],
             meta: ResponseMetadata { next: None },
         })
     }
 
-    async fn update(&self, _org_id: u64, _req: UpdateOrganizationRequest) -> Result<Organization> {
+    fn update(&self, _org_id: u64, _req: UpdateOrganizationRequest) -> Result<Organization> {
         Ok(Organizations::org())
     }
 
-    async fn delete(&self, _id: u64) -> Result<Organization> {
+    fn delete(&self, _id: u64) -> Result<Organization> {
         Ok(Organizations::org())
     }
 }
@@ -711,28 +713,27 @@ impl Projects {
     }
 }
 
-#[async_trait]
 impl projects::Provider for Projects {
-    async fn create(&self, _organization_id: u64, _req: CreateProjectRequest) -> Result<Project> {
+    fn create(&self, _organization_id: u64, _req: CreateProjectRequest) -> Result<Project> {
         Ok(Projects::project())
     }
 
-    async fn get_by_id(&self, _organization_id: u64, _project_id: u64) -> Result<Project> {
+    fn get_by_id(&self, _organization_id: u64, _project_id: u64) -> Result<Project> {
         Ok(Projects::project())
     }
 
-    async fn get_by_token(&self, token: &str) -> Result<Project> {
+    fn get_by_token(&self, token: &str) -> Result<Project> {
         Ok(Projects::project())
     }
 
-    async fn list(&self, _organization_id: u64) -> Result<ListResponse<Project>> {
+    fn list(&self, _organization_id: u64) -> Result<ListResponse<Project>> {
         Ok(ListResponse {
             data: vec![Projects::project()],
             meta: ResponseMetadata { next: None },
         })
     }
 
-    async fn update(
+    fn update(
         &self,
         _organization_id: u64,
         _project_id: u64,
@@ -741,7 +742,7 @@ impl projects::Provider for Projects {
         Ok(Projects::project())
     }
 
-    async fn delete(&self, _organization_id: u64, _project_id: u64) -> Result<Project> {
+    fn delete(&self, _organization_id: u64, _project_id: u64) -> Result<Project> {
         Ok(Projects::project())
     }
 }
@@ -762,24 +763,23 @@ impl Teams {
     }
 }
 
-#[async_trait]
 impl teams::Provider for Teams {
-    async fn create(&self, _organization_id: u64, _req: CreateTeamRequest) -> Result<Team> {
+    fn create(&self, _organization_id: u64, _req: CreateTeamRequest) -> Result<Team> {
         Ok(Teams::team())
     }
 
-    async fn get_by_id(&self, _organization_id: u64, _team_id: u64) -> Result<Team> {
+    fn get_by_id(&self, _organization_id: u64, _team_id: u64) -> Result<Team> {
         Ok(Teams::team())
     }
 
-    async fn list(&self, _organization_id: u64) -> Result<ListResponse<Team>> {
+    fn list(&self, _organization_id: u64) -> Result<ListResponse<Team>> {
         Ok(ListResponse {
             data: vec![Teams::team()],
             meta: ResponseMetadata { next: None },
         })
     }
 
-    async fn update(
+    fn update(
         &self,
         _organization_id: u64,
         _team_id: u64,
@@ -788,7 +788,7 @@ impl teams::Provider for Teams {
         Ok(Teams::team())
     }
 
-    async fn delete(&self, _organization_id: u64, _team_id: u64) -> Result<Team> {
+    fn delete(&self, _organization_id: u64, _team_id: u64) -> Result<Team> {
         Ok(Teams::team())
     }
 }

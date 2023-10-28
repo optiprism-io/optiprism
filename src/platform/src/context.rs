@@ -182,7 +182,7 @@ where S: Send + Sync
                 .await
                 .map_err(|err| PlatformError::Internal(err.to_string()))?;
 
-        let acc = md_acc_prov.get_by_id(claims.account_id).await?;
+        let acc = md_acc_prov.get_by_id(claims.account_id)?;
         let ctx = Context {
             account_id: Some(acc.id),
             role: acc.role,

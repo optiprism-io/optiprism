@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
 use bincode::deserialize;
+use rocksdb::Transaction;
+use rocksdb::TransactionDB;
 use serde::de::DeserializeOwned;
 
 use crate::metadata::ListResponse;
 use crate::metadata::ResponseMetadata;
-use crate::store::Store;
 use crate::Result;
 
 pub fn org_proj_ns(organization_id: u64, project_id: u64, ns: &[u8]) -> Vec<u8> {
@@ -46,15 +47,14 @@ pub fn make_id_seq_key(ns: &[u8]) -> Vec<u8> {
     [ns, b"/id_seq"].concat()
 }
 
-pub async fn list<'a, T>(store: Arc<Store>, ns: &[u8]) -> Result<ListResponse<T>>
+pub fn list<'a, T>(tx: &Transaction<TransactionDB>, ns: &[u8]) -> Result<ListResponse<T>>
 where T: DeserializeOwned {
     let prefix = make_data_key(ns);
 
-    let list = store
-        .list_prefix("")
-        .await?
-        .iter()
+    let list = tx
+        .prefix_iterator("")
         .filter_map(|x| {
+            let x = x.unwrap();
             if x.0.len() < prefix.len() || !prefix.as_slice().cmp(&x.0[..prefix.len()]).is_eq() {
                 return None;
             }

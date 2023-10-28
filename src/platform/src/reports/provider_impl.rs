@@ -37,21 +37,18 @@ impl Provider for ProviderImpl {
             ProjectPermission::ManageReports,
         )?;
 
-        let report = self
-            .prov
-            .create(
-                organization_id,
-                project_id,
-                metadata::reports::CreateReportRequest {
-                    created_by: ctx.account_id.unwrap(),
-                    tags: request.tags,
-                    name: request.name,
-                    description: request.description,
-                    typ: request.typ.into(),
-                    query: request.query.into(),
-                },
-            )
-            .await?;
+        let report = self.prov.create(
+            organization_id,
+            project_id,
+            metadata::reports::CreateReportRequest {
+                created_by: ctx.account_id.unwrap(),
+                tags: request.tags,
+                name: request.name,
+                description: request.description,
+                typ: request.typ.into(),
+                query: request.query.into(),
+            },
+        )?;
 
         Ok(report.into())
     }
@@ -69,11 +66,7 @@ impl Provider for ProviderImpl {
             ProjectPermission::ExploreReports,
         )?;
 
-        Ok(self
-            .prov
-            .get_by_id(organization_id, project_id, id)
-            .await?
-            .into())
+        Ok(self.prov.get_by_id(organization_id, project_id, id)?.into())
     }
 
     async fn list(
@@ -87,7 +80,7 @@ impl Provider for ProviderImpl {
             project_id,
             ProjectPermission::ExploreReports,
         )?;
-        let resp = self.prov.list(organization_id, project_id).await?;
+        let resp = self.prov.list(organization_id, project_id)?;
         Ok(ListResponse {
             data: resp.data.into_iter().map(|v| v.into()).collect(),
             meta: resp.meta.into(),
@@ -119,8 +112,7 @@ impl Provider for ProviderImpl {
 
         let report = self
             .prov
-            .update(organization_id, project_id, report_id, md_req)
-            .await?;
+            .update(organization_id, project_id, report_id, md_req)?;
 
         Ok(report.into())
     }
@@ -138,10 +130,6 @@ impl Provider for ProviderImpl {
             ProjectPermission::ManageReports,
         )?;
 
-        Ok(self
-            .prov
-            .delete(organization_id, project_id, id)
-            .await?
-            .into())
+        Ok(self.prov.delete(organization_id, project_id, id)?.into())
     }
 }

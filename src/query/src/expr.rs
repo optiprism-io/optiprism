@@ -55,7 +55,7 @@ pub fn time_expression<S: ExprSchema>(
 }
 
 /// builds expression for event
-pub async fn event_expression(
+pub fn event_expression(
     ctx: &Context,
     metadata: &Arc<MetadataProvider>,
     event: &EventRef,
@@ -66,8 +66,7 @@ pub async fn event_expression(
         EventRef::RegularName(name) => {
             let e = metadata
                 .events
-                .get_by_name(ctx.organization_id, ctx.project_id, name)
-                .await?;
+                .get_by_name(ctx.organization_id, ctx.project_id, name)?;
 
             binary_expr(
                 col(event_fields::EVENT),
@@ -84,30 +83,25 @@ pub async fn event_expression(
         EventRef::Custom(id) => {
             let e = metadata
                 .custom_events
-                .get_by_id(ctx.organization_id, ctx.project_id, *id)
-                .await?;
+                .get_by_id(ctx.organization_id, ctx.project_id, *id)?;
             let mut exprs: Vec<Expr> = Vec::new();
             for event in e.events.iter() {
                 let mut expr = match &event.event {
-                    EventRef::RegularName(name) => executor::block_on(event_expression(
-                        ctx,
-                        metadata,
-                        &EventRef::RegularName(name.to_owned()),
-                    ))?,
-                    EventRef::Regular(id) => executor::block_on(event_expression(
-                        ctx,
-                        metadata,
-                        &EventRef::Regular(*id),
-                    ))?,
+                    EventRef::RegularName(name) => {
+                        event_expression(ctx, metadata, &EventRef::RegularName(name.to_owned()))?
+                    }
+                    EventRef::Regular(id) => {
+                        event_expression(ctx, metadata, &EventRef::Regular(*id))?
+                    }
                     EventRef::Custom(id) => {
-                        executor::block_on(event_expression(ctx, metadata, &EventRef::Custom(*id)))?
+                        event_expression(ctx, metadata, &EventRef::Custom(*id))?
                     }
                 };
 
                 if let Some(filters) = &event.filters {
                     expr = and(
                         expr.clone(),
-                        event_filters_expression(ctx, metadata, filters).await?,
+                        event_filters_expression(ctx, metadata, filters)?,
                     );
                 }
 
@@ -125,7 +119,7 @@ pub async fn event_expression(
 }
 
 /// builds event filters expression
-pub async fn event_filters_expression(
+pub fn event_filters_expression(
     ctx: &Context,
     metadata: &Arc<MetadataProvider>,
     filters: &[EventFilter],
@@ -140,13 +134,7 @@ pub async fn event_filters_expression(
                     property,
                     operation,
                     value,
-                } => executor::block_on(property_expression(
-                    ctx,
-                    metadata,
-                    property,
-                    operation,
-                    value.clone(),
-                )),
+                } => property_expression(ctx, metadata, property, operation, value.clone()),
             }
         })
         .collect::<Result<Vec<Expr>>>()?;
@@ -158,7 +146,7 @@ pub async fn event_filters_expression(
     Ok(multi_and(filters_exprs))
 }
 
-pub async fn encode_property_dict_values(
+pub fn encode_property_dict_values(
     ctx: &Context,
     dictionaries: &Arc<dyn dictionaries::Provider>,
     dict_type: &DictionaryType,
@@ -169,14 +157,12 @@ pub async fn encode_property_dict_values(
     for value in values.iter() {
         if let ScalarValue::Utf8(inner) = value {
             if let Some(str_value) = inner {
-                let key = dictionaries
-                    .get_key(
-                        ctx.organization_id,
-                        ctx.project_id,
-                        col_name,
-                        str_value.as_str(),
-                    )
-                    .await?;
+                let key = dictionaries.get_key(
+                    ctx.organization_id,
+                    ctx.project_id,
+                    col_name,
+                    str_value.as_str(),
+                )?;
 
                 let scalar_value = match dict_type {
                     DictionaryType::UInt8 => ScalarValue::UInt8(Some(key as u8)),
@@ -206,7 +192,7 @@ pub async fn encode_property_dict_values(
 }
 
 /// builds name [property] [operation] [value] expression
-pub async fn property_expression(
+pub fn property_expression(
     ctx: &Context,
     md: &Arc<MetadataProvider>,
     property: &PropertyRef,
@@ -215,10 +201,9 @@ pub async fn property_expression(
 ) -> Result<Expr> {
     match property {
         PropertyRef::User(prop_name) => {
-            let prop = md
-                .user_properties
-                .get_by_name(ctx.organization_id, ctx.project_id, prop_name)
-                .await?;
+            let prop =
+                md.user_properties
+                    .get_by_name(ctx.organization_id, ctx.project_id, prop_name)?;
             let col_name = prop.column_name();
             let col = col(col_name.as_str());
 
@@ -233,18 +218,16 @@ pub async fn property_expression(
                     &dict_type,
                     col_name.as_str(),
                     &values.unwrap(),
-                )
-                .await?;
+                )?;
                 named_property_expression(col, operation, Some(dict_values))
             } else {
                 named_property_expression(col, operation, values)
             }
         }
         PropertyRef::Event(prop_name) => {
-            let prop = md
-                .event_properties
-                .get_by_name(ctx.organization_id, ctx.project_id, prop_name)
-                .await?;
+            let prop =
+                md.event_properties
+                    .get_by_name(ctx.organization_id, ctx.project_id, prop_name)?;
             let col_name = prop.column_name();
             let col = col(col_name.as_str());
 
@@ -259,8 +242,7 @@ pub async fn property_expression(
                     &dict_type,
                     col_name.as_str(),
                     &values.unwrap(),
-                )
-                .await?;
+                )?;
                 named_property_expression(col, operation, Some(dict_values))
             } else {
                 named_property_expression(col, operation, values)
@@ -270,24 +252,22 @@ pub async fn property_expression(
     }
 }
 
-pub async fn property_col(
+pub fn property_col(
     ctx: &Context,
     md: &Arc<MetadataProvider>,
     property: &PropertyRef,
 ) -> Result<Expr> {
     Ok(match property {
         PropertyRef::User(prop_name) => {
-            let prop = md
-                .user_properties
-                .get_by_name(ctx.organization_id, ctx.project_id, prop_name)
-                .await?;
+            let prop =
+                md.user_properties
+                    .get_by_name(ctx.organization_id, ctx.project_id, prop_name)?;
             col(prop.column_name().as_str())
         }
         PropertyRef::Event(prop_name) => {
-            let prop = md
-                .event_properties
-                .get_by_name(ctx.organization_id, ctx.project_id, prop_name)
-                .await?;
+            let prop =
+                md.event_properties
+                    .get_by_name(ctx.organization_id, ctx.project_id, prop_name)?;
             col(prop.column_name().as_str())
         }
         PropertyRef::Custom(_prop_name) => unimplemented!(),

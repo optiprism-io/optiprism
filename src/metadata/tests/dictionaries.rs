@@ -6,27 +6,26 @@ use metadata::dictionaries::ProviderImpl;
 use metadata::error::Result;
 use metadata::store::Store;
 use uuid::Uuid;
-
-#[tokio::test]
-async fn test_dictionaries() -> Result<()> {
+#[test]
+fn test_dictionaries() -> Result<()> {
     let mut path = temp_dir();
     path.push(format!("{}.db", Uuid::new_v4()));
 
-    let store = Arc::new(Store::new(path));
-    let dicts: Box<dyn Provider> = Box::new(ProviderImpl::new(store.clone()));
+    let db = Arc::new(metadata::rocksdb::new(path).unwrap());
+    let dicts: Box<dyn Provider> = Box::new(ProviderImpl::new(db.clone()));
 
-    assert!(dicts.get_key(1, 1, "d1", "v1").await.is_err());
-    assert!(dicts.get_value(1, 1, "d1", 1).await.is_err());
+    assert!(dicts.get_key(1, 1, "d1", "v1").is_err());
+    assert!(dicts.get_value(1, 1, "d1", 1).is_err());
 
-    assert_eq!(dicts.get_key_or_create(1, 1, "d1", "d1v1").await?, 1);
-    assert_eq!(dicts.get_key(1, 1, "d1", "d1v1").await?, 1);
-    assert_eq!(dicts.get_value(1, 1, "d1", 1).await?, "d1v1");
-    assert_eq!(dicts.get_key_or_create(1, 1, "d1", "d1v1").await?, 1);
+    assert_eq!(dicts.get_key_or_create(1, 1, "d1", "d1v1")?, 1);
+    assert_eq!(dicts.get_key(1, 1, "d1", "d1v1")?, 1);
+    assert_eq!(dicts.get_value(1, 1, "d1", 1)?, "d1v1");
+    assert_eq!(dicts.get_key_or_create(1, 1, "d1", "d1v1")?, 1);
 
-    assert_eq!(dicts.get_key_or_create(1, 1, "d1", "d1v2").await?, 2);
-    assert_eq!(dicts.get_key_or_create(1, 1, "d2", "d2v1").await?, 1);
-    assert_eq!(dicts.get_key_or_create(1, 1, "d2", "d2v2").await?, 2);
-    assert_eq!(dicts.get_key(1, 1, "d2", "d2v1").await?, 1);
-    assert_eq!(dicts.get_value(1, 1, "d2", 1).await?, "d2v1");
+    assert_eq!(dicts.get_key_or_create(1, 1, "d1", "d1v2")?, 2);
+    assert_eq!(dicts.get_key_or_create(1, 1, "d2", "d2v1")?, 1);
+    assert_eq!(dicts.get_key_or_create(1, 1, "d2", "d2v2")?, 2);
+    assert_eq!(dicts.get_key(1, 1, "d2", "d2v1")?, 1);
+    assert_eq!(dicts.get_value(1, 1, "d2", 1)?, "d2v1");
     Ok(())
 }

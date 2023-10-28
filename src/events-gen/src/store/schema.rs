@@ -6,9 +6,10 @@ use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 use enum_iterator::all;
 use metadata::database::Column;
+use metadata::database::CreateTableRequest;
 use metadata::database::Table;
 use metadata::database::TableRef;
-use metadata::error::DatabaseError;
+use metadata::error::MetadataError;
 use metadata::properties::DataType;
 use metadata::properties::DictionaryType;
 use metadata::properties::Type;
@@ -20,11 +21,7 @@ use test_util::CreatePropertyMainRequest;
 use crate::error::Result;
 use crate::store::events::Event;
 
-pub async fn create_entities(
-    org_id: u64,
-    proj_id: u64,
-    md: &Arc<MetadataProvider>,
-) -> Result<Schema> {
+pub fn create_entities(org_id: u64, proj_id: u64, md: &Arc<MetadataProvider>) -> Result<Schema> {
     let mut cols: Vec<Column> = Vec::new();
 
     create_property(
@@ -39,8 +36,7 @@ pub async fn create_entities(
             dict: None,
         },
         &mut cols,
-    )
-    .await?;
+    )?;
 
     create_property(
         md,
@@ -54,8 +50,7 @@ pub async fn create_entities(
             dict: None,
         },
         &mut cols,
-    )
-    .await?;
+    )?;
 
     create_property(
         md,
@@ -69,8 +64,7 @@ pub async fn create_entities(
             dict: Some(DictionaryType::UInt64),
         },
         &mut cols,
-    )
-    .await?;
+    )?;
 
     // create event props
     create_property(
@@ -85,8 +79,7 @@ pub async fn create_entities(
             dict: Some(DictionaryType::UInt16),
         },
         &mut cols,
-    )
-    .await?;
+    )?;
 
     create_property(
         md,
@@ -100,8 +93,7 @@ pub async fn create_entities(
             dict: Some(DictionaryType::UInt16),
         },
         &mut cols,
-    )
-    .await?;
+    )?;
 
     create_property(
         md,
@@ -115,8 +107,7 @@ pub async fn create_entities(
             dict: Some(DictionaryType::UInt16),
         },
         &mut cols,
-    )
-    .await?;
+    )?;
 
     create_property(
         md,
@@ -130,8 +121,7 @@ pub async fn create_entities(
             dict: Some(DictionaryType::UInt16),
         },
         &mut cols,
-    )
-    .await?;
+    )?;
 
     create_property(
         md,
@@ -145,8 +135,7 @@ pub async fn create_entities(
             dict: None,
         },
         &mut cols,
-    )
-    .await?;
+    )?;
 
     create_property(
         md,
@@ -160,8 +149,7 @@ pub async fn create_entities(
             dict: None,
         },
         &mut cols,
-    )
-    .await?;
+    )?;
 
     create_property(
         md,
@@ -175,8 +163,7 @@ pub async fn create_entities(
             dict: None,
         },
         &mut cols,
-    )
-    .await?;
+    )?;
 
     create_property(
         md,
@@ -190,8 +177,7 @@ pub async fn create_entities(
             dict: None,
         },
         &mut cols,
-    )
-    .await?;
+    )?;
 
     create_property(
         md,
@@ -205,8 +191,7 @@ pub async fn create_entities(
             dict: None,
         },
         &mut cols,
-    )
-    .await?;
+    )?;
 
     create_property(
         md,
@@ -220,8 +205,7 @@ pub async fn create_entities(
             dict: None,
         },
         &mut cols,
-    )
-    .await?;
+    )?;
 
     create_property(
         md,
@@ -235,8 +219,7 @@ pub async fn create_entities(
             dict: None,
         },
         &mut cols,
-    )
-    .await?;
+    )?;
 
     create_property(
         md,
@@ -250,8 +233,7 @@ pub async fn create_entities(
             dict: Some(DictionaryType::UInt16),
         },
         &mut cols,
-    )
-    .await?;
+    )?;
 
     create_property(
         md,
@@ -265,8 +247,7 @@ pub async fn create_entities(
             dict: Some(DictionaryType::UInt16),
         },
         &mut cols,
-    )
-    .await?;
+    )?;
 
     create_property(
         md,
@@ -280,8 +261,7 @@ pub async fn create_entities(
             dict: Some(DictionaryType::UInt16),
         },
         &mut cols,
-    )
-    .await?;
+    )?;
 
     create_property(
         md,
@@ -295,8 +275,7 @@ pub async fn create_entities(
             dict: Some(DictionaryType::UInt16),
         },
         &mut cols,
-    )
-    .await?;
+    )?;
 
     create_property(
         md,
@@ -310,8 +289,7 @@ pub async fn create_entities(
             dict: Some(DictionaryType::UInt16),
         },
         &mut cols,
-    )
-    .await?;
+    )?;
 
     create_property(
         md,
@@ -325,23 +303,25 @@ pub async fn create_entities(
             dict: Some(DictionaryType::UInt16),
         },
         &mut cols,
-    )
-    .await?;
+    )?;
 
     for event in all::<Event>() {
-        create_event(md, org_id, proj_id, event.to_string()).await?;
+        create_event(md, org_id, proj_id, event.to_string())?;
     }
 
+    let table = CreateTableRequest {
+        typ: TableRef::Events(org_id, proj_id),
+        columns: cols.clone(),
+    };
+
+    match md.database.create_table(table.clone()) {
+        Ok(_) | Err(MetadataError::AlreadyExists(_)) => {}
+        Err(err) => return Err(err.into()),
+    };
     let table = Table {
+        id: 1,
         typ: TableRef::Events(org_id, proj_id),
         columns: cols,
     };
-
-    match md.database.create_table(table.clone()).await {
-        Ok(_)
-        | Err(metadata::error::MetadataError::Database(DatabaseError::TableAlreadyExists(_))) => {}
-        Err(err) => return Err(err.into()),
-    };
-
     Ok(table.arrow_schema())
 }
