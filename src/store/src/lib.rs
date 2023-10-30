@@ -4,14 +4,34 @@
 extern crate core;
 
 pub mod arrow_conversion;
+pub mod db;
 pub mod error;
+pub mod options;
 pub mod parquet;
 
+use std::cmp::Ordering;
 use std::fmt::Debug;
 
 use chrono::DateTime;
 use chrono::Utc;
 use error::Result;
+
+#[derive(Eq, PartialEq, PartialOrd, Ord, Debug, Clone)]
+pub enum KeyValue {
+    Int8(i8),
+    Int16(i16),
+    Int64(i64),
+    UInt8(u8),
+    UInt16(u16),
+    UInt64(u64),
+    String(String),
+}
+
+#[derive(Debug)]
+pub struct ColValue {
+    col: String,
+    val: Value,
+}
 
 #[derive(Clone, Debug)]
 pub enum Value {
@@ -49,24 +69,7 @@ pub enum Value {
     ListBinary(Vec<Vec<u8>>),
     ListString(Vec<String>),
 }
-#[derive(Clone, Debug)]
-pub enum UpdateValueOp {
-    Insert,
-    Increment,
-    Decrement,
-}
-#[derive(Clone, Debug)]
-pub struct UpdateRowValue {
-    col: String,
-    op: UpdateValueOp,
-    value: Value,
-}
-#[derive(Clone, Debug)]
-pub enum ValueOp {
-    Insert,
-    Increment,
-    Decrement,
-}
+
 #[derive(Clone, Debug)]
 pub struct RowValue {
     col: String,
@@ -77,17 +80,6 @@ impl RowValue {
     pub fn new(col: String, value: Value) -> Self {
         Self { col, value }
     }
-}
-
-pub trait SortedMergeTree: Sync + Send {
-    fn insert(&self, value: Vec<RowValue>) -> Result<()>;
-    fn delete(&self, col: &str, eq_value: Value) -> Result<()>;
-}
-
-pub trait ReplacingMergeTree: Sync + Send {
-    fn insert(&self, value: Vec<RowValue>) -> Result<()>;
-    fn update(&self, value: Vec<UpdateRowValue>) -> Result<()>;
-    fn delete(&self, col: &str, eq_value: Value) -> Result<()>;
 }
 
 pub mod test_util {
