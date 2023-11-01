@@ -22,6 +22,10 @@ pub enum StoreError {
     Arrow(#[from] arrow::error::ArrowError),
     #[error("arrow2 {0:?}")]
     Arrow2(#[from] arrow2::error::Error),
+    #[error("io {0:?}")]
+    Io(#[from] std::io::Error),
+    #[error("bincode {0:?}")]
+    Bincode(#[from] bincode::Error),
 }
 
 impl StoreError {

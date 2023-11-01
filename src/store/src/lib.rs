@@ -15,8 +15,10 @@ use std::fmt::Debug;
 use chrono::DateTime;
 use chrono::Utc;
 use error::Result;
+use serde::Deserialize;
+use serde::Serialize;
 
-#[derive(Eq, PartialEq, PartialOrd, Ord, Debug, Clone)]
+#[derive(Eq, PartialEq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize, Hash)]
 pub enum KeyValue {
     Int8(i8),
     Int16(i16),
@@ -27,49 +29,61 @@ pub enum KeyValue {
     String(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, Hash)]
 pub struct ColValue {
     col: String,
     val: Value,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub enum Value {
-    Null,
-    Int8(i8),
-    Int16(i16),
-    Int32(i32),
-    Int64(i64),
-    Int128(i128),
-    UInt8(u8),
-    UInt16(u16),
-    UInt32(u32),
-    UInt64(u64),
-    Float32(f32),
-    Float64(f64),
-    Boolean(bool),
-    Timestamp(DateTime<Utc>),
-    Decimal(i128),
-    Binary(Vec<u8>),
-    String(String),
-    ListInt8(Vec<i8>),
-    ListInt16(Vec<i16>),
-    ListInt32(Vec<i32>),
-    ListInt64(Vec<i64>),
-    ListInt128(Vec<i128>),
-    ListUInt8(Vec<u8>),
-    ListUInt16(Vec<u16>),
-    ListUInt32(Vec<u32>),
-    ListUInt64(Vec<u64>),
-    ListFloat32(Vec<f32>),
-    ListFloat64(Vec<f64>),
-    ListBoolean(Vec<bool>),
-    ListTimestamp(Vec<i64>),
-    ListDecimal(Vec<i128>),
-    ListBinary(Vec<Vec<u8>>),
-    ListString(Vec<String>),
+    Int8(Option<i8>),
+    Int16(Option<i16>),
+    Int32(Option<i32>),
+    Int64(Option<i64>),
+    Int128(Option<i128>),
+    UInt8(Option<u8>),
+    UInt16(Option<u16>),
+    UInt32(Option<u32>),
+    UInt64(Option<u64>),
+    // Float32(Option<f32>),
+    // Float64(Option<f64>),
+    Boolean(Option<bool>),
+    Timestamp(Option<i64>),
+    Decimal(Option<i128>),
+    Binary(Option<Vec<u8>>),
+    String(Option<String>),
+    ListInt8(Option<Vec<Option<i8>>>),
+    ListInt16(Option<Vec<Option<i16>>>),
+    ListInt32(Option<Vec<Option<i32>>>),
+    ListInt64(Option<Vec<Option<i64>>>),
+    ListInt128(Option<Vec<Option<i128>>>),
+    ListUInt8(Option<Vec<Option<u8>>>),
+    ListUInt16(Option<Vec<Option<u16>>>),
+    ListUInt32(Option<Vec<Option<u32>>>),
+    ListUInt64(Option<Vec<Option<u64>>>),
+    // ListFloat32(Option<Vec<Option<f32>>>),
+    // ListFloat64(Option<Vec<Option<f64>>>),
+    ListBoolean(Option<Vec<Option<bool>>>),
+    ListTimestamp(Option<Vec<Option<i64>>>),
+    ListDecimal(Option<Vec<Option<i128>>>),
+    ListBinary(Option<Vec<Vec<Option<u8>>>>),
+    ListString(Option<Vec<Option<String>>>),
 }
 
+impl From<KeyValue> for Value {
+    fn from(value: KeyValue) -> Self {
+        match value {
+            KeyValue::Int8(v) => Value::Int8(Some(v)),
+            KeyValue::Int16(v) => Value::Int16(Some(v)),
+            KeyValue::Int64(v) => Value::Int64(Some(v)),
+            KeyValue::UInt8(v) => Value::UInt8(Some(v)),
+            KeyValue::UInt16(v) => Value::UInt16(Some(v)),
+            KeyValue::UInt64(v) => Value::UInt64(Some(v)),
+            KeyValue::String(v) => Value::String(Some(v)),
+        }
+    }
+}
 #[derive(Clone, Debug)]
 pub struct RowValue {
     col: String,
