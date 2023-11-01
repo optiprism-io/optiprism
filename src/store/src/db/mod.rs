@@ -1,9 +1,15 @@
 use std::cmp::Ordering;
+use std::collections::BinaryHeap;
+use std::ffi::OsStr;
 use std::fs;
 use std::fs::File;
 use std::fs::OpenOptions;
+use std::io::BufReader;
+use std::io::BufWriter;
+use std::io::Read;
 use std::io::Write;
 use std::mem;
+use std::os::unix::fs::DirEntryExt2;
 use std::path::PathBuf;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
@@ -24,6 +30,7 @@ use arrow2::datatypes::SchemaRef;
 use arrow2::io::parquet;
 use arrow2::io::parquet::write::transverse;
 use arrow_buffer::ToByteSlice;
+use bincode::deserialize;
 use bincode::serialize;
 use crossbeam_skiplist::SkipSet;
 use rocksdb::Transaction;
@@ -32,6 +39,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::error::Result;
+use crate::error::StoreError;
 use crate::options::ReadOptions;
 use crate::options::WriteOptions;
 use crate::ColValue;
@@ -39,7 +47,7 @@ use crate::KeyValue;
 use crate::RowValue;
 use crate::Value;
 
-const TABLES_DIR: &str = "tables";
+const PARTS_DIR: &str = "parts";
 
 macro_rules! memory_col_to_arrow {
     ($col:expr, $dt:ident,$arr_ty:ident) => {{
@@ -52,6 +60,22 @@ macro_rules! memory_col_to_arrow {
             .collect::<Vec<_>>();
         $arr_ty::from(vals).as_arc()
     }};
+}
+
+struct Table {
+    id: u64,
+    size_bytes: u64,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize, Hash)]
+struct Metadata {
+    version: u64,
+    seq_id: u64,
+    log_id: u64,
+    table_id: u64,
+    // levels->tables
+    tables: Vec<Vec<Table>>,
+    stats: Stats,
 }
 
 #[derive(Debug, Serialize, Deserialize, Hash)]
@@ -72,12 +96,15 @@ pub enum Op {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct LogOp(usize, i64, Op);
+pub enum LogOp {
+    Op(Op),
+    Metadata(Metadata),
+}
 
 #[derive(Debug)]
 struct MemOp {
     op: Op,
-    op_id: u64,
+    seq_id: u64,
 }
 
 impl PartialOrd for MemOp {
@@ -99,7 +126,7 @@ impl PartialEq for MemOp {
         };
 
         if left_k == right_k {
-            self.op_id == other.op_id
+            self.seq_id == other.seq_id
         } else {
             false
         }
@@ -121,7 +148,7 @@ impl Ord for MemOp {
         match left_k.partial_cmp(&right_k) {
             None => unreachable!("keys must be comparable"),
             Some(ord) => match ord {
-                Ordering::Equal => self.op_id.cmp(&other.op_id),
+                Ordering::Equal => self.seq_id.cmp(&other.seq_id),
                 _ => ord,
             },
         }
@@ -163,28 +190,92 @@ struct Options {
 
 struct OptiDBImpl {
     opts: Options,
-    version: u64,
-    op_id: u64,
     memtable: SkipSet<MemOp>,
-    table_id: usize,
-    logged_bytes: usize,
-    stats: Stats,
-    log: File,
+    metadata: Metadata,
+    log: BufWriter<File>,
     schema: SchemaRef,
     path: PathBuf,
 }
 
+fn load_metadata(path: PathBuf) {}
+
+fn recover(path: PathBuf, opts: Options) -> Result<OptiDBImpl> {
+    let dir = fs::read_dir(path.clone())?;
+    let mut logs = BinaryHeap::new();
+    for f in dir {
+        let f = f?;
+        match f.path().extension() {
+            None => false,
+            Some(n) => {
+                if n == OsStr::new("log") {
+                    logs.push(f)
+                }
+            }
+        };
+    }
+
+    let mut metadata = Default::default();
+    let mut memtable = SkipSet::new();
+    let log = if let Some(log) = logs.pop() {
+        let mut f = BufReader::new(File::open(log.path())?);
+
+        let mut crc_b = [0u8; mem::size_of::<i32>()];
+        f.read_exact(&mut crc_b)?;
+        let crc32 = i32::from_le_bytes(crc_b);
+
+        let mut len_b = [0u8; mem::size_of::<u64>()];
+        f.read_exact(&mut len_b)?;
+        let len = i32::from_le_bytes(len_b);
+
+        let mut data_b = Vec::with_capacity(len as usize);
+        f.read_exact(&mut data_b)?;
+        // todo recover from this case
+        if crc32 != hash_crc32(&data_b) {
+            return Err(StoreError::Internal("corrupted log".into()));
+        }
+        let log_op = deserialize::<LogOp>(&data_b)?;
+        match log_op {
+            LogOp::Op(op) => {
+                memtable.insert(MemOp {
+                    op,
+                    seq_id: metadata.seq_id,
+                });
+                metadata.seq_id += 1;
+            }
+            LogOp::Metadata(md) => metadata = md,
+        }
+
+        drop(f);
+
+        OpenOptions::new().write(true).read(true).open(log.path())?
+    } else {
+        OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .read(true)
+            .open(path.join("0.log"))?
+    };
+
+    if recover {}
+    Ok(OptiDBImpl {
+        opts,
+        memtable,
+        metadata,
+        log,
+        schema: Arc::new(Default::default()),
+        path,
+    })
+}
+
 impl OptiDBImpl {
     pub fn open(path: PathBuf, opts: Options) -> Result<Self> {
-        println!("{:?}", path.join("log"));
+        recover(&path, &opts)?;
         Ok(OptiDBImpl {
             opts: opts.clone(),
-            version: 0,
-            op_id: 0,
             memtable: Default::default(),
-            table_id: 0,
+            metadata: Default::default(),
+            log_id: 0,
             logged_bytes: 0,
-            stats: Default::default(),
             log: OpenOptions::new()
                 .create_new(true)
                 .write(true)
@@ -196,8 +287,8 @@ impl OptiDBImpl {
     }
     pub fn insert(&mut self, key: Vec<KeyValue>, values: Vec<Value>) -> Result<()> {
         let op = Op::Insert(key, values);
-        self.log_op(op)?;
-        if self.logged_bytes > self.opts.max_log_length {
+        self.log_op(LogOp::Op(op))?;
+        if self.metadata.stats.logged_bytes > self.opts.max_log_length {
             self.flush()?;
         }
         Ok(())
@@ -211,29 +302,47 @@ impl OptiDBImpl {
         unimplemented!()
     }
 
-    fn log_op(&mut self, op: Op) -> Result<()> {
+    // 1. write to operation log
+    // 2. insert to memtable
+    fn log_op(&mut self, op: LogOp) -> Result<()> {
         let data = serialize(&op)?;
 
-        self.log.write_all(&self.op_id.to_le_bytes())?;
         let crc = hash_crc32(&data);
         self.log.write_all(&crc.to_le_bytes())?;
+        self.log.write_all(&(data.len() as u64).to_le_bytes())?;
+        self.log.write_all(&data)?;
 
-        self.memtable.insert(MemOp {
-            op,
-            op_id: self.op_id,
-        });
-        self.op_id += 1;
+        match op {
+            LogOp::Op(op) => {
+                self.memtable.insert(MemOp {
+                    op,
+                    seq_id: self.metadata.seq_id,
+                });
+            }
+            LogOp::Metadata(md) => {}
+        }
+
+        self.metadata.seq_id += 1;
         let logged_size = 8 + 4 + data.len();
         self.logged_bytes += logged_size;
-        self.stats.logged_bytes += logged_size as u64;
+        self.metadata.stats.logged_bytes += logged_size as u64;
+
         Ok(())
     }
 
+    // swap memtable
+    // write memtable to parquet
+    // update metadata
+    // write metadata to new log
+    // delete cur log
     fn flush(&mut self) -> Result<()> {
         self.log.flush()?;
         self.log.sync_all()?;
 
+        // swap memtable
         let memtable = std::mem::take(&mut self.memtable);
+
+        // write to parquet
         let mut cols: Vec<Vec<Value>> = vec![Vec::new(); self.schema.fields.len()];
         for op in memtable {
             let (keys, vals) = match op.op {
@@ -320,14 +429,13 @@ impl OptiDBImpl {
             encodings,
         )?;
 
-        fs::create_dir_all(self.path.join("tables/0"))?;
+        fs::create_dir_all(self.path.join("parts/0"))?;
 
         let p = self
             .path
-            .join("tables")
+            .join("parts")
             .join("0")
-            .join(self.table_id.to_string());
-        println!("{:?}", p);
+            .join(self.metadata.table_id.to_string());
         let w = OpenOptions::new().create_new(true).write(true).open(p)?;
         let mut writer = parquet::write::FileWriter::try_new(
             w,
@@ -335,12 +443,36 @@ impl OptiDBImpl {
             popts,
         )?;
 
-        // Write the file.
+        // Write the part
         for group in row_groups {
             writer.write(group?)?;
         }
-        let _ = writer.end(None)?;
-        self.table_id += 1;
+        let sz = writer.end(None)?;
+
+        // add table to md
+        self.metadata.tables[0].push(Table {
+            id: self.metadata.table_id,
+            size_bytes: sz,
+        });
+
+        // increment table id
+        self.metadata.table_id += 1;
+        self.metadata.stats.written_bytes += sz;
+        // increment log id
+        self.metadata.log_id += 1;
+
+        // create new log
+        let log = OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .read(true)
+            .open(self.path.join(format!("{:16x}.log", self.metadata.log_id)))?;
+        self.log = log;
+
+        // write metadata to log as first record
+        let op = LogOp::Metadata(self.metadata.clone());
+        self.log_op(op)?;
+
         Ok(())
     }
 
