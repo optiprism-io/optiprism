@@ -9,7 +9,6 @@ use std::io::BufWriter;
 use std::io::Read;
 use std::io::Write;
 use std::mem;
-use std::os::unix::fs::DirEntryExt2;
 use std::path::PathBuf;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
@@ -25,6 +24,7 @@ use arrow2::array::MutableUtf8Array;
 use arrow2::array::PrimitiveArray;
 use arrow2::chunk::Chunk;
 use arrow2::datatypes::DataType;
+use arrow2::datatypes::Field;
 use arrow2::datatypes::Schema;
 use arrow2::datatypes::SchemaRef;
 use arrow2::io::parquet;
@@ -37,6 +37,8 @@ use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
+use tracing::instrument;
+use tracing::trace;
 
 use crate::error::Result;
 use crate::error::StoreError;
@@ -61,18 +63,19 @@ macro_rules! memory_col_to_arrow {
         $arr_ty::from(vals).as_arc()
     }};
 }
-
+#[derive(Debug, Serialize, Deserialize, Clone)]
 struct Table {
     id: u64,
     size_bytes: u64,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Hash)]
-struct Metadata {
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Metadata {
     version: u64,
     seq_id: u64,
     log_id: u64,
-    table_id: u64,
+    part_id: u64,
+    schema: Schema,
     // levels->tables
     tables: Vec<Vec<Table>>,
     stats: Stats,
@@ -166,7 +169,7 @@ fn hash_crc32(v: &[u8]) -> u32 {
     hasher.finalize() ^ 0xFF
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct Stats {
     pub resident_bytes: u64,
     pub on_disk_bytes: u64,
@@ -182,10 +185,9 @@ pub struct OptiDB {
     inner: Arc<OptiDBImpl>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Options {
-    max_log_length: usize,
-    schema: SchemaRef,
+    max_log_length: u64,
 }
 
 struct OptiDBImpl {
@@ -193,99 +195,120 @@ struct OptiDBImpl {
     memtable: SkipSet<MemOp>,
     metadata: Metadata,
     log: BufWriter<File>,
-    schema: SchemaRef,
     path: PathBuf,
 }
 
-fn load_metadata(path: PathBuf) {}
-
+// #[instrument(level = "trace")]
 fn recover(path: PathBuf, opts: Options) -> Result<OptiDBImpl> {
+    trace!("db dir: {:?}", path);
+    trace!("starting recovery");
     let dir = fs::read_dir(path.clone())?;
     let mut logs = BinaryHeap::new();
+
     for f in dir {
         let f = f?;
         match f.path().extension() {
-            None => false,
+            None => {}
             Some(n) => {
                 if n == OsStr::new("log") {
-                    logs.push(f)
+                    logs.push(f.path());
                 }
             }
         };
     }
 
-    let mut metadata = Default::default();
+    trace!("found {} logs", logs.len());
+
+    let mut metadata = Metadata {
+        version: 0,
+        seq_id: 0,
+        log_id: 0,
+        part_id: 0,
+        schema: Schema::from(vec![]),
+        tables: vec![],
+        stats: Default::default(),
+    };
+
     let mut memtable = SkipSet::new();
-    let log = if let Some(log) = logs.pop() {
-        let mut f = BufReader::new(File::open(log.path())?);
+    let log = if let Some(log_path) = logs.pop() {
+        trace!("last log: {:?}", log_path);
+        let mut f = BufReader::new(File::open(&log_path)?);
 
-        let mut crc_b = [0u8; mem::size_of::<i32>()];
-        f.read_exact(&mut crc_b)?;
-        let crc32 = i32::from_le_bytes(crc_b);
-
-        let mut len_b = [0u8; mem::size_of::<u64>()];
-        f.read_exact(&mut len_b)?;
-        let len = i32::from_le_bytes(len_b);
-
-        let mut data_b = Vec::with_capacity(len as usize);
-        f.read_exact(&mut data_b)?;
-        // todo recover from this case
-        if crc32 != hash_crc32(&data_b) {
-            return Err(StoreError::Internal("corrupted log".into()));
-        }
-        let log_op = deserialize::<LogOp>(&data_b)?;
-        match log_op {
-            LogOp::Op(op) => {
-                memtable.insert(MemOp {
-                    op,
-                    seq_id: metadata.seq_id,
-                });
-                metadata.seq_id += 1;
+        let mut ops = 0;
+        let mut read_bytes = 0;
+        loop {
+            let mut crc_b = [0u8; mem::size_of::<u32>()];
+            read_bytes = f.read(&mut crc_b)?;
+            if read_bytes == 0 {
+                break;
             }
-            LogOp::Metadata(md) => metadata = md,
-        }
+            let crc32 = u32::from_le_bytes(crc_b);
+            trace!("crc32: {}", crc32);
 
+            let mut len_b = [0u8; mem::size_of::<u64>()];
+            f.read_exact(&mut len_b)?;
+            let len = u64::from_le_bytes(len_b);
+            trace!("len: {}", len);
+            let mut data_b = vec![0u8; len as usize];
+            f.read_exact(&mut data_b)?;
+            // todo recover from this case
+            let cur_crc32 = hash_crc32(&data_b);
+            if crc32 != cur_crc32 {
+                return Err(StoreError::Internal(format!(
+                    "corrupted log. crc32 has: {}, need: {}",
+                    cur_crc32, crc32
+                )));
+            }
+            let log_op = deserialize::<LogOp>(&data_b)?;
+            match log_op {
+                LogOp::Op(op) => {
+                    trace!("op: insert: {:?}", op);
+                    memtable.insert(MemOp {
+                        op,
+                        seq_id: metadata.seq_id,
+                    });
+                }
+                LogOp::Metadata(md) => {
+                    trace!("op: metadata: {:?}", md);
+                    metadata = md
+                }
+            }
+
+            metadata.seq_id += 1;
+            ops += 1;
+        }
+        trace!("operations recovered: {}", ops);
         drop(f);
 
-        OpenOptions::new().write(true).read(true).open(log.path())?
+        OpenOptions::new().append(true).open(log_path)?
     } else {
+        trace!("creating initial log {}", format!("{:016}.log", 0));
+
         OpenOptions::new()
             .create_new(true)
             .write(true)
             .read(true)
-            .open(path.join("0.log"))?
+            .open(path.join(format!("{:016}.log", 0)))?
     };
 
-    if recover {}
+    trace!("metadata: {:?}", metadata);
     Ok(OptiDBImpl {
         opts,
         memtable,
         metadata,
-        log,
-        schema: Arc::new(Default::default()),
+        log: BufWriter::new(log),
         path,
     })
 }
 
 impl OptiDBImpl {
+    // #[instrument(level = "trace")]
     pub fn open(path: PathBuf, opts: Options) -> Result<Self> {
-        recover(&path, &opts)?;
-        Ok(OptiDBImpl {
-            opts: opts.clone(),
-            memtable: Default::default(),
-            metadata: Default::default(),
-            log_id: 0,
-            logged_bytes: 0,
-            log: OpenOptions::new()
-                .create_new(true)
-                .write(true)
-                .read(true)
-                .open(path.join("log"))?,
-            schema: opts.schema.clone(),
-            path,
-        })
+        recover(path, opts)
     }
+    // #[instrument(level = "trace", skip(self))]
     pub fn insert(&mut self, key: Vec<KeyValue>, values: Vec<Value>) -> Result<()> {
+        assert_eq!(key.len() + values.len(), self.metadata.schema.fields.len());
         let op = Op::Insert(key, values);
         self.log_op(LogOp::Op(op))?;
         if self.metadata.stats.logged_bytes > self.opts.max_log_length {
@@ -302,12 +325,21 @@ impl OptiDBImpl {
         unimplemented!()
     }
 
+    // #[instrument(level = "trace", skip(self))]
+    fn add_field(&mut self, field: Field) -> Result<()> {
+        self.metadata.schema.fields.push(field);
+        self.log_op(LogOp::Metadata(self.metadata.clone()))?;
+        Ok(())
+    }
     // 1. write to operation log
     // 2. insert to memtable
+    // #[instrument(level = "trace", skip(self))]
     fn log_op(&mut self, op: LogOp) -> Result<()> {
+        trace!("log op: {:?}", op);
         let data = serialize(&op)?;
 
         let crc = hash_crc32(&data);
+        trace!("crc32: {}", crc);
         self.log.write_all(&crc.to_le_bytes())?;
         self.log.write_all(&(data.len() as u64).to_le_bytes())?;
         self.log.write_all(&data)?;
@@ -319,12 +351,13 @@ impl OptiDBImpl {
                     seq_id: self.metadata.seq_id,
                 });
             }
-            LogOp::Metadata(md) => {}
+            LogOp::Metadata(_) => {}
         }
 
         self.metadata.seq_id += 1;
+        trace!("next op id: {}", self.metadata.seq_id);
         let logged_size = 8 + 4 + data.len();
-        self.logged_bytes += logged_size;
+        trace!("logged size: {}", logged_size);
         self.metadata.stats.logged_bytes += logged_size as u64;
 
         Ok(())
@@ -335,15 +368,20 @@ impl OptiDBImpl {
     // update metadata
     // write metadata to new log
     // delete cur log
+    // #[instrument(level = "trace", skip(self))]
     fn flush(&mut self) -> Result<()> {
-        self.log.flush()?;
-        self.log.sync_all()?;
-
+        trace!("flushing log file");
+        let f = self.log.get_mut();
+        f.flush()?;
+        f.sync_all()?;
         // swap memtable
+        trace!("swapping memtable");
         let memtable = std::mem::take(&mut self.memtable);
 
         // write to parquet
-        let mut cols: Vec<Vec<Value>> = vec![Vec::new(); self.schema.fields.len()];
+        trace!("writing to parquet");
+        let mut cols: Vec<Vec<Value>> = vec![Vec::new(); self.metadata.schema.fields.len()];
+        trace!("{} entries to write", memtable.len());
         for op in memtable {
             let (keys, vals) = match op.op {
                 Op::Insert(k, v) => (k, Some(v)),
@@ -363,47 +401,49 @@ impl OptiDBImpl {
         let arrs = cols
             .into_iter()
             .enumerate()
-            .map(|(idx, col)| match self.schema.fields[idx].data_type {
-                DataType::Boolean => memory_col_to_arrow!(col, Boolean, MutableBooleanArray),
-                DataType::Int8 => memory_col_to_arrow!(col, Int8, MutablePrimitiveArray),
-                DataType::Int16 => memory_col_to_arrow!(col, Int16, MutablePrimitiveArray),
-                DataType::Int32 => memory_col_to_arrow!(col, Int32, MutablePrimitiveArray),
-                DataType::Int64 => memory_col_to_arrow!(col, Int64, MutablePrimitiveArray),
-                DataType::UInt8 => memory_col_to_arrow!(col, UInt8, MutablePrimitiveArray),
-                DataType::UInt16 => memory_col_to_arrow!(col, UInt16, MutablePrimitiveArray),
-                DataType::UInt32 => memory_col_to_arrow!(col, UInt32, MutablePrimitiveArray),
-                DataType::UInt64 => memory_col_to_arrow!(col, UInt64, MutablePrimitiveArray),
-                // DataType::Float32 => memory_col_to_arrow!(col, Float32, MutablePrimitiveArray),
-                // DataType::Float64 => memory_col_to_arrow!(col, Float64, MutablePrimitiveArray),
-                DataType::Timestamp(_, _) => {
-                    memory_col_to_arrow!(col, Int64, MutablePrimitiveArray)
-                }
-                DataType::Binary => {
-                    let vals = col
-                        .into_iter()
-                        .map(|v| match v {
-                            Value::Binary(b) => b,
-                            _ => unreachable!(),
-                        })
-                        .collect::<Vec<_>>();
-                    MutableBinaryArray::<i32>::from(vals).as_arc()
-                }
-                DataType::Utf8 => {
-                    let vals = col
-                        .into_iter()
-                        .map(|v| match v {
-                            Value::String(b) => b,
-                            _ => unreachable!(),
-                        })
-                        .collect::<Vec<_>>();
-                    MutableUtf8Array::<i32>::from(vals).as_arc()
-                }
-                DataType::Decimal(_, _) => {
-                    memory_col_to_arrow!(col, Decimal, MutablePrimitiveArray)
-                }
-                DataType::List(_) => unimplemented!(),
-                _ => unimplemented!(),
-            })
+            .map(
+                |(idx, col)| match self.metadata.schema.fields[idx].data_type {
+                    DataType::Boolean => memory_col_to_arrow!(col, Boolean, MutableBooleanArray),
+                    DataType::Int8 => memory_col_to_arrow!(col, Int8, MutablePrimitiveArray),
+                    DataType::Int16 => memory_col_to_arrow!(col, Int16, MutablePrimitiveArray),
+                    DataType::Int32 => memory_col_to_arrow!(col, Int32, MutablePrimitiveArray),
+                    DataType::Int64 => memory_col_to_arrow!(col, Int64, MutablePrimitiveArray),
+                    DataType::UInt8 => memory_col_to_arrow!(col, UInt8, MutablePrimitiveArray),
+                    DataType::UInt16 => memory_col_to_arrow!(col, UInt16, MutablePrimitiveArray),
+                    DataType::UInt32 => memory_col_to_arrow!(col, UInt32, MutablePrimitiveArray),
+                    DataType::UInt64 => memory_col_to_arrow!(col, UInt64, MutablePrimitiveArray),
+                    // DataType::Float32 => memory_col_to_arrow!(col, Float32, MutablePrimitiveArray),
+                    // DataType::Float64 => memory_col_to_arrow!(col, Float64, MutablePrimitiveArray),
+                    DataType::Timestamp(_, _) => {
+                        memory_col_to_arrow!(col, Int64, MutablePrimitiveArray)
+                    }
+                    DataType::Binary => {
+                        let vals = col
+                            .into_iter()
+                            .map(|v| match v {
+                                Value::Binary(b) => b,
+                                _ => unreachable!(),
+                            })
+                            .collect::<Vec<_>>();
+                        MutableBinaryArray::<i32>::from(vals).as_arc()
+                    }
+                    DataType::Utf8 => {
+                        let vals = col
+                            .into_iter()
+                            .map(|v| match v {
+                                Value::String(b) => b,
+                                _ => unreachable!("{:?}", v),
+                            })
+                            .collect::<Vec<_>>();
+                        MutableUtf8Array::<i32>::from(vals).as_arc()
+                    }
+                    DataType::Decimal(_, _) => {
+                        memory_col_to_arrow!(col, Decimal, MutablePrimitiveArray)
+                    }
+                    DataType::List(_) => unimplemented!(),
+                    _ => unimplemented!(),
+                },
+            )
             .collect::<Vec<_>>();
 
         let popts = parquet::write::WriteOptions {
@@ -413,9 +453,11 @@ impl OptiDBImpl {
             data_pagesize_limit: None,
         };
 
+        println!("{:?}", arrs);
         let chunk = Chunk::try_new(arrs)?;
 
         let encodings = self
+            .metadata
             .schema
             .fields
             .iter()
@@ -424,55 +466,69 @@ impl OptiDBImpl {
 
         let row_groups = parquet::write::RowGroupIterator::try_new(
             vec![Ok(chunk)].into_iter(),
-            &self.schema,
+            &self.metadata.schema,
             popts,
             encodings,
         )?;
 
+        trace!("trying to create {:?}", self.path.join("parts/0"));
         fs::create_dir_all(self.path.join("parts/0"))?;
 
         let p = self
             .path
             .join("parts")
             .join("0")
-            .join(self.metadata.table_id.to_string());
+            .join(self.metadata.part_id.to_string());
+        trace!("creating part file {:?}", p);
         let w = OpenOptions::new().create_new(true).write(true).open(p)?;
-        let mut writer = parquet::write::FileWriter::try_new(
-            w,
-            Schema::from(self.schema.fields.clone()),
-            popts,
-        )?;
-
+        let mut writer =
+            parquet::write::FileWriter::try_new(w, self.metadata.schema.clone(), popts)?;
         // Write the part
         for group in row_groups {
             writer.write(group?)?;
         }
         let sz = writer.end(None)?;
-
+        trace!("{:?} bytes written", sz);
         // add table to md
+        if self.metadata.tables.len() == 0 {
+            self.metadata.tables.push(Vec::new());
+        }
         self.metadata.tables[0].push(Table {
-            id: self.metadata.table_id,
+            id: self.metadata.part_id,
             size_bytes: sz,
         });
 
         // increment table id
-        self.metadata.table_id += 1;
+        self.metadata.part_id += 1;
         self.metadata.stats.written_bytes += sz;
         // increment log id
         self.metadata.log_id += 1;
 
         // create new log
+        trace!(
+            "creating new log file {:?}",
+            format!("{:016}.log", self.metadata.log_id)
+        );
+
         let log = OpenOptions::new()
             .create_new(true)
             .write(true)
             .read(true)
-            .open(self.path.join(format!("{:16x}.log", self.metadata.log_id)))?;
-        self.log = log;
+            .open(self.path.join(format!("{:016}.log", self.metadata.log_id)))?;
+        self.log = BufWriter::new(log);
 
         // write metadata to log as first record
         let op = LogOp::Metadata(self.metadata.clone());
         self.log_op(op)?;
 
+        trace!(
+            "removing previous log file {:?}",
+            format!("{:016}.log", self.metadata.log_id - 1)
+        );
+        fs::remove_file(
+            self.path
+                .join(format!("{:016}.log", self.metadata.log_id - 1)),
+        )?;
         Ok(())
     }
 
@@ -490,6 +546,13 @@ mod tests {
     use arrow2::datatypes::DataType;
     use arrow2::datatypes::Field;
     use arrow2::datatypes::Schema;
+    use tracing::info;
+    use tracing::log;
+    use tracing::log::debug;
+    use tracing::trace;
+    use tracing::Level;
+    use tracing_subscriber::util::SubscriberInitExt;
+    use tracing_test::traced_test;
 
     use crate::db::Insert;
     use crate::db::MemOp;
@@ -500,21 +563,21 @@ mod tests {
     use crate::KeyValue;
     use crate::Value;
 
+    #[traced_test]
     #[test]
     fn it_works() {
         let path = temp_dir().join("db3");
         fs::create_dir_all(&path).unwrap();
         let opts = Options {
             max_log_length: 1024,
-            schema: Arc::new(Schema::from(vec![
-                Field::new("a", DataType::Utf8, false),
-                Field::new("b", DataType::Utf8, false),
-                Field::new("c", DataType::Int8, false),
-            ])),
         };
-
         let mut db = OptiDBImpl::open(path, opts).unwrap();
-
+        // db.add_field(Field::new("a", DataType::Utf8, false))
+        // .unwrap();
+        // db.add_field(Field::new("b", DataType::Utf8, false))
+        // .unwrap();
+        // db.add_field(Field::new("c", DataType::Int8, false))
+        // .unwrap();
         db.insert(
             vec![
                 KeyValue::String("a".to_string()),
@@ -523,42 +586,41 @@ mod tests {
             vec![Value::Int8(Some(1))],
         )
         .unwrap();
-
-        db.insert(
-            vec![
-                KeyValue::String("a".to_string()),
-                KeyValue::String("a".to_string()),
-            ],
-            vec![Value::Int8(Some(2))],
-        )
-        .unwrap();
-
-        db.insert(
-            vec![
-                KeyValue::String("a".to_string()),
-                KeyValue::String("a".to_string()),
-            ],
-            vec![Value::Int8(Some(3))],
-        )
-        .unwrap();
-
-        db.insert(
-            vec![
-                KeyValue::String("a".to_string()),
-                KeyValue::String("b".to_string()),
-            ],
-            vec![Value::Int8(Some(4))],
-        )
-        .unwrap();
-
-        db.insert(
-            vec![
-                KeyValue::String("a".to_string()),
-                KeyValue::String("b".to_string()),
-            ],
-            vec![Value::Int8(Some(5))],
-        )
-        .unwrap();
+        // db.insert(
+        // vec![
+        // KeyValue::String("a".to_string()),
+        // KeyValue::String("a".to_string()),
+        // ],
+        // vec![Value::Int8(Some(2))],
+        // )
+        // .unwrap();
+        //
+        // db.insert(
+        // vec![
+        // KeyValue::String("a".to_string()),
+        // KeyValue::String("a".to_string()),
+        // ],
+        // vec![Value::Int8(Some(3))],
+        // )
+        // .unwrap();
+        //
+        // db.insert(
+        // vec![
+        // KeyValue::String("a".to_string()),
+        // KeyValue::String("b".to_string()),
+        // ],
+        // vec![Value::Int8(Some(4))],
+        // )
+        // .unwrap();
+        //
+        // db.insert(
+        // vec![
+        // KeyValue::String("a".to_string()),
+        // KeyValue::String("b".to_string()),
+        // ],
+        // vec![Value::Int8(Some(5))],
+        // )
+        // .unwrap();
 
         db.flush().unwrap();
     }
