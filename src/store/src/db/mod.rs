@@ -11,9 +11,11 @@ use std::io::Write;
 use std::mem;
 use std::path::PathBuf;
 use std::sync::mpsc::Receiver;
+use std::sync::mpsc::RecvError;
 use std::sync::mpsc::Sender;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::thread;
 
 use arrow2::array::Array;
 use arrow2::array::MutableArray;
@@ -188,7 +190,55 @@ pub struct OptiDB {
 
 #[derive(Clone, Debug)]
 struct Options {
+    l0_max_parts: usize,
     max_log_length: u64,
+}
+
+enum CompactorMessage {
+    Compact,
+    Stop,
+}
+
+struct Compactor {
+    opts: Options,
+    metadata: Arc<Mutex<Metadata>>,
+    path: PathBuf,
+    inbox: Receiver<CompactorMessage>,
+}
+
+impl Compactor {
+    fn new(
+        opts: Options,
+        metadata: Arc<Mutex<Metadata>>,
+        path: PathBuf,
+        inbox: Receiver<CompactorMessage>,
+    ) -> Self {
+        Compactor {
+            opts,
+            metadata,
+            path,
+            inbox,
+        }
+    }
+    fn run(self) {
+        loop {
+            match self.inbox.recv() {
+                Ok(msg) => match msg {
+                    CompactorMessage::Compact => {
+                        let md = self.metadata.lock().unwrap();
+                        println!("COMPACT TRIGGERED. Parts: {:?}", md.parts);
+                    }
+                    CompactorMessage::Stop => {
+                        break;
+                    }
+                },
+                Err(err) => {
+                    trace!("unexpected compactor error: {:?}", err);
+                    break;
+                }
+            }
+        }
+    }
 }
 
 struct OptiDBImpl {
@@ -196,7 +246,24 @@ struct OptiDBImpl {
     memtable: SkipSet<MemOp>,
     metadata: Arc<Mutex<Metadata>>,
     log: BufWriter<File>,
+    compactor_outbox: Sender<CompactorMessage>,
     path: PathBuf,
+}
+
+fn _log(op: &LogOp, metadata: &mut Metadata, log: &mut File) -> Result<()> {
+    let data = serialize(op)?;
+
+    let crc = hash_crc32(&data);
+    trace!("crc32: {}", crc);
+    log.write_all(&crc.to_le_bytes())?;
+    log.write_all(&(data.len() as u64).to_le_bytes())?;
+    log.write_all(&data)?;
+
+    let logged_size = 8 + 4 + data.len();
+    trace!("logged size: {}", logged_size);
+    metadata.stats.logged_bytes += logged_size as u64;
+
+    Ok(())
 }
 
 fn log_op(
@@ -212,18 +279,8 @@ fn log_op(
         trace!("log op: {:?}", op);
     }
     if !recover {
-        let data = serialize(&op)?;
-
-        let crc = hash_crc32(&data);
-        trace!("crc32: {}", crc);
         let log = log.unwrap();
-        log.write_all(&crc.to_le_bytes())?;
-        log.write_all(&(data.len() as u64).to_le_bytes())?;
-        log.write_all(&data)?;
-
-        let logged_size = 8 + 4 + data.len();
-        trace!("logged size: {}", logged_size);
-        metadata.stats.logged_bytes += logged_size as u64;
+        _log(&op, metadata, log)?;
     }
     match op {
         LogOp::Insert(k, v) => {
@@ -235,6 +292,15 @@ fn log_op(
         LogOp::Metadata(md) => *metadata = md,
     }
 
+    metadata.seq_id += 1;
+    trace!("next op id: {}", metadata.seq_id);
+
+    Ok(())
+}
+
+fn log_metadata(log: Option<&mut File>, metadata: &mut Metadata) -> Result<()> {
+    let log = log.unwrap();
+    _log(&LogOp::Metadata(metadata.clone()), metadata, log)?;
     metadata.seq_id += 1;
     trace!("next op id: {}", metadata.seq_id);
 
@@ -323,11 +389,25 @@ fn recover(path: PathBuf, opts: Options) -> Result<OptiDBImpl> {
     };
 
     metadata.stats.logged_bytes = log.metadata().unwrap().len();
+    let trigger_compact = if metadata.parts.len() > 0 && metadata.parts[0].len() > opts.l0_max_parts
+    {
+        true
+    } else {
+        false
+    };
+    let (tx, rx) = std::sync::mpsc::channel();
+    let metadata = Arc::new(Mutex::new(metadata));
+    let compactor = Compactor::new(opts.clone(), metadata.clone(), path.clone(), rx);
+    thread::spawn(move || compactor.run());
+    if trigger_compact {
+        tx.send(CompactorMessage::Compact).unwrap();
+    }
     Ok(OptiDBImpl {
         opts,
         memtable,
-        metadata: Arc::new(Mutex::new(metadata)),
+        metadata,
         log: BufWriter::new(log),
+        compactor_outbox: tx,
         path,
     })
 }
@@ -485,8 +565,7 @@ fn flush(
     let mut log = BufWriter::new(log);
 
     // write metadata to log as first record
-    let op = LogOp::Metadata(md.clone());
-    log_op(op, false, Some(log.get_mut()), &mut memtable, md)?;
+    log_metadata(Some(log.get_mut()), md)?;
 
     trace!(
         "removing previous log file {:?}",
@@ -519,13 +598,18 @@ impl OptiDBImpl {
             &mut md,
         )?;
         if md.stats.logged_bytes > self.opts.max_log_length {
-            println!("{}", md.stats.logged_bytes);
             flush(
                 Some(self.log.get_mut()),
                 &mut self.memtable,
                 &mut md,
                 &self.path,
             )?;
+
+            if md.parts.len() > 0 && md.parts[0].len() > self.opts.l0_max_parts {
+                self.compactor_outbox
+                    .send(CompactorMessage::Compact)
+                    .unwrap();
+            }
         }
         Ok(())
     }
@@ -550,13 +634,7 @@ impl OptiDBImpl {
             }
         }
         md.schema.fields.push(field);
-        log_op(
-            LogOp::Metadata(md.clone()),
-            false,
-            Some(self.log.get_mut()),
-            &mut self.memtable,
-            &mut md,
-        )?;
+        log_metadata(Some(self.log.get_mut()), &mut md)?;
         Ok(())
     }
 
@@ -568,7 +646,8 @@ impl OptiDBImpl {
     // #[instrument(level = "trace", skip(self))]
 
     fn close(&mut self) -> Result<()> {
-        unimplemented!()
+        self.compactor_outbox.send(CompactorMessage::Stop).unwrap();
+        Ok(())
     }
 }
 
@@ -604,6 +683,7 @@ mod tests {
         let path = temp_dir().join("db3");
         fs::create_dir_all(&path).unwrap();
         let opts = Options {
+            l0_max_parts: 2,
             max_log_length: 1024,
         };
         let mut db = OptiDBImpl::open(path, opts).unwrap();
@@ -654,6 +734,7 @@ mod tests {
         )
         .unwrap();
 
+        db.close().unwrap();
         // db.flush().unwrap();
     }
 }
