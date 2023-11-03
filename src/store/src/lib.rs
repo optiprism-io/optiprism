@@ -71,16 +71,16 @@ pub enum Value {
     ListString(Option<Vec<Option<String>>>),
 }
 
-impl From<KeyValue> for Value {
-    fn from(value: KeyValue) -> Self {
+impl From<&KeyValue> for Value {
+    fn from(value: &KeyValue) -> Self {
         match value {
-            KeyValue::Int8(v) => Value::Int8(Some(v)),
-            KeyValue::Int16(v) => Value::Int16(Some(v)),
-            KeyValue::Int64(v) => Value::Int64(Some(v)),
-            KeyValue::UInt8(v) => Value::UInt8(Some(v)),
-            KeyValue::UInt16(v) => Value::UInt16(Some(v)),
-            KeyValue::UInt64(v) => Value::UInt64(Some(v)),
-            KeyValue::String(v) => Value::String(Some(v)),
+            KeyValue::Int8(v) => Value::Int8(Some(*v)),
+            KeyValue::Int16(v) => Value::Int16(Some(*v)),
+            KeyValue::Int64(v) => Value::Int64(Some(*v)),
+            KeyValue::UInt8(v) => Value::UInt8(Some(*v)),
+            KeyValue::UInt16(v) => Value::UInt16(Some(*v)),
+            KeyValue::UInt64(v) => Value::UInt64(Some(*v)),
+            KeyValue::String(v) => Value::String(Some(v.to_owned())),
         }
     }
 }
