@@ -102,7 +102,6 @@ pub enum Op {
 #[derive(Debug, Serialize, Deserialize)]
 pub enum LogOp {
     Insert(Vec<KeyValue>, Vec<Value>),
-    AddField(Field),
     Metadata(Metadata),
 }
 
@@ -195,7 +194,7 @@ struct Options {
 struct OptiDBImpl {
     opts: Options,
     memtable: SkipSet<MemOp>,
-    metadata: Metadata,
+    metadata: Arc<Mutex<Metadata>>,
     log: BufWriter<File>,
     path: PathBuf,
 }
@@ -207,7 +206,11 @@ fn log_op(
     memtable: &mut SkipSet<MemOp>,
     metadata: &mut Metadata,
 ) -> Result<()> {
-    trace!("log op: {:?}", op);
+    if recover {
+        trace!("recover op: {:?}", op);
+    } else {
+        trace!("log op: {:?}", op);
+    }
     if !recover {
         let data = serialize(&op)?;
 
@@ -228,9 +231,6 @@ fn log_op(
                 op: Op::Insert(k, v),
                 seq_id: metadata.seq_id,
             });
-        }
-        LogOp::AddField(f) => {
-            metadata.schema.fields.push(f);
         }
         LogOp::Metadata(md) => *metadata = md,
     }
@@ -322,11 +322,11 @@ fn recover(path: PathBuf, opts: Options) -> Result<OptiDBImpl> {
             .open(path.join(format!("{:016}.log", 0)))?
     };
 
-    trace!("metadata: {:?}", metadata);
+    metadata.stats.logged_bytes = log.metadata().unwrap().len();
     Ok(OptiDBImpl {
         opts,
         memtable,
-        metadata,
+        metadata: Arc::new(Mutex::new(metadata)),
         log: BufWriter::new(log),
         path,
     })
@@ -444,6 +444,58 @@ fn write_level0(
     })
 }
 
+fn flush(
+    log: Option<&mut File>,
+    memtable: &mut SkipSet<MemOp>,
+    md: &mut Metadata,
+    path: &PathBuf,
+) -> Result<()> {
+    trace!("flushing log file");
+    let f = log.unwrap();
+    f.flush()?;
+    f.sync_all()?;
+    // swap memtable
+    trace!("swapping memtable");
+    let mut memtable = std::mem::take(memtable);
+
+    // write to parquet
+    trace!("writing to parquet");
+    let part = write_level0(&memtable, md.part_id, &md.schema, path.clone())?;
+    if md.parts.len() == 0 {
+        md.parts.push(Vec::new());
+    }
+    md.parts[0].push(part.clone());
+    // increment table id
+    md.part_id += 1;
+    md.stats.written_bytes += part.size_bytes;
+    // increment log id
+    md.log_id += 1;
+
+    // create new log
+    trace!(
+        "creating new log file {:?}",
+        format!("{:016}.log", md.log_id)
+    );
+
+    let log = OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .read(true)
+        .open(path.join(format!("{:016}.log", md.log_id)))?;
+    let mut log = BufWriter::new(log);
+
+    // write metadata to log as first record
+    let op = LogOp::Metadata(md.clone());
+    log_op(op, false, Some(log.get_mut()), &mut memtable, md)?;
+
+    trace!(
+        "removing previous log file {:?}",
+        format!("{:016}.log", md.log_id - 1)
+    );
+    fs::remove_file(path.join(format!("{:016}.log", md.log_id - 1)))?;
+    Ok(())
+}
+
 impl OptiDBImpl {
     // #[instrument(level = "trace")]
     pub fn open(path: PathBuf, opts: Options) -> Result<Self> {
@@ -451,11 +503,12 @@ impl OptiDBImpl {
     }
     // #[instrument(level = "trace", skip(self))]
     pub fn insert(&mut self, key: Vec<KeyValue>, values: Vec<Value>) -> Result<()> {
-        if key.len() + values.len() != self.metadata.schema.fields.len() {
+        let mut md = self.metadata.lock().unwrap();
+        if key.len() + values.len() != md.schema.fields.len() {
             return Err(StoreError::Internal(format!(
                 "Fields mismatch. Key+Val len: {}, schema fields len: {}",
                 key.len() + values.len(),
-                self.metadata.schema.fields.len()
+                md.schema.fields.len()
             )));
         }
         log_op(
@@ -463,11 +516,16 @@ impl OptiDBImpl {
             false,
             Some(self.log.get_mut()),
             &mut self.memtable,
-            &mut self.metadata,
+            &mut md,
         )?;
-        if self.metadata.stats.logged_bytes > self.opts.max_log_length {
-            println!("{}", self.metadata.stats.logged_bytes);
-            self.flush()?;
+        if md.stats.logged_bytes > self.opts.max_log_length {
+            println!("{}", md.stats.logged_bytes);
+            flush(
+                Some(self.log.get_mut()),
+                &mut self.memtable,
+                &mut md,
+                &self.path,
+            )?;
         }
         Ok(())
     }
@@ -482,7 +540,8 @@ impl OptiDBImpl {
 
     // #[instrument(level = "trace", skip(self))]
     fn add_field(&mut self, field: Field) -> Result<()> {
-        for f in &self.metadata.schema.fields {
+        let mut md = self.metadata.lock().unwrap();
+        for f in &md.schema.fields {
             if f.name == field.name {
                 return Err(StoreError::Internal(format!(
                     "Field with name {} already exists",
@@ -490,12 +549,13 @@ impl OptiDBImpl {
                 )));
             }
         }
+        md.schema.fields.push(field);
         log_op(
-            LogOp::AddField(field),
+            LogOp::Metadata(md.clone()),
             false,
             Some(self.log.get_mut()),
             &mut self.memtable,
-            &mut self.metadata,
+            &mut md,
         )?;
         Ok(())
     }
@@ -506,66 +566,6 @@ impl OptiDBImpl {
     // write metadata to new log
     // delete cur log
     // #[instrument(level = "trace", skip(self))]
-    fn flush(&mut self) -> Result<()> {
-        trace!("flushing log file");
-        let f = self.log.get_mut();
-        f.flush()?;
-        f.sync_all()?;
-        // swap memtable
-        trace!("swapping memtable");
-        let memtable = std::mem::take(&mut self.memtable);
-
-        // write to parquet
-        trace!("writing to parquet");
-        let part = write_level0(
-            &memtable,
-            self.metadata.part_id,
-            &self.metadata.schema,
-            self.path.clone(),
-        )?;
-        if self.metadata.parts.len() == 0 {
-            self.metadata.parts.push(Vec::new());
-        }
-        self.metadata.parts[0].push(part.clone());
-        // increment table id
-        self.metadata.part_id += 1;
-        self.metadata.stats.written_bytes += part.size_bytes;
-        // increment log id
-        self.metadata.log_id += 1;
-
-        // create new log
-        trace!(
-            "creating new log file {:?}",
-            format!("{:016}.log", self.metadata.log_id)
-        );
-
-        let log = OpenOptions::new()
-            .create_new(true)
-            .write(true)
-            .read(true)
-            .open(self.path.join(format!("{:016}.log", self.metadata.log_id)))?;
-        self.log = BufWriter::new(log);
-
-        // write metadata to log as first record
-        let op = LogOp::Metadata(self.metadata.clone());
-        log_op(
-            op,
-            false,
-            Some(self.log.get_mut()),
-            &mut self.memtable,
-            &mut self.metadata,
-        )?;
-
-        trace!(
-            "removing previous log file {:?}",
-            format!("{:016}.log", self.metadata.log_id - 1)
-        );
-        fs::remove_file(
-            self.path
-                .join(format!("{:016}.log", self.metadata.log_id - 1)),
-        )?;
-        Ok(())
-    }
 
     fn close(&mut self) -> Result<()> {
         unimplemented!()
@@ -618,42 +618,42 @@ mod tests {
             vec![Value::Int8(Some(1))],
         )
         .unwrap();
-        // db.insert(
-        // vec![
-        // KeyValue::String("a".to_string()),
-        // KeyValue::String("a".to_string()),
-        // ],
-        // vec![Value::Int8(Some(2))],
-        // )
-        // .unwrap();
-        //
-        // db.insert(
-        // vec![
-        // KeyValue::String("a".to_string()),
-        // KeyValue::String("a".to_string()),
-        // ],
-        // vec![Value::Int8(Some(3))],
-        // )
-        // .unwrap();
-        //
-        // db.insert(
-        // vec![
-        // KeyValue::String("a".to_string()),
-        // KeyValue::String("b".to_string()),
-        // ],
-        // vec![Value::Int8(Some(4))],
-        // )
-        // .unwrap();
-        //
-        // db.insert(
-        // vec![
-        // KeyValue::String("a".to_string()),
-        // KeyValue::String("b".to_string()),
-        // ],
-        // vec![Value::Int8(Some(5))],
-        // )
-        // .unwrap();
+        db.insert(
+            vec![
+                KeyValue::String("a".to_string()),
+                KeyValue::String("a".to_string()),
+            ],
+            vec![Value::Int8(Some(2))],
+        )
+        .unwrap();
 
-        db.flush().unwrap();
+        db.insert(
+            vec![
+                KeyValue::String("a".to_string()),
+                KeyValue::String("a".to_string()),
+            ],
+            vec![Value::Int8(Some(3))],
+        )
+        .unwrap();
+
+        db.insert(
+            vec![
+                KeyValue::String("a".to_string()),
+                KeyValue::String("b".to_string()),
+            ],
+            vec![Value::Int8(Some(4))],
+        )
+        .unwrap();
+
+        db.insert(
+            vec![
+                KeyValue::String("a".to_string()),
+                KeyValue::String("b".to_string()),
+            ],
+            vec![Value::Int8(Some(5))],
+        )
+        .unwrap();
+
+        // db.flush().unwrap();
     }
 }
