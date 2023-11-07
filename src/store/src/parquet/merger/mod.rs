@@ -14,9 +14,12 @@
 use std::collections::BinaryHeap;
 use std::collections::HashMap;
 use std::collections::VecDeque;
-use std::io::Read;
+use std::fs::File;
+use std::io::{BufReader, Read};
 use std::io::Seek;
 use std::io::Write;
+use std::os::unix::fs::MetadataExt;
+use std::path::{Path, PathBuf};
 
 use arrow2::array::new_null_array;
 use arrow2::array::Array;
@@ -60,7 +63,7 @@ use parquet2::write::Version;
 use parquet2::write::WriteOptions;
 
 use crate::error::Result;
-use crate::merge_arrays;
+use crate::{merge_arrays};
 use crate::merge_arrays_inner;
 use crate::merge_list_arrays;
 use crate::merge_list_arrays_inner;
@@ -68,7 +71,7 @@ use crate::merge_list_primitive_arrays;
 use crate::merge_primitive_arrays;
 use crate::parquet::merger::arrow::merge_chunks;
 use crate::parquet::merger::arrow::try_merge_schemas;
-use crate::parquet::merger::parquet::array_to_pages_simple;
+use crate::parquet::merger::parquet::{array_to_pages_simple, Value};
 use crate::parquet::merger::parquet::check_intersection;
 use crate::parquet::merger::parquet::data_page_to_array;
 use crate::parquet::merger::parquet::ColumnPath;
@@ -78,7 +81,7 @@ use crate::parquet::merger::parquet::PagesChunk;
 
 pub mod arrow;
 mod merge_data_arrays;
-mod parquet;
+pub mod parquet;
 
 // this is a temporary array used to merge data pages avoiding downcasting
 
@@ -124,10 +127,18 @@ enum TmpArray {
     ListLargeUtf8(Utf8Array<i64>, OffsetsBuffer<i32>, Option<Bitmap>, usize),
 }
 
-pub struct ParquetMerger<R, W>
-where
-    R: Read,
-    W: Write,
+pub struct Options {
+    pub index_cols: usize,
+    pub data_page_size_limit_bytes: Option<usize>,
+    pub row_group_values_limit: usize,
+    pub array_page_size: usize,
+    pub out_part_id: usize,
+    pub max_part_size_bytes: Option<usize>,
+}
+
+pub struct ParquetMerger<R>
+    where
+        R: Read,
 {
     // list of index cols (partitions) in parquet file
     index_cols: Vec<ColumnDescriptor>,
@@ -149,14 +160,16 @@ where
     // merge result
     result_buffer: VecDeque<MergedPagesChunk>,
     // result parquet file writer
-    writer: FileSeqWriter<W>,
+    to_path: PathBuf,
+    id_from: usize,
     // values/rows per row group
     row_group_values_limit: usize,
     // merge result array size
     array_page_size: usize,
     // null_pages_cache: HashMap<(DataType, usize), Rc<CompressedPage>>,
     // result page size
-    data_page_size_limit: Option<usize>,
+    data_page_size_limit_bytes: Option<usize>,
+    max_part_file_size_bytes: Option<usize>,
 }
 
 #[derive(Debug, Clone)]
@@ -168,66 +181,74 @@ pub enum MergeReorder {
     Merge(Vec<usize>, Vec<usize>),
 }
 
-impl<R, W> ParquetMerger<R, W>
-where
-    R: Read + Seek,
-    W: Write,
+pub struct FileMergeOptions {
+    index_cols: usize,
+    data_page_size_limit: Option<usize>,
+    row_group_values_limit: usize,
+    array_page_size: usize,
+}
+
+pub struct MergedFile {
+    pub size_bytes: u64,
+    pub  id: usize,
+    pub min: Vec<Value>,
+    pub max: Vec<Value>,
+}
+
+
+pub fn merge<R: Read + Seek>(mut readers: Vec<R>,
+                             to_path: PathBuf,
+                             out_part_id: usize,
+                             opts: Options) -> Result<Vec<MergedFile>> {
+    // get arrow schemas of streams
+    let arrow_schemas = readers
+        .iter_mut()
+        .map(|r| arrow2::io::parquet::read::read_metadata(r).and_then(|md| infer_schema(&md)))
+        .collect::<arrow2::error::Result<Vec<Schema>>>()?;
+
+    // make unified schema
+    let arrow_schema = try_merge_schemas(arrow_schemas)?;
+    // make parquet schema
+    let parquet_schema = to_parquet_schema(&arrow_schema)?;
+    // initialize parquet streams/readers
+    let page_streams = readers
+        .into_iter()
+        .map(|r| CompressedPageIterator::try_new(r))
+        .collect::<Result<Vec<_>>>()?;
+    let streams_n = page_streams.len();
+
+    let index_cols = (0..opts.index_cols)
+        .map(|idx| parquet_schema.columns()[idx].to_owned())
+        .collect::<Vec<_>>();
+
+    let mut mr = ParquetMerger {
+        index_cols,
+        parquet_schema,
+        arrow_schema,
+        page_streams,
+        tmp_arrays: (0..streams_n).map(|_| HashMap::new()).collect(),
+        tmp_array_idx: (0..streams_n).map(|_| HashMap::new()).collect(),
+        sorter: BinaryHeap::new(),
+        merge_queue: Vec::with_capacity(100),
+        result_buffer: VecDeque::with_capacity(10),
+        to_path,
+        id_from: out_part_id,
+        row_group_values_limit: opts.row_group_values_limit,
+        array_page_size: opts.array_page_size,
+        // null_pages_cache: HashMap::new(),
+        data_page_size_limit_bytes: opts.data_page_size_limit_bytes,
+        max_part_file_size_bytes: opts.max_part_size_bytes,
+    };
+
+    Ok(mr.merge()?)
+}
+
+impl<R> ParquetMerger<R>
+    where
+        R: Read + Seek,
 {
     // Create new merger
 
-    pub fn try_new(
-        mut readers: Vec<R>,
-        writer: W,
-        index_cols: usize,
-        data_page_size_limit: Option<usize>,
-        row_group_values_limit: usize,
-        array_page_size: usize,
-    ) -> Result<Self> {
-        // get arrow schemas of streams
-        let arrow_schemas = readers
-            .iter_mut()
-            .map(|r| arrow2::io::parquet::read::read_metadata(r).and_then(|md| infer_schema(&md)))
-            .collect::<arrow2::error::Result<Vec<Schema>>>()?;
-
-        // make unified schema
-        let arrow_schema = try_merge_schemas(arrow_schemas)?;
-        // make parquet schema
-        let parquet_schema = to_parquet_schema(&arrow_schema)?;
-        // initialize parquet streams/readers
-        let page_streams = readers
-            .into_iter()
-            .map(|r| CompressedPageIterator::try_new(r))
-            .collect::<Result<Vec<_>>>()?;
-        let streams_n = page_streams.len();
-
-        // initialize parquet writer
-        let opts = WriteOptions {
-            write_statistics: true,
-            version: Version::V2,
-        };
-        let seq_writer = FileSeqWriter::new(writer, parquet_schema.clone(), opts, None);
-        // get descriptors of index/partition columns
-        let index_cols = (0..index_cols)
-            .map(|idx| parquet_schema.columns()[idx].to_owned())
-            .collect::<Vec<_>>();
-
-        Ok(Self {
-            index_cols,
-            parquet_schema,
-            arrow_schema,
-            page_streams,
-            tmp_arrays: (0..streams_n).map(|_| HashMap::new()).collect(),
-            tmp_array_idx: (0..streams_n).map(|_| HashMap::new()).collect(),
-            sorter: BinaryHeap::new(),
-            merge_queue: Vec::with_capacity(100),
-            result_buffer: VecDeque::with_capacity(10),
-            writer: seq_writer,
-            row_group_values_limit,
-            array_page_size,
-            // null_pages_cache: HashMap::new(),
-            data_page_size_limit,
-        })
-    }
 
     // Get next chunk by stream_id. Chunk - all pages within row group
     fn next_stream_index_chunk(&mut self, stream_id: usize) -> Result<Option<PagesChunk>> {
@@ -256,7 +277,7 @@ where
     }
 
     // Main merge loop
-    pub fn merge(&mut self) -> Result<()> {
+    pub fn merge(&mut self) -> Result<Vec<MergedFile>> {
         // Init sorter with chunk per stream
         for stream_id in 0..self.page_streams.len() {
             if let Some(chunk) = self.next_stream_index_chunk(stream_id)? {
@@ -264,79 +285,116 @@ where
                 self.sorter.push(chunk);
             }
         }
+        // initialize parquet writer
+        let write_opts = WriteOptions {
+            write_statistics: true,
+            version: Version::V2,
+        };
+        let mut merged_files: Vec<MergedFile> = Vec::new();
+        for part_id in self.id_from.. {
+            let mut w = File::create(&self.to_path.join(format!("/parts/{}", part_id).as_str()))?;
+            let mut seq_writer = FileSeqWriter::new(w, self.parquet_schema.clone(), write_opts, None);
 
-        // Request merge of index column
-        while let Some(chunks) = self.next_index_chunk()? {
-            for col_id in 0..self.index_cols.len() {
-                for chunk in chunks.iter() {
-                    for page in chunk.0.cols[col_id].iter() {
-                        // write index pages
-                        self.writer.write_page(page)?;
-                    }
+            let mut min: Vec<Value> = Vec::new();
+            let mut max: Vec<Value> = Vec::new();
+
+            let mut first = false;
+            // Request merge of index column
+            while let Some(chunks) = self.next_index_chunk()? {
+                // get descriptors of index/partition columns
+
+                if first {
+                    min = chunks[0].0.min_values.clone();
                 }
-                self.writer.end_column()?;
-            }
+                max = chunks.last().unwrap().0.max_values.clone();
 
-            // todo avoid cloning
-            let cols = self
-                .parquet_schema
-                .columns()
-                .iter()
-                .skip(self.index_cols.len())
-                .map(|v| v.to_owned())
-                .collect::<Vec<_>>();
+                first = false;
+                for col_id in 0..self.index_cols.len() {
+                    for chunk in chunks.iter() {
+                        for page in chunk.0.cols[col_id].iter() {
+                            // write index pages
+                            seq_writer.write_page(page)?;
+                        }
+                    }
+                    seq_writer.end_column()?;
+                }
 
-            let fields = self
-                .arrow_schema
-                .fields
-                .iter()
-                .skip(self.index_cols.len())
-                .map(|f| f.to_owned())
-                .collect::<Vec<_>>();
+                // todo avoid cloning
+                let cols = self
+                    .parquet_schema
+                    .columns()
+                    .iter()
+                    .skip(self.index_cols.len())
+                    .map(|v| v.to_owned())
+                    .collect::<Vec<_>>();
 
-            // merge data pages based on reorder from MergedPagesChunk
-            for (col, field) in cols.into_iter().zip(fields.into_iter()) {
-                for chunk in chunks.iter() {
-                    let pages = match &chunk.1 {
-                        // Exclusively pick page from the stream
-                        MergeReorder::PickFromStream(stream_id, num_rows) => {
-                            // If column exist for stream id then write it
-                            if self.page_streams[*stream_id].contains_column(&col.path_in_schema) {
-                                self.page_streams[*stream_id]
-                                    .next_chunk(&col.path_in_schema)?
-                                    .unwrap()
-                            } else {
-                                // for non-existant column make null page and write
-                                self.make_null_pages(
-                                    &col,
-                                    field.clone(),
-                                    *num_rows,
-                                    self.data_page_size_limit,
-                                )?
+                let fields = self
+                    .arrow_schema
+                    .fields
+                    .iter()
+                    .skip(self.index_cols.len())
+                    .map(|f| f.to_owned())
+                    .collect::<Vec<_>>();
+
+                // merge data pages based on reorder from MergedPagesChunk
+                for (col, field) in cols.into_iter().zip(fields.into_iter()) {
+                    for chunk in chunks.iter() {
+                        let pages = match &chunk.1 {
+                            // Exclusively pick page from the stream
+                            MergeReorder::PickFromStream(stream_id, num_rows) => {
+                                // If column exist for stream id then write it
+                                if self.page_streams[*stream_id].contains_column(&col.path_in_schema) {
+                                    self.page_streams[*stream_id]
+                                        .next_chunk(&col.path_in_schema)?
+                                        .unwrap()
+                                } else {
+                                    // for non-existant column make null page and write
+                                    self.make_null_pages(
+                                        &col,
+                                        field.clone(),
+                                        *num_rows,
+                                        self.data_page_size_limit_bytes,
+                                    )?
+                                }
                             }
-                        }
-                        // Merge pages
-                        MergeReorder::Merge(reorder, streams) => {
-                            self.merge_data(&col, field.clone(), reorder, streams)?
-                        }
-                    };
+                            // Merge pages
+                            MergeReorder::Merge(reorder, streams) => {
+                                self.merge_data(&col, field.clone(), reorder, streams)?
+                            }
+                        };
 
-                    // Write pages for column
-                    for page in pages {
-                        self.writer.write_page(&page)?;
+                        // Write pages for column
+                        for page in pages {
+                            seq_writer.write_page(&page)?;
+                        }
+                    }
+
+                    seq_writer.end_column()?;
+                }
+                seq_writer.end_row_group()?;
+
+                if let Some(max_part_file_size) = self.max_part_file_size_bytes {
+                    let f = File::open(&self.to_path.join(format!("/parts/{}", part_id).as_str()))?;
+                    if f.metadata().unwrap().size() > max_part_file_size as u64 {
+                        break;
                     }
                 }
-
-                self.writer.end_column()?;
             }
-            self.writer.end_row_group()?;
+
+
+            // Add arrow schema to parquet metadata
+            let key_value_metadata = add_arrow_schema(&self.arrow_schema, None);
+            seq_writer.end(key_value_metadata)?;
+
+            let mf = MergedFile {
+                size_bytes: File::open(&self.to_path.join(format!("/parts/{}", part_id).as_str()))?.metadata().unwrap().size(),
+                id: part_id,
+                min,
+                max,
+            };
+            merged_files.push(mf);
         }
-
-        // Add arrow schema to parquet metadata
-        let key_value_metadata = add_arrow_schema(&self.arrow_schema, None);
-        self.writer.end(key_value_metadata)?;
-
-        Ok(())
+        Ok(merged_files)
     }
 
     // Merge data pages
@@ -585,7 +643,7 @@ where
             ),
         };
 
-        let pages = array_to_pages_simple(out, col.base_type.clone(), self.data_page_size_limit)?;
+        let pages = array_to_pages_simple(out, col.base_type.clone(), self.data_page_size_limit_bytes)?;
 
         Ok(pages)
     }

@@ -33,7 +33,6 @@ use crate::error::Result;
 use crate::error::StoreError;
 use crate::parquet::merger::arrow::ArrowChunk;
 use crate::parquet::merger::MergeReorder;
-
 #[derive(Eq, PartialEq, PartialOrd, Ord, Debug, Clone)]
 pub enum Value {
     Boolean(bool),

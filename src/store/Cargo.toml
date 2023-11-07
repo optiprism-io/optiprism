@@ -9,6 +9,7 @@ authors = ["Optiprism <dev@optiprism.io>"]
 opt-level = 3
 
 [dependencies]
+rand = "0.8.4"
 anyhow = "1.0.66"
 arrow = { version = "42.0.0", features = ["ffi"] }
 arrow-array = "42.0.0"
@@ -45,6 +46,7 @@ serde = { version = "1.0.149", features = ["derive"] }
 bincode = "1.3.3"
 crossbeam-skiplist = "0.1.1"
 crc32fast = "1.3.2"
+log = "0.4.20"
 
 [dev-dependencies]
 rstest = "0.18.1"

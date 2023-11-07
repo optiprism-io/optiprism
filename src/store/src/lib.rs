@@ -17,17 +17,33 @@ use chrono::Utc;
 use error::Result;
 use serde::Deserialize;
 use serde::Serialize;
+use crate::error::StoreError;
+use crate::parquet::merger;
 
 #[derive(Eq, PartialEq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize, Hash)]
 pub enum KeyValue {
     Int8(i8),
     Int16(i16),
+    Int32(i32),
     Int64(i64),
     UInt8(u8),
     UInt16(u16),
     UInt64(u64),
     String(String),
 }
+
+impl TryFrom<&merger::parquet::Value> for KeyValue {
+    type Error = StoreError;
+
+    fn try_from(value: &merger::parquet::Value) -> std::result::Result<Self, Self::Error> {
+        Ok(match value {
+            merger::parquet::Value::Int32(v) => KeyValue::Int32(*v),
+            merger::parquet::Value::Int64(v) => KeyValue::Int64(*v),
+            _ => unimplemented!(),
+        })
+    }
+}
+
 
 #[derive(Debug, Serialize, Deserialize, Hash)]
 pub struct ColValue {
@@ -81,9 +97,11 @@ impl From<&KeyValue> for Value {
             KeyValue::UInt16(v) => Value::UInt16(Some(*v)),
             KeyValue::UInt64(v) => Value::UInt64(Some(*v)),
             KeyValue::String(v) => Value::String(Some(v.to_owned())),
+            KeyValue::Int32(v) => Value::Int32(Some(*v))
         }
     }
 }
+
 #[derive(Clone, Debug)]
 pub struct RowValue {
     col: String,
@@ -835,7 +853,7 @@ pub mod test_util {
             }
             _ => unimplemented!("{:?}", pt),
         }
-        .boxed()
+            .boxed()
     }
 
     pub fn gen_utf8_data_list_array<O: Offset, O2: Offset>(
