@@ -241,6 +241,7 @@ enum CompactorMessage {
 struct Compactor {
     opts: Options,
     metadata: Arc<Mutex<Metadata>>,
+    log: Arc<Mutex<BufWriter<File>>>,
     path: PathBuf,
     inbox: Receiver<CompactorMessage>,
 }
@@ -276,6 +277,7 @@ fn determine_compaction(
             size += part.size_bytes;
             let level_threshold =
                 opts.l1_max_size_bytes * opts.level_size_multiplier.pow(level_id as u32 - 1);
+            println!("threshold {} size {}", level_threshold, size);
             if size > level_threshold as u64 {
                 to_compact.push(ToCompact::new(level_id, part.id));
             }
@@ -305,18 +307,59 @@ fn determine_compaction(
     Ok(Some(to_compact))
 }
 
-fn compact(levels: &[Level], path: &PathBuf, opts: &Options) -> Result<(Vec<(usize, usize)>)> {
-    let mut out: Vec<(usize, usize)> = Vec::new();
+fn print_levels(levels: &[Level]) {
+    for (idx, l) in levels.iter().enumerate() {
+        println!("+-- {}", idx);
+        for part in &l.parts {
+            println!(
+                "|   +-- id {} min {:?},max {:?}, size {}",
+                part.id, part.min, part.max, part.size_bytes
+            );
+        }
+    }
+}
+
+enum FsOp {
+    Rename(PathBuf, PathBuf),
+    Delete(PathBuf),
+}
+
+fn compact(levels: &[Level], path: &PathBuf, opts: &Options) -> Result<(Vec<usize>, Vec<Level>, Vec<FsOp>)> {
+    let mut fs_ops = vec![];
+    let mut l0_rem: Vec<(usize)> = Vec::new();
     let mut tmp_levels = levels.to_owned().clone();
     for l in 0..tmp_levels.len() - 2 {
+        println!();
         let mut v = None;
         v = determine_compaction(l, &tmp_levels[l], &tmp_levels[l + 1], opts)?;
         match v {
             None => {}
             Some(to_compact) => {
+                if to_compact.len() == 1 {
+                    println!("rename");
+
+                    let idx = tmp_levels[l].parts.iter().position(|p| p.id == to_compact[0].part).unwrap();
+
+                    let mut part = tmp_levels[l].parts[idx].clone();
+                    tmp_levels[l].parts.remove(idx);
+                    part.id = tmp_levels[l + 1].part_id + 1;
+
+                    let from = path.join(format!("parts/{}/{}.parquet", l, to_compact[0].part));
+                    let to = path.join(format!("parts/{}/{}.parquet", l + 1, part.id));
+                    fs_ops.push(FsOp::Rename(from, to));
+                    // fs::rename(from.clone(), to.clone()).map_err(|e| StoreError::Internal(format!("rename {:?} to {:?} error: {:?}", from, to, e)))?;
+
+                    tmp_levels[l + 1].parts.push(part.clone());
+                    tmp_levels[l + 1].part_id += 1;
+                    println!("done");
+                    continue;
+                }
+                println!("llee {}", to_compact.len());
                 let mut to_merge: Vec<Part> = vec![];
                 for tc in &to_compact {
-                    out.push((tc.level, tc.part));
+                    if tc.level == 0 {
+                        l0_rem.push(tc.part);
+                    }
                     let part = tmp_levels[tc.level]
                         .clone()
                         .parts
@@ -332,8 +375,8 @@ fn compact(levels: &[Level], path: &PathBuf, opts: &Options) -> Result<(Vec<(usi
                         .collect::<Vec<_>>();
                 }
 
-
                 let in_paths = to_merge.iter().map(|p| path.join(format!("parts/{}/{}.parquet", l, p.id))).collect::<Vec<_>>();
+                println!("{:?}", in_paths);
                 let out_part_id = tmp_levels[l + 1].part_id + 1;
                 let out_path = path.join(format!("parts/{}", l + 1));
                 let rdrs = in_paths.iter().map(|p| File::open(p)).collect::<std::result::Result<Vec<File>, std::io::Error>>()?;
@@ -346,7 +389,7 @@ fn compact(levels: &[Level], path: &PathBuf, opts: &Options) -> Result<(Vec<(usi
                     max_part_size_bytes: Some(opts.merge_max_part_size_bytes),
                 };
                 let merge_result = merge(rdrs, out_path, out_part_id, merger_opts)?;
-
+                println!("merge result {:#?}", merge_result);
                 for f in merge_result {
                     let final_part = {
                         Part {
@@ -359,23 +402,30 @@ fn compact(levels: &[Level], path: &PathBuf, opts: &Options) -> Result<(Vec<(usi
                     tmp_levels[l + 1].parts.push(final_part);
                     tmp_levels[l + 1].part_id += 1;
                 }
+
+                fs_ops.append(in_paths.iter().map(|p| FsOp::Delete(p.clone())).collect::<Vec<_>>().as_mut());
+                println!("after compaction");
+                // println!("sdf {:#?}",tmp_levels);
             }
         }
     }
 
-    Ok(out)
+    println!("return lvl");
+    Ok((l0_rem, tmp_levels, fs_ops))
 }
 
 impl Compactor {
     fn new(
         opts: Options,
         metadata: Arc<Mutex<Metadata>>,
+        log: Arc<Mutex<BufWriter<File>>>,
         path: PathBuf,
         inbox: Receiver<CompactorMessage>,
     ) -> Self {
         Compactor {
             opts,
             metadata,
+            log,
             path,
             inbox,
         }
@@ -390,32 +440,46 @@ impl Compactor {
                             let md = self.metadata.lock().unwrap();
                             md.levels.clone()
                         };
-
-                        let removed = match compact(&levels, &self.path, &self.opts) {
-                            Ok(removed) => removed,
+                        println!("MD LEVELS");
+                        let (l0_rem, mut res, fs_log) = match compact(&levels, &self.path, &self.opts) {
+                            Ok(update) => update,
                             Err(err) => {
                                 error!("compaction error: {:?}", err);
 
                                 continue;
                             }
                         };
+                        println!("before");
+                        print_levels(&res);
                         let mut md = self.metadata.lock().unwrap();
-                        let mut out_levels: Vec<Level> = Vec::with_capacity(7);
-                        for (level_id, level) in md.levels.iter().enumerate() {
-                            for part in &level.parts {
-                                let mut found = false;
-                                for (rem_lvl, rem_part) in &removed {
-                                    if level_id == *rem_lvl && part.id == *rem_part {
-                                        found = true;
-                                        break;
-                                    }
+                        for rem in l0_rem {
+                            md.levels[0].parts = md.levels[0]
+                                .parts
+                                .clone()
+                                .into_iter()
+                                .filter(|p| p.id != rem)
+                                .collect::<Vec<_>>();
+                        }
+                        for (idx, l) in res.iter().enumerate() {
+                            md.levels[idx] = l.clone();
+                        }
+                        let mut log = self.log.lock().unwrap();
+                        log_metadata(Some(log.get_mut()), &mut md).unwrap();
+                        for op in fs_log {
+                            match op {
+                                FsOp::Rename(from, to) => {
+                                    // todo handle error
+                                    fs::rename(from, to).unwrap();
                                 }
-                                if !found {
-                                    out_levels[level_id].parts.push(part.to_owned());
+                                FsOp::Delete(path) => {
+                                    fs::remove_file(path).unwrap();
                                 }
                             }
                         }
-                        md.levels = out_levels;
+                        println!("After");
+                        // let mut md = self.metadata.lock().unwrap();
+                        // println!("post md");
+                        print_levels(&md.levels);
                     }
                     CompactorMessage::Stop(dropper) => {
                         drop(dropper);
@@ -435,7 +499,7 @@ struct OptiDBImpl {
     opts: Options,
     memtable: SkipSet<MemOp>,
     metadata: Arc<Mutex<Metadata>>,
-    log: BufWriter<File>,
+    log: Arc<Mutex<BufWriter<File>>>,
     compactor_outbox: Sender<CompactorMessage>,
     path: PathBuf,
 }
@@ -489,6 +553,7 @@ fn log_op(
 }
 
 fn log_metadata(log: Option<&mut File>, metadata: &mut Metadata) -> Result<()> {
+    trace!("log metadata");
     let log = log.unwrap();
     _log(&LogOp::Metadata(metadata.clone()), metadata, log)?;
     metadata.seq_id += 1;
@@ -500,6 +565,9 @@ fn log_metadata(log: Option<&mut File>, metadata: &mut Metadata) -> Result<()> {
 // #[instrument(level = "trace")]
 fn recover(path: PathBuf, opts: Options) -> Result<OptiDBImpl> {
     trace!("db dir: {:?}", path);
+    for i in 0..7 {
+        fs::create_dir_all(path.join("parts").join(i.to_string()))?;
+    }
     trace!("starting recovery");
     let dir = fs::read_dir(path.clone())?;
     let mut logs = BinaryHeap::new();
@@ -585,19 +653,20 @@ fn recover(path: PathBuf, opts: Options) -> Result<OptiDBImpl> {
     } else {
         false
     };
-    let (tx, rx) = std::sync::mpsc::channel();
+    let (compactor_outbox, rx) = std::sync::mpsc::channel();
     let metadata = Arc::new(Mutex::new(metadata));
-    let compactor = Compactor::new(opts.clone(), metadata.clone(), path.clone(), rx);
+    let log = Arc::new(Mutex::new(BufWriter::new(log)));
+    let compactor = Compactor::new(opts.clone(), metadata.clone(), log.clone(), path.clone(), rx);
     thread::spawn(move || compactor.run());
     if trigger_compact {
-        tx.send(CompactorMessage::Compact).unwrap();
+        compactor_outbox.send(CompactorMessage::Compact).unwrap();
     }
     Ok(OptiDBImpl {
         opts,
         memtable,
         metadata,
-        log: BufWriter::new(log),
-        compactor_outbox: tx,
+        log,
+        compactor_outbox,
         path,
     })
 }
@@ -687,7 +756,6 @@ fn write_level0(
         data_pagesize_limit: None,
     };
 
-    println!("{:?}", arrs);
     let chunk = Chunk::try_new(arrs)?;
 
     let encodings = schema
@@ -703,10 +771,7 @@ fn write_level0(
         encodings,
     )?;
 
-    trace!("trying to create {:?}", path.join("parts/0"));
-    fs::create_dir_all(path.join("parts/0"))?;
-
-    let p = path.join("parts").join("0").join(part_id.to_string());
+    let p = path.join("parts").join("0").join(format!("{}.parquet", part_id));
     trace!("creating part file {:?}", p);
     let w = OpenOptions::new().create_new(true).write(true).open(p)?;
     let mut writer = parquet::write::FileWriter::try_new(w, schema.clone(), popts)?;
@@ -790,13 +855,13 @@ impl OptiDBImpl {
         log_op(
             LogOp::Insert(key, values),
             false,
-            Some(self.log.get_mut()),
+            Some(self.log.lock().unwrap().get_mut()),
             &mut self.memtable,
             &mut md,
         )?;
         if md.stats.logged_bytes as usize > self.opts.max_log_length_bytes {
             flush(
-                Some(self.log.get_mut()),
+                Some(self.log.lock().unwrap().get_mut()),
                 &mut self.memtable,
                 &mut md,
                 &self.path,
@@ -831,7 +896,7 @@ impl OptiDBImpl {
             }
         }
         md.schema.fields.push(field);
-        log_metadata(Some(self.log.get_mut()), &mut md)?;
+        log_metadata(Some(self.log.lock().unwrap().get_mut()), &mut md)?;
         Ok(())
     }
 }
@@ -891,29 +956,29 @@ mod tests {
         let path = temp_dir().join("db");
         fs::remove_dir_all(&path).unwrap();
         fs::create_dir_all(&path).unwrap();
-        let opts = Options {
-            l1_max_size_bytes: 1,
-            level_size_multiplier: 10,
-            l0_max_parts: 2,
-            max_log_length_bytes: 1024,
-            merge_array_page_size: 1,
-            merge_data_page_size_limit_bytes: Some(1),
-            merge_index_cols: 1,
-            merge_max_part_size_bytes: 1,
-            merge_row_group_values_limit: 1,
 
+        let opts = Options {
+            l1_max_size_bytes: 1024,
+            level_size_multiplier: 10,
+            l0_max_parts: 4,
+            max_log_length_bytes: 1024,
+            merge_array_page_size: 1000,
+            merge_data_page_size_limit_bytes: Some(1024),
+            merge_index_cols: 2,
+            merge_max_part_size_bytes: 2048,
+            merge_row_group_values_limit: 1000,
         };
         let mut db = OptiDBImpl::open(path, opts).unwrap();
-        db.add_field(Field::new("a", DataType::Utf8, false));
-        db.add_field(Field::new("b", DataType::Utf8, false));
-        db.add_field(Field::new("c", DataType::Int8, false));
-        for i in 0..100 {
+        db.add_field(Field::new("a", DataType::Int64, false));
+        db.add_field(Field::new("b", DataType::Int64, false));
+        db.add_field(Field::new("c", DataType::Int64, false));
+        for i in 0..10 {
             db.insert(
                 vec![
-                    KeyValue::String(i.to_string()),
-                    KeyValue::String((i + 1).to_string()),
+                    KeyValue::Int64(i),
+                    KeyValue::Int64((i + 1)),
                 ],
-                vec![Value::Int8(Some(i))],
+                vec![Value::Int64(Some(i))],
             )
                 .unwrap();
         }

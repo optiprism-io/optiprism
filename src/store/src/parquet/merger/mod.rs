@@ -14,6 +14,7 @@
 use std::collections::BinaryHeap;
 use std::collections::HashMap;
 use std::collections::VecDeque;
+use std::fs;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::io::Seek;
@@ -187,10 +188,10 @@ pub struct FileMergeOptions {
     row_group_values_limit: usize,
     array_page_size: usize,
 }
-
+#[derive(Debug, Clone)]
 pub struct MergedFile {
     pub size_bytes: u64,
-    pub  id: usize,
+    pub id: usize,
     pub min: Vec<Value>,
     pub max: Vec<Value>,
 }
@@ -205,7 +206,6 @@ pub fn merge<R: Read + Seek>(mut readers: Vec<R>,
         .iter_mut()
         .map(|r| arrow2::io::parquet::read::read_metadata(r).and_then(|md| infer_schema(&md)))
         .collect::<arrow2::error::Result<Vec<Schema>>>()?;
-
     // make unified schema
     let arrow_schema = try_merge_schemas(arrow_schemas)?;
     // make parquet schema
@@ -292,15 +292,18 @@ impl<R> ParquetMerger<R>
         };
         let mut merged_files: Vec<MergedFile> = Vec::new();
         for part_id in self.id_from.. {
-            let mut w = File::create(&self.to_path.join(format!("/parts/{}", part_id).as_str()))?;
+            let w = File::create(&self.to_path.join(format!("{}.parquet", part_id)))?;
             let mut seq_writer = FileSeqWriter::new(w, self.parquet_schema.clone(), write_opts, None);
 
             let mut min: Vec<Value> = Vec::new();
             let mut max: Vec<Value> = Vec::new();
 
-            let mut first = false;
+            let mut first = true;
+            let mut end = true;
+            let mut some = false;
             // Request merge of index column
             while let Some(chunks) = self.next_index_chunk()? {
+                some = true;
                 // get descriptors of index/partition columns
 
                 if first {
@@ -374,25 +377,33 @@ impl<R> ParquetMerger<R>
                 seq_writer.end_row_group()?;
 
                 if let Some(max_part_file_size) = self.max_part_file_size_bytes {
-                    let f = File::open(&self.to_path.join(format!("/parts/{}", part_id).as_str()))?;
+                    let f = File::open(&self.to_path.join(format!("{}.parquet", part_id)))?;
                     if f.metadata().unwrap().size() > max_part_file_size as u64 {
+                        end = false;
                         break;
                     }
                 }
+                some = false;
             }
 
+            if some {
+                // Add arrow schema to parquet metadata
+                let key_value_metadata = add_arrow_schema(&self.arrow_schema, None);
+                seq_writer.end(key_value_metadata)?;
 
-            // Add arrow schema to parquet metadata
-            let key_value_metadata = add_arrow_schema(&self.arrow_schema, None);
-            seq_writer.end(key_value_metadata)?;
-
-            let mf = MergedFile {
-                size_bytes: File::open(&self.to_path.join(format!("/parts/{}", part_id).as_str()))?.metadata().unwrap().size(),
-                id: part_id,
-                min,
-                max,
-            };
-            merged_files.push(mf);
+                let mf = MergedFile {
+                    size_bytes: File::open(&self.to_path.join(format!("{}.parquet", part_id)))?.metadata().unwrap().size(),
+                    id: part_id,
+                    min,
+                    max,
+                };
+                merged_files.push(mf);
+            } else {
+                fs::remove_file(self.to_path.join(format!("{}.parquet", part_id)))?;
+            }
+            if end {
+                break;
+            }
         }
         Ok(merged_files)
     }
