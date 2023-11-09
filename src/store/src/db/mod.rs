@@ -1,6 +1,9 @@
 use std::{cmp, io, time};
+use shuffle::shuffler::Shuffler;
+use shuffle::irs::Irs;
+use rand::rngs::mock::StepRng;
 use std::cmp::Ordering;
-use std::collections::BinaryHeap;
+use std::collections::{BinaryHeap, HashMap};
 use std::ffi::OsStr;
 use std::fs;
 use std::fs::File;
@@ -11,7 +14,7 @@ use std::io::Read;
 use std::io::Write;
 use std::mem;
 use std::os::unix::fs::MetadataExt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, TryRecvError};
 use std::sync::mpsc::RecvError;
@@ -19,6 +22,7 @@ use std::sync::mpsc::Sender;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread;
+use std::time::Instant;
 use rand::Rng;
 use arrow2::array::Array;
 use arrow2::array::MutableArray;
@@ -246,6 +250,7 @@ struct Compactor {
     log: Arc<Mutex<BufWriter<File>>>,
     path: PathBuf,
     inbox: Receiver<CompactorMessage>,
+    vfs: Arc<Vfs>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -266,7 +271,7 @@ fn determine_compaction(
     next_level: &Level,
     opts: &Options,
 ) -> Result<Option<Vec<ToCompact>>> {
-    println!("lid {} {}", level_id, level.parts.len());
+    // !@#println!("lid {} {}", level_id, level.parts.len());
     let mut to_compact = vec![];
 
     let level_parts = &level.parts;
@@ -322,6 +327,55 @@ fn print_levels(levels: &[Level]) {
     }
 }
 
+struct Vfs {
+    files: Mutex<HashMap<PathBuf, usize>>,
+}
+
+impl Vfs {
+    pub fn new() -> Self {
+        Self {
+            files: Default::default()
+        }
+    }
+
+    pub fn open(&self, path: &PathBuf) -> Result<()> {
+        let mut files = self.files.lock().unwrap();
+        let cnt = files.entry(path.clone()).or_insert_with(|| 0);
+        *cnt = *cnt + 1;
+
+        Ok(())
+    }
+    pub fn close(&self, path: &PathBuf) -> Result<()> {
+        let mut files = self.files.lock().unwrap();
+        let cnt = files.entry(path.clone()).or_insert_with(|| 0);
+        *cnt = *cnt - 1;
+        Ok(())
+    }
+    fn write(&self, path: &PathBuf) -> Result<()> {
+        loop {
+            let files = self.files.lock().unwrap();
+            if files.get(path).is_none() || *files.get(path).unwrap() == 0 {
+                break;
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn remove_file(&self, path: &PathBuf) -> Result<()> {
+        self.write(path)?;
+        fs::remove_file(path)?;
+        Ok(())
+    }
+
+    pub fn rename(&self, from: &PathBuf, to: &PathBuf) -> Result<()> {
+        println!("rename");
+        self.write(from)?;
+        fs::rename(from, to)?;
+        Ok(())
+    }
+}
+
 enum FsOp {
     Rename(PathBuf, PathBuf),
     Delete(PathBuf),
@@ -351,9 +405,9 @@ fn compact(levels: &[Level], path: &PathBuf, opts: &Options) -> Result<Option<Co
             }
             Some(to_compact) => {
                 compacted = true;
-                println!("to compact {:?}", to_compact);
+                // !@#println!("to compact {:?}", to_compact);
                 if to_compact.len() == 1 {
-                    println!("rename");
+                    // !@#println!("rename");
 
                     let idx = tmp_levels[l].parts.iter().position(|p| p.id == to_compact[0].part).unwrap();
 
@@ -367,10 +421,10 @@ fn compact(levels: &[Level], path: &PathBuf, opts: &Options) -> Result<Option<Co
 
                     tmp_levels[l + 1].parts.push(part.clone());
                     tmp_levels[l + 1].part_id += 1;
-                    println!("done");
+                    // !@#println!("done");
                     continue;
                 }
-                println!("llee {}", to_compact.len());
+                // !@#println!("llee {}", to_compact.len());
                 let mut to_merge: Vec<Part> = vec![];
                 for tc in &to_compact {
                     if tc.level == 0 {
@@ -392,7 +446,7 @@ fn compact(levels: &[Level], path: &PathBuf, opts: &Options) -> Result<Option<Co
                 }
 
                 let in_paths = to_merge.iter().map(|p| path.join(format!("parts/{}/{}.parquet", l, p.id))).collect::<Vec<_>>();
-                println!("{:?}", in_paths);
+                // !@#println!("{:?}", in_paths);
                 let out_part_id = tmp_levels[l + 1].part_id + 1;
                 let out_path = path.join(format!("parts/{}", l + 1));
                 let rdrs = in_paths.iter().map(|p| File::open(p)).collect::<std::result::Result<Vec<File>, std::io::Error>>()?;
@@ -405,7 +459,7 @@ fn compact(levels: &[Level], path: &PathBuf, opts: &Options) -> Result<Option<Co
                     max_part_size_bytes: Some(opts.merge_max_part_size_bytes),
                 };
                 let merge_result = merge(rdrs, out_path, out_part_id, merger_opts)?;
-                println!("merge result {:#?}", merge_result);
+                // !@#println!("merge result {:#?}", merge_result);
                 for f in merge_result {
                     let final_part = {
                         Part {
@@ -420,12 +474,12 @@ fn compact(levels: &[Level], path: &PathBuf, opts: &Options) -> Result<Option<Co
                 }
 
                 fs_ops.append(in_paths.iter().map(|p| FsOp::Delete(p.clone())).collect::<Vec<_>>().as_mut());
-                println!("after compaction");
+                // !@#println!("after compaction");
             }
         }
     }
 
-    println!("return lvl");
+    // !@#println!("return lvl");
     Ok(Some(CompactResult {
         l0_remove: l0_rem,
         levels: tmp_levels,
@@ -440,6 +494,7 @@ impl Compactor {
         log: Arc<Mutex<BufWriter<File>>>,
         path: PathBuf,
         inbox: Receiver<CompactorMessage>,
+        vfs: Arc<Vfs>,
     ) -> Self {
         Compactor {
             opts,
@@ -447,9 +502,10 @@ impl Compactor {
             log,
             path,
             inbox,
+            vfs,
         }
     }
-    fn run(self) {
+    fn run(mut self) {
         loop {
             match self.inbox.try_recv() {
                 Ok(v) => {
@@ -460,7 +516,7 @@ impl Compactor {
                         }
                         _ => unreachable!()
                     }
-                    println!("Terminating.");
+                    // !@#println!("Terminating.");
                     break;
                 }
                 Err(TryRecvError::Disconnected) => {
@@ -472,20 +528,21 @@ impl Compactor {
             // match self.inbox.recv() {
             // Ok(msg) => match msg {
             //     CompactorMessage::Compact => {
-            debug!("compaction started");
+            // !@#debug!("compaction started");
             let levels = {
                 let md = self.metadata.lock().unwrap();
                 md.levels.clone()
             };
-            println!("md lvlb {}", levels[0].part_id);
-            print_levels(&levels);
+            // !@#println!("md lvlb {}", levels[0].part_id);
+            // print_levels(&levels);
+            let start = Instant::now();
             match compact(&levels, &self.path, &self.opts) {
                 Ok(res) => match res {
                     None => continue,
                     Some(res) => {
                         let mut md = self.metadata.lock().unwrap();
-                        println!("md lvl");
-                        print_levels(&md.levels);
+                        // !@#println!("md lvl");
+                        // print_levels(&md.levels);
                         // print_levels(&md.levels);
                         for rem in &res.l0_remove {
                             md.levels[0].parts = md.levels[0]
@@ -494,35 +551,36 @@ impl Compactor {
                                 .into_iter()
                                 .filter(|p| p.id != *rem)
                                 .collect::<Vec<_>>();
-
-                            }
-                        println!("res rem: {:?}",res.l0_remove);
-                        println!("res levels");
-                        print_levels(&res.levels);
+                        }
+                        // !@#println!("res rem: {:?}", res.l0_remove);
+                        // !@#println!("res levels");
+                        // print_levels(&res.levels);
                         for (idx, l) in res.levels.iter().enumerate().skip(1) {
                             md.levels[idx] = l.clone();
                         }
                         let mut log = self.log.lock().unwrap();
                         log_metadata(Some(log.get_mut()), &mut md).unwrap();
-                        println!("md lvl after");
-                        print_levels(&md.levels);
+                        // drop because next fs operation is with locking
+                        drop(md);
+                        // !@#println!("md lvl after");
+                        // print_levels(&md.levels);
                         for op in res.fs_ops {
                             match op {
                                 FsOp::Rename(from, to) => {
-                                    trace!("renaming");
+                                    // !@#trace!("renaming");
                                     // todo handle error
-                                    fs::rename(from, to).unwrap();
+                                    self.vfs.rename(&from, &to).unwrap();
                                 }
                                 FsOp::Delete(path) => {
-                                    trace!("deleting {:?}",path);
-                                    fs::remove_file(path).unwrap();
+                                    // !@#trace!("deleting {:?}",path);
+                                    self.vfs.remove_file(&path).unwrap();
                                 }
                             }
                         }
-                        println!("After");
+                        // !@#println!("After");
                         // let mut md = self.metadata.lock().unwrap();
-                        // println!("post md");
-                        print_levels(&md.levels);
+                        // // !@#println!("post md");
+                        // print_levels(&md.levels);
                     }
                 }
                 Err(err) => {
@@ -531,6 +589,8 @@ impl Compactor {
                     continue;
                 }
             }
+            let duration = start.elapsed();
+            // !@#debug!("compaction finished in {:?}", duration);
         }
         //     CompactorMessage::Stop(dropper) => {
         //         drop(dropper);
@@ -538,7 +598,7 @@ impl Compactor {
         //     }
         // },
         // Err(err) => {
-        //     trace!("unexpected compactor error: {:?}", err);
+        //     // !@#trace!("unexpected compactor error: {:?}", err);
         //     break;
         // }
         // }
@@ -558,13 +618,13 @@ fn _log(op: &LogOp, metadata: &mut Metadata, log: &mut File) -> Result<()> {
     let data = serialize(op)?;
 
     let crc = hash_crc32(&data);
-    trace!("crc32: {}", crc);
+    // !@#trace!("crc32: {}", crc);
     log.write_all(&crc.to_le_bytes())?;
     log.write_all(&(data.len() as u64).to_le_bytes())?;
     log.write_all(&data)?;
 
     let logged_size = 8 + 4 + data.len();
-    trace!("logged size: {}", logged_size);
+    // !@#trace!("logged size: {}", logged_size);
     metadata.stats.logged_bytes += logged_size as u64;
 
     Ok(())
@@ -578,9 +638,9 @@ fn log_op(
     metadata: &mut Metadata,
 ) -> Result<()> {
     if recover {
-        trace!("recover op: {:?}", op);
+        // !@#trace!("recover op: {:?}", op);
     } else {
-        trace!("log op: {:?}", op);
+        // !@#trace!("log op: {:?}", op);
     }
     if !recover {
         let log = log.unwrap();
@@ -597,28 +657,28 @@ fn log_op(
     }
 
     metadata.seq_id += 1;
-    trace!("next op id: {}", metadata.seq_id);
+    // !@#trace!("next op id: {}", metadata.seq_id);
 
     Ok(())
 }
 
 fn log_metadata(log: Option<&mut File>, metadata: &mut Metadata) -> Result<()> {
-    trace!("log metadata");
+    // !@#trace!("log metadata");
     let log = log.unwrap();
     _log(&LogOp::Metadata(metadata.clone()), metadata, log)?;
     metadata.seq_id += 1;
-    trace!("next op id: {}", metadata.seq_id);
+    // !@#trace!("next op id: {}", metadata.seq_id);
 
     Ok(())
 }
 
 // #[instrument(level = "trace")]
 fn recover(path: PathBuf, opts: Options) -> Result<OptiDBImpl> {
-    trace!("db dir: {:?}", path);
+    // !@#trace!("db dir: {:?}", path);
     for i in 0..7 {
         fs::create_dir_all(path.join("parts").join(i.to_string()))?;
     }
-    trace!("starting recovery");
+    // !@#trace!("starting recovery");
     let dir = fs::read_dir(path.clone())?;
     let mut logs = BinaryHeap::new();
 
@@ -634,7 +694,7 @@ fn recover(path: PathBuf, opts: Options) -> Result<OptiDBImpl> {
         };
     }
 
-    trace!("found {} logs", logs.len());
+    // !@#trace!("found {} logs", logs.len());
 
     let mut metadata = Metadata {
         version: 0,
@@ -647,7 +707,7 @@ fn recover(path: PathBuf, opts: Options) -> Result<OptiDBImpl> {
 
     let mut memtable = SkipSet::new();
     let log = if let Some(log_path) = logs.pop() {
-        trace!("last log: {:?}", log_path);
+        // !@#trace!("last log: {:?}", log_path);
         let mut f = BufReader::new(File::open(&log_path)?);
 
         let mut ops = 0;
@@ -659,12 +719,12 @@ fn recover(path: PathBuf, opts: Options) -> Result<OptiDBImpl> {
                 break;
             }
             let crc32 = u32::from_le_bytes(crc_b);
-            trace!("crc32: {}", crc32);
+            // !@#trace!("crc32: {}", crc32);
 
             let mut len_b = [0u8; mem::size_of::<u64>()];
             f.read_exact(&mut len_b)?;
             let len = u64::from_le_bytes(len_b);
-            trace!("len: {}", len);
+            // !@#trace!("len: {}", len);
             let mut data_b = vec![0u8; len as usize];
             f.read_exact(&mut data_b)?;
             // todo recover from this case
@@ -681,12 +741,12 @@ fn recover(path: PathBuf, opts: Options) -> Result<OptiDBImpl> {
             metadata.seq_id += 1;
             ops += 1;
         }
-        trace!("operations recovered: {}", ops);
+        // !@#trace!("operations recovered: {}", ops);
         drop(f);
 
         OpenOptions::new().append(true).open(log_path)?
     } else {
-        trace!("creating initial log {}", format!("{:016}.log", 0));
+        // !@#trace!("creating initial log {}", format!("{:016}.log", 0));
 
         OpenOptions::new()
             .create_new(true)
@@ -706,7 +766,8 @@ fn recover(path: PathBuf, opts: Options) -> Result<OptiDBImpl> {
     let (compactor_outbox, rx) = std::sync::mpsc::channel();
     let metadata = Arc::new(Mutex::new(metadata));
     let log = Arc::new(Mutex::new(BufWriter::new(log)));
-    let compactor = Compactor::new(opts.clone(), metadata.clone(), log.clone(), path.clone(), rx);
+    let vfs = Arc::new(Vfs::new());
+    let compactor = Compactor::new(opts.clone(), metadata.clone(), log.clone(), path.clone(), rx, vfs.clone());
     thread::spawn(move || compactor.run());
     if trigger_compact {
         // compactor_outbox.send(CompactorMessage::Compact).unwrap();
@@ -728,7 +789,7 @@ fn write_level0(
     path: PathBuf,
 ) -> Result<Part> {
     let mut cols: Vec<Vec<Value>> = vec![Vec::new(); schema.fields.len()];
-    trace!("{} entries to write", memtable.len());
+    // !@#trace!("{} entries to write", memtable.len());
     let mut min: Option<Vec<KeyValue>> = None;
     let mut max: Option<Vec<KeyValue>> = None;
     for (idx, op) in memtable.iter().enumerate() {
@@ -822,7 +883,7 @@ fn write_level0(
     )?;
 
     let p = path.join("parts").join("0").join(format!("{}.parquet", part_id));
-    trace!("creating part file {:?}", p);
+    // !@#trace!("creating part file {:?}", p);
     let w = OpenOptions::new().create_new(true).write(true).open(p)?;
     let mut writer = parquet::write::FileWriter::try_new(w, schema.clone(), popts)?;
     // Write the part
@@ -830,7 +891,7 @@ fn write_level0(
         writer.write(group?)?;
     }
     let sz = writer.end(None)?;
-    trace!("{:?} bytes written", sz);
+    // !@#trace!("{:?} bytes written", sz);
     Ok(Part {
         id: part_id,
         size_bytes: sz,
@@ -845,22 +906,23 @@ fn flush(
     md: &mut Metadata,
     path: &PathBuf,
 ) -> Result<()> {
-    trace!("flushing log file");
+    // !@#trace!("flushing log file");
     let f = log.unwrap();
     f.flush()?;
     f.sync_all()?;
     // swap memtable
-    trace!("swapping memtable");
+    // !@#trace!("swapping memtable");
     let mut memtable = std::mem::take(memtable);
 
     // write to parquet
-    trace!("writing to parquet");
-    trace!("part id: {}", md.levels[0].part_id);
+    // !@#trace!("writing to parquet");
+    // !@#trace!("part id: {}", md.levels[0].part_id);
     let part = write_level0(&memtable, md.levels[0].part_id, &md.schema, path.clone())?;
     md.levels[0].parts.push(part.clone());
     // increment table id
     md.levels[0].part_id += 1;
     md.stats.written_bytes += part.size_bytes;
+    md.stats.logged_bytes = 0;
     // increment log id
     md.log_id += 1;
 
@@ -895,6 +957,7 @@ impl OptiDBImpl {
     }
     // #[instrument(level = "trace", skip(self))]
     pub fn insert(&mut self, key: Vec<KeyValue>, values: Vec<Value>) -> Result<()> {
+        let start = Instant::now();
         let mut md = self.metadata.lock().unwrap();
         if key.len() + values.len() != md.schema.fields.len() {
             return Err(StoreError::Internal(format!(
@@ -924,6 +987,9 @@ impl OptiDBImpl {
             //         .unwrap();
             // }
         }
+
+        let duration = start.elapsed();
+        // !@#debug!("insert finished in {:?}", duration);
         Ok(())
     }
 
@@ -997,7 +1063,11 @@ mod tests {
     use arrow2::datatypes::DataType;
     use arrow2::datatypes::Field;
     use arrow2::datatypes::Schema;
-    use rand::Rng;
+    use rand::{Rng, thread_rng};
+    use rand::rngs::mock::StepRng;
+    use shuffle::fy::FisherYates;
+    use shuffle::irs::Irs;
+    use shuffle::shuffler::Shuffler;
     use tracing::info;
     use tracing::log;
     use tracing::log::debug;
@@ -1028,12 +1098,12 @@ mod tests {
         // fs::create_dir_all(&path).unwrap();
 
         let opts = Options {
-            l1_max_size_bytes: 1024,
+            l1_max_size_bytes: 1024 * 1024 * 10,
             level_size_multiplier: 10,
             l0_max_parts: 4,
-            max_log_length_bytes: 1024,
-            merge_array_page_size: 1000,
-            merge_data_page_size_limit_bytes: Some(1024),
+            max_log_length_bytes: 1024 * 1024 * 10,
+            merge_array_page_size: 10000,
+            merge_data_page_size_limit_bytes: Some(1024 * 1024),
             merge_index_cols: 2,
             merge_max_part_size_bytes: 2048,
             merge_row_group_values_limit: 1000,
@@ -1042,8 +1112,14 @@ mod tests {
         db.add_field(Field::new("a", DataType::Int64, false));
         db.add_field(Field::new("b", DataType::Int64, false));
         db.add_field(Field::new("c", DataType::Int64, false));
-        for i in 0..1000 {
-            thread::sleep(Duration::from_millis(1));
+
+        let mut rng = StepRng::new(2, 13);
+        let mut irs = FisherYates::default();
+        // let mut input = (0..10_000_000).collect();
+        let mut input = (0..1000).collect();
+        irs.shuffle(&mut input, &mut rng).unwrap();
+
+        for i in input {
             db.insert(
                 vec![
                     KeyValue::Int64(i),
@@ -1054,7 +1130,7 @@ mod tests {
                 .unwrap();
         }
 
-        // db.flush().unwrap();
+        db.flush().unwrap();
         thread::sleep(Duration::from_millis(20));
         print_levels(db.metadata.lock().unwrap().levels.as_ref());
         // db.compact();

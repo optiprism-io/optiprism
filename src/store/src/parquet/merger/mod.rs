@@ -407,6 +407,9 @@ impl<R> ParquetMerger<R>
                     max,
                 };
                 merged_files.push(mf);
+            } else {
+                // delete empty file
+                fs::remove_file(&self.to_path.join(format!("{}.parquet", part_id)))?;
             }
             break;
         }
