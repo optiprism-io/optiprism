@@ -1,4 +1,4 @@
-use std::{cmp, io};
+use std::{cmp, io, time};
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::ffi::OsStr;
@@ -13,7 +13,7 @@ use std::mem;
 use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
 use std::sync::mpsc;
-use std::sync::mpsc::Receiver;
+use std::sync::mpsc::{Receiver, TryRecvError};
 use std::sync::mpsc::RecvError;
 use std::sync::mpsc::Sender;
 use std::sync::Arc;
@@ -37,7 +37,9 @@ use arrow2::io::parquet::write::transverse;
 use arrow_buffer::ToByteSlice;
 use bincode::deserialize;
 use bincode::serialize;
+use chrono::Duration;
 use crossbeam_skiplist::SkipSet;
+use futures::select;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
@@ -264,6 +266,7 @@ fn determine_compaction(
     next_level: &Level,
     opts: &Options,
 ) -> Result<Option<Vec<ToCompact>>> {
+    println!("lid {} {}", level_id, level.parts.len());
     let mut to_compact = vec![];
 
     let level_parts = &level.parts;
@@ -324,17 +327,31 @@ enum FsOp {
     Delete(PathBuf),
 }
 
-fn compact(levels: &[Level], path: &PathBuf, opts: &Options) -> Result<(Vec<usize>, Vec<Level>, Vec<FsOp>)> {
+struct CompactResult {
+    l0_remove: Vec<usize>,
+    levels: Vec<Level>,
+    fs_ops: Vec<FsOp>,
+}
+
+fn compact(levels: &[Level], path: &PathBuf, opts: &Options) -> Result<Option<CompactResult>> {
     let mut fs_ops = vec![];
     let mut l0_rem: Vec<(usize)> = Vec::new();
     let mut tmp_levels = levels.to_owned().clone();
+    let mut compacted = false;
     for l in 0..tmp_levels.len() - 2 {
-        println!();
         let mut v = None;
         v = determine_compaction(l, &tmp_levels[l], &tmp_levels[l + 1], opts)?;
         match v {
-            None => {}
+            None => {
+                if compacted {
+                    break;
+                } else {
+                    return Ok(None);
+                }
+            }
             Some(to_compact) => {
+                compacted = true;
+                println!("to compact {:?}", to_compact);
                 if to_compact.len() == 1 {
                     println!("rename");
 
@@ -347,7 +364,6 @@ fn compact(levels: &[Level], path: &PathBuf, opts: &Options) -> Result<(Vec<usiz
                     let from = path.join(format!("parts/{}/{}.parquet", l, to_compact[0].part));
                     let to = path.join(format!("parts/{}/{}.parquet", l + 1, part.id));
                     fs_ops.push(FsOp::Rename(from, to));
-                    // fs::rename(from.clone(), to.clone()).map_err(|e| StoreError::Internal(format!("rename {:?} to {:?} error: {:?}", from, to, e)))?;
 
                     tmp_levels[l + 1].parts.push(part.clone());
                     tmp_levels[l + 1].part_id += 1;
@@ -405,13 +421,16 @@ fn compact(levels: &[Level], path: &PathBuf, opts: &Options) -> Result<(Vec<usiz
 
                 fs_ops.append(in_paths.iter().map(|p| FsOp::Delete(p.clone())).collect::<Vec<_>>().as_mut());
                 println!("after compaction");
-                // println!("sdf {:#?}",tmp_levels);
             }
         }
     }
 
     println!("return lvl");
-    Ok((l0_rem, tmp_levels, fs_ops))
+    Ok(Some(CompactResult {
+        l0_remove: l0_rem,
+        levels: tmp_levels,
+        fs_ops,
+    }))
 }
 
 impl Compactor {
@@ -432,46 +451,70 @@ impl Compactor {
     }
     fn run(self) {
         loop {
-            match self.inbox.recv() {
-                Ok(msg) => match msg {
-                    CompactorMessage::Compact => {
-                        debug!("compaction started");
-                        let levels = {
-                            let md = self.metadata.lock().unwrap();
-                            md.levels.clone()
-                        };
-                        println!("MD LEVELS");
-                        let (l0_rem, mut res, fs_log) = match compact(&levels, &self.path, &self.opts) {
-                            Ok(update) => update,
-                            Err(err) => {
-                                error!("compaction error: {:?}", err);
-
-                                continue;
-                            }
-                        };
-                        println!("before");
-                        print_levels(&res);
+            match self.inbox.try_recv() {
+                Ok(v) => {
+                    match v {
+                        CompactorMessage::Stop(dropper) => {
+                            drop(dropper);
+                            break;
+                        }
+                        _ => unreachable!()
+                    }
+                    println!("Terminating.");
+                    break;
+                }
+                Err(TryRecvError::Disconnected) => {
+                    break;
+                }
+                Err(TryRecvError::Empty) => {}
+            }
+            thread::sleep(time::Duration::from_micros(20));
+            // match self.inbox.recv() {
+            // Ok(msg) => match msg {
+            //     CompactorMessage::Compact => {
+            debug!("compaction started");
+            let levels = {
+                let md = self.metadata.lock().unwrap();
+                md.levels.clone()
+            };
+            println!("md lvlb {}", levels[0].part_id);
+            print_levels(&levels);
+            match compact(&levels, &self.path, &self.opts) {
+                Ok(res) => match res {
+                    None => continue,
+                    Some(res) => {
                         let mut md = self.metadata.lock().unwrap();
-                        for rem in l0_rem {
+                        println!("md lvl");
+                        print_levels(&md.levels);
+                        // print_levels(&md.levels);
+                        for rem in &res.l0_remove {
                             md.levels[0].parts = md.levels[0]
                                 .parts
                                 .clone()
                                 .into_iter()
-                                .filter(|p| p.id != rem)
+                                .filter(|p| p.id != *rem)
                                 .collect::<Vec<_>>();
-                        }
-                        for (idx, l) in res.iter().enumerate() {
+
+                            }
+                        println!("res rem: {:?}",res.l0_remove);
+                        println!("res levels");
+                        print_levels(&res.levels);
+                        for (idx, l) in res.levels.iter().enumerate().skip(1) {
                             md.levels[idx] = l.clone();
                         }
                         let mut log = self.log.lock().unwrap();
                         log_metadata(Some(log.get_mut()), &mut md).unwrap();
-                        for op in fs_log {
+                        println!("md lvl after");
+                        print_levels(&md.levels);
+                        for op in res.fs_ops {
                             match op {
                                 FsOp::Rename(from, to) => {
+                                    trace!("renaming");
                                     // todo handle error
                                     fs::rename(from, to).unwrap();
                                 }
                                 FsOp::Delete(path) => {
+                                    trace!("deleting {:?}",path);
                                     fs::remove_file(path).unwrap();
                                 }
                             }
@@ -481,17 +524,24 @@ impl Compactor {
                         // println!("post md");
                         print_levels(&md.levels);
                     }
-                    CompactorMessage::Stop(dropper) => {
-                        drop(dropper);
-                        break;
-                    }
-                },
+                }
                 Err(err) => {
-                    trace!("unexpected compactor error: {:?}", err);
-                    break;
+                    error!("compaction error: {:?}", err);
+
+                    continue;
                 }
             }
         }
+        //     CompactorMessage::Stop(dropper) => {
+        //         drop(dropper);
+        //         break;
+        //     }
+        // },
+        // Err(err) => {
+        //     trace!("unexpected compactor error: {:?}", err);
+        //     break;
+        // }
+        // }
     }
 }
 
@@ -659,7 +709,7 @@ fn recover(path: PathBuf, opts: Options) -> Result<OptiDBImpl> {
     let compactor = Compactor::new(opts.clone(), metadata.clone(), log.clone(), path.clone(), rx);
     thread::spawn(move || compactor.run());
     if trigger_compact {
-        compactor_outbox.send(CompactorMessage::Compact).unwrap();
+        // compactor_outbox.send(CompactorMessage::Compact).unwrap();
     }
     Ok(OptiDBImpl {
         opts,
@@ -805,6 +855,7 @@ fn flush(
 
     // write to parquet
     trace!("writing to parquet");
+    trace!("part id: {}", md.levels[0].part_id);
     let part = write_level0(&memtable, md.levels[0].part_id, &md.schema, path.clone())?;
     md.levels[0].parts.push(part.clone());
     // increment table id
@@ -867,15 +918,31 @@ impl OptiDBImpl {
                 &self.path,
             )?;
 
-            if md.levels[0].parts.len() > 0 && md.levels[0].parts.len() > self.opts.l0_max_parts {
-                self.compactor_outbox
-                    .send(CompactorMessage::Compact)
-                    .unwrap();
-            }
+            // if md.levels[0].parts.len() > 0 && md.levels[0].parts.len() > self.opts.l0_max_parts {
+            //     self.compactor_outbox
+            //         .send(CompactorMessage::Compact)
+            //         .unwrap();
+            // }
         }
         Ok(())
     }
 
+    fn compact(&self) {
+        self.compactor_outbox
+            .send(CompactorMessage::Compact)
+            .unwrap();
+    }
+    fn flush(&mut self) -> Result<()> {
+        let mut md = self.metadata.lock().unwrap();
+        flush(
+            Some(self.log.lock().unwrap().get_mut()),
+            &mut self.memtable,
+            &mut md,
+            &self.path,
+        )?;
+
+        Ok(())
+    }
     fn get(&self, opts: ReadOptions, key: Vec<KeyValue>) -> Result<Vec<(String, Value)>> {
         unimplemented!()
     }
@@ -921,9 +988,11 @@ impl Drop for OptiDBImpl {
 #[cfg(test)]
 mod tests {
     use std::env::temp_dir;
-    use std::fs;
+    use std::{fs, io, thread};
+    use std::io::Write;
     use std::path::PathBuf;
     use std::sync::Arc;
+    use std::time::Duration;
 
     use arrow2::datatypes::DataType;
     use arrow2::datatypes::Field;
@@ -936,7 +1005,7 @@ mod tests {
     use tracing_subscriber::util::SubscriberInitExt;
     use tracing_test::traced_test;
 
-    use crate::db::compact;
+    use crate::db::{compact, print_levels};
     use crate::db::determine_compaction;
     use crate::db::Insert;
     use crate::db::Level;
@@ -953,9 +1022,10 @@ mod tests {
     #[traced_test]
     #[test]
     fn it_works() {
-        let path = temp_dir().join("db");
+        // let path = temp_dir().join("db");
+        let path = PathBuf::from("/Users/maximbogdanov/user_files");
         fs::remove_dir_all(&path).unwrap();
-        fs::create_dir_all(&path).unwrap();
+        // fs::create_dir_all(&path).unwrap();
 
         let opts = Options {
             l1_max_size_bytes: 1024,
@@ -972,15 +1042,21 @@ mod tests {
         db.add_field(Field::new("a", DataType::Int64, false));
         db.add_field(Field::new("b", DataType::Int64, false));
         db.add_field(Field::new("c", DataType::Int64, false));
-        for i in 0..10 {
+        for i in 0..1000 {
+            thread::sleep(Duration::from_millis(1));
             db.insert(
                 vec![
                     KeyValue::Int64(i),
-                    KeyValue::Int64((i + 1)),
+                    KeyValue::Int64(i),
                 ],
                 vec![Value::Int64(Some(i))],
             )
                 .unwrap();
         }
+
+        // db.flush().unwrap();
+        thread::sleep(Duration::from_millis(20));
+        print_levels(db.metadata.lock().unwrap().levels.as_ref());
+        // db.compact();
     }
 }

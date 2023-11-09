@@ -188,6 +188,7 @@ pub struct FileMergeOptions {
     row_group_values_limit: usize,
     array_page_size: usize,
 }
+
 #[derive(Debug, Clone)]
 pub struct MergedFile {
     pub size_bytes: u64,
@@ -291,8 +292,8 @@ impl<R> ParquetMerger<R>
             version: Version::V2,
         };
         let mut merged_files: Vec<MergedFile> = Vec::new();
-        for part_id in self.id_from.. {
-            let w = File::create(&self.to_path.join(format!("{}.parquet", part_id)))?;
+        'l1: for part_id in self.id_from.. {
+            let mut w = File::create(&self.to_path.join(format!("{}.parquet", part_id)))?;
             let mut seq_writer = FileSeqWriter::new(w, self.parquet_schema.clone(), write_opts, None);
 
             let mut min: Vec<Value> = Vec::new();
@@ -302,7 +303,7 @@ impl<R> ParquetMerger<R>
             let mut end = true;
             let mut some = false;
             // Request merge of index column
-            while let Some(chunks) = self.next_index_chunk()? {
+            'l2: while let Some(chunks) = self.next_index_chunk()? {
                 some = true;
                 // get descriptors of index/partition columns
 
@@ -379,15 +380,23 @@ impl<R> ParquetMerger<R>
                 if let Some(max_part_file_size) = self.max_part_file_size_bytes {
                     let f = File::open(&self.to_path.join(format!("{}.parquet", part_id)))?;
                     if f.metadata().unwrap().size() > max_part_file_size as u64 {
-                        end = false;
-                        break;
+                        // Add arrow schema to parquet metadata
+                        let key_value_metadata = add_arrow_schema(&self.arrow_schema, None);
+                        seq_writer.end(key_value_metadata)?;
+
+                        let mf = MergedFile {
+                            size_bytes: File::open(&self.to_path.join(format!("{}.parquet", part_id)))?.metadata().unwrap().size(),
+                            id: part_id,
+                            min,
+                            max,
+                        };
+                        merged_files.push(mf);
+                        continue 'l1;
                     }
                 }
-                some = false;
             }
 
             if some {
-                // Add arrow schema to parquet metadata
                 let key_value_metadata = add_arrow_schema(&self.arrow_schema, None);
                 seq_writer.end(key_value_metadata)?;
 
@@ -398,12 +407,8 @@ impl<R> ParquetMerger<R>
                     max,
                 };
                 merged_files.push(mf);
-            } else {
-                fs::remove_file(self.to_path.join(format!("{}.parquet", part_id)))?;
             }
-            if end {
-                break;
-            }
+            break;
         }
         Ok(merged_files)
     }
