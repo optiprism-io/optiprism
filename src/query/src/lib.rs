@@ -64,6 +64,7 @@ pub mod logical_plan;
 pub mod physical_plan;
 pub mod provider_impl;
 pub mod queries;
+pub mod datasources;
 
 pub mod event_fields {
     pub const EVENT: &str = "event_event";

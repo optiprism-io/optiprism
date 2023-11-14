@@ -1,13 +1,16 @@
+mod compaction;
+
 use std::{cmp, io, time};
 use shuffle::shuffler::Shuffler;
 use shuffle::irs::Irs;
 use rand::rngs::mock::StepRng;
 use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashMap};
+use std::collections::{BinaryHeap, HashMap, VecDeque};
 use std::ffi::OsStr;
 use std::fs;
 use std::fs::File;
 use std::fs::OpenOptions;
+use std::hash::{Hash, Hasher};
 use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::Read;
@@ -15,12 +18,14 @@ use std::io::Write;
 use std::mem;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc;
+use std::pin::Pin;
+use std::sync::{mpsc, MutexGuard, RwLock};
 use std::sync::mpsc::{Receiver, TryRecvError};
 use std::sync::mpsc::RecvError;
 use std::sync::mpsc::Sender;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::task::{Context, Poll};
 use std::thread;
 use std::time::Instant;
 use rand::Rng;
@@ -37,17 +42,23 @@ use arrow2::datatypes::Field;
 use arrow2::datatypes::Schema;
 use arrow2::datatypes::SchemaRef;
 use arrow2::io::parquet;
+use arrow2::io::parquet::read;
+use arrow2::io::parquet::read::FileReader;
 use arrow2::io::parquet::write::transverse;
+use arrow::compute::concat;
+use arrow_array::{Int32Array, Int64Array};
 use arrow_buffer::ToByteSlice;
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::Duration;
 use crossbeam_skiplist::SkipSet;
-use futures::select;
+use futures::{select, Stream};
+use parquet2::metadata::FileMetaData;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
+use siphasher::sip::SipHasher13;
 use tracing::{debug, trace};
 use tracing::error;
 use tracing::instrument;
@@ -58,6 +69,7 @@ use crate::error::StoreError;
 use crate::options::ReadOptions;
 use crate::options::WriteOptions;
 use crate::ColValue;
+use crate::db::compaction::{Compactor, CompactorMessage};
 use crate::KeyValue;
 use crate::parquet::merger;
 use crate::parquet::merger::{FileMergeOptions, merge, ParquetMerger};
@@ -75,7 +87,7 @@ macro_rules! memory_col_to_arrow {
                 _ => unreachable!(),
             })
             .collect::<Vec<_>>();
-        $arr_ty::from(vals).as_arc()
+        $arr_ty::from(vals).as_box()
     }};
 }
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq, PartialOrd, Ord)]
@@ -84,6 +96,12 @@ pub struct Part {
     size_bytes: u64,
     min: Vec<KeyValue>,
     max: Vec<KeyValue>,
+}
+
+impl Part {
+    fn path(path: &PathBuf, partition_id: usize, level: usize, id: usize) -> PathBuf {
+        PathBuf::from(path.join(format!("parts/{}/{}/{}.parquet", partition_id, level, id)))
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq, PartialOrd, Ord)]
@@ -112,12 +130,18 @@ impl Level {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+struct Partition {
+    id: usize,
+    levels: Vec<Level>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Metadata {
     version: u64,
     seq_id: u64,
     log_id: u64,
     schema: Schema,
-    levels: Vec<Level>,
+    partitions: Vec<Partition>,
     // levels->parts
     stats: Stats,
 }
@@ -210,6 +234,12 @@ fn hash_crc32(v: &[u8]) -> u32 {
     hasher.finalize() ^ 0xFF
 }
 
+fn siphash<T: Hash>(t: &T) -> u64 {
+    let mut h = SipHasher13::new();
+    t.hash(&mut h);
+    h.finish()
+}
+
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct Stats {
     pub resident_bytes: u64,
@@ -227,11 +257,14 @@ pub struct OptiDB {
 }
 
 #[derive(Clone, Debug)]
-struct Options {
+pub struct Options {
+    partitions: usize,
+    partition_keys: Vec<usize>,
     l0_max_parts: usize,
     l1_max_size_bytes: usize,
     level_size_multiplier: usize,
     max_log_length_bytes: usize,
+    read_chunk_size: usize,
     merge_max_part_size_bytes: usize,
     merge_index_cols: usize,
     merge_data_page_size_limit_bytes: Option<usize>,
@@ -239,139 +272,70 @@ struct Options {
     merge_array_page_size: usize,
 }
 
-enum CompactorMessage {
-    Compact,
-    Stop(mpsc::Sender<()>),
-}
 
-struct Compactor {
-    opts: Options,
-    metadata: Arc<Mutex<Metadata>>,
-    log: Arc<Mutex<BufWriter<File>>>,
-    path: PathBuf,
-    inbox: Receiver<CompactorMessage>,
-    vfs: Arc<Vfs>,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-struct ToCompact {
-    level: usize,
-    part: usize,
-}
-
-impl ToCompact {
-    fn new(level: usize, part: usize) -> Self {
-        ToCompact { level, part }
-    }
-}
-
-fn determine_compaction(
-    level_id: usize,
-    level: &Level,
-    next_level: &Level,
-    opts: &Options,
-) -> Result<Option<Vec<ToCompact>>> {
-    // !@#println!("lid {} {}", level_id, level.parts.len());
-    let mut to_compact = vec![];
-
-    let level_parts = &level.parts;
-    if level_id == 0 && level_parts.len() > opts.l0_max_parts {
-        for part in level_parts {
-            to_compact.push(ToCompact::new(0, part.id));
-        }
-    } else if level_id > 0 && level_parts.len() > 0 {
-        let mut size = 0;
-        for part in level_parts {
-            size += part.size_bytes;
-            let level_threshold =
-                opts.l1_max_size_bytes * opts.level_size_multiplier.pow(level_id as u32 - 1);
-            println!("threshold {} size {}", level_threshold, size);
-            if size > level_threshold as u64 {
-                to_compact.push(ToCompact::new(level_id, part.id));
+fn print_partitions(partitions: &[Partition]) {
+    for (pid, p) in partitions.iter().enumerate() {
+        println!("+-- {}", pid);
+        for (lid, l) in p.levels.iter().enumerate() {
+            println!("|  +-- {}", lid);
+            for part in &l.parts {
+                println!(
+                    "|     +-- id {} min {:?},max {:?}, size {}",
+                    part.id, part.min, part.max, part.size_bytes
+                );
             }
         }
-    } else {
-        return Ok(None);
-    }
-    if to_compact.is_empty() {
-        return Ok(None);
-    }
-    let min = to_compact
-        .iter()
-        .map(|tc| level.get_part(tc.part).min)
-        .min()
-        .unwrap();
-    let max = to_compact
-        .iter()
-        .map(|tc| level.get_part(tc.part).max)
-        .max()
-        .unwrap();
-    for part in &next_level.parts {
-        if cmp::max(part.min.clone(), min.clone()) < cmp::min(part.max.clone(), max.clone()) {
-            to_compact.push(ToCompact::new(level_id + 1, part.id));
-        }
-    }
-
-    Ok(Some(to_compact))
-}
-
-fn print_levels(levels: &[Level]) {
-    for (idx, l) in levels.iter().enumerate() {
-        println!("+-- {}", idx);
-        for part in &l.parts {
-            println!(
-                "|   +-- id {} min {:?},max {:?}, size {}",
-                part.id, part.min, part.max, part.size_bytes
-            );
-        }
     }
 }
 
-struct Vfs {
-    files: Mutex<HashMap<PathBuf, usize>>,
+fn part_path(path: &PathBuf, partition_id: usize, level_id: usize, part_id: usize) -> PathBuf {
+    path.join(format!("parts/{}/{}/{}.parquet", partition_id, level_id, part_id))
+}
+
+pub struct Vfs {
+    // not RWLock because of possible deadlocks
+    lock: Mutex<usize>,
 }
 
 impl Vfs {
     pub fn new() -> Self {
         Self {
-            files: Default::default()
+            lock: Default::default(),
         }
     }
 
-    pub fn open(&self, path: &PathBuf) -> Result<()> {
-        let mut files = self.files.lock().unwrap();
-        let cnt = files.entry(path.clone()).or_insert_with(|| 0);
-        *cnt = *cnt + 1;
+    pub fn add_readers(&self, v: usize) -> Result<()> {
+        let mut lock = self.lock.lock().unwrap();
+        *lock = *lock + v;
 
         Ok(())
     }
-    pub fn close(&self, path: &PathBuf) -> Result<()> {
-        let mut files = self.files.lock().unwrap();
-        let cnt = files.entry(path.clone()).or_insert_with(|| 0);
-        *cnt = *cnt - 1;
+
+    pub fn remove_readers(&self, v: usize) -> Result<()> {
+        let mut lock = self.lock.lock().unwrap();
+        *lock = *lock - v;
         Ok(())
     }
-    fn write(&self, path: &PathBuf) -> Result<()> {
+
+    pub fn remove_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         loop {
-            let files = self.files.lock().unwrap();
-            if files.get(path).is_none() || *files.get(path).unwrap() == 0 {
+            let a = *self.lock.lock().unwrap();
+            if a == 0 {
+                fs::remove_file(path)?;
                 break;
             }
         }
-
         Ok(())
     }
 
-    pub fn remove_file(&self, path: &PathBuf) -> Result<()> {
-        self.write(path)?;
-        fs::remove_file(path)?;
-        Ok(())
-    }
-
-    pub fn rename(&self, from: &PathBuf, to: &PathBuf) -> Result<()> {
-        println!("rename");
-        self.write(from)?;
-        fs::rename(from, to)?;
+    pub fn rename<P: AsRef<Path>>(&self, from: P, to: P) -> Result<()> {
+        loop {
+            let a = *self.lock.lock().unwrap();
+            if a == 0 {
+                fs::rename(from, to)?;
+                break;
+            }
+        }
         Ok(())
     }
 }
@@ -381,234 +345,14 @@ enum FsOp {
     Delete(PathBuf),
 }
 
-struct CompactResult {
-    l0_remove: Vec<usize>,
-    levels: Vec<Level>,
-    fs_ops: Vec<FsOp>,
-}
 
-fn compact(levels: &[Level], path: &PathBuf, opts: &Options) -> Result<Option<CompactResult>> {
-    let mut fs_ops = vec![];
-    let mut l0_rem: Vec<(usize)> = Vec::new();
-    let mut tmp_levels = levels.to_owned().clone();
-    let mut compacted = false;
-    for l in 0..tmp_levels.len() - 2 {
-        let mut v = None;
-        v = determine_compaction(l, &tmp_levels[l], &tmp_levels[l + 1], opts)?;
-        match v {
-            None => {
-                if compacted {
-                    break;
-                } else {
-                    return Ok(None);
-                }
-            }
-            Some(to_compact) => {
-                compacted = true;
-                // !@#println!("to compact {:?}", to_compact);
-                if to_compact.len() == 1 {
-                    // !@#println!("rename");
-
-                    let idx = tmp_levels[l].parts.iter().position(|p| p.id == to_compact[0].part).unwrap();
-
-                    let mut part = tmp_levels[l].parts[idx].clone();
-                    tmp_levels[l].parts.remove(idx);
-                    part.id = tmp_levels[l + 1].part_id + 1;
-
-                    let from = path.join(format!("parts/{}/{}.parquet", l, to_compact[0].part));
-                    let to = path.join(format!("parts/{}/{}.parquet", l + 1, part.id));
-                    fs_ops.push(FsOp::Rename(from, to));
-
-                    tmp_levels[l + 1].parts.push(part.clone());
-                    tmp_levels[l + 1].part_id += 1;
-                    // !@#println!("done");
-                    continue;
-                }
-                // !@#println!("llee {}", to_compact.len());
-                let mut to_merge: Vec<Part> = vec![];
-                for tc in &to_compact {
-                    if tc.level == 0 {
-                        l0_rem.push(tc.part);
-                    }
-                    let part = tmp_levels[tc.level]
-                        .clone()
-                        .parts
-                        .into_iter()
-                        .find(|p| p.id == tc.part)
-                        .unwrap();
-                    to_merge.push(part);
-                    tmp_levels[tc.level].parts = tmp_levels[tc.level]
-                        .clone()
-                        .parts
-                        .into_iter()
-                        .filter(|p| p.id != tc.part)
-                        .collect::<Vec<_>>();
-                }
-
-                let in_paths = to_merge.iter().map(|p| path.join(format!("parts/{}/{}.parquet", l, p.id))).collect::<Vec<_>>();
-                // !@#println!("{:?}", in_paths);
-                let out_part_id = tmp_levels[l + 1].part_id + 1;
-                let out_path = path.join(format!("parts/{}", l + 1));
-                let rdrs = in_paths.iter().map(|p| File::open(p)).collect::<std::result::Result<Vec<File>, std::io::Error>>()?;
-                let merger_opts = merger::Options {
-                    index_cols: opts.merge_index_cols,
-                    data_page_size_limit_bytes: opts.merge_data_page_size_limit_bytes,
-                    row_group_values_limit: opts.merge_row_group_values_limit,
-                    array_page_size: opts.merge_array_page_size,
-                    out_part_id,
-                    max_part_size_bytes: Some(opts.merge_max_part_size_bytes),
-                };
-                let merge_result = merge(rdrs, out_path, out_part_id, merger_opts)?;
-                // !@#println!("merge result {:#?}", merge_result);
-                for f in merge_result {
-                    let final_part = {
-                        Part {
-                            id: tmp_levels[l + 1].part_id + 1,
-                            size_bytes: f.size_bytes,
-                            min: f.min.iter().map(|v| v.try_into()).collect::<Result<Vec<_>>>()?,
-                            max: f.max.iter().map(|v| v.try_into()).collect::<Result<Vec<_>>>()?,
-                        }
-                    };
-                    tmp_levels[l + 1].parts.push(final_part);
-                    tmp_levels[l + 1].part_id += 1;
-                }
-
-                fs_ops.append(in_paths.iter().map(|p| FsOp::Delete(p.clone())).collect::<Vec<_>>().as_mut());
-                // !@#println!("after compaction");
-            }
-        }
-    }
-
-    // !@#println!("return lvl");
-    Ok(Some(CompactResult {
-        l0_remove: l0_rem,
-        levels: tmp_levels,
-        fs_ops,
-    }))
-}
-
-impl Compactor {
-    fn new(
-        opts: Options,
-        metadata: Arc<Mutex<Metadata>>,
-        log: Arc<Mutex<BufWriter<File>>>,
-        path: PathBuf,
-        inbox: Receiver<CompactorMessage>,
-        vfs: Arc<Vfs>,
-    ) -> Self {
-        Compactor {
-            opts,
-            metadata,
-            log,
-            path,
-            inbox,
-            vfs,
-        }
-    }
-    fn run(mut self) {
-        loop {
-            match self.inbox.try_recv() {
-                Ok(v) => {
-                    match v {
-                        CompactorMessage::Stop(dropper) => {
-                            drop(dropper);
-                            break;
-                        }
-                        _ => unreachable!()
-                    }
-                    // !@#println!("Terminating.");
-                    break;
-                }
-                Err(TryRecvError::Disconnected) => {
-                    break;
-                }
-                Err(TryRecvError::Empty) => {}
-            }
-            thread::sleep(time::Duration::from_micros(20));
-            // match self.inbox.recv() {
-            // Ok(msg) => match msg {
-            //     CompactorMessage::Compact => {
-            // !@#debug!("compaction started");
-            let levels = {
-                let md = self.metadata.lock().unwrap();
-                md.levels.clone()
-            };
-            // !@#println!("md lvlb {}", levels[0].part_id);
-            // print_levels(&levels);
-            let start = Instant::now();
-            match compact(&levels, &self.path, &self.opts) {
-                Ok(res) => match res {
-                    None => continue,
-                    Some(res) => {
-                        let mut md = self.metadata.lock().unwrap();
-                        // !@#println!("md lvl");
-                        // print_levels(&md.levels);
-                        // print_levels(&md.levels);
-                        for rem in &res.l0_remove {
-                            md.levels[0].parts = md.levels[0]
-                                .parts
-                                .clone()
-                                .into_iter()
-                                .filter(|p| p.id != *rem)
-                                .collect::<Vec<_>>();
-                        }
-                        // !@#println!("res rem: {:?}", res.l0_remove);
-                        // !@#println!("res levels");
-                        // print_levels(&res.levels);
-                        for (idx, l) in res.levels.iter().enumerate().skip(1) {
-                            md.levels[idx] = l.clone();
-                        }
-                        let mut log = self.log.lock().unwrap();
-                        log_metadata(Some(log.get_mut()), &mut md).unwrap();
-                        // drop because next fs operation is with locking
-                        drop(md);
-                        // !@#println!("md lvl after");
-                        // print_levels(&md.levels);
-                        for op in res.fs_ops {
-                            match op {
-                                FsOp::Rename(from, to) => {
-                                    // !@#trace!("renaming");
-                                    // todo handle error
-                                    self.vfs.rename(&from, &to).unwrap();
-                                }
-                                FsOp::Delete(path) => {
-                                    // !@#trace!("deleting {:?}",path);
-                                    self.vfs.remove_file(&path).unwrap();
-                                }
-                            }
-                        }
-                        // !@#println!("After");
-                        // let mut md = self.metadata.lock().unwrap();
-                        // // !@#println!("post md");
-                        // print_levels(&md.levels);
-                    }
-                }
-                Err(err) => {
-                    error!("compaction error: {:?}", err);
-
-                    continue;
-                }
-            }
-            let duration = start.elapsed();
-            // !@#debug!("compaction finished in {:?}", duration);
-        }
-        //     CompactorMessage::Stop(dropper) => {
-        //         drop(dropper);
-        //         break;
-        //     }
-        // },
-        // Err(err) => {
-        //     // !@#trace!("unexpected compactor error: {:?}", err);
-        //     break;
-        // }
-        // }
-    }
-}
-
+#[derive(Clone)]
 struct OptiDBImpl {
     opts: Options,
-    memtable: SkipSet<MemOp>,
+    // mutex is needed to lock write during reads
+    memtable: Arc<Mutex<SkipSet<MemOp>>>,
     metadata: Arc<Mutex<Metadata>>,
+    vfs: Arc<Vfs>,
     log: Arc<Mutex<BufWriter<File>>>,
     compactor_outbox: Sender<CompactorMessage>,
     path: PathBuf,
@@ -675,8 +419,10 @@ fn log_metadata(log: Option<&mut File>, metadata: &mut Metadata) -> Result<()> {
 // #[instrument(level = "trace")]
 fn recover(path: PathBuf, opts: Options) -> Result<OptiDBImpl> {
     // !@#trace!("db dir: {:?}", path);
-    for i in 0..7 {
-        fs::create_dir_all(path.join("parts").join(i.to_string()))?;
+    for l in 0..opts.partitions {
+        for i in 0..7 {
+            fs::create_dir_all(path.join("parts").join(l.to_string()).join(i.to_string()))?;
+        }
     }
     // !@#trace!("starting recovery");
     let dir = fs::read_dir(path.clone())?;
@@ -702,7 +448,7 @@ fn recover(path: PathBuf, opts: Options) -> Result<OptiDBImpl> {
         log_id: 0,
         schema: Schema::from(vec![]),
         stats: Default::default(),
-        levels: vec![Level::new_empty(); 7],
+        partitions: vec![Partition { levels: vec![Level::new_empty(); 7] }; opts.partitions],
     };
 
     let mut memtable = SkipSet::new();
@@ -756,156 +502,225 @@ fn recover(path: PathBuf, opts: Options) -> Result<OptiDBImpl> {
     };
 
     metadata.stats.logged_bytes = log.metadata().unwrap().len();
-    let trigger_compact = if metadata.levels[0].parts.len() > 0
-        && metadata.levels[0].parts.len() > opts.l0_max_parts
+    /*let trigger_compact = if metadata.partitions[0].parts.len() > 0
+        && metadata.partitions[0].parts.len() > opts.l0_max_parts
     {
         true
     } else {
         false
-    };
+    };*/
     let (compactor_outbox, rx) = std::sync::mpsc::channel();
     let metadata = Arc::new(Mutex::new(metadata));
     let log = Arc::new(Mutex::new(BufWriter::new(log)));
     let vfs = Arc::new(Vfs::new());
     let compactor = Compactor::new(opts.clone(), metadata.clone(), log.clone(), path.clone(), rx, vfs.clone());
     thread::spawn(move || compactor.run());
-    if trigger_compact {
-        // compactor_outbox.send(CompactorMessage::Compact).unwrap();
-    }
+    // if trigger_compact {
+    //     // compactor_outbox.send(CompactorMessage::Compact).unwrap();
+    // }
     Ok(OptiDBImpl {
         opts,
-        memtable,
+        memtable: Arc::new(Mutex::new(memtable)),
         metadata,
+        vfs,
         log,
         compactor_outbox,
         path,
     })
 }
 
-fn write_level0(
-    memtable: &SkipSet<MemOp>,
-    part_id: usize,
-    schema: &Schema,
-    path: PathBuf,
-) -> Result<Part> {
-    let mut cols: Vec<Vec<Value>> = vec![Vec::new(); schema.fields.len()];
-    // !@#trace!("{} entries to write", memtable.len());
-    let mut min: Option<Vec<KeyValue>> = None;
-    let mut max: Option<Vec<KeyValue>> = None;
-    for (idx, op) in memtable.iter().enumerate() {
+#[derive(Debug)]
+struct MemtablePartitionChunk {
+    partition_id: usize,
+    chunk: Chunk<Box<dyn Array>>,
+    min: Vec<KeyValue>,
+    max: Vec<KeyValue>,
+}
+
+#[derive(Debug)]
+struct MemtablePartition {
+    id: usize,
+    min: Option<Vec<KeyValue>>,
+    max: Option<Vec<KeyValue>>,
+    cols: Vec<Vec<Value>>,
+}
+
+impl MemtablePartition {
+    pub fn new(id: usize, fields: usize) -> Self {
+        Self {
+            id,
+            min: None,
+            max: None,
+            cols: vec![Vec::new(); fields],
+        }
+    }
+}
+
+fn memtable_to_partitioned_chunks(memtable: &SkipSet<MemOp>,
+                                  schema: &Schema, partitions_count: usize, partition_keys: Vec<usize>) -> Result<Vec<MemtablePartitionChunk>> {
+    let mut partitions: Vec<MemtablePartition> = vec![];
+    // let mut partitions = vec![MemtablePartition::new(schema.fields.len()); partition_count];
+// !@#trace!("{} entries to write", memtable.len());
+    for op in memtable.iter() {
         let (keys, vals) = match &op.op {
             Op::Insert(k, v) => (k, Some(v)),
             Op::Delete(k) => (k, None),
         };
-        if idx == 0 {
-            min = Some(keys.clone());
+        let pid_keys = partition_keys.iter().map(|pk| keys[*pk].clone()).collect::<Vec<_>>();
+        let phash = siphash(&pid_keys);
+        let mut pid: isize = -1;
+        for (pidx, p) in partitions.iter().enumerate() {
+            if p.id == phash as usize % partitions_count {
+                pid = pidx as isize;
+                break;
+            }
+            continue;
         }
-        if idx == memtable.len() - 1 {
-            max = Some(keys.clone());
+        if pid < 0 {
+            partitions.push(MemtablePartition::new(phash as usize % partitions_count, schema.fields.len()));
+            pid = 0;
         }
+        let pid = pid as usize;
+        if partitions[pid].min.is_none() {
+            partitions[pid].min = Some(keys.clone());
+        }
+        partitions[pid].max = Some(keys.clone());
         let idx_offset = keys.len();
         for (idx, key) in keys.into_iter().enumerate() {
-            cols[idx].push(key.into());
+            partitions[pid].cols[idx].push(key.into());
         }
         if let Some(v) = vals {
             for (idx, val) in v.into_iter().enumerate() {
-                cols[idx_offset + idx].push(val.clone());
+                partitions[pid].cols[idx_offset + idx].push(val.clone());
             }
         }
     }
+    let v = partitions.into_iter().map(|p| {
+        // println!("{:?}", p);
+        let arrs = p.cols
+            .into_iter()
+            .enumerate()
+            .map(|(idx, col)| match schema.fields[idx].data_type {
+                DataType::Boolean => memory_col_to_arrow!(col, Boolean, MutableBooleanArray),
+                DataType::Int8 => memory_col_to_arrow!(col, Int8, MutablePrimitiveArray),
+                DataType::Int16 => memory_col_to_arrow!(col, Int16, MutablePrimitiveArray),
+                DataType::Int32 => memory_col_to_arrow!(col, Int32, MutablePrimitiveArray),
+                DataType::Int64 => memory_col_to_arrow!(col, Int64, MutablePrimitiveArray),
+                DataType::UInt8 => memory_col_to_arrow!(col, UInt8, MutablePrimitiveArray),
+                DataType::UInt16 => memory_col_to_arrow!(col, UInt16, MutablePrimitiveArray),
+                DataType::UInt32 => memory_col_to_arrow!(col, UInt32, MutablePrimitiveArray),
+                DataType::UInt64 => memory_col_to_arrow!(col, UInt64, MutablePrimitiveArray),
+// DataType::Float32 => memory_col_to_arrow!(col, Float32, MutablePrimitiveArray),
+// DataType::Float64 => memory_col_to_arrow!(col, Float64, MutablePrimitiveArray),
+                DataType::Timestamp(_, _) => {
+                    memory_col_to_arrow!(col, Int64, MutablePrimitiveArray)
+                }
+                DataType::Binary => {
+                    let vals = col
+                        .into_iter()
+                        .map(|v| match v {
+                            Value::Binary(b) => b,
+                            _ => unreachable!(),
+                        })
+                        .collect::<Vec<_>>();
+                    MutableBinaryArray::<i32>::from(vals).as_box()
+                }
+                DataType::Utf8 => {
+                    let vals = col
+                        .into_iter()
+                        .map(|v| match v {
+                            Value::String(b) => b,
+                            _ => unreachable!("{:?}", v),
+                        })
+                        .collect::<Vec<_>>();
+                    MutableUtf8Array::<i32>::from(vals).as_box()
+                }
+                DataType::Decimal(_, _) => {
+                    memory_col_to_arrow!(col, Decimal, MutablePrimitiveArray)
+                }
+                DataType::List(_) => unimplemented!(),
+                _ => unimplemented!(),
+            })
+            .collect::<Vec<_>>();
+        (p.id, Chunk::new(arrs), p.min.clone().unwrap(), p.max.clone().unwrap())
+    }).collect::<Vec<_>>();
 
-    let arrs = cols
-        .into_iter()
-        .enumerate()
-        .map(|(idx, col)| match schema.fields[idx].data_type {
-            DataType::Boolean => memory_col_to_arrow!(col, Boolean, MutableBooleanArray),
-            DataType::Int8 => memory_col_to_arrow!(col, Int8, MutablePrimitiveArray),
-            DataType::Int16 => memory_col_to_arrow!(col, Int16, MutablePrimitiveArray),
-            DataType::Int32 => memory_col_to_arrow!(col, Int32, MutablePrimitiveArray),
-            DataType::Int64 => memory_col_to_arrow!(col, Int64, MutablePrimitiveArray),
-            DataType::UInt8 => memory_col_to_arrow!(col, UInt8, MutablePrimitiveArray),
-            DataType::UInt16 => memory_col_to_arrow!(col, UInt16, MutablePrimitiveArray),
-            DataType::UInt32 => memory_col_to_arrow!(col, UInt32, MutablePrimitiveArray),
-            DataType::UInt64 => memory_col_to_arrow!(col, UInt64, MutablePrimitiveArray),
-            // DataType::Float32 => memory_col_to_arrow!(col, Float32, MutablePrimitiveArray),
-            // DataType::Float64 => memory_col_to_arrow!(col, Float64, MutablePrimitiveArray),
-            DataType::Timestamp(_, _) => {
-                memory_col_to_arrow!(col, Int64, MutablePrimitiveArray)
-            }
-            DataType::Binary => {
-                let vals = col
-                    .into_iter()
-                    .map(|v| match v {
-                        Value::Binary(b) => b,
-                        _ => unreachable!(),
-                    })
-                    .collect::<Vec<_>>();
-                MutableBinaryArray::<i32>::from(vals).as_arc()
-            }
-            DataType::Utf8 => {
-                let vals = col
-                    .into_iter()
-                    .map(|v| match v {
-                        Value::String(b) => b,
-                        _ => unreachable!("{:?}", v),
-                    })
-                    .collect::<Vec<_>>();
-                MutableUtf8Array::<i32>::from(vals).as_arc()
-            }
-            DataType::Decimal(_, _) => {
-                memory_col_to_arrow!(col, Decimal, MutablePrimitiveArray)
-            }
-            DataType::List(_) => unimplemented!(),
-            _ => unimplemented!(),
-        })
-        .collect::<Vec<_>>();
 
-    let popts = parquet::write::WriteOptions {
-        write_statistics: true,
-        compression: parquet::write::CompressionOptions::Snappy,
-        version: parquet::write::Version::V1,
-        data_pagesize_limit: None,
-    };
+    let chunks = v.into_iter().map(|(pid, chunk, min, max)| {
+        MemtablePartitionChunk {
+            partition_id: pid,
+            chunk,
+            min,
+            max,
+        }
+    }).collect::<Vec<_>>();
 
-    let chunk = Chunk::try_new(arrs)?;
+    Ok(chunks)
+}
 
-    let encodings = schema
-        .fields
-        .iter()
-        .map(|f| transverse(&f.data_type, |_| parquet::write::Encoding::Plain))
-        .collect();
 
-    let row_groups = parquet::write::RowGroupIterator::try_new(
-        vec![Ok(chunk)].into_iter(),
-        schema,
-        popts,
-        encodings,
-    )?;
+fn write_level0(
+    memtable: &SkipSet<MemOp>,
+    partitions: &[Partition],
+    partition_keys: Vec<usize>,
+    schema: &Schema,
+    path: PathBuf,
+) -> Result<Vec<(usize, Part)>> {
+    let mut ret = vec![];
+    let parts = memtable_to_partitioned_chunks(memtable, schema, partitions.len(), partition_keys)?;
+    for part in parts.into_iter() {
+        let popts = parquet::write::WriteOptions {
+            write_statistics: true,
+            compression: parquet::write::CompressionOptions::Snappy,
+            version: parquet::write::Version::V1,
+            //todo define page size
+            data_pagesize_limit: None,
+        };
 
-    let p = path.join("parts").join("0").join(format!("{}.parquet", part_id));
-    // !@#trace!("creating part file {:?}", p);
-    let w = OpenOptions::new().create_new(true).write(true).open(p)?;
-    let mut writer = parquet::write::FileWriter::try_new(w, schema.clone(), popts)?;
-    // Write the part
-    for group in row_groups {
-        writer.write(group?)?;
+        let encodings = schema
+            .fields
+            .iter()
+            .map(|f| transverse(&f.data_type, |_| parquet::write::Encoding::Plain))
+            .collect();
+        let row_groups = parquet::write::RowGroupIterator::try_new(
+            vec![Ok(part.chunk)].into_iter(),
+            schema,
+            popts,
+            encodings,
+        )?;
+
+        let path = part_path(&path, part.partition_id, 0, partitions[part.partition_id].levels[0].part_id);
+        // !@#trace!("creating part file {:?}", p);
+        println!("{:?}", path);
+        let w = OpenOptions::new().create_new(true).write(true).open(path)?;
+        let mut writer = parquet::write::FileWriter::try_new(w, schema.clone(), popts)?;
+        // Write the part
+        for group in row_groups {
+            writer.write(group?)?;
+        }
+        let sz = writer.end(None)?;
+        ret.push((part.partition_id, Part {
+            id: partitions[part.partition_id].levels[0].part_id,
+            size_bytes: sz,
+            min: part.min,
+            max: part.max,
+        }))
     }
-    let sz = writer.end(None)?;
     // !@#trace!("{:?} bytes written", sz);
-    Ok(Part {
-        id: part_id,
-        size_bytes: sz,
-        min: min.unwrap(),
-        max: max.unwrap(),
-    })
+    Ok(ret)
 }
 
 fn flush(
     log: Option<&mut File>,
     memtable: &mut SkipSet<MemOp>,
     md: &mut Metadata,
+    partition_keys: Vec<usize>,
     path: &PathBuf,
 ) -> Result<()> {
+    // in case when it is flushed by another thread
+    if memtable.len() == 0 {
+        return Ok(());
+    }
     // !@#trace!("flushing log file");
     let f = log.unwrap();
     f.flush()?;
@@ -917,11 +732,14 @@ fn flush(
     // write to parquet
     // !@#trace!("writing to parquet");
     // !@#trace!("part id: {}", md.levels[0].part_id);
-    let part = write_level0(&memtable, md.levels[0].part_id, &md.schema, path.clone())?;
-    md.levels[0].parts.push(part.clone());
-    // increment table id
-    md.levels[0].part_id += 1;
-    md.stats.written_bytes += part.size_bytes;
+    let parts = write_level0(&memtable, &md.partitions, partition_keys, &md.schema, path.clone())?;
+    for (pid, part) in parts {
+        md.partitions[pid].levels[0].parts.push(part.clone());
+        // increment table id
+        md.partitions[pid].levels[0].part_id += 1;
+        md.stats.written_bytes += part.size_bytes;
+    }
+
     md.stats.logged_bytes = 0;
     // increment log id
     md.log_id += 1;
@@ -950,6 +768,275 @@ fn flush(
     Ok(())
 }
 
+pub struct IterateOptions {
+    fields: Vec<Field>,
+}
+
+struct DiskPart {
+    id: usize,
+    level: usize,
+    min: Vec<KeyValue>,
+    max: Vec<KeyValue>,
+}
+
+impl PartialOrd for DiskPart {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for DiskPart {
+    fn eq(&self, other: &Self) -> bool {
+        self.min == other.min
+    }
+}
+
+impl Ord for DiskPart {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.min.partial_cmp(&other.min).unwrap()
+    }
+}
+
+impl Eq for DiskPart {}
+
+struct MemPart {
+    chunk: Chunk<Box<dyn Array>>,
+    min: Vec<KeyValue>,
+    max: Vec<KeyValue>,
+}
+
+impl PartialOrd for MemPart {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for MemPart {
+    fn eq(&self, other: &Self) -> bool {
+        self.min == other.min
+    }
+}
+
+impl Ord for MemPart {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.min.partial_cmp(&other.min).unwrap()
+    }
+}
+
+impl Eq for MemPart {}
+
+#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
+enum StreamPart {
+    Mem(MemPart),
+    Disk(DiskPart), // level, part
+}
+
+pub struct PartitionStream {
+    vfs: Arc<Vfs>,
+    levels: Vec<Level>,
+    cur_level: usize,
+    cur_part: usize,
+    memtable_chunk: Option<Chunk<Box<dyn Array>>>,
+    file_md: FileMetaData,
+    path: PathBuf,
+    fields: Vec<Field>,
+    rdr: FileReader<File>,
+    chunk_size: usize,
+    sorted: BinaryHeap<StreamPart>,
+}
+
+struct RetStream {
+    shot: bool,
+    l: usize,
+}
+
+impl RetStream {
+    pub fn new(partitions: Vec<Partition>) -> Self {
+        Self { shot: false, l: partitions.len() }
+    }
+}
+
+impl Stream for RetStream {
+    type Item = Result<Chunk<Box<dyn Array>>>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        if self.shot || self.l == 0 {
+            return Poll::Ready(None);
+        }
+
+        let a1 = Box::new(Int64Array::from(vec![1, 1, 2, 2, 3]));
+        let a2 = Box::new(Int32Array::from(vec![1, 2, 1, 2, 1]));
+        self.shot = true;
+
+        Poll::Ready(Some(Ok(Chunk::new(vec![a1, a2]))))
+    }
+}
+
+struct EmptyStream {}
+
+impl Stream for EmptyStream {
+    type Item = Result<Chunk<Box<dyn Array>>>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        Poll::Ready(None)
+    }
+}
+/*impl PartitionStream {
+    pub fn try_new(partitions: Vec<(Partition, Option<MemtablePartitionChunk>)>, chunk_size: usize, vfs: Arc<Vfs>, path: PathBuf, fields: Vec<Field>) -> Result<Self> {
+        Ok(Self {
+            vfs,
+            levels: vec![],
+            cur_level: 0,
+            cur_part: 0,
+            memtable_chunk: None,
+            file_md: FileMetaData {},
+            path,
+            fields,
+            rdr: (),
+            chunk_size,
+            sorted: Default::default(),
+        })
+        /*let mut sorted: BinaryHeap<StreamPart> = Default::default();
+        if let Some(chunk) = memtable_chunk {
+            sorted.push(StreamPart::Mem(MemPart {
+                chunk: chunk.chunk,
+                min: chunk.min,
+                max: chunk.max,
+            }))
+        }
+
+        for (lid, l) in levels.iter().enumerate() {
+            for p in l.parts {
+                let disk_part = DiskPart {
+                    id: p.id,
+                    level: lid,
+                    min: p.min,
+                    max: p.max,
+                };
+                sorted.push(StreamPart::Disk(disk_part));
+            }
+        }
+
+        for p in sorted.iter() {
+            println!("{:?}", p);
+        }
+*/
+    }
+}*/
+
+impl Stream for PartitionStream {
+    type Item = ();
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        todo!()
+    }
+}
+
+pub struct PartitionIterator {
+    vfs: Arc<Vfs>,
+    levels: Vec<Level>,
+    cur_level: usize,
+    cur_part: usize,
+    memtable_chunk: Option<Chunk<Box<dyn Array>>>,
+    file_md: FileMetaData,
+    path: PathBuf,
+    fields: Vec<Field>,
+    rdr: FileReader<File>,
+    chunk_size: usize,
+}
+
+impl PartitionIterator {
+    pub fn new(levels: Vec<Level>, memtable_chunk: Chunk<Box<dyn Array>>, chunk_size: usize, vfs: Arc<Vfs>, path: PathBuf, fields: Vec<Field>) -> Result<Self> {
+        let mut level_idx = 0;
+        let mut part_idx = 0;
+
+        // get first part
+        let mut found = false;
+        'outer: for (lid, level) in levels.iter().enumerate() {
+            for (pid, part) in level.parts.iter().enumerate() {
+                found = true;
+                level_idx = lid;
+                part_idx = pid;
+                break 'outer;
+            }
+        }
+        if !found {}
+        println!("{:?}", path.join(format!("parts/{level_idx}/{part_idx}.parquet")));
+        let mut rdr = File::open(path.join(format!("parts/{level_idx}/{part_idx}.parquet")))?;
+        println!("!");
+
+        let file_md = read::read_metadata(&mut rdr)?;
+        let schema = read::infer_schema(&file_md)?;
+        let schema = schema.filter(|_, field| fields.contains(field));
+
+        let rdr = read::FileReader::new(rdr, file_md.row_groups.clone(), schema, Some(1024 * 8 * 8), None, None);
+
+        Ok(Self {
+            vfs,
+            levels,
+            cur_level: level_idx,
+            cur_part: part_idx,
+            memtable_chunk: Some(memtable_chunk),
+            file_md,
+            path,
+            fields,
+            rdr,
+            chunk_size,
+        })
+    }
+}
+
+impl Iterator for PartitionIterator {
+    type Item = Result<Chunk<Box<dyn Array>>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(chunk) = self.memtable_chunk.take() {
+            return Some(Ok(chunk));
+        }
+
+        loop {
+            let maybe_chunk = self.rdr.next();
+            if let Some(chunk) = maybe_chunk {
+                return Some(chunk.map_err(|e| e.into()));
+            }
+
+            loop {
+                self.cur_part = self.cur_part + 1;
+                match self.levels.get(self.cur_level) {
+                    None => return None,
+                    Some(level) => match level.parts.get(self.cur_part) {
+                        None => self.cur_level += 1,
+                        Some(_) => {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            let rdr = File::open(self.path.join(format!("parts/{}/{}.parquet", self.cur_level, self.cur_part)));
+            // todo is there a better way?
+            let mut rdr = match rdr {
+                Ok(rdr) => rdr,
+                Err(err) => return Some(Err(err.into()))
+            };
+
+            let file_md = read::read_metadata(&mut rdr);
+            let file_md = match file_md {
+                Ok(file_md) => file_md,
+                Err(err) => return Some(Err(err.into()))
+            };
+            let schema = read::infer_schema(&file_md);
+            let schema = match schema {
+                Ok(schema) => schema,
+                Err(err) => return Some(Err(err.into()))
+            };
+            let schema = schema.filter(|_, field| self.fields.contains(field));
+
+            self.rdr = FileReader::new(rdr, file_md.row_groups.clone(), schema, Some(self.chunk_size), None, None);
+        }
+    }
+}
+
 impl OptiDBImpl {
     // #[instrument(level = "trace")]
     pub fn open(path: PathBuf, opts: Options) -> Result<Self> {
@@ -966,18 +1053,20 @@ impl OptiDBImpl {
                 md.schema.fields.len()
             )));
         }
+        let mut memtable = self.memtable.lock().unwrap();
         log_op(
             LogOp::Insert(key, values),
             false,
             Some(self.log.lock().unwrap().get_mut()),
-            &mut self.memtable,
+            &mut memtable,
             &mut md,
         )?;
         if md.stats.logged_bytes as usize > self.opts.max_log_length_bytes {
             flush(
                 Some(self.log.lock().unwrap().get_mut()),
-                &mut self.memtable,
+                &mut memtable,
                 &mut md,
+                self.opts.partition_keys.clone(),
                 &self.path,
             )?;
 
@@ -993,30 +1082,66 @@ impl OptiDBImpl {
         Ok(())
     }
 
-    fn compact(&self) {
+    pub fn compact(&self) {
         self.compactor_outbox
             .send(CompactorMessage::Compact)
             .unwrap();
     }
-    fn flush(&mut self) -> Result<()> {
+    pub fn flush(&mut self) -> Result<()> {
         let mut md = self.metadata.lock().unwrap();
+        let mut memtable = self.memtable.lock().unwrap();
         flush(
             Some(self.log.lock().unwrap().get_mut()),
-            &mut self.memtable,
+            &mut memtable,
             &mut md,
+            self.opts.partition_keys.clone(),
             &self.path,
         )?;
 
         Ok(())
     }
-    fn get(&self, opts: ReadOptions, key: Vec<KeyValue>) -> Result<Vec<(String, Value)>> {
+    pub fn get(&self, opts: ReadOptions, key: Vec<KeyValue>) -> Result<Vec<(String, Value)>> {
         unimplemented!()
     }
 
-    fn delete(&self, opts: WriteOptions, key: Vec<KeyValue>) -> Result<()> {
+    pub fn delete(&self, opts: WriteOptions, key: Vec<KeyValue>) -> Result<()> {
         unimplemented!()
     }
 
+    pub fn scan(&self, opts: IterateOptions, required_partitions: usize, fields: Vec<Field>) -> Result<Vec<RetStream>> {
+        let md = self.metadata.lock().unwrap();
+        let mut parts_count = 0;
+        let mut partitions = md.partitions.clone();
+
+        let mut mt = self.memtable.lock().unwrap();
+        let chunk = memtable_to_partitioned_chunks(
+            &mut mt,
+            &md.schema,
+            self.opts.partitions,
+            self.opts.partition_keys.clone(),
+        )?;
+
+        let mut out = vec![];
+        for p in 0..required_partitions {
+            match partitions.pop() {
+                None => out.push(vec![]),
+                Some(v) => {
+                    out.push(vec![v]);
+                }
+            }
+        }
+
+        if partitions.len() > 0 {
+            let mut rest = out.pop().unwrap().unwrap();
+            let mut b = partitions.drain(..).collect();
+            rest.append(&mut b);
+            out.push(Some(rest))
+        }
+
+        let streams = out.into_iter().map(|parts| RetStream::new(parts)).collect::<Vec<_>>();
+
+        Ok(streams)
+    }
     // #[instrument(level = "trace", skip(self))]
     fn add_field(&mut self, field: Field) -> Result<()> {
         let mut md = self.metadata.lock().unwrap();
@@ -1075,8 +1200,7 @@ mod tests {
     use tracing_subscriber::util::SubscriberInitExt;
     use tracing_test::traced_test;
 
-    use crate::db::{compact, print_levels};
-    use crate::db::determine_compaction;
+    use crate::db::{IterateOptions, print_partitions};
     use crate::db::Insert;
     use crate::db::Level;
     use crate::db::MemOp;
@@ -1084,7 +1208,6 @@ mod tests {
     use crate::db::OptiDBImpl;
     use crate::db::Options;
     use crate::db::Part;
-    use crate::db::ToCompact;
     use crate::ColValue;
     use crate::KeyValue;
     use crate::Value;
@@ -1093,11 +1216,13 @@ mod tests {
     #[test]
     fn it_works() {
         // let path = temp_dir().join("db");
-        let path = PathBuf::from("/Users/maximbogdanov/user_files");
+        let path = PathBuf::from("/opt/homebrew/Caskroom/clickhouse/user_files");
         fs::remove_dir_all(&path).unwrap();
         // fs::create_dir_all(&path).unwrap();
 
         let opts = Options {
+            partitions: 2,
+            partition_keys: vec![0],
             l1_max_size_bytes: 1024 * 1024 * 10,
             level_size_multiplier: 10,
             l0_max_parts: 4,
@@ -1107,6 +1232,7 @@ mod tests {
             merge_index_cols: 2,
             merge_max_part_size_bytes: 2048,
             merge_row_group_values_limit: 1000,
+            read_chunk_size: 10,
         };
         let mut db = OptiDBImpl::open(path, opts).unwrap();
         db.add_field(Field::new("a", DataType::Int64, false));
@@ -1116,7 +1242,7 @@ mod tests {
         let mut rng = StepRng::new(2, 13);
         let mut irs = FisherYates::default();
         // let mut input = (0..10_000_000).collect();
-        let mut input = (0..1000).collect();
+        let mut input = (0..1000000).collect();
         irs.shuffle(&mut input, &mut rng).unwrap();
 
         for i in input {
@@ -1130,9 +1256,21 @@ mod tests {
                 .unwrap();
         }
 
+        let opts = IterateOptions {
+            fields: vec![
+                Field::new("a", DataType::Int64, false),
+                Field::new("b", DataType::Int64, false),
+                Field::new("c", DataType::Int64, false),
+            ]
+        };
+
+        // for chunk in db.iterate(opts).unwrap() {
+        //     let chunk = chunk.unwrap();
+        //     println!("{:?}", chunk);
+        // }
         db.flush().unwrap();
         thread::sleep(Duration::from_millis(20));
-        print_levels(db.metadata.lock().unwrap().levels.as_ref());
+        print_partitions(db.metadata.lock().unwrap().partitions.as_ref());
         // db.compact();
     }
 }

@@ -13,5 +13,6 @@ pub mod planner;
 mod segment;
 mod segmented_aggregate;
 mod unpivot;
+pub mod local;
 // pub mod merge;
 // pub mod planner;

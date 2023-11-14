@@ -408,7 +408,7 @@ impl<R> ParquetMerger<R>
                 };
                 merged_files.push(mf);
             } else {
-                // delete empty file
+                // delete empty file. We can do this safely because we write to temp file and then rename it
                 fs::remove_file(&self.to_path.join(format!("{}.parquet", part_id)))?;
             }
             break;

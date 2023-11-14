@@ -51,6 +51,7 @@ use service::tracing::TracingCliArgs;
 use tracing::debug;
 use tracing::info;
 use uuid::Uuid;
+use query::datasources::local::LocalTable;
 
 extern crate parse_duration;
 
@@ -203,7 +204,8 @@ async fn main() -> Result<(), anyhow::Error> {
         write_parquet(1, 1, &md, &path, &partitions, &schema)?;
     }
 
-    let data_provider = Arc::new(MemTable::try_new(partitions[0][0].schema(), partitions)?);
+    // let data_provider = Arc::new(MemTable::try_new(partitions[0][0].schema(), partitions)?);
+    let data_provider = Arc::new(LocalTable::;
     let query_provider = Arc::new(ProviderImpl::try_new_from_provider(
         md.clone(),
         data_provider,

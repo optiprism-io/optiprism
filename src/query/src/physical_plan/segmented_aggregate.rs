@@ -436,7 +436,7 @@ impl ExecutionPlan for SegmentedAggregateExec {
                 Runner::new(opts, partition, context.clone())
             })
             .collect::<DFResult<Vec<_>>>()?;
-        let (tx, rx) = bounded(5);
+        let (tx, rx) = bounded(5);  // todo why 5?
         // let (tx, rx) = mpsc::channel();
         run(runners, tx);
 

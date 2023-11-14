@@ -26,6 +26,7 @@ pub enum StoreError {
     Io(#[from] std::io::Error),
     #[error("bincode {0:?}")]
     Bincode(#[from] bincode::Error),
+
 }
 
 impl StoreError {
