@@ -11,6 +11,7 @@ use crate::error::Result;
 use crate::parquet::merger;
 use crate::parquet::merger::merge;
 
+#[derive(Clone, Debug)]
 pub enum CompactorMessage {
     Compact,
     Stop(Sender<()>),

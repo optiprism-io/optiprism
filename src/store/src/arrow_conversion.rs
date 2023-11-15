@@ -1,13 +1,15 @@
 use std::mem;
 use std::sync::Arc;
+use arrow2::chunk::Chunk;
 
 use arrow::ffi::ArrowArray;
 use arrow::ffi::ArrowArrayRef;
-use arrow2::datatypes::DataType;
+use arrow2::datatypes::{DataType, Schema};
 use arrow2::datatypes::Field;
 use arrow2::datatypes::IntervalUnit;
 use arrow2::datatypes::TimeUnit;
-use arrow_array::make_array;
+use arrow::ipc::RecordBatch;
+use arrow_array::{Array, make_array};
 use arrow_array::ArrayRef;
 
 use crate::error::Result;
@@ -42,6 +44,12 @@ fn interval_unit2_to_interval_unit1(iu: IntervalUnit) -> arrow_schema::IntervalU
         IntervalUnit::DayTime => arrow_schema::IntervalUnit::DayTime,
         IntervalUnit::MonthDayNano => arrow_schema::IntervalUnit::MonthDayNano,
     }
+}
+
+pub fn schema2_to_schema1(schema: Schema) -> arrow_schema::Schema {
+    arrow_schema::Schema::new(
+        schema.fields.iter().map(|f| field2_to_field1(f.clone())).collect::<Vec<_>>()
+    )
 }
 
 fn field2_to_field1(field: Field) -> arrow_schema::Field {

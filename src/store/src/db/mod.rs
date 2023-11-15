@@ -29,7 +29,7 @@ use std::task::{Context, Poll};
 use std::thread;
 use std::time::Instant;
 use rand::Rng;
-use arrow2::array::Array;
+use arrow2::array::{Array, Int32Array, Int64Array};
 use arrow2::array::MutableArray;
 use arrow2::array::MutableBinaryArray;
 use arrow2::array::MutableBooleanArray;
@@ -46,7 +46,6 @@ use arrow2::io::parquet::read;
 use arrow2::io::parquet::read::FileReader;
 use arrow2::io::parquet::write::transverse;
 use arrow::compute::concat;
-use arrow_array::{Int32Array, Int64Array};
 use arrow_buffer::ToByteSlice;
 use bincode::deserialize;
 use bincode::serialize;
@@ -130,7 +129,7 @@ impl Level {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-struct Partition {
+pub struct Partition {
     id: usize,
     levels: Vec<Level>,
 }
@@ -258,18 +257,18 @@ pub struct OptiDB {
 
 #[derive(Clone, Debug)]
 pub struct Options {
-    partitions: usize,
-    partition_keys: Vec<usize>,
-    l0_max_parts: usize,
-    l1_max_size_bytes: usize,
-    level_size_multiplier: usize,
-    max_log_length_bytes: usize,
-    read_chunk_size: usize,
-    merge_max_part_size_bytes: usize,
-    merge_index_cols: usize,
-    merge_data_page_size_limit_bytes: Option<usize>,
-    merge_row_group_values_limit: usize,
-    merge_array_page_size: usize,
+    pub partitions: usize,
+    pub partition_keys: Vec<usize>,
+    pub l0_max_parts: usize,
+    pub l1_max_size_bytes: usize,
+    pub level_size_multiplier: usize,
+    pub max_log_length_bytes: usize,
+    pub read_chunk_size: usize,
+    pub merge_max_part_size_bytes: usize,
+    pub merge_index_cols: usize,
+    pub merge_data_page_size_limit_bytes: Option<usize>,
+    pub merge_row_group_values_limit: usize,
+    pub merge_array_page_size: usize,
 }
 
 
@@ -347,7 +346,7 @@ enum FsOp {
 
 
 #[derive(Clone)]
-struct OptiDBImpl {
+pub struct OptiDBImpl {
     opts: Options,
     // mutex is needed to lock write during reads
     memtable: Arc<Mutex<SkipSet<MemOp>>>,
@@ -448,7 +447,7 @@ fn recover(path: PathBuf, opts: Options) -> Result<OptiDBImpl> {
         log_id: 0,
         schema: Schema::from(vec![]),
         stats: Default::default(),
-        partitions: vec![Partition { levels: vec![Level::new_empty(); 7] }; opts.partitions],
+        partitions: (0..opts.partitions).into_iter().map(|pid| Partition { id: pid, levels: vec![Level::new_empty(); 7] }).collect::<Vec<_>>(),
     };
 
     let mut memtable = SkipSet::new();
@@ -667,8 +666,8 @@ fn write_level0(
     path: PathBuf,
 ) -> Result<Vec<(usize, Part)>> {
     let mut ret = vec![];
-    let parts = memtable_to_partitioned_chunks(memtable, schema, partitions.len(), partition_keys)?;
-    for part in parts.into_iter() {
+    let partitioned_chunks = memtable_to_partitioned_chunks(memtable, schema, partitions.len(), partition_keys)?;
+    for chunk in partitioned_chunks.into_iter() {
         let popts = parquet::write::WriteOptions {
             write_statistics: true,
             compression: parquet::write::CompressionOptions::Snappy,
@@ -683,13 +682,13 @@ fn write_level0(
             .map(|f| transverse(&f.data_type, |_| parquet::write::Encoding::Plain))
             .collect();
         let row_groups = parquet::write::RowGroupIterator::try_new(
-            vec![Ok(part.chunk)].into_iter(),
+            vec![Ok(chunk.chunk)].into_iter(),
             schema,
             popts,
             encodings,
         )?;
 
-        let path = part_path(&path, part.partition_id, 0, partitions[part.partition_id].levels[0].part_id);
+        let path = part_path(&path, chunk.partition_id, 0, partitions[chunk.partition_id].levels[0].part_id);
         // !@#trace!("creating part file {:?}", p);
         println!("{:?}", path);
         let w = OpenOptions::new().create_new(true).write(true).open(path)?;
@@ -699,11 +698,11 @@ fn write_level0(
             writer.write(group?)?;
         }
         let sz = writer.end(None)?;
-        ret.push((part.partition_id, Part {
-            id: partitions[part.partition_id].levels[0].part_id,
+        ret.push((chunk.partition_id, Part {
+            id: partitions[chunk.partition_id].levels[0].part_id,
             size_bytes: sz,
-            min: part.min,
-            max: part.max,
+            min: chunk.min,
+            max: chunk.max,
         }))
     }
     // !@#trace!("{:?} bytes written", sz);
@@ -772,6 +771,7 @@ pub struct IterateOptions {
     fields: Vec<Field>,
 }
 
+#[derive(Debug, Clone)]
 struct DiskPart {
     id: usize,
     level: usize,
@@ -799,6 +799,7 @@ impl Ord for DiskPart {
 
 impl Eq for DiskPart {}
 
+#[derive(Debug, Clone)]
 struct MemPart {
     chunk: Chunk<Box<dyn Array>>,
     min: Vec<KeyValue>,
@@ -845,30 +846,31 @@ pub struct PartitionStream {
     sorted: BinaryHeap<StreamPart>,
 }
 
-struct RetStream {
-    shot: bool,
+#[derive(Debug, Clone)]
+pub struct RetStream {
     l: usize,
 }
 
 impl RetStream {
     pub fn new(partitions: Vec<Partition>) -> Self {
-        Self { shot: false, l: partitions.len() }
+        Self { l: partitions.len() }
     }
 }
 
 impl Stream for RetStream {
     type Item = Result<Chunk<Box<dyn Array>>>;
 
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        if self.shot || self.l == 0 {
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        if self.l == 0 {
             return Poll::Ready(None);
         }
 
-        let a1 = Box::new(Int64Array::from(vec![1, 1, 2, 2, 3]));
-        let a2 = Box::new(Int32Array::from(vec![1, 2, 1, 2, 1]));
-        self.shot = true;
+        self.l-=1;
+        let a1 = Int64Array::from(vec![Some(1), Some(1), Some(2), Some(2), Some(3)]);
+        let a2 = Int64Array::from(vec![Some(1), Some(2), Some(1), Some(2), Some(1)]);
+        let a3 = Int64Array::from(vec![Some(1), Some(2), Some(1), Some(2), Some(1)]);
 
-        Poll::Ready(Some(Ok(Chunk::new(vec![a1, a2]))))
+        Poll::Ready(Some(Ok(Chunk::new(vec![a1.boxed(), a2.boxed(),a3.boxed()]))))
     }
 }
 
@@ -1100,6 +1102,11 @@ impl OptiDBImpl {
 
         Ok(())
     }
+
+    pub fn schema(&self) -> Schema {
+        self.metadata.lock().unwrap().schema.clone()
+    }
+
     pub fn get(&self, opts: ReadOptions, key: Vec<KeyValue>) -> Result<Vec<(String, Value)>> {
         unimplemented!()
     }
@@ -1108,21 +1115,21 @@ impl OptiDBImpl {
         unimplemented!()
     }
 
-    pub fn scan(&self, opts: IterateOptions, required_partitions: usize, fields: Vec<Field>) -> Result<Vec<RetStream>> {
+    pub fn scan(&self, required_partitions: usize, fields: Vec<Field>) -> Result<Vec<RetStream>> {
         let md = self.metadata.lock().unwrap();
-        let mut parts_count = 0;
+        let schema = md.schema.clone();
         let mut partitions = md.partitions.clone();
-
+        drop(md);
         let mut mt = self.memtable.lock().unwrap();
         let chunk = memtable_to_partitioned_chunks(
             &mut mt,
-            &md.schema,
+            &schema,
             self.opts.partitions,
             self.opts.partition_keys.clone(),
         )?;
 
         let mut out = vec![];
-        for p in 0..required_partitions {
+        for _ in 0..required_partitions {
             match partitions.pop() {
                 None => out.push(vec![]),
                 Some(v) => {
@@ -1132,10 +1139,10 @@ impl OptiDBImpl {
         }
 
         if partitions.len() > 0 {
-            let mut rest = out.pop().unwrap().unwrap();
+            let mut rest = out.pop().unwrap();
             let mut b = partitions.drain(..).collect();
             rest.append(&mut b);
-            out.push(Some(rest))
+            out.push(rest);
         }
 
         let streams = out.into_iter().map(|parts| RetStream::new(parts)).collect::<Vec<_>>();
@@ -1143,7 +1150,7 @@ impl OptiDBImpl {
         Ok(streams)
     }
     // #[instrument(level = "trace", skip(self))]
-    fn add_field(&mut self, field: Field) -> Result<()> {
+    pub fn add_field(&mut self, field: Field) -> Result<()> {
         let mut md = self.metadata.lock().unwrap();
         for f in &md.schema.fields {
             if f.name == field.name {

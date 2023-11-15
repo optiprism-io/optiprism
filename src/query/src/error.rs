@@ -5,6 +5,7 @@ use common::error::CommonError;
 use datafusion::error::DataFusionError;
 use metadata::error::MetadataError;
 use thiserror::Error;
+use store::error::StoreError;
 
 pub type Result<T> = result::Result<T, QueryError>;
 
@@ -24,6 +25,8 @@ pub enum QueryError {
     Metadata(#[from] MetadataError),
     #[error("common {0:?}")]
     Common(#[from] CommonError),
+    #[error("store {0:?}")]
+    Store(#[from] StoreError),
 }
 
 impl QueryError {
