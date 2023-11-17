@@ -865,12 +865,12 @@ impl Stream for RetStream {
             return Poll::Ready(None);
         }
 
-        self.l-=1;
+        self.l -= 1;
         let a1 = Int64Array::from(vec![Some(1), Some(1), Some(2), Some(2), Some(3)]);
         let a2 = Int64Array::from(vec![Some(1), Some(2), Some(1), Some(2), Some(1)]);
         let a3 = Int64Array::from(vec![Some(1), Some(2), Some(1), Some(2), Some(1)]);
 
-        Poll::Ready(Some(Ok(Chunk::new(vec![a1.boxed(), a2.boxed(),a3.boxed()]))))
+        Poll::Ready(Some(Ok(Chunk::new(vec![a1.boxed(), a2.boxed(), a3.boxed()]))))
     }
 }
 

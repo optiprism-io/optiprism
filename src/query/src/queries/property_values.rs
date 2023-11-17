@@ -7,7 +7,7 @@ use common::query::PropertyRef;
 use datafusion_common::Column;
 use datafusion_common::DFSchema;
 use datafusion_common::ScalarValue;
-use datafusion_expr::col;
+use datafusion_expr::{col, Limit};
 use datafusion_expr::expr;
 use datafusion_expr::utils::exprlist_to_fields;
 use datafusion_expr::Aggregate;
@@ -110,6 +110,12 @@ impl LogicalPlanBuilder {
             })],
             input: Arc::new(input),
             fetch: None,
+        });
+
+        let input = LogicalPlan::Limit(Limit {
+            skip: 0,
+            fetch: Some(1000),
+            input: Arc::new(input)
         });
 
         Ok(input)

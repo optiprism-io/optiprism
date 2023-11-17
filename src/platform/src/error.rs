@@ -53,8 +53,8 @@ pub enum PlatformError {
     NotFound(String),
     #[error("internal: {0:?}")]
     Internal(String),
-    #[error("entity map")]
-    EntityMap,
+    #[error("entity map {0:?}")]
+    EntityMap(String),
     #[error("serde: {0:?}")]
     Serde(#[from] serde_json::Error),
     #[error("password hash")]
@@ -107,6 +107,7 @@ impl PlatformError {
                 QueryError::Arrow(err) => ApiError::internal(err.to_string()),
                 QueryError::Metadata(err) => ApiError::internal(err.to_string()),
                 QueryError::Common(err) => ApiError::internal(err.to_string()),
+                QueryError::Store(err) => ApiError::internal(err.to_string()),
             },
             PlatformError::BadRequest(msg) => ApiError::bad_request(msg),
             PlatformError::Internal(msg) => ApiError::internal(msg),
@@ -138,7 +139,7 @@ impl PlatformError {
                 ApiError::new(StatusCode::BAD_REQUEST).with_fields(fields)
             }
             PlatformError::NotFound(err) => ApiError::not_found(err),
-            PlatformError::EntityMap => ApiError::internal("map error"),
+            PlatformError::EntityMap(err) => ApiError::internal(err),
         }
     }
 }

@@ -76,6 +76,7 @@ impl TryInto<DataType> for ArrowDataType {
         Ok(match self {
             ArrowDataType::Boolean => DataType::Boolean,
             ArrowDataType::Timestamp(_, _) => DataType::Timestamp,
+            ArrowDataType::Utf8 => DataType::String,
             ArrowDataType::Int8 => DataType::Int8,
             ArrowDataType::Int16 => DataType::Int16,
             ArrowDataType::Int32 => DataType::Int32,
@@ -86,7 +87,7 @@ impl TryInto<DataType> for ArrowDataType {
             ArrowDataType::UInt64 => DataType::UInt64,
             ArrowDataType::Float64 => DataType::Float64,
             ArrowDataType::Decimal128(_, _) => DataType::Decimal,
-            _ => return Err(PlatformError::EntityMap),
+            _ => return Err(PlatformError::EntityMap(format!("{:?}", self))),
         })
     }
 }
@@ -126,7 +127,7 @@ impl TryInto<DictionaryType> for properties::DictionaryType {
             properties::DictionaryType::UInt16 => DictionaryType::UInt16,
             properties::DictionaryType::UInt32 => DictionaryType::UInt32,
             properties::DictionaryType::UInt64 => DictionaryType::UInt64,
-            _ => return Err(PlatformError::EntityMap),
+            _ => return Err(PlatformError::EntityMap(format!("{:?}", self))),
         })
     }
 }
