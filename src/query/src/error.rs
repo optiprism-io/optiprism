@@ -4,8 +4,8 @@ use arrow::error::ArrowError;
 use common::error::CommonError;
 use datafusion::error::DataFusionError;
 use metadata::error::MetadataError;
-use thiserror::Error;
 use store::error::StoreError;
+use thiserror::Error;
 
 pub type Result<T> = result::Result<T, QueryError>;
 

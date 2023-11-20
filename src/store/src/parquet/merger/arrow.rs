@@ -2,21 +2,21 @@ use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::fmt::Debug;
 
-use arrow2::array::Array;
+use arrow2::array::{Array, Int32Array, Int64Array};
 use arrow2::array::PrimitiveArray;
-use arrow2::datatypes::Field;
+use arrow2::datatypes::{DataType, Field};
 use arrow2::datatypes::Schema;
 use arrow2::types::NativeType;
 use arrow2::types::PrimitiveType;
 
 use crate::error::Result;
 use crate::error::StoreError;
+use crate::parquet::merger::parquet::{IndexChunk, Value};
 
 #[derive(Debug)]
 // Arrow chunk after being merged
 pub struct MergedArrowChunk {
-    // cultiple arrays as a result of merging multiple chunks
-    pub arrs: Vec<Box<dyn Array>>,
+    pub cols: Vec<Box<dyn Array>>,
     // contains the stream id of each row so we can take the rows in the correct order
     pub reorder: Vec<usize>,
 }
@@ -24,7 +24,7 @@ pub struct MergedArrowChunk {
 impl MergedArrowChunk {
     // Create new merged arrow chunk
     pub fn new(arrs: Vec<Box<dyn Array>>, reorder: Vec<usize>) -> Self {
-        Self { arrs, reorder }
+        Self { cols: arrs, reorder }
     }
 }
 
@@ -34,18 +34,100 @@ impl MergedArrowChunk {
 pub struct ArrowChunk {
     // stream of arrow chunk Used to identify the chunk during merge
     pub stream: usize,
-    pub arrs: Vec<Box<dyn Array>>,
+    pub cols: Vec<Box<dyn Array>>,
+    pub min_values: Vec<Value>,
+    pub max_values: Vec<Value>,
 }
 
+impl Eq for ArrowChunk {}
+
+impl PartialOrd for ArrowChunk {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(other.cmp(self))
+    }
+
+    fn lt(&self, other: &Self) -> bool {
+        other.min_values < self.min_values
+    }
+    #[inline]
+    fn le(&self, other: &Self) -> bool {
+        other.min_values <= self.min_values
+    }
+    #[inline]
+    fn gt(&self, other: &Self) -> bool {
+        other.min_values > self.min_values
+    }
+    #[inline]
+    fn ge(&self, other: &Self) -> bool {
+        other.min_values >= self.min_values
+    }
+}
+
+impl Ord for ArrowChunk {
+    fn cmp(&self, other: &Self) -> Ordering {
+        other.min_values.cmp(&self.min_values)
+    }
+}
+
+impl PartialEq for ArrowChunk {
+    fn eq(&self, other: &Self) -> bool {
+        self.min_values == other.min_values && self.max_values == other.max_values
+    }
+}
+
+impl IndexChunk for ArrowChunk {
+    fn min_values(&self) -> Vec<Value> {
+        self.min_values.clone()
+    }
+
+    fn max_values(&self) -> Vec<Value> {
+        self.max_values.clone()
+    }
+
+}
 impl ArrowChunk {
-    // Creates ArrowChunk
-    pub fn new(arrs: Vec<Box<dyn Array>>, stream: usize) -> Self {
-        Self { stream, arrs }
+    pub fn new(cols: Vec<Box<dyn Array>>, stream: usize) -> Self {
+        let (min_values, max_values) = cols
+            .iter()
+            .map(|arr| {
+                match arr.data_type() {
+                    // todo move to macro
+                    DataType::Int32 => {
+                        let arr = arr.as_any().downcast_ref::<Int32Array>().unwrap();
+                        let min = Value::from(arr.value(0));
+                        let max = Value::from(arr.value(arr.len() - 1));
+                        (min, max)
+                    }
+                    DataType::Int64 => {
+                        let arr = arr.as_any().downcast_ref::<Int64Array>().unwrap();
+                        let min = Value::from(arr.value(0));
+                        let max = Value::from(arr.value(arr.len() - 1));
+                        (min, max)
+                    }
+                    _ => unimplemented!("only support int32 and int64")
+                }
+            })
+            .unzip();
+
+        Self {
+            cols,
+            min_values,
+            max_values,
+            stream,
+        }
+    }
+
+    pub fn min_values(&self) -> Vec<Value> {
+        self.min_values.clone()
+    }
+
+    pub fn max_values(&self) -> Vec<Value> {
+        self.max_values.clone()
     }
 
     // Get length of arrow chunk
     pub fn len(&self) -> usize {
-        self.arrs[0].len()
+        self.cols[0].len()
     }
 
     // Check if chunk is empty
@@ -53,6 +135,7 @@ impl ArrowChunk {
         self.len() == 0
     }
 }
+
 
 // Row for merge chunks with one column partition
 
@@ -140,7 +223,7 @@ pub fn merge_one_primitive<T: NativeType + Ord>(
     let mut arr_iters = chunks
         .iter()
         .map(|row| {
-            row.arrs[0]
+            row.cols[0]
                 .as_any()
                 .downcast_ref::<PrimitiveArray<T>>()
                 .unwrap()
@@ -200,12 +283,12 @@ pub fn merge_two_primitives<T1: NativeType + Ord, T2: NativeType + Ord>(
     let mut arr_iters = chunks
         .iter()
         .map(|row| {
-            let arr1 = row.arrs[0]
+            let arr1 = row.cols[0]
                 .as_any()
                 .downcast_ref::<PrimitiveArray<T1>>()
                 .unwrap()
                 .values_iter();
-            let arr2 = row.arrs[1]
+            let arr2 = row.cols[1]
                 .as_any()
                 .downcast_ref::<PrimitiveArray<T2>>()
                 .unwrap()
@@ -265,21 +348,21 @@ pub fn merge_two_primitives<T1: NativeType + Ord, T2: NativeType + Ord>(
 // panics if merges is not implemented for combination of types
 pub fn merge_chunks(chunks: Vec<ArrowChunk>, array_size: usize) -> Result<Vec<MergedArrowChunk>> {
     // supported lengths (count of index columns)
-    match chunks[0].arrs.len() {
-        1 => match chunks[0].arrs[0].data_type().to_physical_type() {
+    match chunks[0].cols.len() {
+        1 => match chunks[0].cols[0].data_type().to_physical_type() {
             arrow2::datatypes::PhysicalType::Primitive(pt) => match pt {
                 PrimitiveType::Int64 => merge_one_primitive::<i64>(chunks, array_size),
                 _ => unimplemented!("merge is not implemented for {pt:?} primitive type"),
             },
             _ => unimplemented!(
                 "merge not implemented for {:?} type",
-                chunks[0].arrs[0].data_type()
+                chunks[0].cols[0].data_type()
             ),
         },
         2 => {
             match (
-                chunks[0].arrs[0].data_type().to_physical_type(),
-                chunks[0].arrs[1].data_type().to_physical_type(),
+                chunks[0].cols[0].data_type().to_physical_type(),
+                chunks[0].cols[1].data_type().to_physical_type(),
             ) {
                 (
                     arrow2::datatypes::PhysicalType::Primitive(a),
@@ -301,14 +384,14 @@ pub fn merge_chunks(chunks: Vec<ArrowChunk>, array_size: usize) -> Result<Vec<Me
                 }
                 _ => unimplemented!(
                     "merge not implemented for {:?} {:?} types",
-                    chunks[0].arrs[0].data_type(),
-                    chunks[0].arrs[1].data_type()
+                    chunks[0].cols[0].data_type(),
+                    chunks[0].cols[1].data_type()
                 ),
             }
         }
         _ => unimplemented!(
             "merge not implemented for {:?} columns",
-            chunks[0].arrs.len()
+            chunks[0].cols.len()
         ),
     }
 }
@@ -452,7 +535,7 @@ mod tests {
         ]));
         let res = merge_chunks(vec![row1, row2, row3, row4, row5], 30).unwrap();
 
-        assert_eq!(res[0].arrs[0], arr1_exp.boxed());
+        assert_eq!(res[0].cols[0], arr1_exp.boxed());
     }
 
     #[test]

@@ -71,7 +71,7 @@ use crate::ColValue;
 use crate::db::compaction::{Compactor, CompactorMessage};
 use crate::KeyValue;
 use crate::parquet::merger;
-use crate::parquet::merger::{FileMergeOptions, merge, ParquetMerger};
+use crate::parquet::merger::{FileMergeOptions, merge, Merger};
 use crate::RowValue;
 use crate::Value;
 
@@ -559,7 +559,7 @@ fn memtable_to_partitioned_chunks(memtable: &SkipSet<MemOp>,
                                   schema: &Schema, partitions_count: usize, partition_keys: Vec<usize>) -> Result<Vec<MemtablePartitionChunk>> {
     let mut partitions: Vec<MemtablePartition> = vec![];
     // let mut partitions = vec![MemtablePartition::new(schema.fields.len()); partition_count];
-// !@#trace!("{} entries to write", memtable.len());
+// trace!("{} entries to write", memtable.len());
     for op in memtable.iter() {
         let (keys, vals) = match &op.op {
             Op::Insert(k, v) => (k, Some(v)),
@@ -577,7 +577,7 @@ fn memtable_to_partitioned_chunks(memtable: &SkipSet<MemOp>,
         }
         if pid < 0 {
             partitions.push(MemtablePartition::new(phash as usize % partitions_count, schema.fields.len()));
-            pid = 0;
+            pid = partitions.len() as isize - 1;
         }
         let pid = pid as usize;
         if partitions[pid].min.is_none() {
@@ -595,7 +595,6 @@ fn memtable_to_partitioned_chunks(memtable: &SkipSet<MemOp>,
         }
     }
     let v = partitions.into_iter().map(|p| {
-        // println!("{:?}", p);
         let arrs = p.cols
             .into_iter()
             .enumerate()
@@ -832,6 +831,30 @@ enum StreamPart {
     Disk(DiskPart), // level, part
 }
 
+impl StreamPart {
+    fn min_values(&self) -> Vec<KeyValue> {
+        match self {
+            StreamPart::Mem(v) => {
+                v.min.clone()
+            }
+            StreamPart::Disk(v) => {
+                v.min.clone()
+            }
+        }
+    }
+
+    fn max_values(&self) -> Vec<KeyValue> {
+        match self {
+            StreamPart::Mem(v) => {
+                v.max.clone()
+            }
+            StreamPart::Disk(v) => {
+                v.max.clone()
+            }
+        }
+    }
+}
+
 pub struct PartitionStream {
     vfs: Arc<Vfs>,
     levels: Vec<Level>,
@@ -881,56 +904,6 @@ impl Stream for EmptyStream {
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         Poll::Ready(None)
-    }
-}
-/*impl PartitionStream {
-    pub fn try_new(partitions: Vec<(Partition, Option<MemtablePartitionChunk>)>, chunk_size: usize, vfs: Arc<Vfs>, path: PathBuf, fields: Vec<Field>) -> Result<Self> {
-        Ok(Self {
-            vfs,
-            levels: vec![],
-            cur_level: 0,
-            cur_part: 0,
-            memtable_chunk: None,
-            file_md: FileMetaData {},
-            path,
-            fields,
-            rdr: (),
-            chunk_size,
-            sorted: Default::default(),
-        })
-        /*let mut sorted: BinaryHeap<StreamPart> = Default::default();
-        if let Some(chunk) = memtable_chunk {
-            sorted.push(StreamPart::Mem(MemPart {
-                chunk: chunk.chunk,
-                min: chunk.min,
-                max: chunk.max,
-            }))
-        }
-
-        for (lid, l) in levels.iter().enumerate() {
-            for p in l.parts {
-                let disk_part = DiskPart {
-                    id: p.id,
-                    level: lid,
-                    min: p.min,
-                    max: p.max,
-                };
-                sorted.push(StreamPart::Disk(disk_part));
-            }
-        }
-
-        for p in sorted.iter() {
-            println!("{:?}", p);
-        }
-*/
-    }
-}*/
-
-impl Stream for PartitionStream {
-    type Item = ();
-
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        todo!()
     }
 }
 
@@ -1250,6 +1223,68 @@ mod tests {
         let mut irs = FisherYates::default();
         // let mut input = (0..10_000_000).collect();
         let mut input = (0..1000000).collect();
+        irs.shuffle(&mut input, &mut rng).unwrap();
+
+        for i in input {
+            db.insert(
+                vec![
+                    KeyValue::Int64(i),
+                    KeyValue::Int64(i),
+                ],
+                vec![Value::Int64(Some(i))],
+            )
+                .unwrap();
+        }
+
+        let opts = IterateOptions {
+            fields: vec![
+                Field::new("a", DataType::Int64, false),
+                Field::new("b", DataType::Int64, false),
+                Field::new("c", DataType::Int64, false),
+            ]
+        };
+
+        // for chunk in db.iterate(opts).unwrap() {
+        //     let chunk = chunk.unwrap();
+        //     println!("{:?}", chunk);
+        // }
+        db.flush().unwrap();
+        thread::sleep(Duration::from_millis(20));
+        print_partitions(db.metadata.lock().unwrap().partitions.as_ref());
+        // db.compact();
+    }
+
+    #[traced_test]
+    #[test]
+    fn scan() {
+        // let path = temp_dir().join("db");
+        let path = PathBuf::from("/opt/homebrew/Caskroom/clickhouse/user_files");
+        fs::remove_dir_all(&path).unwrap();
+        // fs::create_dir_all(&path).unwrap();
+
+        let opts = Options {
+            partitions: 2,
+            partition_keys: vec![0],
+            l1_max_size_bytes: 1024,
+            level_size_multiplier: 2,
+            l0_max_parts: 4,
+            max_log_length_bytes: 1024,
+            merge_array_page_size: 10,
+            merge_data_page_size_limit_bytes: Some(1024 * 1024),
+            merge_index_cols: 1,
+            merge_max_part_size_bytes: 1024,
+            merge_row_group_values_limit: 1000,
+            read_chunk_size: 10,
+        };
+        let mut db = OptiDBImpl::open(path, opts).unwrap();
+        db.add_field(Field::new("a", DataType::Int64, false));
+        db.add_field(Field::new("b", DataType::Int64, false));
+        db.add_field(Field::new("c", DataType::Int64, false));
+
+        let mut rng = StepRng::new(2, 13);
+        let mut irs = FisherYates::default();
+        // let mut input = (0..10_000_000).collect();
+        let mut input = (0..1000).collect();
         irs.shuffle(&mut input, &mut rng).unwrap();
 
         for i in input {

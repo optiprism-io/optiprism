@@ -32,7 +32,9 @@ impl And {
                 let mut out = Int64Builder::with_capacity(left.len());
 
                 left.iter().zip(right.iter()).for_each(|(l, r)| {
-                    if let Some(l) = l && r.is_some() {
+                    if let Some(l) = l
+                        && r.is_some()
+                    {
                         out.append_value(l);
                     } else {
                         out.append_null();

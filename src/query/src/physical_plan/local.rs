@@ -1,22 +1,35 @@
 use std::any::Any;
 use std::mem;
 use std::pin::Pin;
-use std::sync::{Arc, Mutex};
-use std::task::{Context, Poll};
-use arrow2::array::Array;
-use arrow2::chunk::Chunk;
+use std::sync::Arc;
+use std::sync::Mutex;
+use std::task::Context;
+use std::task::Poll;
+
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
+use arrow2::array::Array;
+use arrow2::chunk::Chunk;
 use datafusion::execution::TaskContext;
 use datafusion::physical_expr::PhysicalSortExpr;
-use datafusion::physical_plan::{ExecutionPlan, Partitioning, RecordBatchStream, SendableRecordBatchStream};
-use datafusion_common::{DataFusionError, Statistics};
-use futures::{Stream, StreamExt, TryStream};
-use store::db::{OptiDB, OptiDBImpl, RetStream};
-use crate::error::{QueryError, Result};
+use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::Partitioning;
+use datafusion::physical_plan::RecordBatchStream;
+use datafusion::physical_plan::SendableRecordBatchStream;
+use datafusion_common::DataFusionError;
 use datafusion_common::Result as DFResult;
-use store::arrow_conversion::{arrow2_to_arrow1};
+use datafusion_common::Statistics;
+use futures::Stream;
+use futures::StreamExt;
+use futures::TryStream;
+use store::arrow_conversion::arrow2_to_arrow1;
+use store::db::OptiDB;
+use store::db::OptiDBImpl;
+use store::db::RetStream;
 use store::error::StoreError;
+
+use crate::error::QueryError;
+use crate::error::Result;
 
 #[derive(Debug)]
 pub struct LocalExec {
@@ -34,7 +47,7 @@ impl LocalExec {
 }
 
 struct PartitionStream {
-    local_stream: Pin<Box<dyn Stream<Item=store::error::Result<Chunk<Box<dyn Array>>>> + Send>>,
+    local_stream: Pin<Box<dyn Stream<Item = store::error::Result<Chunk<Box<dyn Array>>>> + Send>>,
     schema: SchemaRef,
 }
 
@@ -50,14 +63,19 @@ impl Stream for PartitionStream {
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let v = match self.local_stream.poll_next_unpin(cx) {
             Poll::Ready(Some(Ok(chunk))) => {
-                let arrs = chunk.into_arrays().into_iter().map(|arr| arrow2_to_arrow1::convert(arr)).collect::<store::error::Result<Vec<_>>>().map_err(|e| DataFusionError::Execution(e.to_string()))?;
+                let arrs = chunk
+                    .into_arrays()
+                    .into_iter()
+                    .map(|arr| arrow2_to_arrow1::convert(arr))
+                    .collect::<store::error::Result<Vec<_>>>()
+                    .map_err(|e| DataFusionError::Execution(e.to_string()))?;
                 Poll::Ready(Some(Ok(RecordBatch::try_new(self.schema.clone(), arrs)?)))
             }
             Poll::Ready(Some(Err(e))) => {
                 Poll::Ready(Some(Err(DataFusionError::Execution(e.to_string()))))
             }
             Poll::Pending => Poll::Pending,
-            Poll::Ready(None) => Poll::Ready(None)
+            Poll::Ready(None) => Poll::Ready(None),
         };
 
         v
@@ -85,19 +103,27 @@ impl ExecutionPlan for LocalExec {
         vec![]
     }
 
-    fn with_new_children(self: Arc<Self>, _children: Vec<Arc<dyn ExecutionPlan>>) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
-        Ok(Arc::new(
-            LocalExec {
-                schema: self.schema.clone(),
-                streams: Mutex::new(self.streams.lock().unwrap().clone()),
-            }
-        ))
+    fn with_new_children(
+        self: Arc<Self>,
+        _children: Vec<Arc<dyn ExecutionPlan>>,
+    ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
+        Ok(Arc::new(LocalExec {
+            schema: self.schema.clone(),
+            streams: Mutex::new(self.streams.lock().unwrap().clone()),
+        }))
     }
 
-    fn execute(&self, partition: usize, context: Arc<TaskContext>) -> datafusion_common::Result<SendableRecordBatchStream> {
+    fn execute(
+        &self,
+        partition: usize,
+        context: Arc<TaskContext>,
+    ) -> datafusion_common::Result<SendableRecordBatchStream> {
         let mut streams = self.streams.lock().unwrap();
         let stream = mem::replace(&mut streams[partition], None);
-        Ok(Box::pin(PartitionStream { local_stream: Box::pin(stream.unwrap()), schema: self.schema.clone() }))
+        Ok(Box::pin(PartitionStream {
+            local_stream: Box::pin(stream.unwrap()),
+            schema: self.schema.clone(),
+        }))
     }
 
     fn statistics(&self) -> Statistics {
@@ -110,17 +136,25 @@ mod tests {
     use std::fs;
     use std::path::PathBuf;
     use std::sync::Arc;
-    use arrow2::datatypes::{DataType, Field};
+
     use arrow::util::pretty::print_batches;
-    use datafusion::datasource::{DefaultTableSource, TableProvider};
+    use arrow2::datatypes::DataType;
+    use arrow2::datatypes::Field;
+    use datafusion::datasource::DefaultTableSource;
+    use datafusion::datasource::TableProvider;
     use datafusion::execution::context::SessionState;
     use datafusion::execution::runtime_env::RuntimeEnv;
-    use datafusion::physical_plan::{collect, displayable};
-    use datafusion::prelude::{SessionConfig, SessionContext};
-    use tracing::debug;
-    use store::db::{OptiDBImpl, Options};
-    use store::{KeyValue, Value};
+    use datafusion::physical_plan::collect;
+    use datafusion::physical_plan::displayable;
+    use datafusion::prelude::SessionConfig;
+    use datafusion::prelude::SessionContext;
     use store::arrow_conversion::schema2_to_schema1;
+    use store::db::OptiDBImpl;
+    use store::db::Options;
+    use store::KeyValue;
+    use store::Value;
+    use tracing::debug;
+
     use crate::datasources::local::LocalTable;
     use crate::physical_plan::planner::planner::QueryPlanner;
 
@@ -145,27 +179,29 @@ mod tests {
             read_chunk_size: 10,
         };
         let mut db = OptiDBImpl::open(path, opts).unwrap();
-        db.add_field(Field::new("a", DataType::Int64, false)).unwrap();
-        db.add_field(Field::new("b", DataType::Int64, false)).unwrap();
-        db.add_field(Field::new("c", DataType::Int64, false)).unwrap();
+        db.add_field(Field::new("a", DataType::Int64, false))
+            .unwrap();
+        db.add_field(Field::new("b", DataType::Int64, false))
+            .unwrap();
+        db.add_field(Field::new("c", DataType::Int64, false))
+            .unwrap();
 
         for i in 0..1000 {
-            db.insert(
-                vec![
-                    KeyValue::Int64(i),
-                    KeyValue::Int64(i),
-                ],
-                vec![Value::Int64(Some(i))],
-            )
-                .unwrap();
+            db.insert(vec![KeyValue::Int64(i), KeyValue::Int64(i)], vec![
+                Value::Int64(Some(i)),
+            ])
+            .unwrap();
         }
-
 
         let schema = schema2_to_schema1(db.schema());
         let prov = LocalTable::try_new(Arc::new(db), Arc::new(schema), 1).unwrap();
-        let table_source = Arc::new(DefaultTableSource::new(Arc::new(prov) as Arc<dyn TableProvider>));
-        let input =
-            datafusion_expr::LogicalPlanBuilder::scan("table", table_source, None).unwrap().build().unwrap();
+        let table_source = Arc::new(DefaultTableSource::new(
+            Arc::new(prov) as Arc<dyn TableProvider>
+        ));
+        let input = datafusion_expr::LogicalPlanBuilder::scan("table", table_source, None)
+            .unwrap()
+            .build()
+            .unwrap();
 
         let runtime = Arc::new(RuntimeEnv::default());
         let state =

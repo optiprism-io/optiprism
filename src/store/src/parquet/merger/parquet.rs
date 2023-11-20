@@ -1,11 +1,14 @@
+use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::io::Read;
 use std::io::Seek;
+use std::sync::{Arc, Mutex};
 
-use arrow2::array::Array;
-use arrow2::datatypes::Field;
+use arrow2::array::{Array, Int32Array};
+use arrow2::chunk::Chunk;
+use arrow2::datatypes::{DataType, Field};
 use arrow2::io::parquet::read::column_iter_to_arrays;
 use arrow2::io::parquet::read::deserialize::page_iter_to_arrays;
 use arrow2::io::parquet::read::schema::convert::to_primitive_type;
@@ -20,7 +23,7 @@ use parquet2::metadata::FileMetaData;
 use parquet2::metadata::SchemaDescriptor;
 use parquet2::page::CompressedDataPage;
 use parquet2::page::CompressedPage;
-use parquet2::read::decompress;
+use parquet2::read::{decompress, PageReader};
 use parquet2::schema::types::ParquetType;
 use parquet2::schema::types::PhysicalType;
 use parquet2::statistics::BinaryStatistics;
@@ -33,6 +36,7 @@ use crate::error::Result;
 use crate::error::StoreError;
 use crate::parquet::merger::arrow::ArrowChunk;
 use crate::parquet::merger::MergeReorder;
+
 #[derive(Eq, PartialEq, PartialOrd, Ord, Debug, Clone)]
 pub enum Value {
     Boolean(bool),
@@ -253,9 +257,15 @@ impl MergedPagesChunk {
     }
 
     pub fn num_values(&self) -> usize {
-        self.0.num_values()
+        self.0.len()
     }
 }
+
+pub trait IndexChunk {
+    fn min_values(&self) -> Vec<Value>;
+    fn max_values(&self) -> Vec<Value>;
+}
+
 
 #[derive(Debug)]
 pub struct PagesChunk {
@@ -301,6 +311,16 @@ impl PartialEq for PagesChunk {
     }
 }
 
+impl IndexChunk for PagesChunk {
+    fn min_values(&self) -> Vec<Value> {
+        self.min_values.clone()
+    }
+
+    fn max_values(&self) -> Vec<Value> {
+        self.max_values.clone()
+    }
+}
+
 impl PagesChunk {
     pub fn new(cols: Vec<Vec<CompressedPage>>, stream: usize) -> Self {
         let (min_values, max_values) = cols
@@ -319,15 +339,7 @@ impl PagesChunk {
         }
     }
 
-    pub fn min_values(&self) -> Vec<Value> {
-        self.min_values.clone()
-    }
-
-    pub fn max_values(&self) -> Vec<Value> {
-        self.max_values.clone()
-    }
-
-    pub fn num_values(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.cols[0]
             .iter()
             .map(|page| match page {
@@ -395,8 +407,11 @@ pub struct CompressedPageIterator<R> {
 }
 
 impl<R: Read + Seek> CompressedPageIterator<R> {
-    pub fn try_new(mut reader: R) -> Result<Self> {
+    pub fn try_new(mut reader: R, max_page_size: usize) -> Result<Self> {
         let metadata = parquet2::read::read_metadata(&mut reader)?;
+        println!("{:?}",metadata
+            .schema()
+            .columns());
         let chunk_buffer = metadata
             .schema()
             .columns()
@@ -414,18 +429,8 @@ impl<R: Read + Seek> CompressedPageIterator<R> {
             metadata,
             row_group_cursors,
             chunk_buffer,
-            max_page_size: 1024 * 1024,
+            max_page_size,
         })
-    }
-
-    pub fn _schema(&self) -> &SchemaDescriptor {
-        self.metadata.schema()
-    }
-
-    pub fn _get_col_path(&self, col_id: usize) -> ColumnPath {
-        self.metadata.schema().columns()[col_id]
-            .path_in_schema
-            .clone()
     }
 
     pub fn contains_column(&self, col_path: &ColumnPath) -> bool {
@@ -499,5 +504,46 @@ impl<R: Read + Seek> CompressedPageIterator<R> {
         };
 
         Ok(maybe_page)
+    }
+}
+
+pub struct ArrowIterator<R: Read + Seek> {
+    page_iter: CompressedPageIterator<R>,
+    fields: Vec<ColumnDescriptor>,
+}
+
+impl<R: Read + Seek> ArrowIterator<R> {
+    pub fn new(page_iter: CompressedPageIterator<R>, fields: Vec<ColumnDescriptor>) -> Self {
+        Self {
+            page_iter,
+            fields
+        }
+    }
+
+    pub fn contains_column(&self, col_path: &ColumnPath) -> bool {
+        self.page_iter.contains_column(col_path)
+    }
+
+    pub fn next(&mut self) -> Result<Option<Chunk<Box<dyn Array>>>> {
+        let mut ret = vec![];
+
+        for cd in self.fields.iter() {
+            let page = self.page_iter.next_page(&cd.path_in_schema)?;
+            match page {
+                None => return Ok(None),
+                Some(page) => {
+                    let mut buf = vec![];
+                    let mut arr = pages_to_arrays(
+                        vec![page],
+                        cd,
+                        None,
+                        &mut buf,
+                    )?;
+                    ret.push(arr.pop().unwrap());
+                }
+            }
+        }
+
+        Ok(Some(Chunk::new(ret)))
     }
 }

@@ -7,13 +7,14 @@ use common::query::PropertyRef;
 use datafusion_common::Column;
 use datafusion_common::DFSchema;
 use datafusion_common::ScalarValue;
-use datafusion_expr::{col, Limit};
+use datafusion_expr::col;
 use datafusion_expr::expr;
 use datafusion_expr::utils::exprlist_to_fields;
 use datafusion_expr::Aggregate;
 use datafusion_expr::Expr;
 use datafusion_expr::Extension;
 use datafusion_expr::Filter as PlanFilter;
+use datafusion_expr::Limit;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::Sort;
 use metadata::dictionaries::provider_impl::SingleDictionaryProvider;
@@ -115,7 +116,7 @@ impl LogicalPlanBuilder {
         let input = LogicalPlan::Limit(Limit {
             skip: 0,
             fetch: Some(1000),
-            input: Arc::new(input)
+            input: Arc::new(input),
         });
 
         Ok(input)

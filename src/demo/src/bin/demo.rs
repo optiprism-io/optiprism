@@ -114,7 +114,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 return Err(DemoError::FileNotFound(format!(
                     "metadata path {path:?} doesn't exist"
                 ))
-                    .into());
+                .into());
             }
 
             path
@@ -147,8 +147,6 @@ async fn main() -> Result<(), anyhow::Error> {
             projects: None,
             teams: None,
         })?;
-
-
 
         let org = md.organizations.create(CreateOrganizationRequest {
             created_by: admin.id,
@@ -262,7 +260,7 @@ fn gen_store(
             "demo data path {:?} doesn't exist",
             cmd_args.demo_data_path
         ))
-            .into());
+        .into());
     }
     info!("store initialization...");
     debug!("demo data path: {:?}", cmd_args.demo_data_path);

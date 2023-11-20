@@ -4,11 +4,11 @@
 //! ```
 //! use std::fs::File;
 //!
-//! use store::parquet::merger::ParquetMerger;
+//! use store::parquet::merger::Merger;
 //! let mut f1 = File::open("1.parquet")?;
 //! let mut f2 = File::open("2.parquet")?;
 //! let mut out = File::create("out.parquet")?;
-//! let mut merger = ParquetMerger::try_new(vec![f1, f2], &mut out, 1, None, 100, 100)?;
+//! let mut merger = Merger::try_new(vec![f1, f2], &mut out, 1, None, 100, 100)?;
 //! merger.merge()?;
 //! ```
 use std::collections::BinaryHeap;
@@ -47,6 +47,7 @@ use arrow2::array::UInt64Array;
 use arrow2::array::UInt8Array;
 use arrow2::array::Utf8Array;
 use arrow2::bitmap::Bitmap;
+use arrow2::chunk::Chunk;
 use arrow2::datatypes::DataType;
 use arrow2::datatypes::Field;
 use arrow2::datatypes::PhysicalType as ArrowPhysicalType;
@@ -83,6 +84,7 @@ use crate::parquet::merger::parquet::PagesChunk;
 pub mod arrow;
 mod merge_data_arrays;
 pub mod parquet;
+pub mod arrow_merger;
 
 // this is a temporary array used to merge data pages avoiding downcasting
 
@@ -137,7 +139,7 @@ pub struct Options {
     pub max_part_size_bytes: Option<usize>,
 }
 
-pub struct ParquetMerger<R>
+pub struct Merger<R>
     where
         R: Read,
 {
@@ -198,6 +200,16 @@ pub struct MergedFile {
 }
 
 
+struct MergeIterator {}
+
+impl Iterator for MergeIterator {
+    type Item = Result<Chunk<Box<dyn Array>>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        todo!()
+    }
+}
+
 pub fn merge<R: Read + Seek>(mut readers: Vec<R>,
                              to_path: PathBuf,
                              out_part_id: usize,
@@ -214,7 +226,8 @@ pub fn merge<R: Read + Seek>(mut readers: Vec<R>,
     // initialize parquet streams/readers
     let page_streams = readers
         .into_iter()
-        .map(|r| CompressedPageIterator::try_new(r))
+        // todo make dynamic page size
+        .map(|r| CompressedPageIterator::try_new(r,1024*1024))
         .collect::<Result<Vec<_>>>()?;
     let streams_n = page_streams.len();
 
@@ -222,7 +235,7 @@ pub fn merge<R: Read + Seek>(mut readers: Vec<R>,
         .map(|idx| parquet_schema.columns()[idx].to_owned())
         .collect::<Vec<_>>();
 
-    let mut mr = ParquetMerger {
+    let mut mr = Merger {
         index_cols,
         parquet_schema,
         arrow_schema,
@@ -244,7 +257,7 @@ pub fn merge<R: Read + Seek>(mut readers: Vec<R>,
     Ok(mr.merge()?)
 }
 
-impl<R> ParquetMerger<R>
+impl<R> Merger<R>
     where
         R: Read + Seek,
 {
@@ -689,7 +702,7 @@ impl<R> ParquetMerger<R>
 
         // convert arrow to parquet page chunks
         for chunk in merged_chunks {
-            let pages_chunk = PagesChunk::from_arrow(chunk.arrs.as_slice(), &self.index_cols)?;
+            let pages_chunk = PagesChunk::from_arrow(chunk.cols.as_slice(), &self.index_cols)?;
             let merged_chunk = MergedPagesChunk::new(
                 pages_chunk,
                 MergeReorder::Merge(chunk.reorder, streams.clone()),
@@ -733,7 +746,7 @@ impl<R> ParquetMerger<R>
             } else {
                 // queue contains only one chunk, so we can just push it to result
                 let chunk = self.merge_queue.pop().unwrap();
-                let num_vals = chunk.num_values();
+                let num_vals = chunk.len();
                 let chunk_stream = chunk.stream;
                 self.result_buffer.push_back(MergedPagesChunk::new(
                     chunk,
