@@ -36,6 +36,7 @@ use arrow2::array::UInt8Array;
 use arrow2::array::Utf8Array;
 use arrow2::bitmap::Bitmap;
 use arrow2::chunk::Chunk;
+use arrow2::compute::merge_sort::{merge_sort, merge_sort_slices};
 use arrow2::datatypes::DataType;
 use arrow2::datatypes::Field;
 use arrow2::datatypes::PhysicalType as ArrowPhysicalType;
@@ -45,7 +46,6 @@ use arrow2::io::parquet::read::infer_schema;
 use arrow2::io::parquet::write::add_arrow_schema;
 use arrow2::io::parquet::write::to_parquet_schema;
 use arrow2::offset::OffsetsBuffer;
-use arrow_array::PrimitiveArray;
 use parquet2::metadata::ColumnDescriptor;
 use parquet2::metadata::SchemaDescriptor;
 use parquet2::page::CompressedPage;
@@ -60,7 +60,8 @@ use crate::merge_list_arrays;
 use crate::merge_list_arrays_inner;
 use crate::merge_list_primitive_arrays;
 use crate::merge_primitive_arrays;
-use crate::parquet::merger::arrow::{merge_chunks};
+use crate::parquet::merger;
+use crate::parquet::merger::arrow::{merge_chunks, merge_two_primitives};
 use crate::parquet::merger::arrow::try_merge_schemas;
 use crate::parquet::merger::parquet::{ArrowIterator, CompressedPageIterator, IndexChunk, Value};
 use crate::parquet::merger::parquet::data_page_to_array;
@@ -294,7 +295,18 @@ impl<R> Merger<R>
     }
 
     fn merge_queue(&self, queue: &[ArrowChunk]) -> Result<Vec<Chunk<Box<dyn Array>>>> {
-        Ok(queue.iter().map(|v| v.chunk.to_owned()).collect::<Vec<_>>())
+        let queue = queue.iter().map(|chunk| merger::arrow::ArrowChunk {
+            stream: chunk.stream,
+            cols: chunk.chunk.columns().to_vec(), // todo avoid clone
+            min_values: chunk.min_values(),
+            max_values: chunk.max_values(),
+        }).collect::<Vec<_>>();
+        let res = merge_two_primitives::<i64, i64>(queue, 10)?.into_iter().map(|chunk| {
+            Chunk::new(chunk.cols)
+        }).collect::<Vec<_>>();
+
+        Ok(res)
+        // Ok(queue.iter().map(|v| v.chunk.to_owned()).collect::<Vec<_>>())
     }
     fn next_stream_chunk(&mut self, stream_id: usize) -> Result<Option<ArrowChunk>> {
         let maybe_chunk = self.streams[stream_id].next()?;
@@ -369,20 +381,18 @@ mod tests {
     #[test]
     fn it_works() {
         let v = (0..100).collect::<Vec<_>>();
-        let d = (100..200).collect::<Vec<_>>();
-        let e = (200..300).collect::<Vec<_>>();
         let cols = vec![
             vec![
                 PrimitiveArray::<i64>::from_slice(v.clone()).boxed(),
-                PrimitiveArray::<i64>::from_slice(d.clone()).boxed(),
+                PrimitiveArray::<i64>::from_slice(v.clone()).boxed(),
             ],
             vec![
                 PrimitiveArray::<i64>::from_slice(v.clone()).boxed(),
-                PrimitiveArray::<i64>::from_slice(d.clone()).boxed(),
+                PrimitiveArray::<i64>::from_slice(v.clone()).boxed(),
             ],
             vec![
+                PrimitiveArray::<i64>::from_slice(v.clone()).boxed(),
                 PrimitiveArray::<i64>::from_slice(v).boxed(),
-                PrimitiveArray::<i64>::from_slice(d).boxed(),
             ],
         ];
 
@@ -403,11 +413,11 @@ mod tests {
 
         let readers = cols
             .into_iter()
-            .zip(fields.iter())
-            .map(|(cols, fields)| {
+            .zip(fields.iter()).enumerate()
+            .map(|(idx, (cols, fields))| {
                 let chunk = Chunk::new(cols);
                 let mut w = Cursor::new(vec![]);
-                create_parquet_from_chunk(chunk, fields.to_owned(), &mut w, Some(1), 10).unwrap();
+                create_parquet_from_chunk(chunk, fields.to_owned(), &mut w, Some(idx * 10 + 10), 10).unwrap();
 
                 w
             })
