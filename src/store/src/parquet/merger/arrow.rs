@@ -83,8 +83,8 @@ impl IndexChunk for ArrowChunk {
     fn max_values(&self) -> Vec<Value> {
         self.max_values.clone()
     }
-
 }
+
 impl ArrowChunk {
     pub fn new(cols: Vec<Box<dyn Array>>, stream: usize) -> Self {
         let (min_values, max_values) = cols
@@ -144,7 +144,7 @@ impl ArrowChunk {
 pub struct OneColMergeRow<A>(usize, A);
 
 impl<A> Ord for OneColMergeRow<A>
-where A: Ord
+    where A: Ord
 {
     fn cmp(&self, other: &Self) -> Ordering {
         self.1.cmp(&other.1).reverse()
@@ -152,7 +152,7 @@ where A: Ord
 }
 
 impl<A> PartialOrd for OneColMergeRow<A>
-where A: Ord
+    where A: Ord
 {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
@@ -160,7 +160,7 @@ where A: Ord
 }
 
 impl<A> PartialEq for OneColMergeRow<A>
-where A: Eq
+    where A: Eq
 {
     fn eq(&self, other: &Self) -> bool {
         self.1 == other.1
@@ -176,9 +176,9 @@ impl<A> Eq for OneColMergeRow<A> where A: Eq {}
 pub struct TwoColMergeRow<A, B>(usize, A, B);
 
 impl<A, B> Ord for TwoColMergeRow<A, B>
-where
-    A: Ord,
-    B: Ord,
+    where
+        A: Ord,
+        B: Ord,
 {
     fn cmp(&self, other: &Self) -> Ordering {
         (&self.1, &self.2).cmp(&(&other.1, &other.2)).reverse()
@@ -186,9 +186,9 @@ where
 }
 
 impl<A, B> PartialOrd for TwoColMergeRow<A, B>
-where
-    A: Ord,
-    B: Ord,
+    where
+        A: Ord,
+        B: Ord,
 {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
@@ -196,9 +196,9 @@ where
 }
 
 impl<A, B> PartialEq for TwoColMergeRow<A, B>
-where
-    A: Eq,
-    B: Eq,
+    where
+        A: Eq,
+        B: Eq,
 {
     fn eq(&self, other: &Self) -> bool {
         (&self.1, &self.2) == (&other.1, &other.2)
@@ -206,11 +206,10 @@ where
 }
 
 impl<A, B> Eq for TwoColMergeRow<A, B>
-where
-    A: Eq,
-    B: Eq,
-{
-}
+    where
+        A: Eq,
+        B: Eq,
+{}
 
 // merge chunks with single column partition which is primitive
 
@@ -272,6 +271,8 @@ pub fn merge_one_primitive<T: NativeType + Ord>(
 
     Ok(res)
 }
+
+type Slice = (usize, usize, usize);
 
 // merge chunks with two column partition that are primitives
 
@@ -339,6 +340,42 @@ pub fn merge_two_primitives<T1: NativeType + Ord, T2: NativeType + Ord>(
     }
 
     Ok(res)
+}
+
+pub fn merge_two_primitives2<T1: NativeType + Ord, T2: NativeType + Ord>(
+    chunks: Vec<&[Box<dyn Array>]>
+) -> Result<Vec<usize>> {
+    let mut arrs = chunks
+        .iter().enumerate()
+        .map(|(idx,row)| {
+            let arr1 = row[0]
+                .as_any()
+                .downcast_ref::<PrimitiveArray<T1>>()
+                .unwrap()
+                .values_iter().collect::<Vec<_>>();
+            let arr2 = row[1]
+                .as_any()
+                .downcast_ref::<PrimitiveArray<T2>>()
+                .unwrap()
+                .values_iter().collect::<Vec<_>>();
+            (idx, arr1, arr2)
+        })
+        .collect::<Vec<_>>();
+
+    let len = chunks.iter().map(|c| c[0].len()).sum();
+    let mut out = Vec::with_capacity(len);
+    let mut sort = BinaryHeap::<TwoColMergeRow<T1, T2>>::with_capacity(len);
+    for (stream, a, b) in arrs {
+        for (a, b) in a.into_iter().zip(b.into_iter()) {
+            sort.push(TwoColMergeRow(stream, *a, *b));
+        }
+    }
+
+    while let Some(TwoColMergeRow(row_idx, _, _)) = sort.pop() {
+        out.push(row_idx);
+    }
+
+    Ok(out)
 }
 
 // Merge chunks

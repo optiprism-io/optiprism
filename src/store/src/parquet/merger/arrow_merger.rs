@@ -16,6 +16,7 @@ use arrow2::array::BinaryArray;
 use arrow2::array::BooleanArray;
 use arrow2::array::Float32Array;
 use arrow2::array::Float64Array;
+use arrow2::array::growable::make_growable;
 use arrow2::array::Int128Array;
 use arrow2::array::Int16Array;
 use arrow2::array::Int32Array;
@@ -61,7 +62,7 @@ use crate::merge_list_arrays_inner;
 use crate::merge_list_primitive_arrays;
 use crate::merge_primitive_arrays;
 use crate::parquet::merger;
-use crate::parquet::merger::arrow::{merge_chunks, merge_two_primitives};
+use crate::parquet::merger::arrow::{merge_chunks, merge_two_primitives, merge_two_primitives2};
 use crate::parquet::merger::arrow::try_merge_schemas;
 use crate::parquet::merger::parquet::{ArrowIterator, CompressedPageIterator, IndexChunk, Value};
 use crate::parquet::merger::parquet::data_page_to_array;
@@ -294,20 +295,26 @@ impl<R> Merger<R>
         Ok(mr)
     }
 
-    fn merge_queue(&self, queue: &[ArrowChunk]) -> Result<Vec<Chunk<Box<dyn Array>>>> {
-        let queue = queue.iter().map(|chunk| merger::arrow::ArrowChunk {
-            stream: chunk.stream,
-            cols: chunk.chunk.columns().to_vec(), // todo avoid clone
-            min_values: chunk.min_values(),
-            max_values: chunk.max_values(),
-        }).collect::<Vec<_>>();
-        let res = merge_two_primitives::<i64, i64>(queue, 10)?.into_iter().map(|chunk| {
-            Chunk::new(chunk.cols)
+    fn merge_queue(&self, queue: &Vec<&Chunk<Box<dyn Array>>>) -> Result<Chunk<Box<dyn Array>>> {
+        let arrs = queue.iter().map(|chunk| chunk.columns()).collect::<Vec<_>>();
+        let reorder = merge_two_primitives2::<i64, i64>(arrs)?;
+
+        let cols_len = queue[0].columns().len();
+        let arrs = (0..cols_len).into_iter().map(|col_id| {
+            let mut arrs = queue.iter().map(|chunk| chunk.columns()[col_id].as_ref()).collect::<Vec<_>>();
+            let mut arr_cursors = vec![0; arrs.len()];
+            let mut growable = make_growable(&arrs, false, reorder.len());
+            for idx in reorder.iter() {
+                growable.extend(*idx, arr_cursors[*idx], 1);
+                arr_cursors[*idx] += 1;
+            }
+
+            growable.as_box()
         }).collect::<Vec<_>>();
 
-        Ok(res)
-        // Ok(queue.iter().map(|v| v.chunk.to_owned()).collect::<Vec<_>>())
+        Ok(Chunk::new(arrs))
     }
+
     fn next_stream_chunk(&mut self, stream_id: usize) -> Result<Option<ArrowChunk>> {
         let maybe_chunk = self.streams[stream_id].next()?;
         if maybe_chunk.is_none() {
@@ -348,8 +355,9 @@ impl<R: Read + Seek> Iterator for Merger<R> {
             // check queue len. Queue len may be 1 if there is no intersection
             if merge_queue.len() > 1 {
                 // in case of intersection, merge queue
-                let res = self.merge_queue(&merge_queue).ok()?;
-                self.merge_result_buffer = VecDeque::from(res);
+                let res = self.merge_queue(&merge_queue.iter().map(|chunk| &chunk.chunk).collect::<Vec<_>>()).ok()?;
+                // todo split arrays
+                self.merge_result_buffer = VecDeque::from(vec![res]);
             } else {
                 // queue contains only one chunk, so we can just push it to result
                 let chunk = merge_queue.pop().unwrap();
@@ -385,12 +393,15 @@ mod tests {
             vec![
                 PrimitiveArray::<i64>::from_slice(v.clone()).boxed(),
                 PrimitiveArray::<i64>::from_slice(v.clone()).boxed(),
+                PrimitiveArray::<i64>::from_slice(v.clone()).boxed(),
             ],
             vec![
                 PrimitiveArray::<i64>::from_slice(v.clone()).boxed(),
                 PrimitiveArray::<i64>::from_slice(v.clone()).boxed(),
+                PrimitiveArray::<i64>::from_slice(v.clone()).boxed(),
             ],
             vec![
+                PrimitiveArray::<i64>::from_slice(v.clone()).boxed(),
                 PrimitiveArray::<i64>::from_slice(v.clone()).boxed(),
                 PrimitiveArray::<i64>::from_slice(v).boxed(),
             ],
@@ -400,14 +411,17 @@ mod tests {
             vec![
                 Field::new("f1", DataType::Int64, false),
                 Field::new("f2", DataType::Int64, false),
+                Field::new("f3", DataType::Int64, false),
             ],
             vec![
                 Field::new("f1", DataType::Int64, false),
                 Field::new("f2", DataType::Int64, false),
+                Field::new("f3", DataType::Int64, false),
             ],
             vec![
                 Field::new("f1", DataType::Int64, false),
                 Field::new("f2", DataType::Int64, false),
+                Field::new("f3", DataType::Int64, false),
             ],
         ];
 
@@ -425,12 +439,12 @@ mod tests {
 
         let opts = Options {
             index_cols: 1,
-            fields: vec!["f1".to_string(), "f2".to_string()],
+            fields: vec!["f1".to_string(), "f2".to_string(), "f3".to_string()],
         };
         let mut merger = Merger::new(readers, opts).unwrap();
         while let Some(chunk) = merger.next()
         {
-            println!("{:?}", chunk.unwrap());
+            println!("{:#?}", chunk.unwrap());
         }
     }
 }
