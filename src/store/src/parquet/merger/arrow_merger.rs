@@ -10,7 +10,7 @@ use std::io::Write;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 
-use arrow2::array::new_null_array;
+use arrow2::array::{new_null_array, PrimitiveArray};
 use arrow2::array::Array;
 use arrow2::array::BinaryArray;
 use arrow2::array::BooleanArray;
@@ -47,6 +47,7 @@ use arrow2::io::parquet::read::infer_schema;
 use arrow2::io::parquet::write::add_arrow_schema;
 use arrow2::io::parquet::write::to_parquet_schema;
 use arrow2::offset::OffsetsBuffer;
+use arrow2::types::NativeType;
 use parquet2::metadata::ColumnDescriptor;
 use parquet2::metadata::SchemaDescriptor;
 use parquet2::page::CompressedPage;
@@ -54,7 +55,7 @@ use parquet2::write::FileSeqWriter;
 use parquet2::write::Version;
 use parquet2::write::WriteOptions;
 
-use crate::error::Result;
+use crate::error::{Result, StoreError};
 use crate::{merge_arrays};
 use crate::merge_arrays_inner;
 use crate::merge_list_arrays;
@@ -62,12 +63,108 @@ use crate::merge_list_arrays_inner;
 use crate::merge_list_primitive_arrays;
 use crate::merge_primitive_arrays;
 use crate::parquet::merger;
-use crate::parquet::merger::arrow::{merge_chunks, merge_two_primitives, merge_two_primitives2};
-use crate::parquet::merger::arrow::try_merge_schemas;
-use crate::parquet::merger::parquet::{ArrowIterator, CompressedPageIterator, IndexChunk, Value};
+use crate::parquet::merger::parquet::{ArrowIterator, CompressedPageIterator, Value};
 use crate::parquet::merger::parquet::data_page_to_array;
 use crate::parquet::merger::parquet::ColumnPath;
-use crate::parquet::merger::{MergeReorder, TmpArray};
+use crate::parquet::merger::{OneColMergeRow, TmpArray, try_merge_arrow_schemas, TwoColMergeRow};
+
+
+// merge chunks with single column partition which is primitive
+
+pub fn merge_one_primitive<T: NativeType + Ord>(
+    chunks: Vec<&[Box<dyn Array>]>
+) -> Result<Vec<usize>> {
+    let mut arrs = chunks
+        .iter().enumerate()
+        .map(|(idx, row)| {
+            let arr = row[0]
+                .as_any()
+                .downcast_ref::<PrimitiveArray<T>>()
+                .unwrap()
+                .values_iter().collect::<Vec<_>>();
+            (idx, arr)
+        })
+        .collect::<Vec<_>>();
+
+    let len = chunks.iter().map(|c| c[0].len()).sum();
+    let mut out = Vec::with_capacity(len);
+    let mut sort = BinaryHeap::<OneColMergeRow<T>>::with_capacity(len);
+    for (stream, a) in arrs {
+        for (a) in a.into_iter() {
+            sort.push(OneColMergeRow(stream, *a));
+        }
+    }
+
+    while let Some(OneColMergeRow(row_idx, _)) = sort.pop() {
+        out.push(row_idx);
+    }
+
+    Ok(out)
+}
+
+pub fn merge_two_primitives<T1: NativeType + Ord, T2: NativeType + Ord>(
+    chunks: Vec<&[Box<dyn Array>]>
+) -> Result<Vec<usize>> {
+    let mut arrs = chunks
+        .iter().enumerate()
+        .map(|(idx, row)| {
+            let arr1 = row[0]
+                .as_any()
+                .downcast_ref::<PrimitiveArray<T1>>()
+                .unwrap()
+                .values_iter().collect::<Vec<_>>();
+            let arr2 = row[1]
+                .as_any()
+                .downcast_ref::<PrimitiveArray<T2>>()
+                .unwrap()
+                .values_iter().collect::<Vec<_>>();
+            (idx, arr1, arr2)
+        })
+        .collect::<Vec<_>>();
+
+    let len = chunks.iter().map(|c| c[0].len()).sum();
+    let mut out = Vec::with_capacity(len);
+    let mut sort = BinaryHeap::<TwoColMergeRow<T1, T2>>::with_capacity(len);
+    for (stream, a, b) in arrs {
+        for (a, b) in a.into_iter().zip(b.into_iter()) {
+            sort.push(TwoColMergeRow(stream, *a, *b));
+        }
+    }
+
+    while let Some(TwoColMergeRow(row_idx, _, _)) = sort.pop() {
+        out.push(row_idx);
+    }
+
+    Ok(out)
+}
+
+// Merge chunks
+
+// Merge multiple chunks into vector of MergedArrowChunk of arrays split by array_size
+
+pub fn merge_chunks(chunks: Vec<&[Box<dyn Array>]>, index_cols: usize) -> Result<Vec<usize>> {
+    let res = match index_cols {
+        1 => {
+            match chunks[0][0].data_type() {
+                DataType::Int64 => {
+                    merge_one_primitive::<i64>(chunks)?
+                }
+                _ => return Err(StoreError::InvalidParameter(format!("merge not implemented for type {:?}", chunks[0][0].data_type())))
+            }
+        }
+        2 => {
+            match (chunks[0][0].data_type(), chunks[0][0].data_type()) {
+                (DataType::Int64, DataType::Int64) => {
+                    merge_two_primitives::<i64, i64>(chunks)?
+                }
+                _ => return Err(StoreError::InvalidParameter(format!("merge not implemented for type {:?}", chunks[0][0].data_type())))
+            }
+        }
+        _ => return Err(StoreError::InvalidParameter(format!("merge not implemented for {:?} columns", index_cols)))
+    };
+
+    Ok(res)
+}
 
 
 pub fn check_intersection(chunks: &[ArrowChunk], other: Option<&ArrowChunk>) -> bool {
@@ -188,18 +285,6 @@ impl ArrowChunk {
     }
 }
 
-#[derive(Debug)]
-pub struct Merged(pub Vec<Box<dyn Array>>, pub MergeReorder);
-
-impl Merged {
-    pub fn new(chunk: Vec<Box<dyn Array>>, merge_reorder: MergeReorder) -> Self {
-        Self(chunk, merge_reorder)
-    }
-
-    pub fn num_values(&self) -> usize {
-        self.0.len()
-    }
-}
 
 // this is a temporary array used to merge data pages avoiding downcasting
 
@@ -208,7 +293,7 @@ pub struct Options {
     pub fields: Vec<String>,
 }
 
-pub struct Merger<R>
+pub struct MergingIterator<R>
     where
         R: Read + Seek,
 {
@@ -242,7 +327,7 @@ impl Iterator for MergeIterator {
     }
 }
 
-impl<R> Merger<R>
+impl<R> MergingIterator<R>
     where
         R: Read + Seek,
 {
@@ -254,7 +339,7 @@ impl<R> Merger<R>
             .map(|r| arrow2::io::parquet::read::read_metadata(r).and_then(|md| infer_schema(&md)))
             .collect::<arrow2::error::Result<Vec<Schema>>>()?;
         // make unified schema
-        let arrow_schema = try_merge_schemas(arrow_schemas)?;
+        let arrow_schema = try_merge_arrow_schemas(arrow_schemas)?;
         // make parquet schema
         let parquet_schema = to_parquet_schema(&arrow_schema)?;
         let page_streams = readers
@@ -271,7 +356,7 @@ impl<R> Merger<R>
         let fields = opts.fields.iter().map(|f| parquet_schema.columns().iter().find(|c| c.path_in_schema[0] == *f).unwrap().to_owned()).collect::<Vec<_>>();
         let arrow_streams = page_streams
             .into_iter()
-            .map(|v| ArrowIterator::new(v, fields.clone()))
+            .map(|v| ArrowIterator::new(v, fields.clone(), arrow_schema.clone()))
             .collect::<Vec<_>>();
         let streams_n = arrow_streams.len();
 
@@ -295,12 +380,13 @@ impl<R> Merger<R>
         Ok(mr)
     }
 
-    fn merge_queue(&self, queue: &Vec<&Chunk<Box<dyn Array>>>) -> Result<Chunk<Box<dyn Array>>> {
+    fn merge_queue(&self, queue: &Vec<&Chunk<Box<dyn Array>>>, index_cols: usize) -> Result<Chunk<Box<dyn Array>>> {
         let arrs = queue.iter().map(|chunk| chunk.columns()).collect::<Vec<_>>();
-        let reorder = merge_two_primitives2::<i64, i64>(arrs)?;
+        let reorder = merge_chunks(arrs, index_cols)?;
 
         let cols_len = queue[0].columns().len();
         let arrs = (0..cols_len).into_iter().map(|col_id| {
+            // todo split arrays
             let mut arrs = queue.iter().map(|chunk| chunk.columns()[col_id].as_ref()).collect::<Vec<_>>();
             let mut arr_cursors = vec![0; arrs.len()];
             let mut growable = make_growable(&arrs, false, reorder.len());
@@ -325,7 +411,7 @@ impl<R> Merger<R>
     }
 }
 
-impl<R: Read + Seek> Iterator for Merger<R> {
+impl<R: Read + Seek> Iterator for MergingIterator<R> {
     type Item = Result<Chunk<Box<dyn Array>>>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -355,7 +441,7 @@ impl<R: Read + Seek> Iterator for Merger<R> {
             // check queue len. Queue len may be 1 if there is no intersection
             if merge_queue.len() > 1 {
                 // in case of intersection, merge queue
-                let res = self.merge_queue(&merge_queue.iter().map(|chunk| &chunk.chunk).collect::<Vec<_>>()).ok()?;
+                let res = self.merge_queue(&merge_queue.iter().map(|chunk| &chunk.chunk).collect::<Vec<_>>(),self.index_cols.len()).ok()?;
                 // todo split arrays
                 self.merge_result_buffer = VecDeque::from(vec![res]);
             } else {
@@ -382,7 +468,7 @@ mod tests {
     use arrow2::io::parquet::write::{RowGroupIterator, WriteOptions};
     use parquet2::compression::CompressionOptions;
     use parquet2::write::Version;
-    use crate::parquet::merger::arrow_merger::{Merger, Options};
+    use crate::parquet::merger::arrow_merger::{MergingIterator, Options};
     use crate::test_util::{create_parquet_from_chunk, parse_markdown_tables};
 
 
@@ -396,7 +482,6 @@ mod tests {
                 PrimitiveArray::<i64>::from_slice(v.clone()).boxed(),
             ],
             vec![
-                PrimitiveArray::<i64>::from_slice(v.clone()).boxed(),
                 PrimitiveArray::<i64>::from_slice(v.clone()).boxed(),
                 PrimitiveArray::<i64>::from_slice(v.clone()).boxed(),
             ],
@@ -416,7 +501,6 @@ mod tests {
             vec![
                 Field::new("f1", DataType::Int64, false),
                 Field::new("f2", DataType::Int64, false),
-                Field::new("f3", DataType::Int64, false),
             ],
             vec![
                 Field::new("f1", DataType::Int64, false),
@@ -441,7 +525,7 @@ mod tests {
             index_cols: 1,
             fields: vec!["f1".to_string(), "f2".to_string(), "f3".to_string()],
         };
-        let mut merger = Merger::new(readers, opts).unwrap();
+        let mut merger = MergingIterator::new(readers, opts).unwrap();
         while let Some(chunk) = merger.next()
         {
             println!("{:#?}", chunk.unwrap());

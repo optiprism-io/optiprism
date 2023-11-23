@@ -71,7 +71,6 @@ use crate::ColValue;
 use crate::db::compaction::{Compactor, CompactorMessage};
 use crate::KeyValue;
 use crate::parquet::merger;
-use crate::parquet::merger::{FileMergeOptions, merge, Merger};
 use crate::RowValue;
 use crate::Value;
 

@@ -6,9 +6,9 @@ use std::io::Read;
 use std::io::Seek;
 use std::sync::{Arc, Mutex};
 
-use arrow2::array::{Array, Int32Array};
+use arrow2::array::{Array, Int32Array, Int64Array, new_null_array};
 use arrow2::chunk::Chunk;
-use arrow2::datatypes::{DataType, Field};
+use arrow2::datatypes::{DataType, Field, Schema};
 use arrow2::io::parquet::read::column_iter_to_arrays;
 use arrow2::io::parquet::read::deserialize::page_iter_to_arrays;
 use arrow2::io::parquet::read::schema::convert::to_primitive_type;
@@ -34,8 +34,8 @@ use parquet2::write::Version;
 
 use crate::error::Result;
 use crate::error::StoreError;
-use crate::parquet::merger::arrow::ArrowChunk;
-use crate::parquet::merger::MergeReorder;
+use crate::parquet::merger::IndexChunk;
+
 
 #[derive(Eq, PartialEq, PartialOrd, Ord, Debug, Clone)]
 pub enum Value {
@@ -103,28 +103,6 @@ macro_rules! min_max_values {
             _ => return Err(StoreError::Internal("no stats".to_string())),
         }
     }};
-}
-pub fn check_intersection(chunks: &[PagesChunk], other: Option<&PagesChunk>) -> bool {
-    if other.is_none() {
-        return false;
-    }
-
-    let mut iter = chunks.iter();
-    let first = iter.next().unwrap();
-    let mut min_values = first.min_values();
-    let mut max_values = first.max_values();
-    for row in iter {
-        if row.min_values <= min_values {
-            min_values = row.min_values();
-        }
-        if row.max_values >= max_values {
-            max_values = row.max_values();
-        }
-    }
-
-    let other = other.unwrap();
-
-    min_values <= other.max_values() && max_values >= other.min_values
 }
 
 pub fn pages_to_arrays(
@@ -248,153 +226,7 @@ pub fn get_page_min_max_values(pages: &[CompressedPage]) -> Result<(Value, Value
     }
 }
 
-#[derive(Debug)]
-pub struct MergedPagesChunk(pub PagesChunk, pub MergeReorder);
 
-impl MergedPagesChunk {
-    pub fn new(chunk: PagesChunk, merge_reorder: MergeReorder) -> Self {
-        Self(chunk, merge_reorder)
-    }
-
-    pub fn num_values(&self) -> usize {
-        self.0.len()
-    }
-}
-
-pub trait IndexChunk {
-    fn min_values(&self) -> Vec<Value>;
-    fn max_values(&self) -> Vec<Value>;
-}
-
-
-#[derive(Debug)]
-pub struct PagesChunk {
-    pub cols: Vec<Vec<CompressedPage>>,
-    pub min_values: Vec<Value>,
-    pub max_values: Vec<Value>,
-    pub stream: usize,
-}
-
-impl Eq for PagesChunk {}
-
-impl PartialOrd for PagesChunk {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(other.cmp(self))
-    }
-
-    fn lt(&self, other: &Self) -> bool {
-        other.min_values < self.min_values
-    }
-    #[inline]
-    fn le(&self, other: &Self) -> bool {
-        other.min_values <= self.min_values
-    }
-    #[inline]
-    fn gt(&self, other: &Self) -> bool {
-        other.min_values > self.min_values
-    }
-    #[inline]
-    fn ge(&self, other: &Self) -> bool {
-        other.min_values >= self.min_values
-    }
-}
-
-impl Ord for PagesChunk {
-    fn cmp(&self, other: &Self) -> Ordering {
-        other.min_values.cmp(&self.min_values)
-    }
-}
-
-impl PartialEq for PagesChunk {
-    fn eq(&self, other: &Self) -> bool {
-        self.min_values == other.min_values && self.max_values == other.max_values
-    }
-}
-
-impl IndexChunk for PagesChunk {
-    fn min_values(&self) -> Vec<Value> {
-        self.min_values.clone()
-    }
-
-    fn max_values(&self) -> Vec<Value> {
-        self.max_values.clone()
-    }
-}
-
-impl PagesChunk {
-    pub fn new(cols: Vec<Vec<CompressedPage>>, stream: usize) -> Self {
-        let (min_values, max_values) = cols
-            .iter()
-            .map(|pages| {
-                let (min, max) = get_page_min_max_values(pages.as_slice()).unwrap();
-                (min, max)
-            })
-            .unzip();
-
-        Self {
-            cols,
-            min_values,
-            max_values,
-            stream,
-        }
-    }
-
-    pub fn len(&self) -> usize {
-        self.cols[0]
-            .iter()
-            .map(|page| match page {
-                CompressedPage::Data(page) => page.num_values(),
-                _ => unimplemented!("dictionary page is not supported"),
-            })
-            .sum()
-    }
-    pub fn to_arrow_chunk(
-        self,
-        buf: &mut Vec<u8>,
-        index_cols: &[ColumnDescriptor],
-    ) -> Result<ArrowChunk> {
-        let cols = self
-            .cols
-            .into_iter()
-            .zip(index_cols.iter())
-            .map(|(pages, cd)| {
-                pages_to_arrays(pages, cd, None, buf).map(|mut res| res.pop().unwrap())
-            })
-            .collect::<Result<Vec<_>>>()?;
-
-        Ok(ArrowChunk::new(cols, self.stream))
-    }
-
-    pub fn from_arrow(arrs: &[Box<dyn Array>], index_cols: &[ColumnDescriptor]) -> Result<Self> {
-        let opts = WriteOptions {
-            write_statistics: true,
-            compression: CompressionOptions::Snappy, // todo
-            version: Version::V2,
-            data_pagesize_limit: None,
-        };
-        let cols = arrs
-            .iter()
-            .zip(index_cols.iter())
-            .map(|(arr, cd)| {
-                array_to_columns(arr, cd.base_type.clone(), opts, &[Encoding::Plain])
-                    .and_then(|mut res| {
-                        res.pop()
-                            .unwrap()
-                            .collect::<arrow2::error::Result<Vec<_>>>()
-                    })
-                    .and_then(|pages| {
-                        pages
-                            .into_iter()
-                            .map(|page| compress(page, vec![], CompressionOptions::Snappy))
-                            .collect::<parquet2::error::Result<Vec<_>>>()
-                            .map_err(|e| arrow2::error::Error::from_external_error(Box::new(e)))
-                    })
-            })
-            .collect::<arrow2::error::Result<Vec<_>>>()?;
-
-        Ok(Self::new(cols, 0))
-    }
-}
 
 pub type ColumnPath = Vec<String>;
 
@@ -409,7 +241,7 @@ pub struct CompressedPageIterator<R> {
 impl<R: Read + Seek> CompressedPageIterator<R> {
     pub fn try_new(mut reader: R, max_page_size: usize) -> Result<Self> {
         let metadata = parquet2::read::read_metadata(&mut reader)?;
-        println!("{:?}",metadata
+        println!("{:?}", metadata
             .schema()
             .columns());
         let chunk_buffer = metadata
@@ -481,6 +313,11 @@ impl<R: Read + Seek> CompressedPageIterator<R> {
     }
 
     pub fn next_page(&mut self, col_path: &ColumnPath) -> Result<Option<CompressedPage>> {
+        let mut need_next = false;
+        match self.chunk_buffer.get(col_path) {
+            None => return Ok(None),
+            Some(p) => need_next = p.is_empty(),
+        }
         let need_next = self.chunk_buffer.get(col_path).unwrap().is_empty();
         let maybe_page = if need_next {
             match self.next_chunk(col_path)? {
@@ -510,13 +347,15 @@ impl<R: Read + Seek> CompressedPageIterator<R> {
 pub struct ArrowIterator<R: Read + Seek> {
     page_iter: CompressedPageIterator<R>,
     fields: Vec<ColumnDescriptor>,
+    schema: Schema,
 }
 
 impl<R: Read + Seek> ArrowIterator<R> {
-    pub fn new(page_iter: CompressedPageIterator<R>, fields: Vec<ColumnDescriptor>) -> Self {
+    pub fn new(page_iter: CompressedPageIterator<R>, fields: Vec<ColumnDescriptor>, schema: Schema) -> Self {
         Self {
             page_iter,
-            fields
+            fields,
+            schema,
         }
     }
 
@@ -527,19 +366,32 @@ impl<R: Read + Seek> ArrowIterator<R> {
     pub fn next(&mut self) -> Result<Option<Chunk<Box<dyn Array>>>> {
         let mut ret = vec![];
 
-        for cd in self.fields.iter() {
+        let mut num_rows = 0;
+        for (idx, cd) in self.fields.iter().enumerate() {
             let page = self.page_iter.next_page(&cd.path_in_schema)?;
             match page {
-                None => return Ok(None),
+                None => {
+                    // no more pages
+                    if idx == 0 {
+                        return Ok(None);
+                    }
+
+                    ret.push(new_null_array(self.schema.fields[idx].data_type().clone(), num_rows))
+                }
                 Some(page) => {
                     let mut buf = vec![];
-                    let mut arr = pages_to_arrays(
+                    let mut arrs = pages_to_arrays(
                         vec![page],
                         cd,
                         None,
                         &mut buf,
                     )?;
-                    ret.push(arr.pop().unwrap());
+                    let arr = arrs.pop().unwrap();
+                    // set rows. Assume that first column is always present
+                    if idx == 0 {
+                        num_rows = arr.len();
+                    }
+                    ret.push(arr);
                 }
             }
         }

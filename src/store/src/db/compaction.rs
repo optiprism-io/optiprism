@@ -9,7 +9,8 @@ use tracing::error;
 use crate::db::{FsOp, Level, log_metadata, Metadata, Options, Part, part_path, Vfs};
 use crate::error::Result;
 use crate::parquet::merger;
-use crate::parquet::merger::merge;
+use crate::parquet::merger::parquet_merger;
+use crate::parquet::merger::parquet_merger::merge;
 
 #[derive(Clone, Debug)]
 pub enum CompactorMessage {
@@ -277,7 +278,7 @@ fn compact(levels: &[Level], partition_id: usize, path: &PathBuf, opts: &Options
                 let out_part_id = tmp_levels[l + 1].part_id + 1;
                 let out_path = path.join(format!("parts/{}/{}", partition_id, l + 1));
                 let rdrs = in_paths.iter().map(|p| File::open(p)).collect::<std::result::Result<Vec<File>, std::io::Error>>()?;
-                let merger_opts = merger::Options {
+                let merger_opts = parquet_merger::Options {
                     index_cols: opts.merge_index_cols,
                     data_page_size_limit_bytes: opts.merge_data_page_size_limit_bytes,
                     row_group_values_limit: opts.merge_row_group_values_limit,
