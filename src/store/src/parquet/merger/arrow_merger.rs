@@ -1,4 +1,4 @@
-use std::cmp::Ordering;
+use std::cmp::{min, Ordering};
 use std::collections::BinaryHeap;
 use std::collections::HashMap;
 use std::collections::VecDeque;
@@ -290,6 +290,7 @@ impl ArrowChunk {
 
 pub struct Options {
     pub index_cols: usize,
+    array_size: usize,
     pub fields: Vec<String>,
 }
 
@@ -299,6 +300,7 @@ pub struct MergingIterator<R>
 {
     // list of index cols (partitions) in parquet file
     index_cols: Vec<ColumnDescriptor>,
+    array_size: usize,
     // final schema of parquet file (merged multiple schemas)
     parquet_schema: SchemaDescriptor,
     // final arrow schema
@@ -363,6 +365,7 @@ impl<R> MergingIterator<R>
 
         let mut mr = Self {
             index_cols,
+            array_size: opts.array_size,
             parquet_schema,
             arrow_schema,
             streams: arrow_streams,
@@ -380,12 +383,12 @@ impl<R> MergingIterator<R>
         Ok(mr)
     }
 
-    fn merge_queue(&self, queue: &Vec<&Chunk<Box<dyn Array>>>, index_cols: usize) -> Result<Chunk<Box<dyn Array>>> {
+    fn merge_queue(&self, queue: &Vec<&Chunk<Box<dyn Array>>>) -> Result<Vec<Chunk<Box<dyn Array>>>> {
         let arrs = queue.iter().map(|chunk| chunk.columns()).collect::<Vec<_>>();
-        let reorder = merge_chunks(arrs, index_cols)?;
+        let reorder = merge_chunks(arrs, self.index_cols.len())?;
 
         let cols_len = queue[0].columns().len();
-        let arrs = (0..cols_len).into_iter().map(|col_id| {
+        let mut arrs = (0..cols_len).into_iter().map(|col_id| {
             // todo split arrays
             let mut arrs = queue.iter().map(|chunk| chunk.columns()[col_id].as_ref()).collect::<Vec<_>>();
             let mut arr_cursors = vec![0; arrs.len()];
@@ -398,7 +401,15 @@ impl<R> MergingIterator<R>
             growable.as_box()
         }).collect::<Vec<_>>();
 
-        Ok(Chunk::new(arrs))
+        let mut out = vec![];
+
+        let mut len = arrs[0].len();
+        for i in (0..reorder.len()).into_iter().step_by(self.array_size) {
+            let arrs = arrs.iter_mut().map(|arr| arr.sliced(i, min(self.array_size, len))).collect::<Vec<_>>();
+            out.push(Chunk::new(arrs));
+            len -= min(self.array_size, len);
+        }
+        Ok(out)
     }
 
     fn next_stream_chunk(&mut self, stream_id: usize) -> Result<Option<ArrowChunk>> {
@@ -441,9 +452,9 @@ impl<R: Read + Seek> Iterator for MergingIterator<R> {
             // check queue len. Queue len may be 1 if there is no intersection
             if merge_queue.len() > 1 {
                 // in case of intersection, merge queue
-                let res = self.merge_queue(&merge_queue.iter().map(|chunk| &chunk.chunk).collect::<Vec<_>>(),self.index_cols.len()).ok()?;
+                let res = self.merge_queue(&merge_queue.iter().map(|chunk| &chunk.chunk).collect::<Vec<_>>()).ok()?;
                 // todo split arrays
-                self.merge_result_buffer = VecDeque::from(vec![res]);
+                self.merge_result_buffer = VecDeque::from(res);
             } else {
                 // queue contains only one chunk, so we can just push it to result
                 let chunk = merge_queue.pop().unwrap();
@@ -523,6 +534,7 @@ mod tests {
 
         let opts = Options {
             index_cols: 1,
+            array_size: 9,
             fields: vec!["f1".to_string(), "f2".to_string(), "f3".to_string()],
         };
         let mut merger = MergingIterator::new(readers, opts).unwrap();
