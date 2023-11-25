@@ -9,7 +9,6 @@ use datafusion::execution::context::SessionState;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion_expr::Expr;
 use datafusion_expr::TableType;
-use store::db::OptiDB;
 use store::db::OptiDBImpl;
 
 use crate::error::Result;
@@ -52,9 +51,31 @@ impl TableProvider for LocalTable {
         _filters: &[Expr],
         _limit: Option<usize>,
     ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
+        let fields = match projection {
+            None => self
+                .schema
+                .fields
+                .iter()
+                .map(|f| f.name().to_owned())
+                .collect::<Vec<_>>(),
+            Some(idx) => self
+                .schema
+                .fields
+                .iter()
+                .enumerate()
+                .filter_map(|(i, f)| {
+                    if idx.contains(&i) {
+                        Some(f.name().to_owned())
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>(),
+        };
+
         let streams = self
             .db
-            .scan(self.partitions, vec![])
+            .scan(self.partitions, fields)
             .map_err(|e| DataFusionError::Internal(e.to_string()))?;
         Ok(Arc::new(
             LocalExec::try_new(self.schema.clone(), streams)

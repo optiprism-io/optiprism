@@ -83,7 +83,7 @@ pub struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
     #[arg(long)]
-    md_path: Option<PathBuf>,
+    path: Option<PathBuf>,
     #[clap(flatten)]
     tracing: TracingCliArgs,
     #[arg(long, default_value = "0.0.0.0:8080")]
@@ -107,8 +107,8 @@ async fn main() -> Result<(), anyhow::Error> {
         return Err(DemoError::BadRequest("no command specified".to_string()).into());
     }
 
-    let md_path = match args.md_path.clone() {
-        None => temp_dir().join(format!("{}.db", Uuid::new_v4())),
+    let md_path = match args.path.clone() {
+        None => temp_dir().join(format!("md/{}.db", Uuid::new_v4())),
         Some(path) => {
             if !path.try_exists()? {
                 return Err(DemoError::FileNotFound(format!(

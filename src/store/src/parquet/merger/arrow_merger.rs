@@ -291,7 +291,7 @@ impl ArrowChunk {
 
 pub struct Options {
     pub index_cols: usize,
-    array_size: usize,
+    pub array_size: usize,
     pub fields: Vec<String>,
 }
 

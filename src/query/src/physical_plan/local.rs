@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::fs::File;
 use std::mem;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -25,7 +26,7 @@ use futures::TryStream;
 use store::arrow_conversion::arrow2_to_arrow1;
 use store::db::OptiDB;
 use store::db::OptiDBImpl;
-use store::db::RetStream;
+use store::db::ScanStream;
 use store::error::StoreError;
 
 use crate::error::QueryError;
@@ -34,11 +35,11 @@ use crate::error::Result;
 #[derive(Debug)]
 pub struct LocalExec {
     schema: SchemaRef,
-    streams: Mutex<Vec<Option<RetStream>>>,
+    streams: Mutex<Vec<Option<ScanStream<File>>>>,
 }
 
 impl LocalExec {
-    pub fn try_new(schema: SchemaRef, streams: Vec<RetStream>) -> Result<Self> {
+    pub fn try_new(schema: SchemaRef, streams: Vec<ScanStream<File>>) -> Result<Self> {
         Ok(Self {
             schema,
             streams: Mutex::new(streams.into_iter().map(|s| Some(s)).collect()),
@@ -177,6 +178,7 @@ mod tests {
             merge_max_part_size_bytes: 2048,
             merge_row_group_values_limit: 1000,
             read_chunk_size: 10,
+            merge_array_size: 100,
         };
         let mut db = OptiDBImpl::open(path, opts).unwrap();
         db.add_field(Field::new("a", DataType::Int64, false))

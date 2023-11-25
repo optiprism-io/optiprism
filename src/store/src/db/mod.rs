@@ -86,6 +86,7 @@ use crate::error::StoreError;
 use crate::options::ReadOptions;
 use crate::options::WriteOptions;
 use crate::parquet::merger;
+use crate::parquet::merger::arrow_merger;
 use crate::parquet::merger::arrow_merger::MergingIterator;
 use crate::parquet::merger::chunk_min_max;
 use crate::ColValue;
@@ -159,7 +160,6 @@ pub struct Metadata {
     log_id: u64,
     schema: Schema,
     partitions: Vec<Partition>,
-    // levels->parts
     stats: Stats,
 }
 
@@ -286,6 +286,7 @@ pub struct Options {
     pub merge_index_cols: usize,
     pub merge_data_page_size_limit_bytes: Option<usize>,
     pub merge_row_group_values_limit: usize,
+    pub merge_array_size: usize,
     pub merge_array_page_size: usize,
 }
 
@@ -624,6 +625,7 @@ fn memtable_to_partitioned_chunks(
             }
         }
     }
+    // todo make nulls for missing values (schema evolution)
     let v = partitions
         .into_iter()
         .map(|p| {
@@ -910,20 +912,20 @@ pub struct PartitionStream {
 }
 
 #[derive(Debug, Clone)]
-pub struct RetStream<R>
+pub struct ScanStream<R>
 where R: Read + Seek
 {
     iters: Vec<MergingIterator<R>>,
     iter_idx: usize,
 }
 
-impl<R: Read + Seek> RetStream<R> {
+impl<R: Read + Seek> ScanStream<R> {
     pub fn new(iters: Vec<MergingIterator<R>>) -> Self {
         Self { iters, iter_idx: 0 }
     }
 }
 
-impl<R: Read + Seek> Stream for RetStream<R> {
+impl<R: Read + Seek> Stream for ScanStream<R> {
     type Item = Result<Chunk<Box<dyn Array>>>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -1030,13 +1032,17 @@ impl OptiDBImpl {
         unimplemented!()
     }
 
-    pub fn scan(&self, required_partitions: usize, fields: Vec<Field>) -> Result<Vec<RetStream>> {
+    pub fn scan(
+        &self,
+        required_partitions: usize,
+        fields: Vec<String>,
+    ) -> Result<Vec<ScanStream<File>>> {
         let md = self.metadata.lock().unwrap();
         let schema = md.schema.clone();
-        let mut partitions = md.partitions.clone();
+        let mut all_partitions = md.partitions.clone();
         drop(md);
         let mut mt = self.memtable.lock().unwrap();
-        let chunk = memtable_to_partitioned_chunks(
+        let mem_chunks = memtable_to_partitioned_chunks(
             &mut mt,
             &schema,
             self.opts.partitions,
@@ -1045,7 +1051,7 @@ impl OptiDBImpl {
 
         let mut out = vec![];
         for _ in 0..required_partitions {
-            match partitions.pop() {
+            match all_partitions.pop() {
                 None => out.push(vec![]),
                 Some(v) => {
                     out.push(vec![v]);
@@ -1053,17 +1059,41 @@ impl OptiDBImpl {
             }
         }
 
-        if partitions.len() > 0 {
+        if all_partitions.len() > 0 {
             let mut rest = out.pop().unwrap();
-            let mut b = partitions.drain(..).collect();
+            let mut b = all_partitions.drain(..).collect();
             rest.append(&mut b);
             out.push(rest);
         }
 
-        let streams = out
-            .into_iter()
-            .map(|parts| RetStream::new(parts))
-            .collect::<Vec<_>>();
+        let mut streams = vec![];
+        for partitions in out {
+            let mut iters = vec![];
+            for partition in partitions {
+                let mut rdrs = vec![];
+                let mem_chunk = mem_chunks
+                    .iter()
+                    .find(|c| c.partition_id == partition.id)
+                    .map(|c| c.chunk.clone());
+
+                for (level_id, level) in partition.levels.into_iter().enumerate() {
+                    for part in level.parts {
+                        let path = part_path(&self.path, partition.id, level_id, part.id);
+                        let rdr = File::open(path)?;
+                        rdrs.push(rdr);
+                    }
+                }
+
+                let opts = arrow_merger::Options {
+                    index_cols: self.opts.merge_index_cols,
+                    array_size: self.opts.merge_array_size,
+                    fields: fields.clone(),
+                };
+                let iter = MergingIterator::new(rdrs, mem_chunk, opts)?;
+                iters.push(iter);
+            }
+            streams.push(ScanStream::new(iters));
+        }
 
         Ok(streams)
     }
