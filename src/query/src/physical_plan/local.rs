@@ -151,7 +151,7 @@ mod tests {
     use datafusion::prelude::SessionContext;
     use store::arrow_conversion::schema2_to_schema1;
     use store::db::OptiDBImpl;
-    use store::db::Options;
+    use store::db::TableOptions;
     use store::KeyValue;
     use store::Value;
     use tracing::debug;
@@ -165,7 +165,7 @@ mod tests {
         fs::remove_dir_all(&path).unwrap();
         // fs::create_dir_all(&path).unwrap();
 
-        let opts = Options {
+        let opts = TableOptions {
             partitions: 2,
             partition_keys: vec![0],
             l1_max_size_bytes: 1024 * 1024 * 10,
@@ -195,7 +195,7 @@ mod tests {
             .unwrap();
         }
 
-        let schema = schema2_to_schema1(db.schema());
+        let schema = schema2_to_schema1(db.schema()?);
         let prov = LocalTable::try_new(Arc::new(db), Arc::new(schema), 1).unwrap();
         let table_source = Arc::new(DefaultTableSource::new(
             Arc::new(prov) as Arc<dyn TableProvider>

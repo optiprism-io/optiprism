@@ -7,6 +7,7 @@ use std::sync::mpsc::Sender;
 use std::sync::mpsc::TryRecvError;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::sync::RwLock;
 use std::thread;
 use std::time;
 use std::time::Instant;
@@ -18,8 +19,9 @@ use crate::db::part_path;
 use crate::db::FsOp;
 use crate::db::Level;
 use crate::db::Metadata;
-use crate::db::Options;
 use crate::db::Part;
+use crate::db::Table;
+use crate::db::TableOptions;
 use crate::db::Vfs;
 use crate::error::Result;
 use crate::parquet::merger;
@@ -51,30 +53,21 @@ struct CompactResult {
 }
 
 pub struct Compactor {
-    opts: Options,
-    metadata: Arc<Mutex<Metadata>>,
-    log: Arc<Mutex<BufWriter<File>>>,
+    tables: Arc<RwLock<Vec<Arc<RwLock<Table>>>>>,
     path: PathBuf,
     inbox: Receiver<CompactorMessage>,
-    vfs: Arc<Vfs>,
 }
 
 impl Compactor {
     pub fn new(
-        opts: Options,
-        metadata: Arc<Mutex<Metadata>>,
-        log: Arc<Mutex<BufWriter<File>>>,
+        tables: Arc<RwLock<Vec<Arc<RwLock<Table>>>>>,
         path: PathBuf,
         inbox: Receiver<CompactorMessage>,
-        vfs: Arc<Vfs>,
     ) -> Self {
         Compactor {
-            opts,
-            metadata,
-            log,
+            tables,
             path,
             inbox,
-            vfs,
         }
     }
     pub fn run(mut self) {
@@ -96,70 +89,83 @@ impl Compactor {
                 }
                 Err(TryRecvError::Empty) => {}
             }
-            thread::sleep(time::Duration::from_micros(20));
+            thread::sleep(time::Duration::from_micros(20)); // todo make configurable
             // match self.inbox.recv() {
             // Ok(msg) => match msg {
             //     CompactorMessage::Compact => {
             // !@#debug!("compaction started");
-            let partitions = {
-                let md = self.metadata.lock().unwrap();
-                md.partitions.clone()
-            };
-            // !@#println!("md lvlb {}", levels[0].part_id);
-            // print_levels(&levels);
-            for (pid, partition) in partitions.iter().enumerate() {
-                let start = Instant::now();
-                match compact(&partition.levels, pid, &self.path, &self.opts) {
-                    Ok(res) => match res {
-                        None => continue,
-                        Some(res) => {
-                            let mut md = self.metadata.lock().unwrap();
-                            // !@#println!("md lvl");
-                            // print_levels(&md.levels);
-                            // print_levels(&md.levels);
-                            for rem in &res.l0_remove {
-                                md.partitions[pid].levels[0].parts = md.partitions[pid].levels[0]
-                                    .parts
-                                    .clone()
-                                    .into_iter()
-                                    .filter(|p| p.id != *rem)
-                                    .collect::<Vec<_>>();
-                            }
-                            // !@#println!("res rem: {:?}", res.l0_remove);
-                            // !@#println!("res levels");
-                            // print_levels(&res.levels);
-                            for (idx, l) in res.levels.iter().enumerate().skip(1) {
-                                md.partitions[pid].levels[idx] = l.clone();
-                            }
-                            let mut log = self.log.lock().unwrap();
-                            log_metadata(Some(log.get_mut()), &mut md).unwrap();
-                            // drop because next fs operation is with locking
-                            drop(md);
-                            // !@#println!("md lvl after");
-                            // print_levels(&md.levels);
-                            for op in res.fs_ops {
-                                match op {
-                                    FsOp::Rename(from, to) => {
-                                        // !@#trace!("renaming");
-                                        // todo handle error
-                                        self.vfs.rename(from, to).unwrap();
-                                    }
-                                    FsOp::Delete(path) => {
-                                        // !@#trace!("deleting {:?}",path);
-                                        self.vfs.remove_file(path).unwrap();
+            let tbls = self.tables.read().unwrap();
+            let tables = tbls.clone();
+            drop(tbls);
+
+            for table in tables {
+                let md = {
+                    let t = table.read().unwrap();
+                    t.metadata.clone()
+                };
+                // !@#println!("md lvlb {}", levels[0].part_id);
+                // print_levels(&levels);
+                for (pid, partition) in md.partitions.iter().enumerate() {
+                    let start = Instant::now();
+                    match compact(
+                        md.table_name.as_str(),
+                        &partition.levels,
+                        pid,
+                        &self.path,
+                        &md.opts,
+                    ) {
+                        Ok(res) => match res {
+                            None => continue,
+                            Some(res) => {
+                                // !@#println!("md lvl");
+                                // print_levels(&md.levels);
+                                // print_levels(&md.levels);
+                                let mut tbl = table.write().unwrap();
+                                for rem in &res.l0_remove {
+                                    tbl.metadata.partitions[pid].levels[0].parts =
+                                        tbl.metadata.partitions[pid].levels[0]
+                                            .parts
+                                            .clone()
+                                            .into_iter()
+                                            .filter(|p| p.id != *rem)
+                                            .collect::<Vec<_>>();
+                                }
+                                // !@#println!("res rem: {:?}", res.l0_remove);
+                                // !@#println!("res levels");
+                                // print_levels(&res.levels);
+                                for (idx, l) in res.levels.iter().enumerate().skip(1) {
+                                    tbl.metadata.partitions[pid].levels[idx] = l.clone();
+                                }
+                                log_metadata(&mut tbl).unwrap();
+                                let vfs = tbl.vfs.clone();
+                                drop(tbl);
+                                // drop because next fs operation is with locking
+                                // !@#println!("md lvl after");
+                                // print_levels(&md.levels);
+                                for op in res.fs_ops {
+                                    match op {
+                                        FsOp::Rename(from, to) => {
+                                            // !@#trace!("renaming");
+                                            // todo handle error
+                                            vfs.rename(from, to).unwrap();
+                                        }
+                                        FsOp::Delete(path) => {
+                                            // !@#trace!("deleting {:?}",path);
+                                            vfs.remove_file(path).unwrap();
+                                        }
                                     }
                                 }
+                                // !@#println!("After");
+                                // let mut md = self.metadata.lock().unwrap();
+                                // // !@#println!("post md");
+                                // print_levels(&md.levels);
                             }
-                            // !@#println!("After");
-                            // let mut md = self.metadata.lock().unwrap();
-                            // // !@#println!("post md");
-                            // print_levels(&md.levels);
-                        }
-                    },
-                    Err(err) => {
-                        error!("compaction error: {:?}", err);
+                        },
+                        Err(err) => {
+                            error!("compaction error: {:?}", err);
 
-                        continue;
+                            continue;
+                        }
                     }
                 }
             }
@@ -182,7 +188,7 @@ fn determine_compaction(
     level_id: usize,
     level: &Level,
     next_level: &Level,
-    opts: &Options,
+    opts: &TableOptions,
 ) -> Result<Option<Vec<ToCompact>>> {
     // !@#println!("lid {} {}", level_id, level.parts.len());
     let mut to_compact = vec![];
@@ -229,10 +235,11 @@ fn determine_compaction(
 }
 
 fn compact(
+    tbl_name: &str,
     levels: &[Level],
     partition_id: usize,
     path: &PathBuf,
-    opts: &Options,
+    opts: &TableOptions,
 ) -> Result<Option<CompactResult>> {
     let mut fs_ops = vec![];
     let mut l0_rem: Vec<(usize)> = Vec::new();
@@ -265,8 +272,8 @@ fn compact(
                     tmp_levels[l].parts.remove(idx);
                     part.id = tmp_levels[l + 1].part_id + 1;
 
-                    let from = part_path(&path, partition_id, l, to_compact[0].part);
-                    let to = part_path(&path, partition_id, l + 1, part.id);
+                    let from = part_path(&path, tbl_name, partition_id, l, to_compact[0].part);
+                    let to = part_path(&path, tbl_name, partition_id, l + 1, part.id);
                     fs_ops.push(FsOp::Rename(from, to));
 
                     tmp_levels[l + 1].parts.push(part.clone());
@@ -297,11 +304,11 @@ fn compact(
 
                 let in_paths = to_merge
                     .iter()
-                    .map(|p| part_path(&path, partition_id, l, p.id))
+                    .map(|p| part_path(&path, tbl_name, partition_id, l, p.id))
                     .collect::<Vec<_>>();
                 // !@#println!("{:?}", in_paths);
                 let out_part_id = tmp_levels[l + 1].part_id + 1;
-                let out_path = path.join(format!("parts/{}/{}", partition_id, l + 1));
+                let out_path = path.join(format!("tables/{}/{}/{}", tbl_name, partition_id, l + 1));
                 let rdrs = in_paths
                     .iter()
                     .map(|p| File::open(p))

@@ -77,7 +77,6 @@ use crate::parquet::merger::parquet::CompressedPageIterator;
 use crate::parquet::merger::parquet::ParquetValue;
 use crate::parquet::merger::try_merge_arrow_schemas;
 use crate::parquet::merger::OneColMergeRow;
-use crate::parquet::merger::TmpArray;
 use crate::parquet::merger::TwoColMergeRow;
 use crate::KeyValue;
 
@@ -213,6 +212,7 @@ pub fn check_intersection(chunks: &[ArrowChunk], other: Option<&ArrowChunk>) -> 
     min_values <= other.max_values() && max_values >= other.min_values
 }
 
+#[derive(Debug, Clone)]
 struct ArrowChunk {
     pub stream: usize,
     chunk: Chunk<Box<dyn Array>>,
@@ -295,6 +295,23 @@ pub struct Options {
     pub fields: Vec<String>,
 }
 
+pub struct MemChunkIterator {
+    chunk: Option<Chunk<Box<dyn Array>>>,
+}
+
+impl MemChunkIterator {
+    pub fn new(chunk: Option<Chunk<Box<dyn Array>>>) -> Self {
+        Self { chunk }
+    }
+}
+impl Iterator for MemChunkIterator {
+    type Item = Result<Chunk<Box<dyn Array>>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.chunk.take().map(|v| Ok(v))
+    }
+}
+#[derive(Debug)]
 pub struct MergingIterator<R>
 where R: Read + Seek
 {
@@ -307,11 +324,6 @@ where R: Read + Seek
     arrow_schema: Schema,
     // list of streams to merge
     streams: Vec<ArrowIterator<R>>,
-    // temporary array for merging data pages
-    // this is used to avoid downcast on each row iteration. See `merge_arrays`
-    tmp_arrays: Vec<HashMap<ColumnPath, TmpArray>>,
-    // indices of temp arrays
-    tmp_array_idx: Vec<HashMap<ColumnPath, usize>>,
     // sorter for pages chunk from parquet
     sorter: BinaryHeap<ArrowChunk>,
     mem_chunk: Option<ArrowChunk>,
@@ -319,8 +331,6 @@ where R: Read + Seek
     // merge result
     merge_result_buffer: VecDeque<Chunk<Box<dyn Array>>>,
 }
-
-struct MergeIterator {}
 
 impl<R> MergingIterator<R>
 where R: Read + Seek
@@ -374,8 +384,6 @@ where R: Read + Seek
             parquet_schema,
             arrow_schema,
             streams: arrow_streams,
-            tmp_arrays: (0..streams_n).map(|_| HashMap::new()).collect(),
-            tmp_array_idx: (0..streams_n).map(|_| HashMap::new()).collect(),
             sorter: BinaryHeap::new(),
             mem_chunk: mem_chunk.map(|chunk| ArrowChunk::new(chunk, 0, opts.index_cols)),
             merge_result_buffer: VecDeque::with_capacity(10),
@@ -403,7 +411,6 @@ where R: Read + Seek
         let mut arrs = (0..cols_len)
             .into_iter()
             .map(|col_id| {
-                // todo split arrays
                 let mut arrs = queue
                     .iter()
                     .map(|chunk| chunk.columns()[col_id].as_ref())

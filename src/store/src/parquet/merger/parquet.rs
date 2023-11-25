@@ -234,6 +234,7 @@ pub fn get_page_min_max_values(pages: &[CompressedPage]) -> Result<(ParquetValue
 
 pub type ColumnPath = Vec<String>;
 
+#[derive(Debug)]
 pub struct CompressedPageIterator<R> {
     reader: R,
     metadata: FileMetaData,
@@ -245,7 +246,6 @@ pub struct CompressedPageIterator<R> {
 impl<R: Read + Seek> CompressedPageIterator<R> {
     pub fn try_new(mut reader: R, max_page_size: usize) -> Result<Self> {
         let metadata = parquet2::read::read_metadata(&mut reader)?;
-        println!("{:?}", metadata.schema().columns());
         let chunk_buffer = metadata
             .schema()
             .columns()
@@ -346,6 +346,7 @@ impl<R: Read + Seek> CompressedPageIterator<R> {
     }
 }
 
+#[derive(Debug)]
 pub struct ArrowIterator<R: Read + Seek> {
     page_iter: CompressedPageIterator<R>,
     fields: Vec<ColumnDescriptor>,
