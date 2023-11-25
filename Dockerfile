@@ -1,6 +1,7 @@
 FROM rust:1.64.0 AS builder
 WORKDIR /app
 RUN apt-get update && apt-get install -y clang openssl
+COPY ./data ./data
 COPY ./src ./src
 COPY ./Cargo.toml ./
 COPY ./Cargo.lock ./
