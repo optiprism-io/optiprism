@@ -1,12 +1,26 @@
-use std::{cmp, thread, time};
+use std::cmp;
 use std::fs::File;
 use std::io::BufWriter;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
-use std::sync::mpsc::{Receiver, Sender, TryRecvError};
+use std::sync::mpsc::Receiver;
+use std::sync::mpsc::Sender;
+use std::sync::mpsc::TryRecvError;
+use std::sync::Arc;
+use std::sync::Mutex;
+use std::thread;
+use std::time;
 use std::time::Instant;
+
 use tracing::error;
-use crate::db::{FsOp, Level, log_metadata, Metadata, Options, Part, part_path, Vfs};
+
+use crate::db::log_metadata;
+use crate::db::part_path;
+use crate::db::FsOp;
+use crate::db::Level;
+use crate::db::Metadata;
+use crate::db::Options;
+use crate::db::Part;
+use crate::db::Vfs;
 use crate::error::Result;
 use crate::parquet::merger;
 use crate::parquet::merger::parquet_merger;
@@ -29,7 +43,6 @@ impl ToCompact {
         ToCompact { level, part }
     }
 }
-
 
 struct CompactResult {
     l0_remove: Vec<usize>,
@@ -73,7 +86,7 @@ impl Compactor {
                             drop(dropper);
                             break;
                         }
-                        _ => unreachable!()
+                        _ => unreachable!(),
                     }
                     // !@#println!("Terminating.");
                     break;
@@ -142,7 +155,7 @@ impl Compactor {
                             // // !@#println!("post md");
                             // print_levels(&md.levels);
                         }
-                    }
+                    },
                     Err(err) => {
                         error!("compaction error: {:?}", err);
 
@@ -215,7 +228,12 @@ fn determine_compaction(
     Ok(Some(to_compact))
 }
 
-fn compact(levels: &[Level], partition_id: usize, path: &PathBuf, opts: &Options) -> Result<Option<CompactResult>> {
+fn compact(
+    levels: &[Level],
+    partition_id: usize,
+    path: &PathBuf,
+    opts: &Options,
+) -> Result<Option<CompactResult>> {
     let mut fs_ops = vec![];
     let mut l0_rem: Vec<(usize)> = Vec::new();
     let mut tmp_levels = levels.to_owned().clone();
@@ -237,7 +255,11 @@ fn compact(levels: &[Level], partition_id: usize, path: &PathBuf, opts: &Options
                 if to_compact.len() == 1 {
                     // !@#println!("rename");
 
-                    let idx = tmp_levels[l].parts.iter().position(|p| p.id == to_compact[0].part).unwrap();
+                    let idx = tmp_levels[l]
+                        .parts
+                        .iter()
+                        .position(|p| p.id == to_compact[0].part)
+                        .unwrap();
 
                     let mut part = tmp_levels[l].parts[idx].clone();
                     tmp_levels[l].parts.remove(idx);
@@ -273,11 +295,17 @@ fn compact(levels: &[Level], partition_id: usize, path: &PathBuf, opts: &Options
                         .collect::<Vec<_>>();
                 }
 
-                let in_paths = to_merge.iter().map(|p| part_path(&path, partition_id, l, p.id)).collect::<Vec<_>>();
+                let in_paths = to_merge
+                    .iter()
+                    .map(|p| part_path(&path, partition_id, l, p.id))
+                    .collect::<Vec<_>>();
                 // !@#println!("{:?}", in_paths);
                 let out_part_id = tmp_levels[l + 1].part_id + 1;
                 let out_path = path.join(format!("parts/{}/{}", partition_id, l + 1));
-                let rdrs = in_paths.iter().map(|p| File::open(p)).collect::<std::result::Result<Vec<File>, std::io::Error>>()?;
+                let rdrs = in_paths
+                    .iter()
+                    .map(|p| File::open(p))
+                    .collect::<std::result::Result<Vec<File>, std::io::Error>>()?;
                 let merger_opts = parquet_merger::Options {
                     index_cols: opts.merge_index_cols,
                     data_page_size_limit_bytes: opts.merge_data_page_size_limit_bytes,
@@ -293,15 +321,29 @@ fn compact(levels: &[Level], partition_id: usize, path: &PathBuf, opts: &Options
                         Part {
                             id: tmp_levels[l + 1].part_id + 1,
                             size_bytes: f.size_bytes,
-                            min: f.min.iter().map(|v| v.try_into()).collect::<Result<Vec<_>>>()?,
-                            max: f.max.iter().map(|v| v.try_into()).collect::<Result<Vec<_>>>()?,
+                            min: f
+                                .min
+                                .iter()
+                                .map(|v| v.try_into())
+                                .collect::<Result<Vec<_>>>()?,
+                            max: f
+                                .max
+                                .iter()
+                                .map(|v| v.try_into())
+                                .collect::<Result<Vec<_>>>()?,
                         }
                     };
                     tmp_levels[l + 1].parts.push(final_part);
                     tmp_levels[l + 1].part_id += 1;
                 }
 
-                fs_ops.append(in_paths.iter().map(|p| FsOp::Delete(p.clone())).collect::<Vec<_>>().as_mut());
+                fs_ops.append(
+                    in_paths
+                        .iter()
+                        .map(|p| FsOp::Delete(p.clone()))
+                        .collect::<Vec<_>>()
+                        .as_mut(),
+                );
                 // !@#println!("after compaction");
             }
         }

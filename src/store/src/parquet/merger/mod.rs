@@ -6,11 +6,13 @@ use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::fs;
 use std::fs::File;
-use std::io::{BufReader, Read};
+use std::io::BufReader;
+use std::io::Read;
 use std::io::Seek;
 use std::io::Write;
 use std::os::unix::fs::MetadataExt;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::path::PathBuf;
 
 use arrow2::array::new_null_array;
 use arrow2::array::Array;
@@ -54,26 +56,59 @@ use parquet2::write::FileSeqWriter;
 use parquet2::write::Version;
 use parquet2::write::WriteOptions;
 
-use crate::error::{Result, StoreError};
-use crate::{merge_arrays};
+use crate::error::Result;
+use crate::error::StoreError;
+use crate::merge_arrays;
 use crate::merge_arrays_inner;
 use crate::merge_list_arrays;
 use crate::merge_list_arrays_inner;
 use crate::merge_list_primitive_arrays;
 use crate::merge_primitive_arrays;
-use crate::parquet::merger::parquet::{array_to_pages_simple, Value};
+use crate::parquet::merger::parquet::array_to_pages_simple;
 use crate::parquet::merger::parquet::data_page_to_array;
 use crate::parquet::merger::parquet::ColumnPath;
 use crate::parquet::merger::parquet::CompressedPageIterator;
+use crate::parquet::merger::parquet::ParquetValue;
+use crate::KeyValue;
+use crate::Value;
 
+pub mod arrow_merger;
 mod merge_data_arrays;
 pub mod parquet;
-pub mod arrow_merger;
 pub mod parquet_merger;
 
+pub fn chunk_min_max(
+    chunk: &Chunk<Box<dyn Array>>,
+    index_cols: usize,
+) -> (Vec<KeyValue>, Vec<KeyValue>) {
+    let (min_values, max_values) = (0..index_cols)
+        .into_iter()
+        .map(|id| {
+            let arr = chunk.columns()[id].as_ref();
+            match arr.data_type() {
+                // todo move to macro
+                DataType::Int32 => {
+                    let arr = arr.as_any().downcast_ref::<Int32Array>().unwrap();
+                    let min = KeyValue::Int32(arr.value(0));
+                    let max = KeyValue::Int32(arr.value(arr.len() - 1));
+                    (min, max)
+                }
+                DataType::Int64 => {
+                    let arr = arr.as_any().downcast_ref::<Int64Array>().unwrap();
+                    let min = KeyValue::Int64(arr.value(0));
+                    let max = KeyValue::Int64(arr.value(arr.len() - 1));
+                    (min, max)
+                }
+                _ => unimplemented!("only support int32 and int64"),
+            }
+        })
+        .unzip();
+
+    (min_values, max_values)
+}
 pub trait IndexChunk {
-    fn min_values(&self) -> Vec<Value>;
-    fn max_values(&self) -> Vec<Value>;
+    fn min_values(&self) -> Vec<ParquetValue>;
+    fn max_values(&self) -> Vec<ParquetValue>;
 }
 
 // Merge arrow2 schemas
@@ -112,7 +147,7 @@ pub fn try_merge_arrow_schemas(schemas: Vec<Schema>) -> Result<Schema> {
 pub struct OneColMergeRow<A>(usize, A);
 
 impl<A> Ord for OneColMergeRow<A>
-    where A: Ord
+where A: Ord
 {
     fn cmp(&self, other: &Self) -> Ordering {
         self.1.cmp(&other.1).reverse()
@@ -120,7 +155,7 @@ impl<A> Ord for OneColMergeRow<A>
 }
 
 impl<A> PartialOrd for OneColMergeRow<A>
-    where A: Ord
+where A: Ord
 {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
@@ -128,7 +163,7 @@ impl<A> PartialOrd for OneColMergeRow<A>
 }
 
 impl<A> PartialEq for OneColMergeRow<A>
-    where A: Eq
+where A: Eq
 {
     fn eq(&self, other: &Self) -> bool {
         self.1 == other.1
@@ -144,9 +179,9 @@ impl<A> Eq for OneColMergeRow<A> where A: Eq {}
 pub struct TwoColMergeRow<A, B>(usize, A, B);
 
 impl<A, B> Ord for TwoColMergeRow<A, B>
-    where
-        A: Ord,
-        B: Ord,
+where
+    A: Ord,
+    B: Ord,
 {
     fn cmp(&self, other: &Self) -> Ordering {
         (&self.1, &self.2).cmp(&(&other.1, &other.2)).reverse()
@@ -154,9 +189,9 @@ impl<A, B> Ord for TwoColMergeRow<A, B>
 }
 
 impl<A, B> PartialOrd for TwoColMergeRow<A, B>
-    where
-        A: Ord,
-        B: Ord,
+where
+    A: Ord,
+    B: Ord,
 {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
@@ -164,9 +199,9 @@ impl<A, B> PartialOrd for TwoColMergeRow<A, B>
 }
 
 impl<A, B> PartialEq for TwoColMergeRow<A, B>
-    where
-        A: Eq,
-        B: Eq,
+where
+    A: Eq,
+    B: Eq,
 {
     fn eq(&self, other: &Self) -> bool {
         (&self.1, &self.2) == (&other.1, &other.2)
@@ -174,11 +209,11 @@ impl<A, B> PartialEq for TwoColMergeRow<A, B>
 }
 
 impl<A, B> Eq for TwoColMergeRow<A, B>
-    where
-        A: Eq,
-        B: Eq,
-{}
-
+where
+    A: Eq,
+    B: Eq,
+{
+}
 
 // this is a temporary array used to merge data pages avoiding downcasting
 

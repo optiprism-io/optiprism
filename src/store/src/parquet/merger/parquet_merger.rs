@@ -4,13 +4,15 @@ use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::fs;
 use std::fs::File;
-use std::io::{BufReader, Read};
+use std::io::BufReader;
+use std::io::Read;
 use std::io::Seek;
 use std::io::Write;
 use std::os::unix::fs::MetadataExt;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::path::PathBuf;
 
-use arrow2::array::{new_null_array, PrimitiveArray};
+use arrow2::array::new_null_array;
 use arrow2::array::Array;
 use arrow2::array::BinaryArray;
 use arrow2::array::BooleanArray;
@@ -28,6 +30,7 @@ use arrow2::array::MutableBooleanArray;
 use arrow2::array::MutableListArray;
 use arrow2::array::MutablePrimitiveArray;
 use arrow2::array::MutableUtf8Array;
+use arrow2::array::PrimitiveArray;
 use arrow2::array::TryPush;
 use arrow2::array::UInt16Array;
 use arrow2::array::UInt32Array;
@@ -42,32 +45,41 @@ use arrow2::datatypes::PhysicalType as ArrowPhysicalType;
 use arrow2::datatypes::PrimitiveType as ArrowPrimitiveType;
 use arrow2::datatypes::Schema;
 use arrow2::io::parquet::read::infer_schema;
-use arrow2::io::parquet::write::{add_arrow_schema, array_to_columns};
+use arrow2::io::parquet::write::add_arrow_schema;
+use arrow2::io::parquet::write::array_to_columns;
 use arrow2::io::parquet::write::to_parquet_schema;
+use arrow2::io::parquet::write::WriteOptions as ArrowWriteOptions;
 use arrow2::offset::OffsetsBuffer;
 use arrow2::types::NativeType;
+use parquet2::compression::CompressionOptions;
+use parquet2::encoding::Encoding;
 use parquet2::metadata::ColumnDescriptor;
 use parquet2::metadata::SchemaDescriptor;
 use parquet2::page::CompressedPage;
-use parquet2::write::{compress, FileSeqWriter};
+use parquet2::write::compress;
+use parquet2::write::FileSeqWriter;
 use parquet2::write::Version;
 use parquet2::write::WriteOptions;
-use arrow2::io::parquet::write::WriteOptions as ArrowWriteOptions;
-use parquet2::compression::CompressionOptions;
-use parquet2::encoding::Encoding;
+
 use crate::error::Result;
-use crate::{merge_arrays};
+use crate::merge_arrays;
 use crate::merge_arrays_inner;
 use crate::merge_list_arrays;
 use crate::merge_list_arrays_inner;
 use crate::merge_list_primitive_arrays;
 use crate::merge_primitive_arrays;
-use crate::parquet::merger::parquet::{array_to_pages_simple, get_page_min_max_values, pages_to_arrays, Value};
+use crate::parquet::merger::parquet::array_to_pages_simple;
 use crate::parquet::merger::parquet::data_page_to_array;
+use crate::parquet::merger::parquet::get_page_min_max_values;
+use crate::parquet::merger::parquet::pages_to_arrays;
 use crate::parquet::merger::parquet::ColumnPath;
 use crate::parquet::merger::parquet::CompressedPageIterator;
-use crate::parquet::merger::{IndexChunk, OneColMergeRow, TmpArray, try_merge_arrow_schemas, TwoColMergeRow};
-
+use crate::parquet::merger::parquet::ParquetValue;
+use crate::parquet::merger::try_merge_arrow_schemas;
+use crate::parquet::merger::IndexChunk;
+use crate::parquet::merger::OneColMergeRow;
+use crate::parquet::merger::TmpArray;
+use crate::parquet::merger::TwoColMergeRow;
 
 #[derive(Debug)]
 // Arrow chunk before being merged
@@ -76,8 +88,8 @@ pub struct ArrowIndexChunk {
     // stream of arrow chunk Used to identify the chunk during merge
     pub stream: usize,
     pub cols: Vec<Box<dyn Array>>,
-    pub min_values: Vec<Value>,
-    pub max_values: Vec<Value>,
+    pub min_values: Vec<ParquetValue>,
+    pub max_values: Vec<ParquetValue>,
 }
 
 impl Eq for ArrowIndexChunk {}
@@ -125,17 +137,17 @@ impl ArrowIndexChunk {
                     // todo move to macro
                     DataType::Int32 => {
                         let arr = arr.as_any().downcast_ref::<Int32Array>().unwrap();
-                        let min = Value::from(arr.value(0));
-                        let max = Value::from(arr.value(arr.len() - 1));
+                        let min = ParquetValue::from(arr.value(0));
+                        let max = ParquetValue::from(arr.value(arr.len() - 1));
                         (min, max)
                     }
                     DataType::Int64 => {
                         let arr = arr.as_any().downcast_ref::<Int64Array>().unwrap();
-                        let min = Value::from(arr.value(0));
-                        let max = Value::from(arr.value(arr.len() - 1));
+                        let min = ParquetValue::from(arr.value(0));
+                        let max = ParquetValue::from(arr.value(arr.len() - 1));
                         (min, max)
                     }
-                    _ => unimplemented!("only support int32 and int64")
+                    _ => unimplemented!("only support int32 and int64"),
                 }
             })
             .unzip();
@@ -148,11 +160,11 @@ impl ArrowIndexChunk {
         }
     }
 
-    pub fn min_values(&self) -> Vec<Value> {
+    pub fn min_values(&self) -> Vec<ParquetValue> {
         self.min_values.clone()
     }
 
-    pub fn max_values(&self) -> Vec<Value> {
+    pub fn max_values(&self) -> Vec<ParquetValue> {
         self.max_values.clone()
     }
 
@@ -166,7 +178,6 @@ impl ArrowIndexChunk {
         self.len() == 0
     }
 }
-
 
 pub fn check_intersection(chunks: &[PagesIndexChunk], other: Option<&PagesIndexChunk>) -> bool {
     if other.is_none() {
@@ -194,8 +205,8 @@ pub fn check_intersection(chunks: &[PagesIndexChunk], other: Option<&PagesIndexC
 #[derive(Debug)]
 pub struct PagesIndexChunk {
     pub cols: Vec<Vec<CompressedPage>>,
-    pub min_values: Vec<Value>,
-    pub max_values: Vec<Value>,
+    pub min_values: Vec<ParquetValue>,
+    pub max_values: Vec<ParquetValue>,
     pub stream: usize,
 }
 
@@ -236,11 +247,11 @@ impl PartialEq for PagesIndexChunk {
 }
 
 impl IndexChunk for PagesIndexChunk {
-    fn min_values(&self) -> Vec<Value> {
+    fn min_values(&self) -> Vec<ParquetValue> {
         self.min_values.clone()
     }
 
-    fn max_values(&self) -> Vec<Value> {
+    fn max_values(&self) -> Vec<ParquetValue> {
         self.max_values.clone()
     }
 }
@@ -344,10 +355,12 @@ pub struct MergedArrowChunk {
 impl MergedArrowChunk {
     // Create new merged arrow chunk
     pub fn new(arrs: Vec<Box<dyn Array>>, reorder: Vec<usize>) -> Self {
-        Self { cols: arrs, reorder }
+        Self {
+            cols: arrs,
+            reorder,
+        }
     }
 }
-
 
 // array_size - size of output arrays
 pub fn merge_one_primitive<T: NativeType + Ord>(
@@ -483,7 +496,10 @@ pub fn merge_two_primitives<T1: NativeType + Ord, T2: NativeType + Ord>(
 // Merge multiple chunks into vector of MergedArrowChunk of arrays split by array_size
 
 // panics if merges is not implemented for combination of types
-pub fn merge_chunks(chunks: Vec<ArrowIndexChunk>, array_size: usize) -> Result<Vec<MergedArrowChunk>> {
+pub fn merge_chunks(
+    chunks: Vec<ArrowIndexChunk>,
+    array_size: usize,
+) -> Result<Vec<MergedArrowChunk>> {
     // supported lengths (count of index columns)
     match chunks[0].cols.len() {
         1 => match chunks[0].cols[0].data_type().to_physical_type() {
@@ -533,7 +549,6 @@ pub fn merge_chunks(chunks: Vec<ArrowIndexChunk>, array_size: usize) -> Result<V
     }
 }
 
-
 pub struct Options {
     pub index_cols: usize,
     pub data_page_size_limit_bytes: Option<usize>,
@@ -544,8 +559,7 @@ pub struct Options {
 }
 
 pub struct Merger<R>
-    where
-        R: Read,
+where R: Read
 {
     // list of index cols (partitions) in parquet file
     index_cols: Vec<ColumnDescriptor>,
@@ -599,14 +613,16 @@ pub struct FileMergeOptions {
 pub struct MergedFile {
     pub size_bytes: u64,
     pub id: usize,
-    pub min: Vec<Value>,
-    pub max: Vec<Value>,
+    pub min: Vec<ParquetValue>,
+    pub max: Vec<ParquetValue>,
 }
 
-pub fn merge<R: Read + Seek>(mut readers: Vec<R>,
-                             to_path: PathBuf,
-                             out_part_id: usize,
-                             opts: Options) -> Result<Vec<MergedFile>> {
+pub fn merge<R: Read + Seek>(
+    mut readers: Vec<R>,
+    to_path: PathBuf,
+    out_part_id: usize,
+    opts: Options,
+) -> Result<Vec<MergedFile>> {
     // get arrow schemas of streams
     let arrow_schemas = readers
         .iter_mut()
@@ -620,7 +636,7 @@ pub fn merge<R: Read + Seek>(mut readers: Vec<R>,
     let page_streams = readers
         .into_iter()
         // todo make dynamic page size
-        .map(|r| CompressedPageIterator::try_new(r,1024*1024))
+        .map(|r| CompressedPageIterator::try_new(r, 1024 * 1024))
         .collect::<Result<Vec<_>>>()?;
     let streams_n = page_streams.len();
 
@@ -651,11 +667,9 @@ pub fn merge<R: Read + Seek>(mut readers: Vec<R>,
 }
 
 impl<R> Merger<R>
-    where
-        R: Read + Seek,
+where R: Read + Seek
 {
     // Create new merger
-
 
     // Get next chunk by stream_id. Chunk - all pages within row group
     fn next_stream_index_chunk(&mut self, stream_id: usize) -> Result<Option<PagesIndexChunk>> {
@@ -700,10 +714,11 @@ impl<R> Merger<R>
         let mut merged_files: Vec<MergedFile> = Vec::new();
         'l1: for part_id in self.id_from.. {
             let mut w = File::create(&self.to_path.join(format!("{}.parquet", part_id)))?;
-            let mut seq_writer = FileSeqWriter::new(w, self.parquet_schema.clone(), write_opts, None);
+            let mut seq_writer =
+                FileSeqWriter::new(w, self.parquet_schema.clone(), write_opts, None);
 
-            let mut min: Vec<Value> = Vec::new();
-            let mut max: Vec<Value> = Vec::new();
+            let mut min: Vec<ParquetValue> = Vec::new();
+            let mut max: Vec<ParquetValue> = Vec::new();
 
             let mut first = true;
             let mut end = true;
@@ -753,7 +768,9 @@ impl<R> Merger<R>
                             // Exclusively pick page from the stream
                             MergeReorder::PickFromStream(stream_id, num_rows) => {
                                 // If column exist for stream id then write it
-                                if self.page_streams[*stream_id].contains_column(&col.path_in_schema) {
+                                if self.page_streams[*stream_id]
+                                    .contains_column(&col.path_in_schema)
+                                {
                                     self.page_streams[*stream_id]
                                         .next_chunk(&col.path_in_schema)?
                                         .unwrap()
@@ -791,7 +808,12 @@ impl<R> Merger<R>
                         seq_writer.end(key_value_metadata)?;
 
                         let mf = MergedFile {
-                            size_bytes: File::open(&self.to_path.join(format!("{}.parquet", part_id)))?.metadata().unwrap().size(),
+                            size_bytes: File::open(
+                                &self.to_path.join(format!("{}.parquet", part_id)),
+                            )?
+                            .metadata()
+                            .unwrap()
+                            .size(),
                             id: part_id,
                             min,
                             max,
@@ -807,7 +829,10 @@ impl<R> Merger<R>
                 seq_writer.end(key_value_metadata)?;
 
                 let mf = MergedFile {
-                    size_bytes: File::open(&self.to_path.join(format!("{}.parquet", part_id)))?.metadata().unwrap().size(),
+                    size_bytes: File::open(&self.to_path.join(format!("{}.parquet", part_id)))?
+                        .metadata()
+                        .unwrap()
+                        .size(),
                     id: part_id,
                     min,
                     max,
@@ -1068,7 +1093,8 @@ impl<R> Merger<R>
             ),
         };
 
-        let pages = array_to_pages_simple(out, col.base_type.clone(), self.data_page_size_limit_bytes)?;
+        let pages =
+            array_to_pages_simple(out, col.base_type.clone(), self.data_page_size_limit_bytes)?;
 
         Ok(pages)
     }

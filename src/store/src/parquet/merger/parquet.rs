@@ -4,11 +4,17 @@ use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::io::Read;
 use std::io::Seek;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use std::sync::Mutex;
 
-use arrow2::array::{Array, Int32Array, Int64Array, new_null_array};
+use arrow2::array::new_null_array;
+use arrow2::array::Array;
+use arrow2::array::Int32Array;
+use arrow2::array::Int64Array;
 use arrow2::chunk::Chunk;
-use arrow2::datatypes::{DataType, Field, Schema};
+use arrow2::datatypes::DataType;
+use arrow2::datatypes::Field;
+use arrow2::datatypes::Schema;
 use arrow2::io::parquet::read::column_iter_to_arrays;
 use arrow2::io::parquet::read::deserialize::page_iter_to_arrays;
 use arrow2::io::parquet::read::schema::convert::to_primitive_type;
@@ -23,7 +29,8 @@ use parquet2::metadata::FileMetaData;
 use parquet2::metadata::SchemaDescriptor;
 use parquet2::page::CompressedDataPage;
 use parquet2::page::CompressedPage;
-use parquet2::read::{decompress, PageReader};
+use parquet2::read::decompress;
+use parquet2::read::PageReader;
 use parquet2::schema::types::ParquetType;
 use parquet2::schema::types::PhysicalType;
 use parquet2::statistics::BinaryStatistics;
@@ -36,9 +43,8 @@ use crate::error::Result;
 use crate::error::StoreError;
 use crate::parquet::merger::IndexChunk;
 
-
 #[derive(Eq, PartialEq, PartialOrd, Ord, Debug, Clone)]
-pub enum Value {
+pub enum ParquetValue {
     Boolean(bool),
     Int32(i32),
     Int64(i64),
@@ -48,45 +54,45 @@ pub enum Value {
     ByteArray(Vec<u8>),
 }
 
-impl From<bool> for Value {
+impl From<bool> for ParquetValue {
     fn from(value: bool) -> Self {
-        Value::Boolean(value)
+        ParquetValue::Boolean(value)
     }
 }
 
-impl From<i32> for Value {
+impl From<i32> for ParquetValue {
     fn from(value: i32) -> Self {
-        Value::Int32(value)
+        ParquetValue::Int32(value)
     }
 }
 
-impl From<i64> for Value {
+impl From<i64> for ParquetValue {
     fn from(value: i64) -> Self {
-        Value::Int64(value)
+        ParquetValue::Int64(value)
     }
 }
 
-impl From<[u32; 3]> for Value {
+impl From<[u32; 3]> for ParquetValue {
     fn from(value: [u32; 3]) -> Self {
-        Value::Int96(value)
+        ParquetValue::Int96(value)
     }
 }
 
-impl From<f32> for Value {
+impl From<f32> for ParquetValue {
     fn from(value: f32) -> Self {
-        Value::Float(OrderedFloat(value))
+        ParquetValue::Float(OrderedFloat(value))
     }
 }
 
-impl From<f64> for Value {
+impl From<f64> for ParquetValue {
     fn from(value: f64) -> Self {
-        Value::Double(OrderedFloat(value))
+        ParquetValue::Double(OrderedFloat(value))
     }
 }
 
-impl From<Vec<u8>> for Value {
+impl From<Vec<u8>> for ParquetValue {
     fn from(value: Vec<u8>) -> Self {
-        Value::ByteArray(value)
+        ParquetValue::ByteArray(value)
     }
 }
 
@@ -97,8 +103,8 @@ macro_rules! min_max_values {
             $last_stats.as_any().downcast_ref::<$ty>(),
         ) {
             (Some(first), Some(last)) => (
-                Value::from(first.min_value.clone().unwrap()),
-                Value::from(last.max_value.clone().unwrap()),
+                ParquetValue::from(first.min_value.clone().unwrap()),
+                ParquetValue::from(last.max_value.clone().unwrap()),
             ),
             _ => return Err(StoreError::Internal("no stats".to_string())),
         }
@@ -182,7 +188,7 @@ pub fn array_to_pages_simple(
     Ok(compressed)
 }
 
-pub fn get_page_min_max_values(pages: &[CompressedPage]) -> Result<(Value, Value)> {
+pub fn get_page_min_max_values(pages: &[CompressedPage]) -> Result<(ParquetValue, ParquetValue)> {
     match (pages.first().as_ref(), pages.last().as_ref()) {
         (Some(&CompressedPage::Data(first)), Some(&CompressedPage::Data(last))) => {
             match (first.statistics(), last.statistics()) {
@@ -226,8 +232,6 @@ pub fn get_page_min_max_values(pages: &[CompressedPage]) -> Result<(Value, Value
     }
 }
 
-
-
 pub type ColumnPath = Vec<String>;
 
 pub struct CompressedPageIterator<R> {
@@ -241,9 +245,7 @@ pub struct CompressedPageIterator<R> {
 impl<R: Read + Seek> CompressedPageIterator<R> {
     pub fn try_new(mut reader: R, max_page_size: usize) -> Result<Self> {
         let metadata = parquet2::read::read_metadata(&mut reader)?;
-        println!("{:?}", metadata
-            .schema()
-            .columns());
+        println!("{:?}", metadata.schema().columns());
         let chunk_buffer = metadata
             .schema()
             .columns()
@@ -351,7 +353,11 @@ pub struct ArrowIterator<R: Read + Seek> {
 }
 
 impl<R: Read + Seek> ArrowIterator<R> {
-    pub fn new(page_iter: CompressedPageIterator<R>, fields: Vec<ColumnDescriptor>, schema: Schema) -> Self {
+    pub fn new(
+        page_iter: CompressedPageIterator<R>,
+        fields: Vec<ColumnDescriptor>,
+        schema: Schema,
+    ) -> Self {
         Self {
             page_iter,
             fields,
@@ -376,16 +382,14 @@ impl<R: Read + Seek> ArrowIterator<R> {
                         return Ok(None);
                     }
 
-                    ret.push(new_null_array(self.schema.fields[idx].data_type().clone(), num_rows))
+                    ret.push(new_null_array(
+                        self.schema.fields[idx].data_type().clone(),
+                        num_rows,
+                    ))
                 }
                 Some(page) => {
                     let mut buf = vec![];
-                    let mut arrs = pages_to_arrays(
-                        vec![page],
-                        cd,
-                        None,
-                        &mut buf,
-                    )?;
+                    let mut arrs = pages_to_arrays(vec![page], cd, None, &mut buf)?;
                     let arr = arrs.pop().unwrap();
                     // set rows. Assume that first column is always present
                     if idx == 0 {

@@ -17,6 +17,7 @@ use chrono::Utc;
 use error::Result;
 use serde::Deserialize;
 use serde::Serialize;
+
 use crate::error::StoreError;
 use crate::parquet::merger;
 
@@ -32,18 +33,17 @@ pub enum KeyValue {
     String(String),
 }
 
-impl TryFrom<&merger::parquet::Value> for KeyValue {
+impl TryFrom<&merger::parquet::ParquetValue> for KeyValue {
     type Error = StoreError;
 
-    fn try_from(value: &merger::parquet::Value) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: &merger::parquet::ParquetValue) -> std::result::Result<Self, Self::Error> {
         Ok(match value {
-            merger::parquet::Value::Int32(v) => KeyValue::Int32(*v),
-            merger::parquet::Value::Int64(v) => KeyValue::Int64(*v),
+            merger::parquet::ParquetValue::Int32(v) => KeyValue::Int32(*v),
+            merger::parquet::ParquetValue::Int64(v) => KeyValue::Int64(*v),
             _ => unimplemented!(),
         })
     }
 }
-
 
 #[derive(Debug, Serialize, Deserialize, Hash)]
 pub struct ColValue {
@@ -97,7 +97,23 @@ impl From<&KeyValue> for Value {
             KeyValue::UInt16(v) => Value::UInt16(Some(*v)),
             KeyValue::UInt64(v) => Value::UInt64(Some(*v)),
             KeyValue::String(v) => Value::String(Some(v.to_owned())),
-            KeyValue::Int32(v) => Value::Int32(Some(*v))
+            KeyValue::Int32(v) => Value::Int32(Some(*v)),
+        }
+    }
+}
+
+impl From<&Value> for KeyValue {
+    fn from(value: &Value) -> Self {
+        match value {
+            Value::Int8(Some(v)) => KeyValue::Int8(*v),
+            Value::Int16(Some(v)) => KeyValue::Int16(*v),
+            Value::Int64(Some(v)) => KeyValue::Int64(*v),
+            Value::UInt8(Some(v)) => KeyValue::UInt8(*v),
+            Value::UInt16(Some(v)) => KeyValue::UInt16(*v),
+            Value::UInt64(Some(v)) => KeyValue::UInt64(*v),
+            Value::String(Some(v)) => KeyValue::String(v.to_owned()),
+            Value::Int32(Some(v)) => KeyValue::Int32(*v),
+            _ => unreachable!(),
         }
     }
 }
@@ -853,7 +869,7 @@ pub mod test_util {
             }
             _ => unimplemented!("{:?}", pt),
         }
-            .boxed()
+        .boxed()
     }
 
     pub fn gen_utf8_data_list_array<O: Offset, O2: Offset>(
