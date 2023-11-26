@@ -28,16 +28,16 @@ use std::sync::mpsc::RecvError;
 use std::sync::mpsc::Sender;
 use std::sync::mpsc::TryRecvError;
 use std::sync::Arc;
-use std::sync::Mutex;
 use std::sync::MutexGuard;
-use std::sync::RwLock;
 use std::task::Context;
 use std::task::Poll;
 use std::thread;
 use std::time;
+use std::time::Duration;
 use std::time::Instant;
 
 use arrow::compute::concat;
+use arrow::ipc::Time;
 use arrow2::array::Array;
 use arrow2::array::Int32Array;
 use arrow2::array::Int64Array;
@@ -60,10 +60,19 @@ use arrow_buffer::ToByteSlice;
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::format::Item;
-use chrono::Duration;
 use crossbeam_skiplist::SkipSet;
 use futures::select;
 use futures::Stream;
+use metrics::counter;
+use metrics::describe_counter;
+use metrics::describe_histogram;
+use metrics::histogram;
+use metrics::Counter;
+use metrics::Gauge;
+use metrics::Histogram;
+use metrics::Unit;
+use parking_lot::Mutex;
+use parking_lot::RwLock;
 use parquet2::metadata::FileMetaData;
 use rand::rngs::mock::StepRng;
 use rand::Rng;
@@ -162,6 +171,9 @@ pub struct Table {
     log: Arc<Mutex<BufWriter<File>>>,
 }
 
+struct TableStats {
+    insert_time_ms: usize,
+}
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Metadata {
     version: u64,
@@ -338,12 +350,12 @@ impl Vfs {
     }
 
     pub fn remove_file<P: AsRef<Path>>(&self, path: P) {
-        let _g = self.lock.lock().unwrap();
+        let _g = self.lock.lock();
         fs::remove_file(path);
     }
 
     pub fn rename<P: AsRef<Path>>(&self, from: P, to: P) {
-        let _g = self.lock.lock().unwrap();
+        let _g = self.lock.lock();
         fs::rename(from, to);
     }
 }
@@ -527,6 +539,8 @@ fn try_recover_table(path: PathBuf, name: String, opts: Option<TableOptions>) ->
 
 // #[instrument(level = "trace")]
 fn recover(path: PathBuf, opts: Options) -> Result<OptiDBImpl> {
+    // Create a background thread which checks for deadlocks every 1s
+
     fs::create_dir_all(path.join("tables"))?;
     let mut tables = vec![];
     let dir = fs::read_dir(path.join("tables"))?;
@@ -820,11 +834,21 @@ fn flush(
 pub struct ScanStream {
     iters: Vec<Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>>>>,
     iter_idx: usize,
+    start_time: Instant,
+    table_name: String, // for metrics
 }
 
 impl ScanStream {
-    pub fn new(iters: Vec<Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>>>>) -> Self {
-        Self { iters, iter_idx: 0 }
+    pub fn new(
+        iters: Vec<Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>>>>,
+        table_name: String,
+    ) -> Self {
+        Self {
+            iters,
+            iter_idx: 0,
+            start_time: Instant::now(),
+            table_name,
+        }
     }
 }
 
@@ -837,6 +861,8 @@ impl Stream for ScanStream {
             None => {
                 self.iter_idx += 1;
                 if self.iter_idx >= self.iters.len() {
+                    histogram!("store.scan_time_sec",self.start_time.elapsed(),"table"=>self.table_name.to_string());
+
                     Poll::Ready(None)
                 } else {
                     Poll::Ready(Some(Ok(Chunk::new(vec![]))))
@@ -857,20 +883,131 @@ impl Stream for EmptyStream {
     }
 }
 
+struct PrintHandle(metrics::Key);
+
+impl metrics::CounterFn for PrintHandle {
+    fn increment(&self, value: u64) {
+        println!("counter increment for '{}': {}", self.0, value);
+    }
+
+    fn absolute(&self, value: u64) {
+        println!("counter absolute for '{}': {}", self.0, value);
+    }
+}
+
+impl metrics::GaugeFn for PrintHandle {
+    fn increment(&self, value: f64) {
+        println!("gauge increment for '{}': {}", self.0, value);
+    }
+
+    fn decrement(&self, value: f64) {
+        println!("gauge decrement for '{}': {}", self.0, value);
+    }
+
+    fn set(&self, value: f64) {
+        println!("gauge set for '{}': {}", self.0, value);
+    }
+}
+
+impl metrics::HistogramFn for PrintHandle {
+    fn record(&self, value: f64) {
+        println!("histogram record for '{}': {}", self.0, value);
+    }
+}
+
+#[derive(Default)]
+struct PrintRecorder;
+
+impl metrics::Recorder for PrintRecorder {
+    fn describe_counter(
+        &self,
+        key_name: metrics::KeyName,
+        unit: Option<Unit>,
+        description: metrics::SharedString,
+    ) {
+        println!(
+            "(counter) registered key {} with unit {:?} and description {:?}",
+            key_name.as_str(),
+            unit,
+            description
+        );
+    }
+
+    fn describe_gauge(
+        &self,
+        key_name: metrics::KeyName,
+        unit: Option<Unit>,
+        description: metrics::SharedString,
+    ) {
+        println!(
+            "(gauge) registered key {} with unit {:?} and description {:?}",
+            key_name.as_str(),
+            unit,
+            description
+        );
+    }
+
+    fn describe_histogram(
+        &self,
+        key_name: metrics::KeyName,
+        unit: Option<Unit>,
+        description: metrics::SharedString,
+    ) {
+        println!(
+            "(histogram) registered key {} with unit {:?} and description {:?}",
+            key_name.as_str(),
+            unit,
+            description
+        );
+    }
+
+    fn register_counter(&self, key: &metrics::Key) -> Counter {
+        Counter::from_arc(Arc::new(PrintHandle(key.clone())))
+    }
+
+    fn register_gauge(&self, key: &metrics::Key) -> Gauge {
+        Gauge::from_arc(Arc::new(PrintHandle(key.clone())))
+    }
+
+    fn register_histogram(&self, key: &metrics::Key) -> Histogram {
+        Histogram::from_arc(Arc::new(PrintHandle(key.clone())))
+    }
+}
+
+fn init_print_logger() {
+    let recorder = PrintRecorder::default();
+    metrics::set_boxed_recorder(Box::new(recorder)).unwrap()
+}
+
 impl OptiDBImpl {
     // #[instrument(level = "trace")]
     pub fn open(path: PathBuf, opts: Options) -> Result<Self> {
+        init_print_logger();
+        describe_counter!("store.inserts_count", "number of inserts processed");
+        describe_histogram!("store.insert_time_sec", Unit::Seconds, "insert time");
+        describe_counter!("store.scans_count", "number of scans processed");
+        describe_histogram!("store.scan_time_sec", Unit::Seconds, "scan time");
+        describe_histogram!(
+            "store.scan_memtable_time_sec",
+            Unit::Seconds,
+            "scan memtable time"
+        );
+        describe_counter!("store.compactions_count", "number of compactions");
+        describe_histogram!("store.compaction_time_sec", Unit::Microseconds, "scan time");
+
         recover(path, opts)
     }
 
     // #[instrument(level = "trace", skip(self))]
     pub fn insert(&mut self, tbl_name: &str, key: Vec<KeyValue>, values: Vec<Value>) -> Result<()> {
-        let tables = self.tables.read().unwrap();
+        counter!("store.inserts_count", 1,"table"=>tbl_name.to_string());
+        let start_time = Instant::now();
+        let tables = self.tables.read();
         let tbl = tables.iter().find(|t| t.name == tbl_name).cloned().unwrap();
 
         drop(tables);
 
-        let mut metadata = tbl.metadata.lock().unwrap();
+        let mut metadata = tbl.metadata.lock();
         if key.len() + values.len() != metadata.schema.fields.len() {
             return Err(StoreError::Internal(format!(
                 "Fields mismatch. Key+Val len: {}, schema fields len: {}",
@@ -878,7 +1015,7 @@ impl OptiDBImpl {
                 metadata.schema.fields.len()
             )));
         }
-        let mut log = tbl.log.lock().unwrap();
+        let mut log = tbl.log.lock();
         let logged = _log(
             LogOp::Insert(key.clone(), values.clone()),
             &mut metadata,
@@ -887,7 +1024,7 @@ impl OptiDBImpl {
         metadata.stats.logged_bytes += logged as u64;
         metadata.seq_id += 1;
 
-        let mut memtable = tbl.memtable.lock().unwrap();
+        let mut memtable = tbl.memtable.lock();
 
         memtable.insert(MemOp {
             op: Op::Insert(key, values),
@@ -895,7 +1032,6 @@ impl OptiDBImpl {
         });
 
         if metadata.stats.logged_bytes as usize > metadata.opts.max_log_length_bytes {
-            let mut log = tbl.log.lock().unwrap();
             flush(log.get_mut(), &mut memtable, &mut metadata, &self.path)?;
 
             // if md.levels[0].parts.len() > 0 && md.levels[0].parts.len() > self.opts.l0_max_parts {
@@ -904,7 +1040,7 @@ impl OptiDBImpl {
             //         .unwrap();
             // }
         }
-
+        histogram!("store.insert_time_sec",start_time.elapsed(),"table"=>tbl_name.to_string());
         // !@#debug!("insert finished in {:?}", duration);
         Ok(())
     }
@@ -916,11 +1052,11 @@ impl OptiDBImpl {
     }
 
     pub fn flush(&mut self) -> Result<()> {
-        let mut tbls = self.tables.write().unwrap();
-        for tbl in tbls.iter_mut() {
-            let mut log = tbl.log.lock().unwrap();
-            let mut memtable = tbl.memtable.lock().unwrap();
-            let mut metadata = tbl.metadata.lock().unwrap();
+        let mut tbls = self.tables.read();
+        for tbl in tbls.iter() {
+            let mut log = tbl.log.lock();
+            let mut memtable = tbl.memtable.lock();
+            let mut metadata = tbl.metadata.lock();
             flush(log.get_mut(), &mut memtable, &mut metadata, &self.path)?;
         }
 
@@ -928,14 +1064,14 @@ impl OptiDBImpl {
     }
 
     pub fn schema(&self, tbl_name: &str) -> Result<Schema> {
-        let tables = self.tables.read().unwrap();
+        let tables = self.tables.read();
         let tbl = tables.iter().find(|t| t.name == tbl_name);
         let mut tbl = match tbl {
             None => return Err(StoreError::Internal("table not found".to_string())),
             Some(tbl) => tbl,
         };
 
-        let schema = tbl.metadata.lock().unwrap().schema.clone();
+        let schema = tbl.metadata.lock().schema.clone();
         Ok(schema)
     }
 
@@ -953,7 +1089,8 @@ impl OptiDBImpl {
         required_partitions: usize,
         fields: Vec<String>,
     ) -> Result<Vec<ScanStream>> {
-        let tables = self.tables.read().unwrap();
+        counter!("store.scans_count", 1,"table"=>tbl_name.to_string());
+        let tables = self.tables.read();
         let tbl = tables.iter().find(|t| t.name == tbl_name);
         let mut tbl = match tbl {
             None => return Err(StoreError::Internal("table not found".to_string())),
@@ -962,8 +1099,8 @@ impl OptiDBImpl {
 
         drop(tables);
         // locking compactor file operations (deleting/moving) to prevent parts deletion during scanning
-        let _vfs = tbl.vfs.lock.lock().unwrap();
-        let _md = tbl.metadata.lock().unwrap();
+        let _vfs = tbl.vfs.lock.lock();
+        let _md = tbl.metadata.lock();
         let metadata = _md.clone();
         drop(_md);
         let mut all_partitions = metadata.partitions.clone();
@@ -983,10 +1120,14 @@ impl OptiDBImpl {
             rest.append(&mut b);
             out.push(rest);
         }
-        let memtable = tbl.memtable.lock().unwrap();
+
+        let start_time = Instant::now();
+
+        let memtable = tbl.memtable.lock();
+        println!("memtable len {}", memtable.len());
         let mem_chunks = memtable_to_partitioned_chunks(&metadata, &memtable)?;
         drop(memtable);
-
+        histogram!("store.scan_memtable_time_sec",start_time.elapsed(),"table"=>tbl_name.to_string());
         let mut streams = vec![];
         for partitions in out {
             let mut iters = vec![];
@@ -1020,18 +1161,18 @@ impl OptiDBImpl {
                     iters.push(iter);
                 }
             }
-            streams.push(ScanStream::new(iters));
+            streams.push(ScanStream::new(iters, tbl_name.to_string()));
         }
 
         Ok(streams)
     }
     // #[instrument(level = "trace", skip(self))]
     pub fn add_field(&mut self, tbl_name: &str, field: Field) -> Result<()> {
-        let tables = self.tables.read().unwrap();
+        let tables = self.tables.read();
         let tbl = tables.iter().find(|t| t.name == tbl_name).cloned().unwrap();
         drop(tables);
 
-        let mut metadata = tbl.metadata.lock().unwrap();
+        let mut metadata = tbl.metadata.lock();
         for f in &metadata.schema.fields {
             if f.name == field.name {
                 return Err(StoreError::Internal(format!(
@@ -1041,7 +1182,7 @@ impl OptiDBImpl {
             }
         }
         metadata.schema.fields.push(field);
-        let mut log = tbl.log.lock().unwrap();
+        let mut log = tbl.log.lock();
         log_metadata(log.get_mut(), &mut metadata)?;
         Ok(())
     }
@@ -1051,7 +1192,7 @@ impl OptiDBImpl {
         fs::create_dir_all(&path)?;
         let new_tbl = try_recover_table(path, tbl_name.to_string(), Some(opts))?;
 
-        let mut tables = self.tables.write().unwrap();
+        let mut tables = self.tables.write();
         tables.push(new_tbl);
 
         Ok(())
@@ -1129,9 +1270,9 @@ mod tests {
         let mut db = OptiDBImpl::open(path, opts).unwrap();
         let topts = TableOptions {
             levels: 7,
-            merge_array_size: 10,
+            merge_array_size: 10000,
             partitions: 2,
-            index_cols: 1,
+            index_cols: 2,
             l1_max_size_bytes: 1024 * 1024,
             level_size_multiplier: 10,
             l0_max_parts: 4,
@@ -1143,47 +1284,43 @@ mod tests {
             merge_row_group_values_limit: 1000,
             read_chunk_size: 10,
         };
+
+        let cols = 100;
         db.create_table("t1", topts).unwrap();
-        db.add_field("t1", Field::new("a", DataType::Int64, false))
-            .unwrap();
-        db.add_field("t1", Field::new("b", DataType::Int64, false))
-            .unwrap();
-        db.add_field("t1", Field::new("c", DataType::Int64, false))
-            .unwrap();
+        for col in 0..cols {
+            db.add_field("t1", Field::new(col.to_string(), DataType::Int64, false))
+                .unwrap();
+        }
 
         let mut rng = StepRng::new(2, 13);
         let mut irs = FisherYates::default();
         // let mut input = (0..10_000_000).collect();
-        let mut input = (0..100).collect();
+        let mut input = (0..1000000).collect();
         irs.shuffle(&mut input, &mut rng).unwrap();
 
         for i in input {
-            db.insert("t1", vec![KeyValue::Int64(i), KeyValue::Int64(i)], vec![
-                Value::Int64(Some(i)),
-            ])
-            .unwrap();
+            let vals = (0..cols - 2)
+                .map(|v| Value::Int64(Some(v as i64)))
+                .collect::<Vec<_>>();
+            db.insert("t1", vec![KeyValue::Int64(i), KeyValue::Int64(i)], vals)
+                .unwrap();
         }
 
-        let streams = db
-            .scan("t1", 2, vec![
-                "a".to_string(),
-                "b".to_string(),
-                "c".to_string(),
-            ])
-            .unwrap();
-
+        let names = (0..100).map(|v| v.to_string()).collect::<Vec<_>>();
+        let streams = db.scan("t1", 2, names).unwrap();
         for stream in streams {
             let b = block_on(stream.collect::<Vec<_>>())
                 .into_iter()
                 .map(|v| v.unwrap())
                 .collect::<Vec<_>>();
 
-            for bb in b {
-                println!("{:?}", bb);
-            }
+            // for bb in b {
+            //     println!("{:?}", bb);
+            // }
         }
+        db.flush().unwrap();
         thread::sleep(Duration::from_millis(20));
-        // print_partitions(db.metadata.lock().unwrap().partitions.as_ref());
+        print_partitions(db.tables.read()[0].metadata.lock().partitions.as_ref());
         // db.compact();
     }
 }

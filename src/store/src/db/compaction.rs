@@ -7,11 +7,11 @@ use std::sync::mpsc::Sender;
 use std::sync::mpsc::TryRecvError;
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::sync::RwLock;
 use std::thread;
 use std::time;
 use std::time::Instant;
 
+use parking_lot::RwLock;
 use tracing::error;
 
 use crate::db::log_metadata;
@@ -94,13 +94,13 @@ impl Compactor {
             // Ok(msg) => match msg {
             //     CompactorMessage::Compact => {
             // !@#debug!("compaction started");
-            let tbls = self.tables.read().unwrap();
+            let tbls = self.tables.read();
             let tables = tbls.clone();
             drop(tbls);
 
             for table in tables {
                 let metadata = {
-                    let md = table.metadata.lock().unwrap();
+                    let md = table.metadata.lock();
                     md.clone()
                 };
                 // !@#println!("md lvlb {}", levels[0].part_id);
@@ -117,7 +117,7 @@ impl Compactor {
                         Ok(res) => match res {
                             None => continue,
                             Some(res) => {
-                                let mut metadata = table.metadata.lock().unwrap();
+                                let mut metadata = table.metadata.lock();
                                 // !@#println!("md lvl");
                                 // print_levels(&md.levels);
                                 // print_levels(&md.levels);
@@ -136,7 +136,7 @@ impl Compactor {
                                 for (idx, l) in res.levels.iter().enumerate().skip(1) {
                                     metadata.partitions[pid].levels[idx] = l.clone();
                                 }
-                                let mut log = table.log.lock().unwrap();
+                                let mut log = table.log.lock();
                                 log_metadata(log.get_mut(), &mut metadata).unwrap();
                                 drop(metadata);
                                 // drop because next fs operation is with locking
