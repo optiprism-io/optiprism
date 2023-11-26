@@ -153,12 +153,13 @@ pub struct Partition {
     levels: Vec<Level>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Table {
-    memtable: SkipSet<MemOp>,
-    metadata: Metadata,
+    name: String,
+    memtable: Arc<Mutex<SkipSet<MemOp>>>,
+    metadata: Arc<Mutex<Metadata>>,
     vfs: Arc<Vfs>,
-    log: BufWriter<File>,
+    log: Arc<Mutex<BufWriter<File>>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -326,7 +327,7 @@ fn level_path(path: &PathBuf, table_name: &str, partition_id: usize, level_id: u
 #[derive(Debug)]
 pub struct Vfs {
     // not RWLock because of possible deadlocks
-    lock: Mutex<usize>,
+    lock: Mutex<()>,
 }
 
 impl Vfs {
@@ -336,39 +337,14 @@ impl Vfs {
         }
     }
 
-    pub fn add_readers(&self, v: usize) -> Result<()> {
-        let mut lock = self.lock.lock().unwrap();
-        *lock = *lock + v;
-
-        Ok(())
+    pub fn remove_file<P: AsRef<Path>>(&self, path: P) {
+        let _g = self.lock.lock().unwrap();
+        fs::remove_file(path);
     }
 
-    pub fn remove_readers(&self, v: usize) -> Result<()> {
-        let mut lock = self.lock.lock().unwrap();
-        *lock = *lock - v;
-        Ok(())
-    }
-
-    pub fn remove_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        loop {
-            let a = *self.lock.lock().unwrap();
-            if a == 0 {
-                fs::remove_file(path)?;
-                break;
-            }
-        }
-        Ok(())
-    }
-
-    pub fn rename<P: AsRef<Path>>(&self, from: P, to: P) -> Result<()> {
-        loop {
-            let a = *self.lock.lock().unwrap();
-            if a == 0 {
-                fs::rename(from, to)?;
-                break;
-            }
-        }
-        Ok(())
+    pub fn rename<P: AsRef<Path>>(&self, from: P, to: P) {
+        let _g = self.lock.lock().unwrap();
+        fs::rename(from, to);
     }
 }
 
@@ -381,19 +357,19 @@ struct Options {}
 #[derive(Clone)]
 pub struct OptiDBImpl {
     opts: Options,
-    tables: Arc<RwLock<Vec<Arc<RwLock<Table>>>>>,
+    tables: Arc<RwLock<Vec<Table>>>,
     compactor_outbox: Sender<CompactorMessage>,
     path: PathBuf,
 }
 
-fn _log(op: LogOp, tbl: &mut Table) -> Result<usize> {
+fn _log(op: LogOp, metadata: &mut Metadata, log: &mut File) -> Result<usize> {
     let data = serialize(&op)?;
 
     let crc = hash_crc32(&data);
     // !@#trace!("crc32: {}", crc);
-    tbl.log.write_all(&crc.to_le_bytes())?;
-    tbl.log.write_all(&(data.len() as u64).to_le_bytes())?;
-    tbl.log.write_all(&data)?;
+    log.write_all(&crc.to_le_bytes())?;
+    log.write_all(&(data.len() as u64).to_le_bytes())?;
+    log.write_all(&data)?;
 
     let logged_size = 8 + 4 + data.len();
     // !@#trace!("logged size: {}", logged_size);
@@ -417,10 +393,10 @@ fn recover_op(op: LogOp, memtable: &mut SkipSet<MemOp>, metadata: &mut Metadata)
     Ok(())
 }
 
-fn log_metadata(tbl: &mut Table) -> Result<()> {
+fn log_metadata(log: &mut File, metadata: &mut Metadata) -> Result<()> {
     // !@#trace!("log metadata");
-    _log(LogOp::Metadata(tbl.metadata.clone()), tbl)?;
-    tbl.metadata.seq_id += 1;
+    _log(LogOp::Metadata(metadata.clone()), metadata, log)?;
+    metadata.seq_id += 1;
 
     Ok(())
 }
@@ -471,7 +447,7 @@ fn try_recover_table(path: PathBuf, name: String, opts: Option<TableOptions>) ->
         version: 0,
         seq_id: 0,
         log_id: 0,
-        table_name: name,
+        table_name: name.clone(),
         schema: Schema::from(vec![]),
         stats: Default::default(),
         partitions: (0..opts.partitions)
@@ -537,15 +513,15 @@ fn try_recover_table(path: PathBuf, name: String, opts: Option<TableOptions>) ->
     metadata.stats.logged_bytes = log.metadata().unwrap().len();
 
     let log = BufWriter::new(log);
-    let vfs = Arc::new(Vfs::new());
     // if trigger_compact {
     //     // compactor_outbox.send(CompactorMessage::Compact).unwrap();
     // }
     Ok(Table {
-        memtable,
-        metadata,
-        vfs,
-        log,
+        name,
+        memtable: Arc::new(Mutex::new(memtable)),
+        metadata: Arc::new(Mutex::new(metadata)),
+        vfs: Arc::new(Vfs::new()),
+        log: Arc::new(Mutex::new(log)),
     })
 }
 
@@ -556,11 +532,11 @@ fn recover(path: PathBuf, opts: Options) -> Result<OptiDBImpl> {
     let dir = fs::read_dir(path.join("tables"))?;
     for f in dir {
         let f = f?;
-        tables.push(Arc::new(RwLock::new(try_recover_table(
+        tables.push(try_recover_table(
             f.path(),
             f.file_name().to_os_string().into_string().unwrap(),
             None,
-        )?)));
+        )?);
     }
 
     // let trigger_compact = if metadata.partitions[0].parts.len() > 0
@@ -778,64 +754,65 @@ fn write_level0(
     Ok(ret)
 }
 
-fn flush(tbl: &mut Table, path: &PathBuf) -> Result<()> {
+fn flush(
+    log: &mut File,
+    memtable: &mut SkipSet<MemOp>,
+    metadata: &mut Metadata,
+    path: &PathBuf,
+) -> Result<()> {
     // in case when it is flushed by another thread
-    if tbl.memtable.len() == 0 {
+    if memtable.len() == 0 {
         return Ok(());
     }
     // !@#trace!("flushing log file");
-    tbl.log.flush()?;
-    // tbl.log.sync_all()?; //todo
+    log.flush()?;
+    log.sync_all()?;
     // swap memtable
     // !@#trace!("swapping memtable");
 
     // write to parquet
     // !@#trace!("writing to parquet");
     // !@#trace!("part id: {}", md.levels[0].part_id);
-    let memtable = mem::take(&mut tbl.memtable);
-    let md = tbl.metadata.clone();
-    let parts = write_level0(&md, &memtable, path.to_owned())?;
+    let memtable = mem::take(memtable);
+    let parts = write_level0(&metadata, &memtable, path.to_owned())?;
 
     for (pid, part) in parts {
-        tbl.metadata.partitions[pid].levels[0]
-            .parts
-            .push(part.clone());
+        metadata.partitions[pid].levels[0].parts.push(part.clone());
         // increment table id
-        tbl.metadata.partitions[pid].levels[0].part_id += 1;
-        tbl.metadata.stats.written_bytes += part.size_bytes;
+        metadata.partitions[pid].levels[0].part_id += 1;
+        metadata.stats.written_bytes += part.size_bytes;
     }
 
-    tbl.metadata.stats.logged_bytes = 0;
+    metadata.stats.logged_bytes = 0;
     // increment log id
-    tbl.metadata.log_id += 1;
+    metadata.log_id += 1;
 
     // create new log
     trace!(
         "creating new log file {:?}",
-        format!("{:016}.log", tbl.metadata.log_id)
+        format!("{:016}.log", metadata.log_id)
     );
 
-    let log = OpenOptions::new()
+    let mut log = OpenOptions::new()
         .create_new(true)
         .write(true)
         .read(true)
         .open(path.join(format!(
             "tables/{}/{:016}.log",
-            tbl.metadata.table_name, tbl.metadata.log_id
+            metadata.table_name, metadata.log_id
         )))?;
-    let mut log = BufWriter::new(log);
 
     // write metadata to log as first record
-    log_metadata(tbl)?;
+    log_metadata(&mut log, metadata)?;
 
     trace!(
         "removing previous log file {:?}",
-        format!("{:016}.log", tbl.metadata.log_id - 1)
+        format!("{:016}.log", metadata.log_id - 1)
     );
     fs::remove_file(path.join(format!(
         "tables/{}/{:016}.log",
-        tbl.metadata.table_name,
-        tbl.metadata.log_id - 1
+        metadata.table_name,
+        metadata.log_id - 1
     )))?;
     Ok(())
 }
@@ -888,33 +865,38 @@ impl OptiDBImpl {
 
     // #[instrument(level = "trace", skip(self))]
     pub fn insert(&mut self, tbl_name: &str, key: Vec<KeyValue>, values: Vec<Value>) -> Result<()> {
-        let tables = self.tables.write().unwrap();
-        let tbl = tables
-            .iter()
-            .find(|t| t.write().unwrap().metadata.table_name == tbl_name)
-            .cloned()
-            .unwrap();
-        let mut tbl = tbl.write().unwrap();
+        let tables = self.tables.read().unwrap();
+        let tbl = tables.iter().find(|t| t.name == tbl_name).cloned().unwrap();
 
         drop(tables);
 
-        if key.len() + values.len() != tbl.metadata.schema.fields.len() {
+        let mut metadata = tbl.metadata.lock().unwrap();
+        if key.len() + values.len() != metadata.schema.fields.len() {
             return Err(StoreError::Internal(format!(
                 "Fields mismatch. Key+Val len: {}, schema fields len: {}",
                 key.len() + values.len(),
-                tbl.metadata.schema.fields.len()
+                metadata.schema.fields.len()
             )));
         }
-        let logged = _log(LogOp::Insert(key.clone(), values.clone()), &mut tbl)?;
-        tbl.metadata.stats.logged_bytes += logged as u64;
-        tbl.metadata.seq_id += 1;
-        tbl.memtable.insert(MemOp {
+        let mut log = tbl.log.lock().unwrap();
+        let logged = _log(
+            LogOp::Insert(key.clone(), values.clone()),
+            &mut metadata,
+            log.get_mut(),
+        )?;
+        metadata.stats.logged_bytes += logged as u64;
+        metadata.seq_id += 1;
+
+        let mut memtable = tbl.memtable.lock().unwrap();
+
+        memtable.insert(MemOp {
             op: Op::Insert(key, values),
-            seq_id: tbl.metadata.seq_id,
+            seq_id: metadata.seq_id,
         });
 
-        if tbl.metadata.stats.logged_bytes as usize > tbl.metadata.opts.max_log_length_bytes {
-            flush(&mut tbl, &self.path)?;
+        if metadata.stats.logged_bytes as usize > metadata.opts.max_log_length_bytes {
+            let mut log = tbl.log.lock().unwrap();
+            flush(log.get_mut(), &mut memtable, &mut metadata, &self.path)?;
 
             // if md.levels[0].parts.len() > 0 && md.levels[0].parts.len() > self.opts.l0_max_parts {
             //     self.compactor_outbox
@@ -936,8 +918,10 @@ impl OptiDBImpl {
     pub fn flush(&mut self) -> Result<()> {
         let mut tbls = self.tables.write().unwrap();
         for tbl in tbls.iter_mut() {
-            let mut tbl = tbl.write().unwrap();
-            flush(&mut tbl, &self.path)?;
+            let mut log = tbl.log.lock().unwrap();
+            let mut memtable = tbl.memtable.lock().unwrap();
+            let mut metadata = tbl.metadata.lock().unwrap();
+            flush(log.get_mut(), &mut memtable, &mut metadata, &self.path)?;
         }
 
         Ok(())
@@ -945,15 +929,14 @@ impl OptiDBImpl {
 
     pub fn schema(&self, tbl_name: &str) -> Result<Schema> {
         let tables = self.tables.read().unwrap();
-        let tbl = tables
-            .iter()
-            .find(|t| t.read().unwrap().metadata.table_name == tbl_name);
+        let tbl = tables.iter().find(|t| t.name == tbl_name);
         let mut tbl = match tbl {
             None => return Err(StoreError::Internal("table not found".to_string())),
-            Some(tbl) => tbl.read().unwrap(),
+            Some(tbl) => tbl,
         };
 
-        Ok(tbl.metadata.schema.clone())
+        let schema = tbl.metadata.lock().unwrap().schema.clone();
+        Ok(schema)
     }
 
     pub fn get(&self, opts: ReadOptions, key: Vec<KeyValue>) -> Result<Vec<(String, Value)>> {
@@ -970,16 +953,20 @@ impl OptiDBImpl {
         required_partitions: usize,
         fields: Vec<String>,
     ) -> Result<Vec<ScanStream>> {
-        let tables = self.tables.write().unwrap();
-        let tbl = tables
-            .iter()
-            .find(|t| t.write().unwrap().metadata.table_name == tbl_name)
-            .cloned()
-            .unwrap();
-        let mut tbl = tbl.write().unwrap();
+        let tables = self.tables.read().unwrap();
+        let tbl = tables.iter().find(|t| t.name == tbl_name);
+        let mut tbl = match tbl {
+            None => return Err(StoreError::Internal("table not found".to_string())),
+            Some(tbl) => tbl.to_owned(),
+        };
 
         drop(tables);
-        let mut all_partitions = tbl.metadata.partitions.clone();
+        // locking compactor file operations (deleting/moving) to prevent parts deletion during scanning
+        let _vfs = tbl.vfs.lock.lock().unwrap();
+        let _md = tbl.metadata.lock().unwrap();
+        let metadata = _md.clone();
+        drop(_md);
+        let mut all_partitions = metadata.partitions.clone();
         let mut out = vec![];
         for _ in 0..required_partitions {
             match all_partitions.pop() {
@@ -996,9 +983,9 @@ impl OptiDBImpl {
             rest.append(&mut b);
             out.push(rest);
         }
-        let mem_chunks = memtable_to_partitioned_chunks(&tbl.metadata, &tbl.memtable)?;
-        let md = tbl.metadata.clone();
-        drop(tbl);
+        let memtable = tbl.memtable.lock().unwrap();
+        let mem_chunks = memtable_to_partitioned_chunks(&metadata, &memtable)?;
+        drop(memtable);
 
         let mut streams = vec![];
         for partitions in out {
@@ -1024,8 +1011,8 @@ impl OptiDBImpl {
                     iters.push(iter);
                 } else {
                     let opts = arrow_merger::Options {
-                        index_cols: md.opts.merge_index_cols,
-                        array_size: md.opts.merge_array_size,
+                        index_cols: metadata.opts.merge_index_cols,
+                        array_size: metadata.opts.merge_array_size,
                         fields: fields.clone(),
                     };
                     let iter = Box::new(MergingIterator::new(rdrs, mem_chunk, opts)?)
@@ -1040,16 +1027,12 @@ impl OptiDBImpl {
     }
     // #[instrument(level = "trace", skip(self))]
     pub fn add_field(&mut self, tbl_name: &str, field: Field) -> Result<()> {
-        let tables = self.tables.write().unwrap();
-        let tbl = tables
-            .iter()
-            .find(|t| t.write().unwrap().metadata.table_name == tbl_name)
-            .cloned()
-            .unwrap();
-        let mut tbl = tbl.write().unwrap();
+        let tables = self.tables.read().unwrap();
+        let tbl = tables.iter().find(|t| t.name == tbl_name).cloned().unwrap();
         drop(tables);
 
-        for f in &tbl.metadata.schema.fields {
+        let mut metadata = tbl.metadata.lock().unwrap();
+        for f in &metadata.schema.fields {
             if f.name == field.name {
                 return Err(StoreError::Internal(format!(
                     "Field with name {} already exists",
@@ -1057,8 +1040,9 @@ impl OptiDBImpl {
                 )));
             }
         }
-        tbl.metadata.schema.fields.push(field);
-        log_metadata(&mut tbl)?;
+        metadata.schema.fields.push(field);
+        let mut log = tbl.log.lock().unwrap();
+        log_metadata(log.get_mut(), &mut metadata)?;
         Ok(())
     }
 
@@ -1068,7 +1052,7 @@ impl OptiDBImpl {
         let new_tbl = try_recover_table(path, tbl_name.to_string(), Some(opts))?;
 
         let mut tables = self.tables.write().unwrap();
-        tables.push(Arc::new(RwLock::new(new_tbl)));
+        tables.push(new_tbl);
 
         Ok(())
     }

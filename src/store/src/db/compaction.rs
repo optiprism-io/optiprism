@@ -53,14 +53,14 @@ struct CompactResult {
 }
 
 pub struct Compactor {
-    tables: Arc<RwLock<Vec<Arc<RwLock<Table>>>>>,
+    tables: Arc<RwLock<Vec<Table>>>,
     path: PathBuf,
     inbox: Receiver<CompactorMessage>,
 }
 
 impl Compactor {
     pub fn new(
-        tables: Arc<RwLock<Vec<Arc<RwLock<Table>>>>>,
+        tables: Arc<RwLock<Vec<Table>>>,
         path: PathBuf,
         inbox: Receiver<CompactorMessage>,
     ) -> Self {
@@ -99,31 +99,31 @@ impl Compactor {
             drop(tbls);
 
             for table in tables {
-                let md = {
-                    let t = table.read().unwrap();
-                    t.metadata.clone()
+                let metadata = {
+                    let md = table.metadata.lock().unwrap();
+                    md.clone()
                 };
                 // !@#println!("md lvlb {}", levels[0].part_id);
                 // print_levels(&levels);
-                for (pid, partition) in md.partitions.iter().enumerate() {
+                for (pid, partition) in metadata.partitions.iter().enumerate() {
                     let start = Instant::now();
                     match compact(
-                        md.table_name.as_str(),
+                        table.name.as_str(),
                         &partition.levels,
                         pid,
                         &self.path,
-                        &md.opts,
+                        &metadata.opts,
                     ) {
                         Ok(res) => match res {
                             None => continue,
                             Some(res) => {
+                                let mut metadata = table.metadata.lock().unwrap();
                                 // !@#println!("md lvl");
                                 // print_levels(&md.levels);
                                 // print_levels(&md.levels);
-                                let mut tbl = table.write().unwrap();
                                 for rem in &res.l0_remove {
-                                    tbl.metadata.partitions[pid].levels[0].parts =
-                                        tbl.metadata.partitions[pid].levels[0]
+                                    metadata.partitions[pid].levels[0].parts =
+                                        metadata.partitions[pid].levels[0]
                                             .parts
                                             .clone()
                                             .into_iter()
@@ -134,11 +134,11 @@ impl Compactor {
                                 // !@#println!("res levels");
                                 // print_levels(&res.levels);
                                 for (idx, l) in res.levels.iter().enumerate().skip(1) {
-                                    tbl.metadata.partitions[pid].levels[idx] = l.clone();
+                                    metadata.partitions[pid].levels[idx] = l.clone();
                                 }
-                                log_metadata(&mut tbl).unwrap();
-                                let vfs = tbl.vfs.clone();
-                                drop(tbl);
+                                let mut log = table.log.lock().unwrap();
+                                log_metadata(log.get_mut(), &mut metadata).unwrap();
+                                drop(metadata);
                                 // drop because next fs operation is with locking
                                 // !@#println!("md lvl after");
                                 // print_levels(&md.levels);
@@ -147,11 +147,11 @@ impl Compactor {
                                         FsOp::Rename(from, to) => {
                                             // !@#trace!("renaming");
                                             // todo handle error
-                                            vfs.rename(from, to).unwrap();
+                                            table.vfs.rename(from, to);
                                         }
                                         FsOp::Delete(path) => {
                                             // !@#trace!("deleting {:?}",path);
-                                            vfs.remove_file(path).unwrap();
+                                            table.vfs.remove_file(path);
                                         }
                                     }
                                 }
