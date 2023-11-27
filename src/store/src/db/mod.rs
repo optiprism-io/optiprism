@@ -295,7 +295,8 @@ pub struct TableOptions {
     pub level_size_multiplier: usize,
     pub max_log_length_bytes: usize,
     pub read_chunk_size: usize,
-    pub merge_max_part_size_bytes: usize,
+    pub merge_max_l1_part_size_bytes: usize,
+    pub merge_part_size_multiplier: usize,
     pub merge_index_cols: usize,
     pub merge_data_page_size_limit_bytes: Option<usize>,
     pub merge_row_group_values_limit: usize,
@@ -349,14 +350,14 @@ impl Vfs {
         }
     }
 
-    pub fn remove_file<P: AsRef<Path>>(&self, path: P) {
+    pub fn remove_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let _g = self.lock.lock();
-        fs::remove_file(path);
+        Ok(fs::remove_file(path)?)
     }
 
-    pub fn rename<P: AsRef<Path>>(&self, from: P, to: P) {
+    pub fn rename<P: AsRef<Path>>(&self, from: P, to: P) -> Result<()> {
         let _g = self.lock.lock();
-        fs::rename(from, to);
+        Ok(fs::rename(from, to)?)
     }
 }
 
@@ -441,7 +442,8 @@ fn try_recover_table(path: PathBuf, name: String, opts: Option<TableOptions>) ->
         level_size_multiplier: 0,
         max_log_length_bytes: 0,
         read_chunk_size: 0,
-        merge_max_part_size_bytes: 0,
+        merge_max_l1_part_size_bytes: 0,
+        merge_part_size_multiplier: 0,
         merge_index_cols: 0,
         merge_data_page_size_limit_bytes: None,
         merge_row_group_values_limit: 0,
@@ -1273,17 +1275,36 @@ mod tests {
             merge_array_size: 10000,
             partitions: 2,
             index_cols: 2,
-            l1_max_size_bytes: 1024 * 1024,
+            l1_max_size_bytes: 1024 * 1024 * 10,
             level_size_multiplier: 10,
             l0_max_parts: 4,
-            max_log_length_bytes: 1024 * 1024 * 10,
+            max_log_length_bytes: 1024 * 1024 * 100,
             merge_array_page_size: 10000,
             merge_data_page_size_limit_bytes: Some(1024 * 1024),
             merge_index_cols: 2,
-            merge_max_part_size_bytes: 2048,
+            merge_max_l1_part_size_bytes: 1024 * 1024,
+            merge_part_size_multiplier: 10,
             merge_row_group_values_limit: 1000,
             read_chunk_size: 10,
         };
+
+        // let topts = TableOptions {
+        // levels: 7,
+        // merge_array_size: 10000,
+        // partitions: 2,
+        // index_cols: 2,
+        // l1_max_size_bytes: 1024 * 1024,
+        // level_size_multiplier: 10,
+        // l0_max_parts: 4,
+        // max_log_length_bytes: 1024 * 1024,
+        // merge_array_page_size: 10000,
+        // merge_data_page_size_limit_bytes: Some(1024 * 1024),
+        // merge_index_cols: 2,
+        // merge_max_l1_part_size_bytes: 1024 * 1024,
+        // merge_part_size_multiplier: 10,
+        // merge_row_group_values_limit: 1000,
+        // read_chunk_size: 10,
+        // };
 
         let cols = 100;
         db.create_table("t1", topts).unwrap();
@@ -1295,17 +1316,19 @@ mod tests {
         let mut rng = StepRng::new(2, 13);
         let mut irs = FisherYates::default();
         // let mut input = (0..10_000_000).collect();
-        let mut input = (0..1000000).collect();
+        let mut input = (0..1000000).collect::<Vec<i64>>();
         irs.shuffle(&mut input, &mut rng).unwrap();
 
-        for i in input {
-            let vals = (0..cols - 2)
-                .map(|v| Value::Int64(Some(v as i64)))
-                .collect::<Vec<_>>();
-            db.insert("t1", vec![KeyValue::Int64(i), KeyValue::Int64(i)], vals)
-                .unwrap();
+        for _ in 0..2 {
+            println!("ASD@");
+            for i in input.clone() {
+                let vals = (0..cols - 2)
+                    .map(|v| Value::Int64(Some(v as i64)))
+                    .collect::<Vec<_>>();
+                db.insert("t1", vec![KeyValue::Int64(i), KeyValue::Int64(i)], vals)
+                    .unwrap();
+            }
         }
-
         let names = (0..100).map(|v| v.to_string()).collect::<Vec<_>>();
         let streams = db.scan("t1", 2, names).unwrap();
         for stream in streams {
@@ -1320,7 +1343,7 @@ mod tests {
         }
         db.flush().unwrap();
         thread::sleep(Duration::from_millis(20));
-        print_partitions(db.tables.read()[0].metadata.lock().partitions.as_ref());
+        // print_partitions(db.tables.read()[0].metadata.lock().partitions.as_ref());
         // db.compact();
     }
 }

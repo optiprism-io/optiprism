@@ -1,0 +1,16 @@
+{ "type": "suite", "event": "started", "test_count": 1 }
+{ "type": "test", "event": "started", "name": "db::tests::it_works" }
+(counter) registered key store.inserts_count with unit None and description "number of inserts processed"
+(histogram) registered key store.insert_time_sec with unit Some(Seconds) and description "insert time"
+(counter) registered key store.scans_count with unit None and description "number of scans processed"
+(histogram) registered key store.scan_time_sec with unit Some(Seconds) and description "scan time"
+(histogram) registered key store.scan_memtable_time_sec with unit Some(Seconds) and description "scan memtable time"
+(counter) registered key store.compactions_count with unit None and description "number of compactions"
+(histogram) registered key store.compaction_time_sec with unit Some(Microseconds) and description "scan time"
+counter increment for 'Key(store.scans_count, [table = t1])': 1
+memtable len 0
+histogram record for 'Key(store.scan_memtable_time_sec, [table = t1])': 0.000123334
+histogram record for 'Key(store.scan_time_sec, [table = t1])': 0.135886791
+histogram record for 'Key(store.scan_time_sec, [table = t1])': 0.249786208
+{ "type": "test", "name": "db::tests::it_works", "event": "ok" }
+{ "type": "suite", "event": "ok", "passed": 1, "failed": 0, "ignored": 0, "measured": 0, "filtered_out": 5, "exec_time": 0.322801875 }

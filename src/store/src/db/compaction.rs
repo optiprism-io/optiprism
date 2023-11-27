@@ -11,6 +11,8 @@ use std::thread;
 use std::time;
 use std::time::Instant;
 
+use log::trace;
+use metrics::histogram;
 use parking_lot::RwLock;
 use tracing::error;
 
@@ -94,9 +96,10 @@ impl Compactor {
             // Ok(msg) => match msg {
             //     CompactorMessage::Compact => {
             // !@#debug!("compaction started");
-            let tbls = self.tables.read();
-            let tables = tbls.clone();
-            drop(tbls);
+            let tables = {
+                let tbls = self.tables.read();
+                tbls.clone()
+            };
 
             for table in tables {
                 let metadata = {
@@ -145,13 +148,13 @@ impl Compactor {
                                 for op in res.fs_ops {
                                     match op {
                                         FsOp::Rename(from, to) => {
-                                            // !@#trace!("renaming");
+                                            trace!("renaming");
                                             // todo handle error
-                                            table.vfs.rename(from, to);
+                                            table.vfs.rename(from, to).unwrap();
                                         }
                                         FsOp::Delete(path) => {
-                                            // !@#trace!("deleting {:?}",path);
-                                            table.vfs.remove_file(path);
+                                            trace!("deleting {:?}", path);
+                                            table.vfs.remove_file(path).unwrap();
                                         }
                                     }
                                 }
@@ -162,11 +165,12 @@ impl Compactor {
                             }
                         },
                         Err(err) => {
-                            error!("compaction error: {:?}", err);
+                            panic!("compaction error: {:?}", err);
 
                             continue;
                         }
                     }
+                    histogram!("store.compaction_time_sec",start.elapsed(),"table"=>table.name.to_string(),"partition"=>pid.to_string());
                 }
             }
             // !@#debug!("compaction finished in {:?}", duration);
@@ -204,7 +208,10 @@ fn determine_compaction(
             size += part.size_bytes;
             let level_threshold =
                 opts.l1_max_size_bytes * opts.level_size_multiplier.pow(level_id as u32 - 1);
-            println!("threshold {} size {}", level_threshold, size);
+            // println!(
+            //     "threshold {} level {level_id} size {}",
+            //     level_threshold, size
+            // );
             if size > level_threshold as u64 {
                 to_compact.push(ToCompact::new(level_id, part.id));
             }
@@ -245,9 +252,15 @@ fn compact(
     let mut l0_rem: Vec<(usize)> = Vec::new();
     let mut tmp_levels = levels.to_owned().clone();
     let mut compacted = false;
-    for l in 0..tmp_levels.len() - 2 {
+    for level_id in 0..tmp_levels.len() - 2 {
+        let start_time = Instant::now();
         let mut v = None;
-        v = determine_compaction(l, &tmp_levels[l], &tmp_levels[l + 1], opts)?;
+        v = determine_compaction(
+            level_id,
+            &tmp_levels[level_id],
+            &tmp_levels[level_id + 1],
+            opts,
+        )?;
         match v {
             None => {
                 if compacted {
@@ -258,42 +271,38 @@ fn compact(
             }
             Some(to_compact) => {
                 compacted = true;
-                // !@#println!("to compact {:?}", to_compact);
+                // println!("to compact {:?}", to_compact);
                 if to_compact.len() == 1 {
-                    // !@#println!("rename");
+                    // println!("rename");
 
-                    let idx = tmp_levels[l]
+                    let idx = tmp_levels[level_id]
                         .parts
                         .iter()
                         .position(|p| p.id == to_compact[0].part)
                         .unwrap();
 
-                    let mut part = tmp_levels[l].parts[idx].clone();
-                    tmp_levels[l].parts.remove(idx);
-                    part.id = tmp_levels[l + 1].part_id + 1;
+                    let mut part = tmp_levels[level_id].parts[idx].clone();
+                    tmp_levels[level_id].parts.remove(idx);
+                    part.id = tmp_levels[level_id + 1].part_id + 1;
 
-                    let from = part_path(&path, tbl_name, partition_id, l, to_compact[0].part);
-                    let to = part_path(&path, tbl_name, partition_id, l + 1, part.id);
+                    let from =
+                        part_path(&path, tbl_name, partition_id, level_id, to_compact[0].part);
+                    let to = part_path(&path, tbl_name, partition_id, level_id + 1, part.id);
                     fs_ops.push(FsOp::Rename(from, to));
 
-                    tmp_levels[l + 1].parts.push(part.clone());
-                    tmp_levels[l + 1].part_id += 1;
+                    tmp_levels[level_id + 1].parts.push(part.clone());
+                    tmp_levels[level_id + 1].part_id += 1;
                     // !@#println!("done");
                     continue;
                 }
-                // !@#println!("llee {}", to_compact.len());
-                let mut to_merge: Vec<Part> = vec![];
+                // println!("llee {}", to_compact.len());
+                let mut tomerge = vec![];
+                // println!("tmplevels {:#?}", tmp_levels);
                 for tc in &to_compact {
                     if tc.level == 0 {
                         l0_rem.push(tc.part);
                     }
-                    let part = tmp_levels[tc.level]
-                        .clone()
-                        .parts
-                        .into_iter()
-                        .find(|p| p.id == tc.part)
-                        .unwrap();
-                    to_merge.push(part);
+                    tomerge.push(part_path(&path, tbl_name, partition_id, tc.level, tc.part));
                     tmp_levels[tc.level].parts = tmp_levels[tc.level]
                         .clone()
                         .parts
@@ -302,31 +311,36 @@ fn compact(
                         .collect::<Vec<_>>();
                 }
 
-                let in_paths = to_merge
-                    .iter()
-                    .map(|p| part_path(&path, tbl_name, partition_id, l, p.id))
-                    .collect::<Vec<_>>();
-                // !@#println!("{:?}", in_paths);
-                let out_part_id = tmp_levels[l + 1].part_id + 1;
-                let out_path = path.join(format!("tables/{}/{}/{}", tbl_name, partition_id, l + 1));
-                let rdrs = in_paths
+                // println!("inpaths {:?}", tomerge);
+                let out_part_id = tmp_levels[level_id + 1].part_id + 1;
+                let out_path = path.join(format!(
+                    "tables/{}/{}/{}",
+                    tbl_name,
+                    partition_id,
+                    level_id + 1
+                ));
+                let rdrs = tomerge
                     .iter()
                     .map(|p| File::open(p))
-                    .collect::<std::result::Result<Vec<File>, std::io::Error>>()?;
+                    .collect::<std::result::Result<Vec<File>, std::io::Error>>()
+                    .unwrap();
+                let max_part_size_bytes = opts.merge_max_l1_part_size_bytes
+                    * opts.merge_part_size_multiplier.pow(level_id as u32 + 1);
+                // println!("max max {max_part_size_bytes} {level_id}");
                 let merger_opts = parquet_merger::Options {
                     index_cols: opts.merge_index_cols,
                     data_page_size_limit_bytes: opts.merge_data_page_size_limit_bytes,
                     row_group_values_limit: opts.merge_row_group_values_limit,
                     array_page_size: opts.merge_array_page_size,
                     out_part_id,
-                    max_part_size_bytes: Some(opts.merge_max_part_size_bytes),
+                    max_part_size_bytes: Some(max_part_size_bytes),
                 };
                 let merge_result = merge(rdrs, out_path, out_part_id, merger_opts)?;
                 // !@#println!("merge result {:#?}", merge_result);
                 for f in merge_result {
                     let final_part = {
                         Part {
-                            id: tmp_levels[l + 1].part_id + 1,
+                            id: tmp_levels[level_id + 1].part_id + 1,
                             size_bytes: f.size_bytes,
                             min: f
                                 .min
@@ -340,12 +354,12 @@ fn compact(
                                 .collect::<Result<Vec<_>>>()?,
                         }
                     };
-                    tmp_levels[l + 1].parts.push(final_part);
-                    tmp_levels[l + 1].part_id += 1;
+                    tmp_levels[level_id + 1].parts.push(final_part);
+                    tmp_levels[level_id + 1].part_id += 1;
                 }
 
                 fs_ops.append(
-                    in_paths
+                    tomerge
                         .iter()
                         .map(|p| FsOp::Delete(p.clone()))
                         .collect::<Vec<_>>()
@@ -354,6 +368,8 @@ fn compact(
                 // !@#println!("after compaction");
             }
         }
+
+        histogram!("store.level_compaction_time_sec",start_time.elapsed(),"table"=>tbl_name.to_string(),"partition"=>partition_id.to_string(),"level"=>level_id.to_string());
     }
 
     // !@#println!("return lvl");
@@ -362,4 +378,10 @@ fn compact(
         levels: tmp_levels,
         fs_ops,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn determine_compaction() {}
 }

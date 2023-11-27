@@ -175,7 +175,7 @@ mod tests {
             merge_array_page_size: 10000,
             merge_data_page_size_limit_bytes: Some(1024 * 1024),
             merge_index_cols: 2,
-            merge_max_part_size_bytes: 2048,
+            merge_max_l1_part_size_bytes: 2048,
             merge_row_group_values_limit: 1000,
             read_chunk_size: 10,
             merge_array_size: 100,
