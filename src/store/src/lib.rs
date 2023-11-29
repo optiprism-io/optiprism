@@ -12,6 +12,7 @@ pub mod parquet;
 use std::cmp::Ordering;
 use std::fmt::Debug;
 
+use arrow2::datatypes::DataType;
 use chrono::DateTime;
 use chrono::Utc;
 use error::Result;
@@ -20,6 +21,7 @@ use serde::Serialize;
 
 use crate::error::StoreError;
 use crate::parquet::merger;
+use crate::Value::Int16;
 
 #[derive(Eq, PartialEq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize, Hash)]
 pub enum KeyValue {
@@ -87,6 +89,42 @@ pub enum Value {
     ListString(Option<Vec<Option<String>>>),
 }
 
+impl Value {
+    fn null(dt: &DataType) -> Value {
+        match dt {
+            DataType::Boolean => Value::Boolean(None),
+            DataType::Int8 => Value::Int8(None),
+            DataType::Int16 => Int16(None),
+            DataType::Int32 => Value::Int32(None),
+            DataType::Int64 => Value::Int64(None),
+            DataType::UInt8 => Value::UInt8(None),
+            DataType::UInt16 => Value::UInt16(None),
+            DataType::UInt32 => Value::UInt32(None),
+            DataType::UInt64 => Value::UInt64(None),
+            DataType::Timestamp(_, _) => Value::Timestamp(None),
+            DataType::Binary => Value::Binary(None),
+            DataType::Utf8 => Value::String(None),
+            DataType::Decimal(_, _) => Value::Decimal(None),
+            DataType::List(f) => match f.data_type() {
+                DataType::Boolean => Value::ListBoolean(None),
+                DataType::Int8 => Value::ListInt8(None),
+                DataType::Int16 => Value::ListInt16(None),
+                DataType::Int32 => Value::ListInt32(None),
+                DataType::Int64 => Value::ListInt64(None),
+                DataType::UInt8 => Value::ListUInt8(None),
+                DataType::UInt16 => Value::ListUInt16(None),
+                DataType::UInt32 => Value::ListUInt32(None),
+                DataType::UInt64 => Value::ListUInt64(None),
+                DataType::Timestamp(_, _) => Value::ListTimestamp(None),
+                DataType::Binary => Value::ListBinary(None),
+                DataType::Utf8 => Value::ListString(None),
+                DataType::Decimal(_, _) => Value::ListDecimal(None),
+                _ => unimplemented!(),
+            },
+            _ => unimplemented!(),
+        }
+    }
+}
 impl From<&KeyValue> for Value {
     fn from(value: &KeyValue) -> Self {
         match value {
@@ -115,18 +153,6 @@ impl From<&Value> for KeyValue {
             Value::Int32(Some(v)) => KeyValue::Int32(*v),
             _ => unreachable!(),
         }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct RowValue {
-    col: String,
-    value: Value,
-}
-
-impl RowValue {
-    pub fn new(col: String, value: Value) -> Self {
-        Self { col, value }
     }
 }
 

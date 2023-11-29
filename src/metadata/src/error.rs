@@ -6,8 +6,6 @@ use std::sync::PoisonError;
 use thiserror::Error;
 use tokio::sync::RwLockWriteGuard;
 
-use crate::database::Column;
-use crate::database::TableRef;
 use crate::properties;
 
 pub type Result<T> = result::Result<T, MetadataError>;

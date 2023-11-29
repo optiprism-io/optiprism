@@ -4,7 +4,6 @@ use arrow::datatypes::TimeUnit;
 use common::types::TIME_UNIT;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
-use metadata::database::Column;
 use metadata::events;
 use metadata::events::Event;
 use metadata::properties;

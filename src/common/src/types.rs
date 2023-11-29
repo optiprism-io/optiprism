@@ -10,9 +10,9 @@ pub const DECIMAL_SCALE: i8 = 16;
 pub const DECIMAL_MULTIPLIER: i128 = 10i128.pow(DECIMAL_SCALE as u32);
 pub const TIME_UNIT: TimeUnit = TimeUnit::Nanosecond;
 
+pub const COLUMN_PROJECT_ID: &str = "project_id";
 pub const COLUMN_USER_ID: &str = "user_id";
 pub const COLUMN_TIMESTAMP: &str = "ts";
-pub const COLUMN_REAL_TIMESTAMP: &str = "real_ts";
 pub const COLUMN_EVENT_ID: &str = "event_id";
 pub const COLUMN_EVENT: &str = "event";
 

@@ -102,7 +102,6 @@ use crate::parquet::merger::arrow_merger::MergingIterator;
 use crate::parquet::merger::chunk_min_max;
 use crate::ColValue;
 use crate::KeyValue;
-use crate::RowValue;
 use crate::Value;
 
 macro_rules! memory_col_to_arrow {
@@ -278,11 +277,6 @@ pub struct Stats {
     pub read_bytes: u64,
     pub space_amp: f64,
     pub write_amp: f64,
-}
-
-#[derive(Clone)]
-pub struct OptiDB {
-    inner: Arc<OptiDBImpl>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -638,8 +632,15 @@ fn memtable_to_partitioned_chunks(
             for (idx, val) in v.into_iter().enumerate() {
                 partitions[pid].cols[idx_offset + idx].push(val.clone());
             }
+
+            for i in 0..metadata.schema.fields.len() - (metadata.opts.index_cols + v.len()) {
+                partitions[pid].cols[idx_offset + v.len() + i].push(Value::null(
+                    &metadata.schema.fields[idx_offset + v.len() + i].data_type,
+                ));
+            }
         }
     }
+    println!("{:?}", partitions[0]);
     // todo make nulls for missing values (schema evolution)
     let v = partitions
         .into_iter()
@@ -648,54 +649,56 @@ fn memtable_to_partitioned_chunks(
                 .cols
                 .into_iter()
                 .enumerate()
-                .map(|(idx, col)| match metadata.schema.fields[idx].data_type {
-                    DataType::Boolean => {
-                        memory_col_to_arrow!(col, Boolean, MutableBooleanArray)
+                .map(|(idx, col)| {
+                    match metadata.schema.fields[idx].data_type {
+                        DataType::Boolean => {
+                            memory_col_to_arrow!(col, Boolean, MutableBooleanArray)
+                        }
+                        DataType::Int8 => memory_col_to_arrow!(col, Int8, MutablePrimitiveArray),
+                        DataType::Int16 => memory_col_to_arrow!(col, Int16, MutablePrimitiveArray),
+                        DataType::Int32 => memory_col_to_arrow!(col, Int32, MutablePrimitiveArray),
+                        DataType::Int64 => memory_col_to_arrow!(col, Int64, MutablePrimitiveArray),
+                        DataType::UInt8 => memory_col_to_arrow!(col, UInt8, MutablePrimitiveArray),
+                        DataType::UInt16 => {
+                            memory_col_to_arrow!(col, UInt16, MutablePrimitiveArray)
+                        }
+                        DataType::UInt32 => {
+                            memory_col_to_arrow!(col, UInt32, MutablePrimitiveArray)
+                        }
+                        DataType::UInt64 => {
+                            memory_col_to_arrow!(col, UInt64, MutablePrimitiveArray)
+                        }
+                        // DataType::Float32 => memory_col_to_arrow!(col, Float32, MutablePrimitiveArray),
+                        // DataType::Float64 => memory_col_to_arrow!(col, Float64, MutablePrimitiveArray),
+                        DataType::Timestamp(_, _) => {
+                            memory_col_to_arrow!(col, Int64, MutablePrimitiveArray)
+                        }
+                        DataType::Binary => {
+                            let vals = col
+                                .into_iter()
+                                .map(|v| match v {
+                                    Value::Binary(b) => b,
+                                    _ => unreachable!(),
+                                })
+                                .collect::<Vec<_>>();
+                            MutableBinaryArray::<i32>::from(vals).as_box()
+                        }
+                        DataType::Utf8 => {
+                            let vals = col
+                                .into_iter()
+                                .map(|v| match v {
+                                    Value::String(b) => b,
+                                    _ => unreachable!("{:?}", v),
+                                })
+                                .collect::<Vec<_>>();
+                            MutableUtf8Array::<i32>::from(vals).as_box()
+                        }
+                        DataType::Decimal(_, _) => {
+                            memory_col_to_arrow!(col, Decimal, MutablePrimitiveArray)
+                        }
+                        DataType::List(_) => unimplemented!(),
+                        _ => unimplemented!(),
                     }
-                    DataType::Int8 => memory_col_to_arrow!(col, Int8, MutablePrimitiveArray),
-                    DataType::Int16 => memory_col_to_arrow!(col, Int16, MutablePrimitiveArray),
-                    DataType::Int32 => memory_col_to_arrow!(col, Int32, MutablePrimitiveArray),
-                    DataType::Int64 => memory_col_to_arrow!(col, Int64, MutablePrimitiveArray),
-                    DataType::UInt8 => memory_col_to_arrow!(col, UInt8, MutablePrimitiveArray),
-                    DataType::UInt16 => {
-                        memory_col_to_arrow!(col, UInt16, MutablePrimitiveArray)
-                    }
-                    DataType::UInt32 => {
-                        memory_col_to_arrow!(col, UInt32, MutablePrimitiveArray)
-                    }
-                    DataType::UInt64 => {
-                        memory_col_to_arrow!(col, UInt64, MutablePrimitiveArray)
-                    }
-                    // DataType::Float32 => memory_col_to_arrow!(col, Float32, MutablePrimitiveArray),
-                    // DataType::Float64 => memory_col_to_arrow!(col, Float64, MutablePrimitiveArray),
-                    DataType::Timestamp(_, _) => {
-                        memory_col_to_arrow!(col, Int64, MutablePrimitiveArray)
-                    }
-                    DataType::Binary => {
-                        let vals = col
-                            .into_iter()
-                            .map(|v| match v {
-                                Value::Binary(b) => b,
-                                _ => unreachable!(),
-                            })
-                            .collect::<Vec<_>>();
-                        MutableBinaryArray::<i32>::from(vals).as_box()
-                    }
-                    DataType::Utf8 => {
-                        let vals = col
-                            .into_iter()
-                            .map(|v| match v {
-                                Value::String(b) => b,
-                                _ => unreachable!("{:?}", v),
-                            })
-                            .collect::<Vec<_>>();
-                        MutableUtf8Array::<i32>::from(vals).as_box()
-                    }
-                    DataType::Decimal(_, _) => {
-                        memory_col_to_arrow!(col, Decimal, MutablePrimitiveArray)
-                    }
-                    DataType::List(_) => unimplemented!(),
-                    _ => unimplemented!(),
                 })
                 .collect::<Vec<_>>();
             (p.id, Chunk::new(arrs))
@@ -1004,7 +1007,12 @@ impl OptiDBImpl {
     }
 
     // #[instrument(level = "trace", skip(self))]
-    pub fn insert(&mut self, tbl_name: &str, key: Vec<KeyValue>, values: Vec<Value>) -> Result<()> {
+    pub fn insert(
+        &mut self,
+        tbl_name: &str,
+        key: Vec<KeyValue>,
+        values: Vec<(String, Value)>,
+    ) -> Result<()> {
         counter!("store.inserts_count", 1,"table"=>tbl_name.to_string());
         let start_time = Instant::now();
         let tables = self.tables.read();
@@ -1013,16 +1021,34 @@ impl OptiDBImpl {
         drop(tables);
 
         let mut metadata = tbl.metadata.lock();
-        if key.len() + values.len() != metadata.schema.fields.len() {
-            return Err(StoreError::Internal(format!(
-                "Fields mismatch. Key+Val len: {}, schema fields len: {}",
-                key.len() + values.len(),
-                metadata.schema.fields.len()
-            )));
+
+        let mut final_values: Vec<Value> = vec![];
+        for (field_idx, field) in metadata
+            .schema
+            .fields
+            .iter()
+            .skip(metadata.opts.index_cols)
+            .enumerate()
+        {
+            let mut found = false;
+            for (name, value) in values.iter() {
+                if field.name == *name {
+                    final_values.push(value.clone());
+                    found = true;
+                    break;
+                }
+            }
+
+            if found {
+                continue;
+            }
+
+            final_values.push(Value::null(field.data_type()));
         }
+
         let mut log = tbl.log.lock();
         let logged = _log(
-            LogOp::Insert(key.clone(), values.clone()),
+            LogOp::Insert(key.clone(), final_values.clone()),
             &mut metadata,
             log.get_mut(),
         )?;
@@ -1032,7 +1058,7 @@ impl OptiDBImpl {
         let mut memtable = tbl.memtable.lock();
 
         memtable.insert(MemOp {
-            op: Op::Insert(key, values),
+            op: Op::Insert(key, final_values),
             seq_id: metadata.seq_id,
         });
 
@@ -1326,7 +1352,7 @@ mod tests {
             println!("ASD@");
             for i in input.clone() {
                 let vals = (0..cols - 2)
-                    .map(|v| Value::Int64(Some(v as i64)))
+                    .map(|v| ((v + 2).to_string(), Value::Int64(Some(v as i64))))
                     .collect::<Vec<_>>();
                 db.insert("t1", vec![KeyValue::Int64(i), KeyValue::Int64(i)], vals)
                     .unwrap();
@@ -1348,5 +1374,55 @@ mod tests {
         thread::sleep(Duration::from_millis(20));
         // print_partitions(db.tables.read()[0].metadata.lock().partitions.as_ref());
         // db.compact();
+    }
+
+    #[test]
+    fn test_schema_evolution() {
+        let path = PathBuf::from("/opt/homebrew/Caskroom/clickhouse/user_files");
+        fs::remove_dir_all(&path).unwrap();
+        // fs::create_dir_all(&path).unwrap();
+
+        let opts = Options {};
+        let mut db = OptiDBImpl::open(path, opts).unwrap();
+        let topts = TableOptions {
+            levels: 7,
+            merge_array_size: 10000,
+            partitions: 1,
+            index_cols: 1,
+            l1_max_size_bytes: 1024 * 1024 * 10,
+            level_size_multiplier: 10,
+            l0_max_parts: 4,
+            max_log_length_bytes: 1024 * 1024 * 100,
+            merge_array_page_size: 10000,
+            merge_data_page_size_limit_bytes: Some(1024 * 1024),
+            merge_index_cols: 2,
+            merge_max_l1_part_size_bytes: 1024 * 1024,
+            merge_part_size_multiplier: 10,
+            merge_row_group_values_limit: 1000,
+            read_chunk_size: 10,
+        };
+
+        db.create_table("t1", topts).unwrap();
+        db.add_field("t1", Field::new("k1", DataType::Int64, false))
+            .unwrap();
+        db.add_field("t1", Field::new("v1", DataType::Int64, false))
+            .unwrap();
+
+        db.insert("t1", vec![KeyValue::Int64(1)], vec![(
+            "v1".to_string(),
+            Value::Int64(Some(1)),
+        )])
+        .unwrap();
+
+        db.add_field("t1", Field::new("v2", DataType::Int64, false))
+            .unwrap();
+
+        db.insert("t1", vec![KeyValue::Int64(1)], vec![(
+            "v1".to_string(),
+            Value::Int64(Some(1)),
+        )])
+        .unwrap();
+
+        db.flush().unwrap();
     }
 }

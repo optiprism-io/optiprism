@@ -75,7 +75,6 @@ pub enum DataType {
     UInt16,
     UInt32,
     UInt64,
-    Float64,
     Decimal,
     Boolean,
     Timestamp,

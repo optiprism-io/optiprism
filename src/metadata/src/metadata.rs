@@ -8,7 +8,6 @@ use crate::accounts;
 use crate::custom_events;
 use crate::custom_properties;
 use crate::dashboards;
-use crate::database;
 use crate::dictionaries;
 use crate::events;
 use crate::organizations;
@@ -29,7 +28,6 @@ pub struct MetadataProvider {
     pub organizations: Arc<dyn organizations::Provider>,
     pub projects: Arc<dyn projects::Provider>,
     pub accounts: Arc<dyn accounts::Provider>,
-    pub database: Arc<dyn database::Provider>,
     pub dictionaries: Arc<dyn dictionaries::Provider>,
 }
 
@@ -47,7 +45,6 @@ impl MetadataProvider {
             organizations: Arc::new(organizations::ProviderImpl::new(db.clone())),
             projects: Arc::new(projects::ProviderImpl::new(db.clone())),
             accounts: Arc::new(accounts::ProviderImpl::new(db.clone())),
-            database: Arc::new(database::ProviderImpl::new(db.clone())),
             dictionaries: Arc::new(dictionaries::ProviderImpl::new(db)),
         })
     }
@@ -64,7 +61,6 @@ impl MetadataProvider {
             organizations: Arc::new(stub::Organizations {}),
             projects: Arc::new(stub::Projects {}),
             accounts: Arc::new(stub::Accounts {}),
-            database: Arc::new(stub::Database {}),
             dictionaries: Arc::new(stub::Dictionaries {}),
         }
     }
