@@ -776,6 +776,7 @@ fn flush(
     metadata: &mut Metadata,
     path: &PathBuf,
 ) -> Result<()> {
+    let start_time = Instant::now();
     // in case when it is flushed by another thread
     if memtable.len() == 0 {
         return Ok(());
@@ -830,6 +831,8 @@ fn flush(
         metadata.table_name,
         metadata.log_id - 1
     )))?;
+
+    histogram!("store.flush_time_sec", start_time.elapsed());
     Ok(())
 }
 
