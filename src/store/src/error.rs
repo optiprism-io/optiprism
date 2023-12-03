@@ -3,6 +3,7 @@ use std::result;
 use parquet2::error::Error as ParquetError;
 // use parquet::errors::ParquetError;
 use thiserror::Error;
+use common::error::CommonError;
 
 pub type Result<T> = result::Result<T, StoreError>;
 
@@ -16,6 +17,8 @@ pub enum StoreError {
     NotYetSupported(String),
     #[error("parquet {0:?}")]
     Parquet(#[from] ParquetError),
+    #[error("common {0:?}")]
+    Common(#[from] CommonError),
     #[error("execution {0:?}")]
     Execution(String),
     #[error("arrow {0:?}")]

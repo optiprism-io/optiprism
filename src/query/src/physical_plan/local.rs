@@ -24,7 +24,6 @@ use futures::Stream;
 use futures::StreamExt;
 use futures::TryStream;
 use store::arrow_conversion::arrow2_to_arrow1;
-use store::db::OptiDB;
 use store::db::OptiDBImpl;
 use store::db::ScanStream;
 use store::error::StoreError;
@@ -35,14 +34,19 @@ use crate::error::Result;
 #[derive(Debug)]
 pub struct LocalExec {
     schema: SchemaRef,
-    streams: Mutex<Vec<Option<ScanStream<File>>>>,
+    // streams: Arc<Mutex<Vec<Option<ScanStream>>>>,
+    db: Arc<OptiDBImpl>,
+    tbl_name: String,
+    fields: Vec<String>,
 }
 
 impl LocalExec {
-    pub fn try_new(schema: SchemaRef, streams: Vec<ScanStream<File>>) -> Result<Self> {
+    pub fn try_new(schema: SchemaRef, db: Arc<OptiDBImpl>, tbl_name: String, fields: Vec<String>) -> Result<Self> {
         Ok(Self {
             schema,
-            streams: Mutex::new(streams.into_iter().map(|s| Some(s)).collect()),
+            db,
+            tbl_name,
+            fields,
         })
     }
 }
@@ -93,7 +97,7 @@ impl ExecutionPlan for LocalExec {
     }
 
     fn output_partitioning(&self) -> Partitioning {
-        Partitioning::UnknownPartitioning(self.streams.lock().unwrap().len())
+        Partitioning::UnknownPartitioning(self.db.table_options(self.tbl_name.as_str()).unwrap().partitions)
     }
 
     fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {
@@ -110,19 +114,23 @@ impl ExecutionPlan for LocalExec {
     ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
         Ok(Arc::new(LocalExec {
             schema: self.schema.clone(),
-            streams: Mutex::new(self.streams.lock().unwrap().clone()),
+            db: self.db.clone(),
+            tbl_name: self.tbl_name.clone(),
+            fields: self.fields.clone(),
         }))
     }
 
     fn execute(
         &self,
         partition: usize,
-        context: Arc<TaskContext>,
+        _cx: Arc<TaskContext>,
     ) -> datafusion_common::Result<SendableRecordBatchStream> {
-        let mut streams = self.streams.lock().unwrap();
-        let stream = mem::replace(&mut streams[partition], None);
+        let stream = self.db.scan_partition(self.tbl_name.as_str(), partition, self.fields.clone()).map_err(|e| {
+            DataFusionError::Execution(format!("Error executing local plan: {:?}", e))
+        })?;
+
         Ok(Box::pin(PartitionStream {
-            local_stream: Box::pin(stream.unwrap()),
+            local_stream: Box::pin(stream),
             schema: self.schema.clone(),
         }))
     }
@@ -150,11 +158,12 @@ mod tests {
     use datafusion::prelude::SessionConfig;
     use datafusion::prelude::SessionContext;
     use store::arrow_conversion::schema2_to_schema1;
-    use store::db::OptiDBImpl;
+    use store::db::{OptiDBImpl, Options};
     use store::db::TableOptions;
-    use store::KeyValue;
+    use store::{KeyValue, NamedValue};
     use store::Value;
     use tracing::debug;
+    use common::types::DType;
 
     use crate::datasources::local::LocalTable;
     use crate::physical_plan::planner::planner::QueryPlanner;
@@ -167,7 +176,7 @@ mod tests {
 
         let opts = TableOptions {
             partitions: 2,
-            partition_keys: vec![0],
+            index_cols: 2,
             l1_max_size_bytes: 1024 * 1024 * 10,
             level_size_multiplier: 10,
             l0_max_parts: 4,
@@ -179,24 +188,26 @@ mod tests {
             merge_row_group_values_limit: 1000,
             read_chunk_size: 10,
             merge_array_size: 100,
+            levels: 7,
+            merge_part_size_multiplier: 0,
         };
-        let mut db = OptiDBImpl::open(path, opts).unwrap();
-        db.add_field(Field::new("a", DataType::Int64, false))
+        let mut db = OptiDBImpl::open(path, Options {}).unwrap();
+        db.create_table("events", opts).unwrap();
+        db.add_field("events", "a", DType::Int64, false)
             .unwrap();
-        db.add_field(Field::new("b", DataType::Int64, false))
+        db.add_field("events", "b", DType::Int64, false)
             .unwrap();
-        db.add_field(Field::new("c", DataType::Int64, false))
+        db.add_field("events", "c", DType::Int64, false)
             .unwrap();
 
-        for i in 0..1000 {
-            db.insert(vec![KeyValue::Int64(i), KeyValue::Int64(i)], vec![
-                Value::Int64(Some(i)),
-            ])
-            .unwrap();
+        let a = NamedValue::new("a".to_string(), Value::Int64(None));
+        for i in 0..1000i64 {
+            db.insert("events", vec![NamedValue::new("a".to_string(), Value::Int64(Some(i))), NamedValue::new("b".to_string(), Value::Int64(Some(i))), NamedValue::new("c".to_string(), Value::Int64(Some(i)))])
+                .unwrap();
         }
 
-        let schema = schema2_to_schema1(db.schema()?);
-        let prov = LocalTable::try_new(Arc::new(db), Arc::new(schema), 1).unwrap();
+        let schema = schema2_to_schema1(db.schema("events").unwrap());
+        let prov = LocalTable::try_new(Arc::new(db), "events".to_string()).unwrap();
         let table_source = Arc::new(DefaultTableSource::new(
             Arc::new(prov) as Arc<dyn TableProvider>
         ));

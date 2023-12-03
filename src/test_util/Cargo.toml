@@ -9,3 +9,4 @@ anyhow = { version = "1.0.66", features = [] }
 arrow = { version = "42.0.0", features = ["prettyprint"] }
 metadata = { path = "../metadata" }
 common = { path = "../common" }
+store = { path = "../store" }

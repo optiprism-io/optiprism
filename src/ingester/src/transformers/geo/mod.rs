@@ -12,16 +12,16 @@ use metadata::properties;
 use crate::error::Result;
 use crate::Context;
 use crate::PropValue;
-use crate::Property;
+use crate::PropertyAndValue;
 use crate::RequestContext;
 
 pub fn resolve_properties(
     ctx: &RequestContext,
     context: &Context,
-    mut user_props: Vec<Property>,
+    mut user_props: Vec<PropertyAndValue>,
     props_prov: &Arc<dyn properties::Provider>,
     city_rdr: &maxminddb::Reader<Vec<u8>>,
-) -> Result<Vec<Property>> {
+) -> Result<Vec<PropertyAndValue>> {
     let org_id = ctx.organization_id.unwrap();
     let proj_id = ctx.project_id.unwrap();
 
@@ -35,7 +35,7 @@ pub fn resolve_properties(
             if let Some(name) = names.get("en") {
                 let prop = props_prov.get_by_name(org_id, proj_id, types::USER_PROPERTY_COUNTRY)?;
 
-                let prop = Property {
+                let prop = PropertyAndValue {
                     property: prop,
                     value: PropValue::String(name.to_string()),
                 };
@@ -49,7 +49,7 @@ pub fn resolve_properties(
             if let Some(name) = names.get("en") {
                 let prop = props_prov.get_by_name(org_id, proj_id, types::USER_PROPERTY_CITY)?;
 
-                let prop = Property {
+                let prop = PropertyAndValue {
                     property: prop,
                     value: PropValue::String(name.to_string()),
                 };

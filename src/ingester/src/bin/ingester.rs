@@ -8,7 +8,7 @@ use std::sync::Arc;
 use chrono::Duration;
 use clap::Parser;
 use common::rbac::Role;
-use common::types::USER_PROPERTY_CITY;
+use common::types::{DType, USER_PROPERTY_CITY};
 use common::types::USER_PROPERTY_CLIENT_FAMILY;
 use common::types::USER_PROPERTY_CLIENT_VERSION_MAJOR;
 use common::types::USER_PROPERTY_CLIENT_VERSION_MINOR;
@@ -45,18 +45,16 @@ use metadata::projects::CreateProjectRequest;
 use metadata::projects::Provider as ProjectsProvider;
 use metadata::properties;
 use metadata::properties::CreatePropertyRequest;
-use metadata::properties::DataType;
 use metadata::properties::DictionaryType;
 use metadata::properties::Provider;
 use metadata::properties::Status;
 use metadata::MetadataProvider;
 use service::tracing::TracingCliArgs;
-use store::RowValue;
-use store::SortedMergeTree;
 use store::Value;
 use tracing::debug;
 use tracing::info;
 use uaparser::UserAgentParser;
+use store::db::{OptiDBImpl, Options};
 
 #[derive(Parser)]
 #[command(propagate_version = true)]
@@ -65,7 +63,7 @@ struct Args {
     #[clap(flatten)]
     tracing: TracingCliArgs,
     #[arg(long)]
-    md_path: PathBuf,
+    path: PathBuf,
     #[arg(long)]
     ua_db_path: PathBuf,
     #[arg(long)]
@@ -81,8 +79,9 @@ async fn main() -> Result<(), anyhow::Error> {
 
     info!("starting http instance...");
 
-    let store = Arc::new(metadata::rocksdb::new(args.md_path.clone())?);
-    let user_props = Arc::new(properties::ProviderImpl::new_user(store.clone()));
+    let rocks = Arc::new(metadata::rocksdb::new(args.path.join("md"))?);
+    let db = OptiDBImpl::open(args.path.join("store"),Options{})?;
+    let user_props = Arc::new(properties::ProviderImpl::new_user(rocks.clone()));
 
     // todo move somewhere else
     {
@@ -110,17 +109,17 @@ async fn main() -> Result<(), anyhow::Error> {
                 description: None,
                 display_name: None,
                 typ: properties::Type::User,
-                data_type: DataType::String,
+                data_type: DType::String,
                 status: Status::Enabled,
                 is_system: true,
                 nullable: false,
                 is_array: false,
                 is_dictionary: true,
-                dictionary_type: Some(DictionaryType::UInt64),
+                dictionary_type: Some(DictionaryType::Int64),
             });
         }
 
-        let accs = Arc::new(metadata::accounts::ProviderImpl::new(store.clone()));
+        let accs = Arc::new(metadata::accounts::ProviderImpl::new(rocks.clone()));
         let admin = accs.create(CreateAccountRequest {
             created_by: None,
             password_hash: "sdf".to_string(),
@@ -134,7 +133,7 @@ async fn main() -> Result<(), anyhow::Error> {
         });
         match admin {
             Ok(admin) => {
-                let orgs = Arc::new(metadata::organizations::ProviderImpl::new(store.clone()));
+                let orgs = Arc::new(metadata::organizations::ProviderImpl::new(rocks.clone()));
 
                 let org = orgs.create(CreateOrganizationRequest {
                     created_by: admin.id,
@@ -144,7 +143,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 match org {
                     Ok(org) => {
                         let projects =
-                            Arc::new(metadata::projects::ProviderImpl::new(store.clone()));
+                            Arc::new(metadata::projects::ProviderImpl::new(rocks.clone()));
                         _ = projects.create(org.id, CreateProjectRequest {
                             created_by: admin.id,
                             name: "Test Project".to_string(),
@@ -157,10 +156,10 @@ async fn main() -> Result<(), anyhow::Error> {
         }
     }
 
-    let event_props = Arc::new(properties::ProviderImpl::new_event(store.clone()));
-    let events = Arc::new(events::ProviderImpl::new(store.clone()));
-    let projects = Arc::new(projects::ProviderImpl::new(store.clone()));
-    let dicts = Arc::new(dictionaries::ProviderImpl::new(store.clone()));
+    let event_props = Arc::new(properties::ProviderImpl::new_event(rocks.clone()));
+    let events = Arc::new(events::ProviderImpl::new(rocks.clone()));
+    let projects = Arc::new(projects::ProviderImpl::new(rocks.clone()));
+    let dicts = Arc::new(dictionaries::ProviderImpl::new(rocks.clone()));
 
     let proj = projects.get_by_id(1, 1)?;
     debug!("project token: {}", proj.token);
@@ -177,7 +176,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let mut track_destinations = Vec::new();
     let track_local_dst = ingester::destinations::local::track::Local::new(
-        Arc::new(Tbl::new()),
+        Arc::new(db),
         dicts.clone(),
         event_props.clone(),
         user_props.clone(),
@@ -221,22 +220,4 @@ async fn main() -> Result<(), anyhow::Error> {
     info!("start listening on {}", args.host);
 
     Ok(svc.serve().await?)
-}
-
-struct Tbl {}
-impl Tbl {
-    fn new() -> Self {
-        Self {}
-    }
-}
-
-impl SortedMergeTree for Tbl {
-    fn insert(&self, value: Vec<RowValue>) -> store::error::Result<()> {
-        println!("{:?}", value);
-        Ok(())
-    }
-
-    fn delete(&self, col: &str, eq_value: Value) -> store::error::Result<()> {
-        todo!()
-    }
 }

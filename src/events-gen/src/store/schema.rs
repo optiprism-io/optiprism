@@ -14,6 +14,7 @@ use metadata::properties::DataType;
 use metadata::properties::DictionaryType;
 use metadata::properties::Type;
 use metadata::MetadataProvider;
+use store::db::OptiDBImpl;
 use test_util::create_event;
 use test_util::create_property;
 use test_util::CreatePropertyMainRequest;
@@ -21,9 +22,12 @@ use test_util::CreatePropertyMainRequest;
 use crate::error::Result;
 use crate::store::events::Event;
 
-pub fn create_entities(org_id: u64, proj_id: u64, md: &Arc<MetadataProvider>) -> Result<Schema> {
-    let mut cols: Vec<Column> = Vec::new();
-
+pub fn create_entities(
+    org_id: u64,
+    proj_id: u64,
+    md: &Arc<MetadataProvider>,
+    db: Arc<OptiDBImpl>,
+) -> Result<Schema> {
     create_property(
         md,
         org_id,
@@ -35,7 +39,7 @@ pub fn create_entities(org_id: u64, proj_id: u64, md: &Arc<MetadataProvider>) ->
             nullable: false,
             dict: None,
         },
-        &mut cols,
+        &db,
     )?;
 
     create_property(

@@ -19,6 +19,7 @@ use common::rbac::Role;
 use datafusion::arrow::datatypes::DataType;
 use datafusion_common::ScalarValue;
 use lazy_static::lazy_static;
+use common::types::DType;
 
 use crate::accounts;
 use crate::accounts::Account;
@@ -449,13 +450,13 @@ impl Properties {
             description: Some("description".to_string()),
             display_name: Some("display_name".to_string()),
             typ: properties::Type::Event,
-            data_type: properties::DataType::UInt16,
+            data_type: DType::Int8,
             status: properties::Status::Enabled,
             is_system: true,
             nullable: true,
             is_array: true,
             is_dictionary: true,
-            dictionary_type: Some(properties::DictionaryType::UInt8),
+            dictionary_type: Some(properties::DictionaryType::Int8),
         }
     }
 }

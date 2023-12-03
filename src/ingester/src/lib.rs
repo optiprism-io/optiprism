@@ -54,7 +54,7 @@ pub struct Page {
 }
 
 #[derive(Debug, Clone)]
-pub struct Property {
+pub struct PropertyAndValue {
     pub property: properties::Property,
     pub value: PropValue,
 }
@@ -80,7 +80,7 @@ pub struct Identify {
     pub context: Context,
     pub event: String,
     pub user_properties: Option<HashMap<String, PropValue>>,
-    pub resolved_user_properties: Option<Vec<Property>>,
+    pub resolved_user_properties: Option<Vec<PropertyAndValue>>,
 }
 
 #[derive(Debug, Clone)]
@@ -95,6 +95,6 @@ pub struct Track {
     pub resolved_event: Option<Event>,
     pub properties: Option<HashMap<String, PropValue>>,
     pub user_properties: Option<HashMap<String, PropValue>>,
-    pub resolved_properties: Option<Vec<Property>>,
-    pub resolved_user_properties: Option<Vec<Property>>,
+    pub resolved_properties: Option<Vec<PropertyAndValue>>,
+    pub resolved_user_properties: Option<Vec<PropertyAndValue>>,
 }

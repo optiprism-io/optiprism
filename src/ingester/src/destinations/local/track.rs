@@ -1,27 +1,26 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use common::types::{COLUMN_EVENT, COLUMN_PROJECT_ID};
+use common::types::{COLUMN_EVENT, DType};
 use common::types::COLUMN_EVENT_ID;
-use common::types::COLUMN_REAL_TIMESTAMP;
+use common::types::COLUMN_PROJECT_ID;
 use common::types::COLUMN_TIMESTAMP;
 use common::types::COLUMN_USER_ID;
 use futures::executor::block_on;
 use metadata::dictionaries;
 use metadata::properties;
-use metadata::properties::DataType;
 use metadata::properties::DictionaryType;
 use metadata::properties::Type;
 use rust_decimal::prelude::ToPrimitive;
 use store::db::OptiDBImpl;
-use store::RowValue;
+use store::NamedValue;
 use store::Value;
 
 use crate::error::IngesterError;
 use crate::error::Result;
 use crate::Destination;
 use crate::PropValue;
-use crate::Property;
+use crate::PropertyAndValue;
 use crate::RequestContext;
 use crate::Track;
 
@@ -51,23 +50,22 @@ impl Local {
 
 fn property_to_value(
     ctx: &RequestContext,
-    prop: &properties::Property,
-    event_prop: &Property,
+    prop: &PropertyAndValue,
     dict: &Arc<dyn dictionaries::Provider>,
 ) -> Result<Value> {
-    let val = if prop.is_dictionary {
-        if let PropValue::String(str_v) = &event_prop.value {
+    let val = if prop.property.is_dictionary {
+        if let PropValue::String(str_v) = &prop.value {
             let dict_id = dict.get_key_or_create(
                 ctx.organization_id.unwrap(),
                 ctx.project_id.unwrap(),
-                prop.column_name().as_str(),
+                prop.property.column_name().as_str(),
                 str_v.as_str(),
             )?;
-            match prop.dictionary_type.clone().unwrap() {
-                DictionaryType::UInt8 => Value::UInt8(Some(dict_id as u8)),
-                DictionaryType::UInt16 => Value::UInt16(Some(dict_id as u16)),
-                DictionaryType::UInt32 => Value::UInt32(Some(dict_id as u32)),
-                DictionaryType::UInt64 => Value::UInt64(Some(dict_id)),
+            match prop.property.dictionary_type.clone().unwrap() {
+                DictionaryType::Int8 => Value::Int8(Some(dict_id as i8)),
+                DictionaryType::Int16 => Value::Int16(Some(dict_id as i16)),
+                DictionaryType::Int32 => Value::Int32(Some(dict_id as i32)),
+                DictionaryType::Int64 => Value::Int64(Some(dict_id as i64)),
             }
         } else {
             return Err(IngesterError::Internal(
@@ -75,19 +73,15 @@ fn property_to_value(
             ));
         }
     } else {
-        match (&prop.data_type, &event_prop.value) {
-            (DataType::String, PropValue::String(v)) => Value::String(Some(v.to_owned())),
-            (DataType::Int8, PropValue::Number(v)) => Value::Int8(Some(v.to_i8().unwrap())),
-            (DataType::Int16, PropValue::Number(v)) => Value::Int16(Some(v.to_i16().unwrap())),
-            (DataType::Int32, PropValue::Number(v)) => Value::Int32(Some(v.to_i32().unwrap())),
-            (DataType::Int64, PropValue::Number(v)) => Value::Int64(Some(v.to_i64().unwrap())),
-            (DataType::UInt8, PropValue::Number(v)) => Value::UInt8(Some(v.to_u8().unwrap())),
-            (DataType::UInt16, PropValue::Number(v)) => Value::UInt16(Some(v.to_u16().unwrap())),
-            (DataType::UInt32, PropValue::Number(v)) => Value::UInt32(Some(v.to_u32().unwrap())),
-            (DataType::UInt64, PropValue::Number(v)) => Value::UInt64(Some(v.to_u64()).unwrap()),
-            (DataType::Decimal, PropValue::Number(v)) => Value::Decimal(Some(v.to_i128().unwrap())),
-            (DataType::Boolean, PropValue::Bool(v)) => Value::Boolean(Some(*v)),
-            (DataType::Timestamp, PropValue::Date(v)) => Value::Timestamp(Some(v.timestamp())),
+        match (&prop.property.data_type, &prop.value) {
+            (DType::String, PropValue::String(v)) => Value::String(Some(v.to_owned())),
+            (DType::Int8, PropValue::Number(v)) => Value::Int8(Some(v.to_i8().unwrap())),
+            (DType::Int16, PropValue::Number(v)) => Value::Int16(Some(v.to_i16().unwrap())),
+            (DType::Int32, PropValue::Number(v)) => Value::Int32(Some(v.to_i32().unwrap())),
+            (DType::Int64, PropValue::Number(v)) => Value::Int64(Some(v.to_i64().unwrap())),
+            (DType::Decimal, PropValue::Number(v)) => Value::Decimal(Some(v.to_i128().unwrap())),
+            (DType::Boolean, PropValue::Bool(v)) => Value::Boolean(Some(*v)),
+            (DType::Timestamp, PropValue::Date(v)) => Value::Timestamp(Some(v.timestamp())),
             _ => {
                 return Err(IngesterError::Internal(
                     "property should be a string".to_string(),
@@ -103,85 +97,49 @@ impl Destination<Track> for Local {
     fn send(&self, ctx: &RequestContext, req: Track) -> Result<()> {
         let mut values = Vec::new();
 
-        values.push(RowValue::new(
+        values.push(NamedValue::new(
             COLUMN_PROJECT_ID.to_string(),
-            Value::Int64(Some(ctx.project_id.unwrap() as i64))
+            Value::Int64(Some(ctx.project_id.unwrap() as i64)),
         ));
-        values.push(RowValue::new(
+        values.push(NamedValue::new(
             COLUMN_USER_ID.to_string(),
             Value::Int64(Some(req.resolved_user_id.unwrap())),
         ));
-        values.push(RowValue::new(
+        values.push(NamedValue::new(
             COLUMN_TIMESTAMP.to_string(),
             Value::Timestamp(Some(req.timestamp.timestamp())),
         ));
-        values.push(RowValue::new(
+        values.push(NamedValue::new(
             COLUMN_EVENT_ID.to_string(),
-            Value::UInt64(Some(req.resolved_event.as_ref().unwrap().record_id)),
+            Value::Int64(Some(req.resolved_event.as_ref().unwrap().record_id as i64)),
         ));
         let event_id = req.resolved_event.as_ref().unwrap().event.id;
 
-        values.push(RowValue::new(
+        values.push(NamedValue::new(
             COLUMN_EVENT.to_string(),
-            Value::UInt16(Some(event_id as u16)),
+            Value::Int16(Some(event_id as i16)),
         ));
-        let event_res = self
-            .event_properties
-            .list(ctx.organization_id.unwrap(), ctx.project_id.unwrap())?;
-
-        let user_res = self
-            .user_properties
-            .list(ctx.organization_id.unwrap(), ctx.project_id.unwrap())?;
 
         let event_props = req
-            .resolved_properties
+            .resolved_properties.as_ref()
             .map(|v| v.clone())
             .unwrap_or_else(|| vec![]);
 
-        let schema = self.db.schema("events")?;
-        schema.fields.
-        for prop in event_res.data {
-            let mut found = false;
-            match prop.typ {
-                Type::Event => {
-                    for event_prop in &event_props {
-                        if event_prop.property.id == prop.id {
-                            found = true;
-                            let value = property_to_value(ctx, &prop, &event_prop, &self.dict)?;
-                            values.push(Value::new(prop.column_name(), value));
-                        };
-                    }
-                }
-                _ => {}
-            }
-            if !found {
-                values.push(Value::new(prop.column_name(), Value::));
-            }
+        for prop in &event_props {
+            let value = property_to_value(ctx, &prop, &self.dict)?;
+            values.push(NamedValue::new(prop.property.column_name(), value));
         }
+
         let user_props = req
-            .resolved_user_properties
+            .resolved_properties.as_ref()
             .map(|v| v.clone())
             .unwrap_or_else(|| vec![]);
-        for prop in user_res.data {
-            let mut found = false;
-            match prop.typ {
-                Type::Event => {
-                    for event_prop in &user_props {
-                        if event_prop.property.id == prop.id {
-                            found = true;
-                            let value = property_to_value(ctx, &prop, &event_prop, &self.dict)?;
-                            values.push(RowValue::new(prop.column_name(), value));
-                        };
-                    }
-                }
-                _ => {}
-            }
-            if !found {
-                values.push(RowValue::new(prop.column_name(), Value::Null));
-            }
-        }
 
-        self.db.insert(values)?;
+        for prop in &user_props {
+            let value = property_to_value(ctx, &prop, &self.dict)?;
+            values.push(NamedValue::new(prop.property.column_name(), value));
+        }
+        self.db.insert("events", values)?;
         Ok(())
     }
 }

@@ -165,10 +165,10 @@ pub fn encode_property_dict_values(
                 )?;
 
                 let scalar_value = match dict_type {
-                    DictionaryType::UInt8 => ScalarValue::UInt8(Some(key as u8)),
-                    DictionaryType::UInt16 => ScalarValue::UInt16(Some(key as u16)),
-                    DictionaryType::UInt32 => ScalarValue::UInt32(Some(key as u32)),
-                    DictionaryType::UInt64 => ScalarValue::UInt64(Some(key)),
+                    DictionaryType::Int8 => ScalarValue::Int8(Some(key as i8)),
+                    DictionaryType::Int16 => ScalarValue::Int16(Some(key as i16)),
+                    DictionaryType::Int32 => ScalarValue::Int32(Some(key as i32)),
+                    DictionaryType::Int64 => ScalarValue::Int64(Some(key as i64)),
                     _ => {
                         return Err(QueryError::Plan(format!(
                             "unsupported dictionary type \"{dict_type:?}\""

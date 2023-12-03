@@ -1,18 +1,19 @@
 use std::sync::Arc;
 
+use arrow::datatypes::Field;
 use arrow::datatypes::TimeUnit;
-use common::types::TIME_UNIT;
+use common::types::{DType, TIME_UNIT};
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 use metadata::events;
 use metadata::events::Event;
 use metadata::properties;
 use metadata::properties::CreatePropertyRequest;
-use metadata::properties::DataType;
 use metadata::properties::DictionaryType;
 use metadata::properties::Property;
 use metadata::properties::Type;
 use metadata::MetadataProvider;
+use store::db::OptiDBImpl;
 
 pub fn create_event(
     md: &Arc<MetadataProvider>,
@@ -38,7 +39,7 @@ pub fn create_event(
 pub struct CreatePropertyMainRequest {
     pub name: String,
     pub typ: Type,
-    pub data_type: DataType,
+    pub data_type: DType,
     pub nullable: bool,
     pub dict: Option<DictionaryType>,
 }
@@ -48,7 +49,7 @@ pub fn create_property(
     org_id: u64,
     proj_id: u64,
     main_req: CreatePropertyMainRequest,
-    cols: &mut Vec<Column>,
+    db: &Arc<OptiDBImpl>,
 ) -> anyhow::Result<Property> {
     let req = CreatePropertyRequest {
         created_by: 0,
@@ -68,30 +69,7 @@ pub fn create_property(
 
     let prop = md.event_properties.get_or_create(org_id, proj_id, req)?;
 
-    let dt = match main_req.data_type {
-        DataType::String => arrow::datatypes::DataType::Utf8,
-        DataType::Int8 => arrow::datatypes::DataType::Int8,
-        DataType::Int16 => arrow::datatypes::DataType::Int16,
-        DataType::Int32 => arrow::datatypes::DataType::Int32,
-        DataType::Int64 => arrow::datatypes::DataType::Int64,
-        DataType::UInt8 => arrow::datatypes::DataType::UInt8,
-        DataType::UInt16 => arrow::datatypes::DataType::UInt16,
-        DataType::UInt32 => arrow::datatypes::DataType::UInt32,
-        DataType::UInt64 => arrow::datatypes::DataType::UInt64,
-        DataType::Float64 => arrow::datatypes::DataType::Float64,
-        DataType::Decimal => {
-            arrow::datatypes::DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE)
-        }
-        DataType::Boolean => arrow::datatypes::DataType::Boolean,
-        DataType::Timestamp => arrow::datatypes::DataType::Timestamp(TIME_UNIT, None),
-    };
-
-    cols.push(Column::new(
-        prop.column_name(),
-        dt,
-        main_req.nullable,
-        main_req.dict,
-    ));
+    db.add_field("events", prop.column_name().as_str(), main_req.data_type, main_req.nullable)?;
 
     Ok(prop)
 }

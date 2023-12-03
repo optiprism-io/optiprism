@@ -14,7 +14,7 @@ use crate::error::Result;
 use crate::transformers::geo::resolve_properties;
 use crate::Identify;
 use crate::PropValue;
-use crate::Property;
+use crate::PropertyAndValue;
 use crate::RequestContext;
 use crate::Track;
 use crate::Transformer;

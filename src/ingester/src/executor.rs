@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use chrono::Utc;
-use common::types::DICT_USERS;
+use common::types::{DICT_USERS, DType};
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 use futures::executor::block_on;
@@ -12,7 +12,6 @@ use metadata::events::CreateEventRequest;
 use metadata::projects;
 use metadata::properties;
 use metadata::properties::CreatePropertyRequest;
-use metadata::properties::DataType;
 use metadata::properties::DictionaryType;
 use metadata::properties::Status;
 
@@ -22,7 +21,7 @@ use crate::Destination;
 use crate::Event;
 use crate::Identify;
 use crate::PropValue;
-use crate::Property;
+use crate::PropertyAndValue;
 use crate::RequestContext;
 use crate::Track;
 use crate::Transformer;
@@ -33,16 +32,16 @@ fn resolve_property(
     typ: properties::Type,
     name: String,
     val: &PropValue,
-) -> Result<Property> {
+) -> Result<PropertyAndValue> {
     let data_type = match val {
-        PropValue::Date(_) => DataType::Timestamp,
-        PropValue::String(_) => DataType::String,
-        PropValue::Number(_) => DataType::Decimal,
-        PropValue::Bool(_) => DataType::Boolean,
+        PropValue::Date(_) => DType::Timestamp,
+        PropValue::String(_) => DType::String,
+        PropValue::Number(_) => DType::Decimal,
+        PropValue::Bool(_) => DType::Boolean,
     };
 
     let (is_dictionary, dictionary_type) = if let PropValue::String(_) = val {
-        (true, Some(DictionaryType::UInt64))
+        (true, Some(DictionaryType::Int64))
     } else {
         (false, None)
     };
@@ -64,7 +63,7 @@ fn resolve_property(
 
     let prop =
         properties.get_or_create(ctx.organization_id.unwrap(), ctx.project_id.unwrap(), req)?;
-    Ok(Property {
+    Ok(PropertyAndValue {
         property: prop,
         value: val.to_owned().into(),
     })
@@ -75,11 +74,11 @@ fn resolve_properties(
     properties: &Arc<dyn properties::Provider>,
     typ: properties::Type,
     props: &HashMap<String, PropValue>,
-) -> Result<Vec<Property>> {
+) -> Result<Vec<PropertyAndValue>> {
     let resolved_props = props
         .iter()
         .map(|(k, v)| resolve_property(&ctx, properties, typ.clone(), k.to_owned(), v))
-        .collect::<Result<Vec<Property>>>()?;
+        .collect::<Result<Vec<PropertyAndValue>>>()?;
     Ok(resolved_props)
 }
 

@@ -29,9 +29,6 @@ pub enum KeyValue {
     Int16(i16),
     Int32(i32),
     Int64(i64),
-    UInt8(u8),
-    UInt16(u16),
-    UInt64(u64),
     String(String),
 }
 
@@ -47,25 +44,22 @@ impl TryFrom<&merger::parquet::ParquetValue> for KeyValue {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Hash)]
-pub struct ColValue {
-    col: String,
-    val: Value,
+pub struct NamedValue {
+    name: String,
+    value: Value,
 }
 
+impl NamedValue {
+    pub fn new(name: String, value: Value) -> Self {
+        Self { name, value }
+    }
+}
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub enum Value {
     Int8(Option<i8>),
     Int16(Option<i16>),
     Int32(Option<i32>),
     Int64(Option<i64>),
-    Int128(Option<i128>),
-    UInt8(Option<u8>),
-    UInt16(Option<u16>),
-    UInt32(Option<u32>),
-    UInt64(Option<u64>),
-    // Float32(Option<f32>),
-    // Float64(Option<f64>),
     Boolean(Option<bool>),
     Timestamp(Option<i64>),
     Decimal(Option<i128>),
@@ -75,17 +69,9 @@ pub enum Value {
     ListInt16(Option<Vec<Option<i16>>>),
     ListInt32(Option<Vec<Option<i32>>>),
     ListInt64(Option<Vec<Option<i64>>>),
-    ListInt128(Option<Vec<Option<i128>>>),
-    ListUInt8(Option<Vec<Option<u8>>>),
-    ListUInt16(Option<Vec<Option<u16>>>),
-    ListUInt32(Option<Vec<Option<u32>>>),
-    ListUInt64(Option<Vec<Option<u64>>>),
-    // ListFloat32(Option<Vec<Option<f32>>>),
-    // ListFloat64(Option<Vec<Option<f64>>>),
     ListBoolean(Option<Vec<Option<bool>>>),
     ListTimestamp(Option<Vec<Option<i64>>>),
     ListDecimal(Option<Vec<Option<i128>>>),
-    ListBinary(Option<Vec<Vec<Option<u8>>>>),
     ListString(Option<Vec<Option<String>>>),
 }
 
@@ -97,10 +83,6 @@ impl Value {
             DataType::Int16 => Int16(None),
             DataType::Int32 => Value::Int32(None),
             DataType::Int64 => Value::Int64(None),
-            DataType::UInt8 => Value::UInt8(None),
-            DataType::UInt16 => Value::UInt16(None),
-            DataType::UInt32 => Value::UInt32(None),
-            DataType::UInt64 => Value::UInt64(None),
             DataType::Timestamp(_, _) => Value::Timestamp(None),
             DataType::Binary => Value::Binary(None),
             DataType::Utf8 => Value::String(None),
@@ -111,12 +93,7 @@ impl Value {
                 DataType::Int16 => Value::ListInt16(None),
                 DataType::Int32 => Value::ListInt32(None),
                 DataType::Int64 => Value::ListInt64(None),
-                DataType::UInt8 => Value::ListUInt8(None),
-                DataType::UInt16 => Value::ListUInt16(None),
-                DataType::UInt32 => Value::ListUInt32(None),
-                DataType::UInt64 => Value::ListUInt64(None),
                 DataType::Timestamp(_, _) => Value::ListTimestamp(None),
-                DataType::Binary => Value::ListBinary(None),
                 DataType::Utf8 => Value::ListString(None),
                 DataType::Decimal(_, _) => Value::ListDecimal(None),
                 _ => unimplemented!(),
@@ -131,9 +108,6 @@ impl From<&KeyValue> for Value {
             KeyValue::Int8(v) => Value::Int8(Some(*v)),
             KeyValue::Int16(v) => Value::Int16(Some(*v)),
             KeyValue::Int64(v) => Value::Int64(Some(*v)),
-            KeyValue::UInt8(v) => Value::UInt8(Some(*v)),
-            KeyValue::UInt16(v) => Value::UInt16(Some(*v)),
-            KeyValue::UInt64(v) => Value::UInt64(Some(*v)),
             KeyValue::String(v) => Value::String(Some(v.to_owned())),
             KeyValue::Int32(v) => Value::Int32(Some(*v)),
         }
@@ -146,9 +120,6 @@ impl From<&Value> for KeyValue {
             Value::Int8(Some(v)) => KeyValue::Int8(*v),
             Value::Int16(Some(v)) => KeyValue::Int16(*v),
             Value::Int64(Some(v)) => KeyValue::Int64(*v),
-            Value::UInt8(Some(v)) => KeyValue::UInt8(*v),
-            Value::UInt16(Some(v)) => KeyValue::UInt16(*v),
-            Value::UInt64(Some(v)) => KeyValue::UInt64(*v),
             Value::String(Some(v)) => KeyValue::String(v.to_owned()),
             Value::Int32(Some(v)) => KeyValue::Int32(*v),
             _ => unreachable!(),

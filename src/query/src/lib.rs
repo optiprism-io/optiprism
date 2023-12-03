@@ -346,11 +346,6 @@ pub mod test_util {
     use datafusion_expr::logical_plan::builder::UNNAMED_TABLE;
     use datafusion_expr::LogicalPlan;
     use datafusion_expr::LogicalPlanBuilder;
-    use metadata::database;
-    use metadata::database::Column;
-    use metadata::database::CreateTableRequest;
-    use metadata::database::Table;
-    use metadata::database::TableRef;
     use metadata::events;
     use metadata::properties;
     use metadata::properties::CreatePropertyRequest;
@@ -358,18 +353,17 @@ pub mod test_util {
     use metadata::properties::Type;
     use metadata::MetadataProvider;
     use uuid::Uuid;
+    use common::types::DType;
+    use store::db::OptiDBImpl;
 
     use crate::error::Result;
     use crate::event_fields;
 
     pub async fn events_provider(
-        db: Arc<dyn database::Provider>,
+        db: Arc<OptiDBImpl>,
         org_id: u64,
         proj_id: u64,
     ) -> Result<LogicalPlan> {
-        let table = db.get_table(TableRef::Events(org_id, proj_id))?;
-        let schema = table.arrow_schema();
-
         let options = CsvReadOptions::new();
         let table_path = ListingTableUrl::parse(
             PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -383,7 +377,7 @@ pub mod test_util {
 
         let config = ListingTableConfig::new(table_path)
             .with_listing_options(listing_options)
-            .with_schema(Arc::new(schema));
+            .with_schema(Arc::new(db.schema1("events")?));
         let provider = ListingTable::try_new(config)?;
         Ok(
             LogicalPlanBuilder::scan(UNNAMED_TABLE, provider_as_source(Arc::new(provider)), None)?
@@ -397,6 +391,7 @@ pub mod test_util {
 
     pub fn create_property(
         md: &Arc<MetadataProvider>,
+        db: &Arc<OptiDBImpl>,
         org_id: u64,
         proj_id: u64,
         req: CreatePropertyRequest,
@@ -406,73 +401,36 @@ pub mod test_util {
             Type::User => md.user_properties.create(org_id, proj_id, req)?,
         };
 
-        md.database.add_column(
-            TableRef::Events(org_id, proj_id),
-            Column::new(
-                prop.column_name(),
-                prop.data_type.clone().into(),
-                prop.nullable,
-                prop.dictionary_type.clone(),
-            ),
-        )?;
+        db.add_field("events", prop.column_name().as_str(), prop.data_type.clone().into(), prop.nullable)?;
 
         Ok(prop)
     }
 
     pub async fn create_entities(
         md: Arc<MetadataProvider>,
+        db:&Arc<OptiDBImpl>,
         org_id: u64,
         proj_id: u64,
     ) -> Result<()> {
-        md.database.create_table(CreateTableRequest {
-            typ: TableRef::Events(org_id, proj_id),
-            columns: vec![],
-        })?;
-
-        md.database.add_column(
-            TableRef::Events(org_id, proj_id),
-            Column::new(
-                event_fields::USER_ID.to_string(),
-                DataType::Int64,
-                false,
-                None,
-            ),
-        )?;
-        md.database.add_column(
-            TableRef::Events(org_id, proj_id),
-            Column::new(
-                event_fields::CREATED_AT.to_string(),
-                DataType::Timestamp(arrow::datatypes::TimeUnit::Nanosecond, None),
-                false,
-                None,
-            ),
-        )?;
-        md.database.add_column(
-            TableRef::Events(org_id, proj_id),
-            Column::new(
-                event_fields::EVENT.to_string(),
-                DataType::UInt16,
-                false,
-                None,
-            ),
-        )?;
-
+        db.add_field("events", event_fields::USER_ID, DType::Int64, false)?;
+        db.add_field("events", event_fields::CREATED_AT, DType::Timestamp, false)?;
+        db.add_field("events", event_fields::EVENT, DType::Int64, false)?;
         // create user props
 
-        let country_prop = create_property(&md, org_id, proj_id, CreatePropertyRequest {
+        let country_prop = create_property(&md,&db, org_id, proj_id, CreatePropertyRequest {
             created_by: 0,
             tags: None,
             name: "Country".to_string(),
             description: None,
             display_name: None,
             typ: properties::Type::User,
-            data_type: properties::DataType::String,
+            data_type: DType::String,
             status: properties::Status::Enabled,
             is_system: false,
             nullable: false,
             is_array: false,
             is_dictionary: false,
-            dictionary_type: Some(properties::DictionaryType::UInt8),
+            dictionary_type: Some(properties::DictionaryType::Int8),
         })?;
 
         md.dictionaries.get_key_or_create(
@@ -487,14 +445,15 @@ pub mod test_util {
             country_prop.column_name().as_str(),
             "german",
         )?;
-        create_property(&md, org_id, proj_id, CreatePropertyRequest {
+
+        create_property(&md, &db,org_id, proj_id, CreatePropertyRequest {
             created_by: 0,
             tags: None,
             name: "Device".to_string(),
             description: None,
             display_name: None,
             typ: properties::Type::User,
-            data_type: properties::DataType::String,
+            data_type:DType::String,
             status: properties::Status::Enabled,
             nullable: true,
             is_array: false,
@@ -503,14 +462,14 @@ pub mod test_util {
             is_system: false,
         })?;
 
-        create_property(&md, org_id, proj_id, CreatePropertyRequest {
+        create_property(&md, &db,org_id, proj_id, CreatePropertyRequest {
             created_by: 0,
             tags: None,
             name: "Is Premium".to_string(),
             description: None,
             display_name: None,
             typ: Type::User,
-            data_type: properties::DataType::String,
+            data_type: DType::String,
             status: properties::Status::Enabled,
             is_system: false,
             nullable: false,
@@ -547,14 +506,14 @@ pub mod test_util {
             })?;
 
         // create event props
-        create_property(&md, org_id, proj_id, CreatePropertyRequest {
+        create_property(&md, &db,org_id, proj_id, CreatePropertyRequest {
             created_by: 0,
             tags: None,
             name: "Product Name".to_string(),
             description: None,
             display_name: None,
             typ: Type::Event,
-            data_type: properties::DataType::String,
+            data_type: DType::String,
             status: properties::Status::Enabled,
             nullable: false,
             is_array: false,
@@ -563,14 +522,14 @@ pub mod test_util {
             is_system: false,
         })?;
 
-        create_property(&md, org_id, proj_id, CreatePropertyRequest {
+        create_property(&md, &db,org_id, proj_id, CreatePropertyRequest {
             created_by: 0,
             tags: None,
             name: "Revenue".to_string(),
             description: None,
             display_name: None,
             typ: Type::Event,
-            data_type: properties::DataType::Decimal,
+            data_type: DType::Decimal,
             status: properties::Status::Enabled,
             nullable: true,
             is_array: false,
