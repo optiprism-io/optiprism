@@ -15,6 +15,7 @@ use arrow2::chunk::Chunk;
 use arrow2::datatypes::DataType;
 use arrow2::datatypes::Field;
 use arrow2::datatypes::Schema;
+use arrow2::io;
 use arrow2::io::parquet::read::column_iter_to_arrays;
 use arrow2::io::parquet::read::deserialize::page_iter_to_arrays;
 use arrow2::io::parquet::read::schema::convert::to_primitive_type;
@@ -346,7 +347,7 @@ impl<R: Read + Seek> CompressedPageIterator<R> {
     }
 }
 
-#[derive(Debug)]
+/*#[derive(Debug)]
 pub struct ArrowIterator<R: Read + Seek> {
     page_iter: CompressedPageIterator<R>,
     fields: Vec<ColumnDescriptor>,
@@ -401,6 +402,45 @@ impl<R: Read + Seek> ArrowIterator<R> {
             }
         }
 
+        ret.iter().for_each(|v| println!("{:?}", v.len()));
         Ok(Some(Chunk::new(ret)))
+    }
+}*/
+
+
+pub struct ArrowIterator<R: Read + Seek> {
+    rdr: io::parquet::read::FileReader<R>,
+    schema: Schema,
+    required_schema:Schema,
+    fields: Vec<String>,
+}
+
+impl<R: Read + Seek> ArrowIterator<R> {
+    pub fn new(
+        mut rdr: R,
+        fields: Vec<String>,
+        required_schema: Schema,
+    ) -> Result<Self> {
+        // we can read its metadata:
+        let metadata = io::parquet::read::read_metadata(&mut rdr)?;
+        let schema = io::parquet::read::infer_schema(&metadata)?;
+        let schema = schema.filter(|_, f| fields.contains(&f.name));
+        let frdr = io::parquet::read::FileReader::new(rdr, metadata.row_groups, schema.clone(), Some(1024 * 8 * 8) /*todo define*/, None, None);
+        Ok(Self {
+            rdr: frdr,
+            schema,
+            required_schema,
+            fields,
+        })
+    }
+
+    pub fn next(&mut self) -> Result<Option<Chunk<Box<dyn Array>>>> {
+        match self.rdr.next() {
+            None => Ok(None),
+            Some(Ok(chunk)) => {
+                Ok(Some(chunk))
+            }
+            Some(Err(err)) => Err(err.into()),
+        }
     }
 }

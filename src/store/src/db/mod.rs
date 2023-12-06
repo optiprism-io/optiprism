@@ -559,8 +559,6 @@ fn try_recover_table(path: PathBuf, name: String, opts: Option<TableOptions>) ->
 
 // #[instrument(level = "trace")]
 fn recover(path: PathBuf, opts: Options) -> Result<OptiDBImpl> {
-    // Create a background thread which checks for deadlocks every 1s
-
     fs::create_dir_all(path.join("tables"))?;
     let mut tables = vec![];
     let dir = fs::read_dir(path.join("tables"))?;
@@ -996,7 +994,7 @@ fn init_print_logger() {
 impl OptiDBImpl {
     // #[instrument(level = "trace")]
     pub fn open(path: PathBuf, opts: Options) -> Result<Self> {
-        init_print_logger();
+        // init_print_logger();
         describe_counter!("store.inserts_count", "number of inserts processed");
         describe_histogram!("store.insert_time_sec", Unit::Seconds, "insert time");
         describe_counter!("store.scans_count", "number of scans processed");

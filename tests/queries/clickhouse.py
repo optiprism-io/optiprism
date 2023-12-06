@@ -13,8 +13,8 @@ def aggregate_property_query(agg, field, group=None, distinct=False, interval="d
         d = "distinct "
 
     q = """select toUnixTimestamp(date_trunc('{interval}',event_created_at, 'UTC')) as {group}, {agg}({distinct}event_{field}) as sums
-        from file('*.parquet', Parquet) as b
-        where b.event_event = 'event'
+        from file('store/tables/*/*/*/*.parquet', Parquet) as b
+        where b.event_event = 1
           and event_created_at >=
               now() - INTERVAL {period} {period_interval}
         group by {group} order by {group} asc format JSONCompactColumns;""".format(agg=agg, field=field, distinct=d,
@@ -63,8 +63,8 @@ def partitioned_aggregate_property_query(agg, outer_agg, field, group=None, inte
     q = """select c, {group} {outer_agg}(counts)
         from (
                  select toUnixTimestamp(date_trunc('{interval}',event_created_at, 'UTC')) as c, {group} {inner_agg}(event_{field}) as counts
-                 from file('*.parquet', Parquet) as b
-                 where b.event_event = 'event'
+                 from file('store/tables/*/*/*/*.parquet', Parquet) as b
+                 where b.event_event = 1
                    and event_created_at >=
                        now() - INTERVAL {period} {period_interval}
                  group by event_user_id,c {group})
@@ -98,8 +98,8 @@ def all_aggregates_query(field, group=None, interval="day", period=2, period_int
 
     q = """select toUnixTimestamp(date_trunc('{interval}',event_created_at, 'UTC')) as {group}, 
         count(event_{field}), min(event_{field}), max(event_{field}), avg(event_{field}), sum(event_{field})
-        from file('*.parquet', Parquet) as b
-        where b.event_event = 'event'
+        from file('store/tables/*/*/*/*.parquet', Parquet) as b
+        where b.event_event = 1
           and event_created_at >=
               now() - INTERVAL {period} {period_interval}
         group by {group} order by {group} asc format JSONCompactColumns;""".format(field=field,

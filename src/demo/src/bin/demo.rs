@@ -120,6 +120,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let path = args.path.clone().unwrap();
     debug!("db path: {:?}", path);
 
+    fs::remove_dir_all(&args.path.clone().unwrap()).unwrap();
     let rocks = Arc::new(metadata::rocksdb::new(path.clone().join("md"))?);
     let md = Arc::new(MetadataProvider::try_new(rocks)?);
     let db = Arc::new(OptiDBImpl::open(path.clone().join("store"), Options {})?);
@@ -215,8 +216,8 @@ async fn main() -> Result<(), anyhow::Error> {
     };
 
 
+
     if let Some(path) = args.out_parquet {
-        db.flush()?;
         let all_parquet_files: Vec<_> = ScanDir::files().walk(args.path.unwrap().join("store/tables/events"), |iter| {
             iter.filter(|&(_, ref name)| name.ends_with(".parquet"))
                 .map(|(ref entry, _)| entry.path())
@@ -262,6 +263,7 @@ fn gen_test(args: &Cli, md: &Arc<MetadataProvider>, db: &Arc<OptiDBImpl>) -> any
     let partitions = args.partitions.unwrap_or_else(num_cpus::get);
     test::init(partitions, md, db, 1, 1)?;
     test::gen(db, 1)?;
+    db.flush()?;
     Ok(())
 }
 

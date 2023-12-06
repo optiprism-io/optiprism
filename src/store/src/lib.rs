@@ -44,7 +44,7 @@ impl TryFrom<&merger::parquet::ParquetValue> for KeyValue {
     }
 }
 
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 pub struct NamedValue {
     name: String,
     value: Value,
@@ -1624,7 +1624,7 @@ pub mod test_util {
             write_statistics: true,
             compression: CompressionOptions::Snappy,
             version: Version::V2,
-            data_pagesize_limit,
+            data_pagesize_limit: Some(1024),
         };
 
         let mut idx = 0;

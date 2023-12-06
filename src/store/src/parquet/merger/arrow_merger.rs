@@ -311,7 +311,6 @@ impl Iterator for MemChunkIterator {
         self.chunk.take().map(|v| Ok(v))
     }
 }
-#[derive(Debug)]
 pub struct MergingIterator<R>
 where R: Read + Seek
 {
@@ -349,34 +348,15 @@ where R: Read + Seek
         let arrow_schema = try_merge_arrow_schemas(arrow_schemas)?;
         // make parquet schema
         let parquet_schema = to_parquet_schema(&arrow_schema)?;
-        let page_streams = readers
-            .into_iter()
-            // todo make dynamic page size
-            .map(|r| CompressedPageIterator::try_new(r, 1024 * 1024))
-            .collect::<Result<Vec<_>>>()?;
-        // initialize parquet streams/readers
 
         let index_cols = (0..opts.index_cols)
             .map(|idx| parquet_schema.columns()[idx].to_owned())
             .collect::<Vec<_>>();
 
-        let fields = opts
-            .fields
-            .iter()
-            .map(|f| {
-                parquet_schema
-                    .columns()
-                    .iter()
-                    .find(|c| c.path_in_schema[0] == *f)
-                    .unwrap()
-                    .to_owned()
-            })
-            .collect::<Vec<_>>();
-        let arrow_streams = page_streams
+        let arrow_streams = readers
             .into_iter()
-            .map(|v| ArrowIterator::new(v, fields.clone(), arrow_schema.clone()))
+            .map(|v| ArrowIterator::new(v, opts.fields.clone()).unwrap())
             .collect::<Vec<_>>();
-        let streams_n = arrow_streams.len();
 
         let mut mr = Self {
             index_cols,
@@ -388,7 +368,6 @@ where R: Read + Seek
             mem_chunk: mem_chunk.map(|chunk| ArrowChunk::new(chunk, 0, opts.index_cols)),
             merge_result_buffer: VecDeque::with_capacity(10),
         };
-
         for stream_id in 0..mr.streams.len() {
             if let Some(chunk) = mr.next_stream_chunk(stream_id)? {
                 mr.sorter.push(chunk);
@@ -434,6 +413,7 @@ where R: Read + Seek
                 .iter_mut()
                 .map(|arr| arr.sliced(i, min(self.array_size, len)))
                 .collect::<Vec<_>>();
+
             out.push(Chunk::new(arrs));
             len -= min(self.array_size, len);
         }

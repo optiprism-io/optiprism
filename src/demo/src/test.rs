@@ -301,9 +301,9 @@ pub fn gen(
         .unwrap()
         .duration_trunc(Duration::days(1))?;
 
-    let users = 1;
-    let days = 1;
-    let events = 2;
+    let users = 100;
+    let days = 360;
+    let events = 10;
     let mut vals: Vec<NamedValue> = vec![];
     for user in 0..users {
         let mut cur_time = now - Duration::days(days);
