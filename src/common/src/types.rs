@@ -16,7 +16,7 @@ pub const TIME_UNIT: TimeUnit = TimeUnit::Nanosecond;
 
 pub const COLUMN_PROJECT_ID: &str = "project_id";
 pub const COLUMN_USER_ID: &str = "user_id";
-pub const COLUMN_TIMESTAMP: &str = "ts";
+pub const COLUMN_CREATED_AT: &str = "created_at";
 pub const COLUMN_EVENT_ID: &str = "event_id";
 pub const COLUMN_EVENT: &str = "event";
 
@@ -61,6 +61,7 @@ pub const EVENT_SCREEN: &str = "Screen";
 
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub enum DType {
     String,
     Int8,

@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::fs;
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{BufReader, BufWriter};
 use std::io::Read;
 use std::io::Seek;
 use std::io::Write;
@@ -559,7 +559,7 @@ pub struct Options {
 }
 
 pub struct Merger<R>
-where R: Read
+    where R: Read
 {
     // list of index cols (partitions) in parquet file
     index_cols: Vec<ColumnDescriptor>,
@@ -667,7 +667,7 @@ pub fn merge<R: Read + Seek>(
 }
 
 impl<R> Merger<R>
-where R: Read + Seek
+    where R: Read + Seek
 {
     // Create new merger
 
@@ -713,7 +713,8 @@ where R: Read + Seek
         };
         let mut merged_files: Vec<MergedFile> = Vec::new();
         'l1: for part_id in self.id_from.. {
-            let mut w = File::create(&self.to_path.join(format!("{}.parquet", part_id)))?;
+            let w = File::create(&self.to_path.join(format!("{}.parquet", part_id)))?;
+            let w = BufWriter::new(w);
             let mut seq_writer =
                 FileSeqWriter::new(w, self.parquet_schema.clone(), write_opts, None);
 
@@ -811,9 +812,9 @@ where R: Read + Seek
                             size_bytes: File::open(
                                 &self.to_path.join(format!("{}.parquet", part_id)),
                             )?
-                            .metadata()
-                            .unwrap()
-                            .size(),
+                                .metadata()
+                                .unwrap()
+                                .size(),
                             id: part_id,
                             min,
                             max,

@@ -18,11 +18,11 @@ use futures::executor::block_on;
 use metadata::MetadataProvider;
 use rand::thread_rng;
 use tracing::info;
+use store::db::{OptiDBImpl, TableOptions};
 
 pub struct Config<R> {
     pub org_id: u64,
     pub project_id: u64,
-    pub md: Arc<MetadataProvider>,
     pub from_date: DateTime<Utc>,
     pub to_date: DateTime<Utc>,
     pub products_rdr: R,
@@ -35,6 +35,7 @@ pub struct Config<R> {
 
 pub fn gen<R>(
     md: &Arc<MetadataProvider>,
+    db:&Arc<OptiDBImpl>,
     cfg: Config<R>,
 ) -> Result<Vec<Vec<RecordBatch>>, anyhow::Error>
 where
@@ -46,7 +47,7 @@ where
     let profiles = ProfileProvider::try_new_from_csv(
         cfg.org_id,
         cfg.project_id,
-        &cfg.md.dictionaries,
+        &md.dictionaries,
         cfg.geo_rdr,
         cfg.device_rdr,
     )?;
@@ -55,11 +56,29 @@ where
         cfg.org_id,
         cfg.project_id,
         &mut rng,
-        cfg.md.dictionaries.clone(),
+        md.dictionaries.clone(),
         cfg.products_rdr,
     )?;
     info!("creating entities...");
-    let schema = Arc::new(create_entities(cfg.org_id, cfg.project_id, &cfg.md)?);
+
+    let topts = TableOptions {
+        levels: 7,
+        merge_array_size: 10000,
+        partitions: cfg.partitions,
+        index_cols: 2,
+        l1_max_size_bytes: 1024 * 1024 * 10,
+        level_size_multiplier: 10,
+        l0_max_parts: 4,
+        max_log_length_bytes: 1024 * 1024 * 100,
+        merge_array_page_size: 10000,
+        merge_data_page_size_limit_bytes: Some(1024 * 1024),
+        merge_index_cols: 2,
+        merge_max_l1_part_size_bytes: 1024 * 1024,
+        merge_part_size_multiplier: 10,
+        merge_row_group_values_limit: 1000,
+    };
+    db.create_table("events",topts)?;
+    let schema = Arc::new(create_entities(cfg.org_id, cfg.project_id, md,db)?);
 
     info!("creating generator...");
     let gen_cfg = generator::Config {
@@ -79,7 +98,7 @@ where
     let mut events_map: HashMap<Event, u64> = HashMap::default();
     for event in all::<Event>() {
         let md_event =
-            cfg.md
+            md
                 .events
                 .get_by_name(cfg.org_id, cfg.project_id, event.to_string().as_str())?;
         events_map.insert(event, md_event.id);
@@ -91,7 +110,7 @@ where
     let run_cfg = scenario::Config {
         rng: rng.clone(),
         gen,
-        schema: schema.clone(),
+        schema:Arc::new(db.schema1("events")?.clone()),
         events_map,
         products,
         to: cfg.to_date,

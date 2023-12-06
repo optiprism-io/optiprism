@@ -11,6 +11,7 @@ chrono = { version = "0.4.23" }
 clap = { version = "4.0.29", features = ["derive"] }
 common = { path = "../common" }
 crossbeam-channel = "0.5.6"
+scan_dir = "0.3.3"
 csv = "1.1"
 datafusion = "27.0.0"
 dateparser = "0.2.0"
@@ -24,6 +25,7 @@ num_cpus = "1.14.0"
 parse_duration = "2.1.1"
 platform = { path = "../platform" }
 query = { path = "../query" }
+store = { path = "../store" }
 rand = "0.8.5"
 rust_decimal = { version = "1.27.0", features = ["serde-float"] }
 serde = { version = "1.0.149", features = ["derive"] }

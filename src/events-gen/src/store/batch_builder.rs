@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use arrow::array::ArrayRef;
+use arrow::array::{ArrayRef, Int16Builder, Int8Builder};
 use arrow::array::Decimal128Builder;
 use arrow::array::Int64Builder;
 use arrow::array::TimestampNanosecondBuilder;
@@ -21,25 +21,25 @@ use crate::store::scenario::State;
 pub struct RecordBatchBuilder {
     user_id: Int64Builder,
     created_at: TimestampNanosecondBuilder,
-    event: UInt64Builder,
-    product_name: UInt16Builder,
-    product_category: UInt16Builder,
-    product_subcategory: UInt16Builder,
-    product_brand: UInt16Builder,
+    event: Int64Builder,
+    product_name: Int16Builder,
+    product_category: Int16Builder,
+    product_subcategory: Int16Builder,
+    product_brand: Int16Builder,
     product_price: Decimal128Builder,
     product_discount_price: Decimal128Builder,
     // search_query: UInt16Builder,
     spent_total: Decimal128Builder,
-    products_bought: UInt8Builder,
-    cart_items_number: UInt8Builder,
+    products_bought: Int8Builder,
+    cart_items_number: Int8Builder,
     cart_amount: Decimal128Builder,
     revenue: Decimal128Builder,
-    country: UInt16Builder,
-    city: UInt16Builder,
-    device: UInt16Builder,
-    device_category: UInt16Builder,
-    os: UInt16Builder,
-    os_version: UInt16Builder,
+    country: Int16Builder,
+    city: Int16Builder,
+    device: Int16Builder,
+    device_category: Int16Builder,
+    os: Int16Builder,
+    os_version: Int16Builder,
     schema: SchemaRef,
     len: usize,
 }
@@ -49,25 +49,25 @@ impl RecordBatchBuilder {
         Self {
             user_id: Int64Builder::with_capacity(cap),
             created_at: TimestampNanosecondBuilder::with_capacity(cap),
-            event: UInt64Builder::with_capacity(cap),
-            product_name: UInt16Builder::with_capacity(cap),
-            product_category: UInt16Builder::with_capacity(cap),
-            product_subcategory: UInt16Builder::with_capacity(cap),
-            product_brand: UInt16Builder::with_capacity(cap),
+            event: Int64Builder::with_capacity(cap),
+            product_name: Int16Builder::with_capacity(cap),
+            product_category: Int16Builder::with_capacity(cap),
+            product_subcategory: Int16Builder::with_capacity(cap),
+            product_brand: Int16Builder::with_capacity(cap),
             product_price: Decimal128Builder::with_capacity(cap),
             product_discount_price: Decimal128Builder::with_capacity(cap),
             // search_query: UInt16Builder::new(cap),
             spent_total: Decimal128Builder::with_capacity(cap),
-            products_bought: UInt8Builder::with_capacity(cap),
-            cart_items_number: UInt8Builder::with_capacity(cap),
+            products_bought: Int8Builder::with_capacity(cap),
+            cart_items_number: Int8Builder::with_capacity(cap),
             cart_amount: Decimal128Builder::with_capacity(cap),
             revenue: Decimal128Builder::with_capacity(cap),
-            country: UInt16Builder::with_capacity(cap),
-            city: UInt16Builder::with_capacity(cap),
-            device: UInt16Builder::with_capacity(cap),
-            device_category: UInt16Builder::with_capacity(cap),
-            os: UInt16Builder::with_capacity(cap),
-            os_version: UInt16Builder::with_capacity(cap),
+            country: Int16Builder::with_capacity(cap),
+            city: Int16Builder::with_capacity(cap),
+            device: Int16Builder::with_capacity(cap),
+            device_category: Int16Builder::with_capacity(cap),
+            os: Int16Builder::with_capacity(cap),
+            os_version: Int16Builder::with_capacity(cap),
             schema,
             len: 0,
         }
@@ -133,7 +133,7 @@ impl RecordBatchBuilder {
         self.user_id.append_value(state.user_id);
         self.created_at
             .append_value(state.cur_timestamp * 10i64.pow(9));
-        self.event.append_value(event_id);
+        self.event.append_value(event_id as i64);
 
         match state.selected_product {
             None => {
@@ -145,12 +145,12 @@ impl RecordBatchBuilder {
                 self.product_discount_price.append_null();
             }
             Some(product) => {
-                self.product_name.append_value(product.name as u16);
-                self.product_category.append_value(product.category as u16);
+                self.product_name.append_value(product.name as i16);
+                self.product_category.append_value(product.category as i16);
                 self.product_subcategory
-                    .append_option(product.subcategory.map(|v| v as u16));
+                    .append_option(product.subcategory.map(|v| v as i16));
                 self.product_brand
-                    .append_option(product.brand.map(|v| v as u16));
+                    .append_option(product.brand.map(|v| v as i16));
                 self.product_price.append_value(product.price.mantissa());
 
                 match product.discount_price {
@@ -170,14 +170,14 @@ impl RecordBatchBuilder {
 
         if !state.products_bought.is_empty() {
             self.products_bought
-                .append_value(state.products_bought.len() as u8);
+                .append_value(state.products_bought.len() as i8);
         } else {
             self.products_bought.append_null();
         }
 
         let mut cart_amount: Option<Decimal> = None;
         if !state.cart.is_empty() {
-            self.cart_items_number.append_value(state.cart.len() as u8);
+            self.cart_items_number.append_value(state.cart.len() as i8);
             let mut _cart_amount: Decimal = state
                 .cart
                 .iter()
@@ -201,15 +201,15 @@ impl RecordBatchBuilder {
         }
 
         self.country
-            .append_option(profile.geo.country.map(|v| v as u16));
-        self.city.append_option(profile.geo.city.map(|v| v as u16));
+            .append_option(profile.geo.country.map(|v| v as i16));
+        self.city.append_option(profile.geo.city.map(|v| v as i16));
         self.device
-            .append_option(profile.device.device.map(|v| v as u16));
+            .append_option(profile.device.device.map(|v| v as i16));
         self.device_category
-            .append_option(profile.device.device_category.map(|v| v as u16));
-        self.os.append_option(profile.device.os.map(|v| v as u16));
+            .append_option(profile.device.device_category.map(|v| v as i16));
+        self.os.append_option(profile.device.os.map(|v| v as i16));
         self.os_version
-            .append_option(profile.device.os_version.map(|v| v as u16));
+            .append_option(profile.device.os_version.map(|v| v as i16));
 
         self.len += 1;
 

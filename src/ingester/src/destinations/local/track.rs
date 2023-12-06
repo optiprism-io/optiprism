@@ -4,7 +4,7 @@ use chrono::Utc;
 use common::types::{COLUMN_EVENT, DType};
 use common::types::COLUMN_EVENT_ID;
 use common::types::COLUMN_PROJECT_ID;
-use common::types::COLUMN_TIMESTAMP;
+use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_USER_ID;
 use futures::executor::block_on;
 use metadata::dictionaries;
@@ -81,7 +81,7 @@ fn property_to_value(
             (DType::Int64, PropValue::Number(v)) => Value::Int64(Some(v.to_i64().unwrap())),
             (DType::Decimal, PropValue::Number(v)) => Value::Decimal(Some(v.to_i128().unwrap())),
             (DType::Boolean, PropValue::Bool(v)) => Value::Boolean(Some(*v)),
-            (DType::Timestamp, PropValue::Date(v)) => Value::Timestamp(Some(v.timestamp())),
+            (DType::Timestamp, PropValue::Date(v)) => Value::Int64(Some(v.timestamp())),
             _ => {
                 return Err(IngesterError::Internal(
                     "property should be a string".to_string(),
@@ -106,8 +106,8 @@ impl Destination<Track> for Local {
             Value::Int64(Some(req.resolved_user_id.unwrap())),
         ));
         values.push(NamedValue::new(
-            COLUMN_TIMESTAMP.to_string(),
-            Value::Timestamp(Some(req.timestamp.timestamp())),
+            COLUMN_CREATED_AT.to_string(),
+            Value::Int64(Some(req.timestamp.timestamp())),
         ));
         values.push(NamedValue::new(
             COLUMN_EVENT_ID.to_string(),

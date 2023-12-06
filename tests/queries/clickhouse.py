@@ -101,7 +101,7 @@ def all_aggregates_query(field, group=None, interval="day", period=2, period_int
         from file('*.parquet', Parquet) as b
         where b.event_event = 'event'
           and event_created_at >=
-              now() - INTERVAL {period} {period_interval}ast
+              now() - INTERVAL {period} {period_interval}
         group by {group} order by {group} asc format JSONCompactColumns;""".format(field=field,
                                                                                    period=period,
                                                                                    period_interval=period_interval,

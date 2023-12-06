@@ -74,6 +74,7 @@ impl Stream for PartitionStream {
                     .map(|arr| arrow2_to_arrow1::convert(arr))
                     .collect::<store::error::Result<Vec<_>>>()
                     .map_err(|e| DataFusionError::Execution(e.to_string()))?;
+                let vv = RecordBatch::try_new(self.schema.clone(), arrs.clone());
                 Poll::Ready(Some(Ok(RecordBatch::try_new(self.schema.clone(), arrs)?)))
             }
             Poll::Ready(Some(Err(e))) => {
@@ -186,7 +187,6 @@ mod tests {
             merge_index_cols: 2,
             merge_max_l1_part_size_bytes: 2048,
             merge_row_group_values_limit: 1000,
-            read_chunk_size: 10,
             merge_array_size: 100,
             levels: 7,
             merge_part_size_multiplier: 0,
@@ -201,7 +201,7 @@ mod tests {
             .unwrap();
 
         let a = NamedValue::new("a".to_string(), Value::Int64(None));
-        for i in 0..1000i64 {
+        for i in 0..1000 {
             db.insert("events", vec![NamedValue::new("a".to_string(), Value::Int64(Some(i))), NamedValue::new("b".to_string(), Value::Int64(Some(i))), NamedValue::new("c".to_string(), Value::Int64(Some(i)))])
                 .unwrap();
         }

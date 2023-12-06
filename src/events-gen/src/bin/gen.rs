@@ -5,7 +5,7 @@ use std::fs::File;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use arrow::array::Array;
+use arrow::array::{Array, Int16Array, Int32Array, Int64Array, Int8Array};
 use arrow::array::ArrayRef;
 use arrow::array::StringBuilder;
 use arrow::array::UInt16Array;
@@ -54,6 +54,7 @@ use service::tracing::TracingCliArgs;
 use tracing::debug;
 use tracing::info;
 use uuid::Uuid;
+use store::db::{OptiDBImpl, Options, TableOptions};
 
 #[derive(clap::ValueEnum, Clone, Debug, Default)]
 enum Format {
@@ -72,7 +73,7 @@ struct Args {
     #[arg(long)]
     demo_data_path: PathBuf,
     #[arg(long)]
-    md_path: Option<PathBuf>,
+    path: PathBuf,
     #[arg(long, default_value = "365 days")]
     duration: Option<String>,
     #[arg(long)]
@@ -99,26 +100,19 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let duration = Duration::from_std(parse_duration::parse(args.duration.unwrap().as_str())?)?;
     let from_date = to_date - duration;
-    let md_path = match args.md_path {
-        None => temp_dir().join(format!("{}.db", Uuid::new_v4())),
-        Some(path) => {
-            if !path.try_exists()? {
-                return Err(EventsGenError::FileNotFound(format!(
-                    "metadata path {path:?} doesn't exist"
-                ))
-                .into());
-            }
-
-            path
-        }
-    };
+    if !args.path.try_exists()? {
+        return Err(EventsGenError::FileNotFound(format!(
+            "metadata path {:?} doesn't exist",args.path
+        ))
+            .into());
+    }
 
     if !args.demo_data_path.try_exists()? {
         return Err(EventsGenError::General(format!(
             "demo data path {:?} doesn't exist",
             args.demo_data_path
         ))
-        .into());
+            .into());
     }
 
     if !args.out_path.try_exists()? {
@@ -127,9 +121,27 @@ async fn main() -> Result<(), anyhow::Error> {
         );
     }
 
-    let store = Arc::new(metadata::rocksdb::new(md_path.clone())?);
-    let md = Arc::new(MetadataProvider::try_new(store)?);
-
+    let rocks = Arc::new(metadata::rocksdb::new(args.path.join("md"))?);
+    let md = Arc::new(MetadataProvider::try_new(rocks)?);
+    let db = Arc::new(OptiDBImpl::open(args.path.join("store"), Options {})?);
+    let topts = TableOptions {
+        levels: 7,
+        merge_array_size: 10000,
+        partitions: args.partitions.unwrap_or_else(num_cpus::get),
+        index_cols: 2,
+        l1_max_size_bytes: 1024 * 1024 * 10,
+        level_size_multiplier: 10,
+        l0_max_parts: 4,
+        max_log_length_bytes: 1024 * 1024 * 100,
+        merge_array_page_size: 10000,
+        merge_data_page_size_limit_bytes: Some(1024 * 1024),
+        merge_index_cols: 2,
+        merge_max_l1_part_size_bytes: 1024 * 1024,
+        merge_part_size_multiplier: 10,
+        merge_row_group_values_limit: 1000,
+    };
+    db.create_table("events",topts)?;
+    let schema = db.schema1("events")?;
     info!("creating org structure and admin account...");
     {
         let admin = md.accounts.create(CreateAccountRequest {
@@ -167,7 +179,7 @@ async fn main() -> Result<(), anyhow::Error> {
         })?;
     }
 
-    debug!("metadata path: {:?}", md_path);
+    debug!("db path: {:?}", args.path);
     debug!("demo data path: {:?}", args.demo_data_path);
     debug!("out path: {:?} ({:?})", args.out_path, args.format);
     debug!("from date {}", from_date);
@@ -206,7 +218,7 @@ async fn main() -> Result<(), anyhow::Error> {
             .map_err(|err| EventsGenError::Internal(format!("can't open products.csv: {err}")))?,
     )?;
     info!("creating entities...");
-    let schema = Arc::new(create_entities(org_id, project_id, &md)?);
+    Arc::new(create_entities(org_id, project_id, &md, &db)?);
 
     info!("creating generator...");
     let gen_cfg = generator::Config {
@@ -241,7 +253,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let run_cfg = scenario::Config {
         rng: rng.clone(),
         gen,
-        schema: schema.clone(),
+        schema: Arc::new(db.schema1("events")?),
         events_map,
         products,
         to: to_date,
@@ -304,7 +316,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 .unwrap();
             out_fields.push(Field::new(
                 prop.column_name(),
-                prop.data_type.clone().into(),
+                prop.data_type.clone().try_into()?,
                 prop.nullable,
             ));
         } else if field.name().starts_with("user_") {
@@ -314,7 +326,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 .unwrap();
             out_fields.push(Field::new(
                 prop.column_name(),
-                prop.data_type.clone().into(),
+                prop.data_type.clone().try_into()?,
                 prop.nullable,
             ));
         } else {
@@ -358,10 +370,10 @@ async fn main() -> Result<(), anyhow::Error> {
                         Field::new(field.name(), datatypes::DataType::Utf8, field.is_nullable());
                     fields.push(field.clone());
                     let arr = match typ {
-                        DictionaryType::UInt8 => {
+                        DictionaryType::Int8 => {
                             let arr = batch.columns()[idx]
                                 .as_any()
-                                .downcast_ref::<UInt8Array>()
+                                .downcast_ref::<Int8Array>()
                                 .unwrap();
 
                             for v in arr {
@@ -380,10 +392,10 @@ async fn main() -> Result<(), anyhow::Error> {
 
                             Arc::new(b.finish()) as ArrayRef
                         }
-                        DictionaryType::UInt16 => {
+                        DictionaryType::Int16 => {
                             let arr = batch.columns()[idx]
                                 .as_any()
-                                .downcast_ref::<UInt16Array>()
+                                .downcast_ref::<Int16Array>()
                                 .unwrap();
                             for v in arr {
                                 if let Some(i) = v {
@@ -401,10 +413,10 @@ async fn main() -> Result<(), anyhow::Error> {
 
                             Arc::new(b.finish()) as ArrayRef
                         }
-                        DictionaryType::UInt32 => {
+                        DictionaryType::Int32 => {
                             let arr = batch.columns()[idx]
                                 .as_any()
-                                .downcast_ref::<UInt32Array>()
+                                .downcast_ref::<Int32Array>()
                                 .unwrap();
                             for v in arr {
                                 if let Some(i) = v {
@@ -422,10 +434,10 @@ async fn main() -> Result<(), anyhow::Error> {
 
                             Arc::new(b.finish()) as ArrayRef
                         }
-                        DictionaryType::UInt64 => {
+                        DictionaryType::Int64 => {
                             let arr = batch.columns()[idx]
                                 .as_any()
-                                .downcast_ref::<UInt64Array>()
+                                .downcast_ref::<Int64Array>()
                                 .unwrap();
                             for v in arr {
                                 if let Some(i) = v {
@@ -433,7 +445,7 @@ async fn main() -> Result<(), anyhow::Error> {
                                         org_id,
                                         project_id,
                                         field.name(),
-                                        i,
+                                        i as u64,
                                     )?;
                                     b.append_value(s);
                                 } else {
@@ -450,7 +462,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 } else {
                     let field = Field::new(
                         field.name(),
-                        prop.data_type.clone().into(),
+                        prop.data_type.clone().try_into()?,
                         field.is_nullable(),
                     );
                     fields.push(field.clone());

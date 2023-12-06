@@ -22,6 +22,7 @@ use arrow::datatypes::FieldRef;
 use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
+use arrow::util::pretty::print_batches;
 use arrow_row::SortField;
 use axum::async_trait;
 use crossbeam::channel::bounded;
@@ -285,6 +286,8 @@ impl Runner {
                     break;
                 }
                 Some(Err(er)) => {
+                    println!("!ff");
+
                     return Err(QueryError::from(er));
                 }
             };

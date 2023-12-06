@@ -28,32 +28,26 @@ use chrono::NaiveDateTime;
 use chrono::Utc;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
-use metadata::database::Column;
-use metadata::database::CreateTableRequest;
-use metadata::database::Table;
-use metadata::database::TableRef;
+use common::types::{COLUMN_EVENT, COLUMN_PROJECT_ID, COLUMN_CREATED_AT, COLUMN_USER_ID, DType};
 use metadata::error::MetadataError;
-use metadata::properties::DataType;
 use metadata::properties::DictionaryType;
 use metadata::properties::Type;
 use metadata::MetadataProvider;
+use store::db::{OptiDBImpl, TableOptions};
+use store::{NamedValue, Value};
 use test_util::create_event;
 use test_util::create_property;
 use test_util::CreatePropertyMainRequest;
 
 struct Builders {
+    b_project_id: Int64Builder,
     b_user_id: Int64Builder,
     b_created_at: TimestampNanosecondBuilder,
-    b_event: UInt64Builder,
+    b_event: Int64Builder,
     b_i8: Int8Builder,
     b_i16: Int16Builder,
     b_i32: Int32Builder,
     b_i64: Int64Builder,
-    b_u8: UInt8Builder,
-    b_u16: UInt16Builder,
-    b_u32: UInt32Builder,
-    b_u64: UInt64Builder,
-    b_f64: Float64Builder,
     b_b: BooleanBuilder,
     b_str: StringBuilder,
     b_ts: TimestampNanosecondBuilder,
@@ -65,18 +59,14 @@ struct Builders {
 impl Builders {
     pub fn new() -> Self {
         Self {
+            b_project_id: Int64Builder::new(),
             b_user_id: Int64Builder::new(),
             b_created_at: TimestampNanosecondBuilder::new(),
-            b_event: UInt64Builder::new(),
+            b_event: Int64Builder::new(),
             b_i8: Int8Builder::new(),
             b_i16: Int16Builder::new(),
             b_i32: Int32Builder::new(),
             b_i64: Int64Builder::new(),
-            b_u8: UInt8Builder::new(),
-            b_u16: UInt16Builder::new(),
-            b_u32: UInt32Builder::new(),
-            b_u64: UInt64Builder::new(),
-            b_f64: Float64Builder::new(),
             b_b: BooleanBuilder::new(),
             b_str: StringBuilder::new(),
             b_ts: TimestampNanosecondBuilder::new(),
@@ -91,6 +81,7 @@ impl Builders {
     pub fn finish(&mut self, schema: SchemaRef) -> RecordBatch {
         let arrs = {
             vec![
+                Arc::new(self.b_project_id.finish()) as ArrayRef,
                 Arc::new(self.b_user_id.finish()) as ArrayRef,
                 Arc::new(self.b_created_at.finish()) as ArrayRef,
                 Arc::new(self.b_event.finish()) as ArrayRef,
@@ -98,11 +89,6 @@ impl Builders {
                 Arc::new(self.b_i16.finish()) as ArrayRef,
                 Arc::new(self.b_i32.finish()) as ArrayRef,
                 Arc::new(self.b_i64.finish()) as ArrayRef,
-                Arc::new(self.b_u8.finish()) as ArrayRef,
-                Arc::new(self.b_u16.finish()) as ArrayRef,
-                Arc::new(self.b_u32.finish()) as ArrayRef,
-                Arc::new(self.b_u64.finish()) as ArrayRef,
-                Arc::new(self.b_f64.finish()) as ArrayRef,
                 Arc::new(self.b_b.finish()) as ArrayRef,
                 Arc::new(self.b_str.finish()) as ArrayRef,
                 Arc::new(self.b_ts.finish()) as ArrayRef,
@@ -119,27 +105,42 @@ impl Builders {
     }
 }
 
-pub fn gen(
+pub fn init(
     partitions: usize,
-    batch_size: usize,
     md: &Arc<MetadataProvider>,
+    db: &Arc<OptiDBImpl>,
     org_id: u64,
     proj_id: u64,
-) -> Result<Vec<Vec<RecordBatch>>, anyhow::Error> {
-    let mut cols: Vec<Column> = Vec::new();
-
+) -> Result<(), anyhow::Error> {
+    let topts = TableOptions {
+        levels: 7,
+        merge_array_size: 10000,
+        partitions,
+        index_cols: 2,
+        l1_max_size_bytes: 1024 * 1024 * 10,
+        level_size_multiplier: 10,
+        l0_max_parts: 4,
+        max_log_length_bytes: 1024 * 1024 * 100,
+        merge_array_page_size: 10000,
+        merge_data_page_size_limit_bytes: Some(1024 * 1024),
+        merge_index_cols: 2,
+        merge_max_l1_part_size_bytes: 1024 * 1024,
+        merge_part_size_multiplier: 10,
+        merge_row_group_values_limit: 1000,
+    };
+    db.create_table("events", topts)?;
     create_property(
         md,
         org_id,
         proj_id,
         CreatePropertyMainRequest {
-            name: "User ID".to_string(),
+            name: COLUMN_PROJECT_ID.to_string(),
             typ: Type::Event,
-            data_type: DataType::Int64,
+            data_type: DType::Int64,
             nullable: false,
             dict: None,
         },
-        &mut cols,
+        &db,
     )?;
 
     create_property(
@@ -147,13 +148,13 @@ pub fn gen(
         org_id,
         proj_id,
         CreatePropertyMainRequest {
-            name: "Created At".to_string(),
+            name: COLUMN_USER_ID.to_string(),
             typ: Type::Event,
-            data_type: DataType::Timestamp,
+            data_type: DType::Int64,
             nullable: false,
             dict: None,
         },
-        &mut cols,
+        &db,
     )?;
 
     create_property(
@@ -161,31 +162,40 @@ pub fn gen(
         org_id,
         proj_id,
         CreatePropertyMainRequest {
-            name: "Event".to_string(),
+            name: COLUMN_CREATED_AT.to_string(),
             typ: Type::Event,
-            data_type: DataType::String,
+            data_type: DType::Timestamp,
             nullable: false,
-            dict: Some(DictionaryType::UInt64),
+            dict: None,
         },
-        &mut cols,
+        &db,
+    )?;
+
+    create_property(
+        md,
+        org_id,
+        proj_id,
+        CreatePropertyMainRequest {
+            name: COLUMN_EVENT.to_string(),
+            typ: Type::Event,
+            data_type: DType::String,
+            nullable: false,
+            dict: Some(DictionaryType::Int64),
+        },
+        &db,
     )?;
 
     let props = vec![
-        ("i_8", DataType::Int8),
-        ("i_16", DataType::Int16),
-        ("i_32", DataType::Int32),
-        ("i_64", DataType::Int64),
-        ("u_8", DataType::UInt8),
-        ("u_16", DataType::UInt16),
-        ("u_32", DataType::UInt32),
-        ("u_64", DataType::UInt64),
-        ("f_64", DataType::Float64),
-        ("bool", DataType::Boolean),
-        ("string", DataType::String),
-        ("timestamp", DataType::Timestamp),
-        ("decimal", DataType::Decimal),
-        ("group", DataType::Int64),
-        ("v", DataType::Int64),
+        ("i_8", DType::Int8),
+        ("i_16", DType::Int16),
+        ("i_32", DType::Int32),
+        ("i_64", DType::Int64),
+        ("bool", DType::Boolean),
+        ("string", DType::String),
+        ("timestamp", DType::Timestamp),
+        ("decimal", DType::Decimal),
+        ("group", DType::Int64),
+        ("v", DType::Int64),
     ];
 
     for (name, dt) in props {
@@ -200,34 +210,24 @@ pub fn gen(
                 nullable: true,
                 dict: None,
             },
-            &mut cols,
+            &db,
         )?;
     }
 
     create_event(md, org_id, proj_id, "event".to_string())?;
-    let table = CreateTableRequest {
-        typ: TableRef::Events(org_id, proj_id),
-        columns: cols.clone(),
-    };
     md.dictionaries
         .get_key_or_create(1, 1, "event_event", "event")?;
 
-    match md.database.create_table(table.clone()) {
-        Ok(_) | Err(MetadataError::AlreadyExists(_)) => {}
-        Err(err) => return Err(err.into()),
-    };
+    Ok(())
+}
 
+pub fn gen_mem(partitions: usize,
+           batch_size: usize,
+           db: &Arc<OptiDBImpl>,
+           proj_id: u64) -> Result<Vec<Vec<RecordBatch>>, anyhow::Error> {
     let now = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0)
         .unwrap()
         .duration_trunc(Duration::days(1))?;
-    let table = Table {
-        id: 1,
-        typ: TableRef::Events(org_id, proj_id),
-        columns: cols,
-    };
-
-    let schema = table.arrow_schema();
-
     let mut res = vec![Vec::new(); partitions];
 
     let mut builders = Vec::new();
@@ -243,6 +243,7 @@ pub fn gen(
         for _day in 0..days {
             let mut event_time = cur_time;
             for event in 0..events {
+                builders[partition].b_project_id.append_value(1);
                 builders[partition].b_user_id.append_value(user as i64);
                 builders[partition]
                     .b_created_at
@@ -252,11 +253,6 @@ pub fn gen(
                 builders[partition].b_i16.append_value(event as i16);
                 builders[partition].b_i32.append_value(event as i32);
                 builders[partition].b_i64.append_value(event);
-                builders[partition].b_u8.append_value(event as u8);
-                builders[partition].b_u16.append_value(event as u16);
-                builders[partition].b_u32.append_value(event as u32);
-                builders[partition].b_u64.append_value(event as u64);
-                builders[partition].b_f64.append_value(event as f64 * 1.1);
                 builders[partition].b_b.append_value(event % 2 == 0);
                 builders[partition]
                     .b_str
@@ -276,7 +272,7 @@ pub fn gen(
                 }
 
                 if builders[partition].len() >= batch_size {
-                    let batch = builders[partition].finish(Arc::new(schema.clone()));
+                    let batch = builders[partition].finish(Arc::new(db.schema1("events")?.clone()));
                     res[partition].push(batch);
                 }
 
@@ -290,10 +286,59 @@ pub fn gen(
 
     for (partition, batches) in res.iter_mut().enumerate() {
         if builders[partition].len() > 0 {
-            let batch = builders[partition].finish(Arc::new(schema.clone()));
+            let batch = builders[partition].finish(Arc::new(db.schema1("events")?.clone()));
             batches.push(batch);
         }
     }
 
     Ok(res)
+}
+
+pub fn gen(
+    db: &Arc<OptiDBImpl>,
+    proj_id: u64) -> Result<(), anyhow::Error> {
+    let now = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0)
+        .unwrap()
+        .duration_trunc(Duration::days(1))?;
+
+    let users = 1;
+    let days = 1;
+    let events = 2;
+    let mut vals: Vec<NamedValue> = vec![];
+    for user in 0..users {
+        let mut cur_time = now - Duration::days(days);
+        for _day in 0..days {
+            let mut event_time = cur_time;
+            for event in 0..events {
+                vals.truncate(0);
+                vals.push(NamedValue::new("event_project_id".to_string(), Value::Int64(Some(proj_id as i64))));
+                vals.push(NamedValue::new("event_user_id".to_string(), Value::Int64(Some(user as i64+1))));
+                vals.push(NamedValue::new("event_created_at".to_string(), Value::Int64(Some(event_time.timestamp_nanos()))));
+                vals.push(NamedValue::new("event_event".to_string(), Value::Int64(Some(1))));
+                vals.push(NamedValue::new("event_i_8".to_string(), Value::Int8(Some(event as i8))));
+                vals.push(NamedValue::new("event_i_16".to_string(), Value::Int16(Some(event as i16))));
+                vals.push(NamedValue::new("event_i_32".to_string(), Value::Int32(Some(event as i32))));
+                vals.push(NamedValue::new("event_i_64".to_string(), Value::Int64(Some(event))));
+                vals.push(NamedValue::new("event_bool".to_string(), Value::Boolean(Some(event % 2 == 0))));
+                vals.push(NamedValue::new("event_string".to_string(), Value::String(Some(format!("event {}", event)))));
+                vals.push(NamedValue::new("event_timestamp".to_string(), Value::Int64(Some(event * 1000))));
+                vals.push(NamedValue::new("event_decimal".to_string(), Value::Decimal(Some(event as i128 * 10_i128.pow(DECIMAL_SCALE as u32) + event as i128 * 100))));
+                vals.push(NamedValue::new("event_group".to_string(), Value::Int64(Some(event % (events / 2)))));
+                // two group of users with different "v" value to proper integration tests
+                if user % 2 == 0 {
+                    vals.push(NamedValue::new("event_v".to_string(), Value::Int64(Some(event))));
+                } else {
+                    vals.push(NamedValue::new("v".to_string(), Value::Int64(Some(event * 2))));
+                }
+
+                db.insert("events", vals.clone())?;
+                let d = Duration::days(1).num_seconds() / events;
+                let diff = Duration::seconds(d);
+                event_time = event_time.add(diff);
+            }
+            cur_time = cur_time.add(Duration::days(1));
+        }
+    }
+
+    Ok(())
 }

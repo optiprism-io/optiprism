@@ -117,6 +117,7 @@ impl PlatformError {
                 CommonError::EntityMapping => ApiError::internal(err.to_string()),
                 CommonError::BadRequest(err) => ApiError::bad_request(err),
                 CommonError::Serde(err) => ApiError::bad_request(err.to_string()),
+                CommonError::General(err) => ApiError::internal(err)
             },
             PlatformError::Auth(err) => match err {
                 AuthError::InvalidCredentials => ApiError::unauthorized(err),

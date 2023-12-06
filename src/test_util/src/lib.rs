@@ -69,7 +69,17 @@ pub fn create_property(
 
     let prop = md.event_properties.get_or_create(org_id, proj_id, req)?;
 
-    db.add_field("events", prop.column_name().as_str(), main_req.data_type, main_req.nullable)?;
+    let t = if let Some(v) = main_req.dict {
+        match v {
+            DictionaryType::Int8 => DType::Int8,
+            DictionaryType::Int16 => DType::Int16,
+            DictionaryType::Int32 => DType::Int32,
+            DictionaryType::Int64 => DType::Int64,
+        }
+    } else {
+        main_req.data_type
+    };
+    db.add_field("events", prop.column_name().as_str(), t, main_req.nullable)?;
 
     Ok(prop)
 }

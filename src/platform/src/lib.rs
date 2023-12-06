@@ -6,7 +6,7 @@ pub mod context;
 pub mod custom_events;
 pub mod custom_properties;
 pub mod dashboards;
-pub mod datatype;
+// pub mod datatype;
 pub mod error;
 pub mod event_records;
 pub mod events;
@@ -53,8 +53,7 @@ use serde::Serialize;
 use serde_json::json;
 use serde_json::Number;
 use serde_json::Value;
-
-use crate::datatype::DataType;
+use common::types::DType;
 
 pub struct PlatformProvider {
     pub events: Arc<dyn events::Provider>,
@@ -491,7 +490,7 @@ pub struct Column {
     pub typ: ColumnType,
     pub name: String,
     pub is_nullable: bool,
-    pub data_type: DataType,
+    pub data_type: DType,
     pub step: Option<usize>,
     pub data: Vec<Value>,
     pub compare_values: Option<Vec<Value>>,

@@ -44,6 +44,7 @@ impl TryFrom<&merger::parquet::ParquetValue> for KeyValue {
     }
 }
 
+#[derive(Clone,Debug)]
 pub struct NamedValue {
     name: String,
     value: Value,
@@ -54,6 +55,7 @@ impl NamedValue {
         Self { name, value }
     }
 }
+
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub enum Value {
     Int8(Option<i8>),
@@ -61,9 +63,7 @@ pub enum Value {
     Int32(Option<i32>),
     Int64(Option<i64>),
     Boolean(Option<bool>),
-    Timestamp(Option<i64>),
     Decimal(Option<i128>),
-    Binary(Option<Vec<u8>>),
     String(Option<String>),
     ListInt8(Option<Vec<Option<i8>>>),
     ListInt16(Option<Vec<Option<i16>>>),
@@ -82,9 +82,7 @@ impl Value {
             DataType::Int8 => Value::Int8(None),
             DataType::Int16 => Int16(None),
             DataType::Int32 => Value::Int32(None),
-            DataType::Int64 => Value::Int64(None),
-            DataType::Timestamp(_, _) => Value::Timestamp(None),
-            DataType::Binary => Value::Binary(None),
+            DataType::Int64 | DataType::Timestamp(_, _) => Value::Int64(None),
             DataType::Utf8 => Value::String(None),
             DataType::Decimal(_, _) => Value::Decimal(None),
             DataType::List(f) => match f.data_type() {
@@ -92,8 +90,7 @@ impl Value {
                 DataType::Int8 => Value::ListInt8(None),
                 DataType::Int16 => Value::ListInt16(None),
                 DataType::Int32 => Value::ListInt32(None),
-                DataType::Int64 => Value::ListInt64(None),
-                DataType::Timestamp(_, _) => Value::ListTimestamp(None),
+                DataType::Int64 | DataType::Timestamp(_, _) => Value::ListInt64(None),
                 DataType::Utf8 => Value::ListString(None),
                 DataType::Decimal(_, _) => Value::ListDecimal(None),
                 _ => unimplemented!(),
@@ -102,6 +99,7 @@ impl Value {
         }
     }
 }
+
 impl From<&KeyValue> for Value {
     fn from(value: &KeyValue) -> Self {
         match value {
@@ -866,7 +864,7 @@ pub mod test_util {
             }
             _ => unimplemented!("{:?}", pt),
         }
-        .boxed()
+            .boxed()
     }
 
     pub fn gen_utf8_data_list_array<O: Offset, O2: Offset>(

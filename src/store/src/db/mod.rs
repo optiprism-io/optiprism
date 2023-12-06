@@ -22,7 +22,7 @@ use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::pin::Pin;
-use std::sync::mpsc;
+use std::sync::{mpsc, OnceLock};
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::RecvError;
 use std::sync::mpsc::Sender;
@@ -48,7 +48,7 @@ use arrow2::array::MutablePrimitiveArray;
 use arrow2::array::MutableUtf8Array;
 use arrow2::array::PrimitiveArray;
 use arrow2::chunk::Chunk;
-use arrow2::datatypes::DataType;
+use arrow2::datatypes::{DataType, TimeUnit};
 use arrow2::datatypes::Field;
 use arrow2::datatypes::Schema;
 use arrow2::datatypes::SchemaRef;
@@ -63,6 +63,7 @@ use chrono::format::Item;
 use crossbeam_skiplist::SkipSet;
 use futures::select;
 use futures::Stream;
+use lazy_static::lazy_static;
 use metrics::counter;
 use metrics::describe_counter;
 use metrics::describe_histogram;
@@ -88,6 +89,7 @@ use tracing::error;
 use tracing::instrument;
 use tracing::trace;
 use tracing_subscriber::fmt::time::FormatTime;
+use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
 use common::types::DType;
 use crate::arrow_conversion::schema2_to_schema1;
 
@@ -118,6 +120,7 @@ macro_rules! memory_col_to_arrow {
         $arr_ty::from(vals).as_box()
     }};
 }
+
 
 pub enum DBDataType {
     Int32,
@@ -304,7 +307,6 @@ pub struct TableOptions {
     pub l1_max_size_bytes: usize,
     pub level_size_multiplier: usize,
     pub max_log_length_bytes: usize,
-    pub read_chunk_size: usize,
     pub merge_max_l1_part_size_bytes: usize,
     pub merge_part_size_multiplier: usize,
     pub merge_index_cols: usize,
@@ -397,7 +399,6 @@ fn _log(op: LogOp, metadata: &mut Metadata, log: &mut File) -> Result<usize> {
     log.write_all(&crc.to_le_bytes())?;
     log.write_all(&(data.len() as u64).to_le_bytes())?;
     log.write_all(&data)?;
-
     let logged_size = 8 + 4 + data.len();
     // !@#trace!("logged size: {}", logged_size);
 
@@ -429,6 +430,7 @@ fn log_metadata(log: &mut File, metadata: &mut Metadata) -> Result<()> {
 }
 
 fn try_recover_table(path: PathBuf, name: String, opts: Option<TableOptions>) -> Result<Table> {
+    let start_time = Instant::now();
     // !@#trace!("starting recovery");
     let dir = fs::read_dir(path.clone())?;
     let mut logs = BinaryHeap::new();
@@ -455,7 +457,6 @@ fn try_recover_table(path: PathBuf, name: String, opts: Option<TableOptions>) ->
         l1_max_size_bytes: 0,
         level_size_multiplier: 0,
         max_log_length_bytes: 0,
-        read_chunk_size: 0,
         merge_max_l1_part_size_bytes: 0,
         merge_part_size_multiplier: 0,
         merge_index_cols: 0,
@@ -491,10 +492,12 @@ fn try_recover_table(path: PathBuf, name: String, opts: Option<TableOptions>) ->
     let mut memtable = SkipSet::new();
     let log = if let Some(log_path) = logs.pop() {
         // !@#trace!("last log: {:?}", log_path);
-        let mut f = BufReader::new(File::open(&log_path)?);
+        // todo make a buffered read. Currently something odd happens with reading of the length of the record
+        let mut f = File::open(&log_path)?;
 
         let mut ops = 0;
         let mut read_bytes = 0;
+
         loop {
             let mut crc_b = [0u8; mem::size_of::<u32>()];
             read_bytes = f.read(&mut crc_b)?;
@@ -505,16 +508,16 @@ fn try_recover_table(path: PathBuf, name: String, opts: Option<TableOptions>) ->
             // !@#trace!("crc32: {}", crc32);
 
             let mut len_b = [0u8; mem::size_of::<u64>()];
-            f.read_exact(&mut len_b)?;
+            f.read(&mut len_b)?;
             let len = u64::from_le_bytes(len_b);
             // !@#trace!("len: {}", len);
             let mut data_b = vec![0u8; len as usize];
-            f.read_exact(&mut data_b)?;
+            f.read(&mut data_b)?;
             // todo recover from this case
             let cur_crc32 = hash_crc32(&data_b);
             if crc32 != cur_crc32 {
                 return Err(StoreError::Internal(format!(
-                    "corrupted log. crc32 has: {}, need: {}",
+                    "corrupted log. crc32 is: {}, need: {}",
                     cur_crc32, crc32
                 )));
             }
@@ -544,6 +547,7 @@ fn try_recover_table(path: PathBuf, name: String, opts: Option<TableOptions>) ->
     // if trigger_compact {
     //     // compactor_outbox.send(CompactorMessage::Compact).unwrap();
     // }
+    histogram!("store.insert_time_sec",start_time.elapsed());
     Ok(Table {
         name,
         memtable: Arc::new(Mutex::new(memtable)),
@@ -684,20 +688,15 @@ fn memtable_to_partitioned_chunks(
                         DataType::Int16 => memory_col_to_arrow!(col, Int16, MutablePrimitiveArray),
                         DataType::Int32 => memory_col_to_arrow!(col, Int32, MutablePrimitiveArray),
                         DataType::Int64 => memory_col_to_arrow!(col, Int64, MutablePrimitiveArray),
-                        // DataType::Float32 => memory_col_to_arrow!(col, Float32, MutablePrimitiveArray),
-                        // DataType::Float64 => memory_col_to_arrow!(col, Float64, MutablePrimitiveArray),
                         DataType::Timestamp(_, _) => {
-                            memory_col_to_arrow!(col, Int64, MutablePrimitiveArray)
-                        }
-                        DataType::Binary => {
                             let vals = col
                                 .into_iter()
                                 .map(|v| match v {
-                                    Value::Binary(b) => b,
-                                    _ => unreachable!(),
+                                    Value::Int64(b) => b,
+                                    _ => unreachable!("{:?}", v),
                                 })
                                 .collect::<Vec<_>>();
-                            MutableBinaryArray::<i32>::from(vals).as_box()
+                            MutablePrimitiveArray::<i64>::from(vals).to(DataType::Timestamp(TimeUnit::Nanosecond, None)).as_box()
                         }
                         DataType::Utf8 => {
                             let vals = col
@@ -710,7 +709,14 @@ fn memtable_to_partitioned_chunks(
                             MutableUtf8Array::<i32>::from(vals).as_box()
                         }
                         DataType::Decimal(_, _) => {
-                            memory_col_to_arrow!(col, Decimal, MutablePrimitiveArray)
+                            let vals = col
+                                .into_iter()
+                                .map(|v| match v {
+                                    Value::Decimal(b) => b,
+                                    _ => unreachable!("{:?}", v),
+                                })
+                                .collect::<Vec<_>>();
+                            MutablePrimitiveArray::<i128>::from(vals).to(DataType::Decimal(DECIMAL_PRECISION as usize, DECIMAL_SCALE as usize)).as_box()
                         }
                         DataType::List(_) => unimplemented!(),
                         _ => unimplemented!(),
@@ -772,7 +778,7 @@ fn write_level0(
         );
         // !@#trace!("creating part file {:?}", p);
         let w = OpenOptions::new().create_new(true).write(true).open(path)?;
-        let mut writer = parquet::write::FileWriter::try_new(w, metadata.schema.clone(), popts)?;
+        let mut writer = parquet::write::FileWriter::try_new(BufWriter::new(w), metadata.schema.clone(), popts)?;
         // Write the part
         for group in row_groups {
             writer.write(group?)?;
@@ -883,7 +889,9 @@ impl Stream for ScanStream {
                 histogram!("store.scan_time_sec",self.start_time.elapsed(),"table"=>self.table_name.to_string());
                 Poll::Ready(None)
             }
-            Some(chunk) => Poll::Ready(Some(chunk)),
+            Some(chunk) => {
+                Poll::Ready(Some(chunk))
+            }
         }
     }
 }
@@ -984,6 +992,7 @@ fn init_print_logger() {
     metrics::set_boxed_recorder(Box::new(recorder)).unwrap()
 }
 
+
 impl OptiDBImpl {
     // #[instrument(level = "trace")]
     pub fn open(path: PathBuf, opts: Options) -> Result<Self> {
@@ -998,7 +1007,8 @@ impl OptiDBImpl {
             "scan memtable time"
         );
         describe_counter!("store.compactions_count", "number of compactions");
-        describe_histogram!("store.compaction_time_sec", Unit::Microseconds, "scan time");
+        describe_histogram!("store.compaction_time_sec", Unit::Microseconds, "compaction time");
+        describe_histogram!("store.recovery_time_sec", Unit::Microseconds, "recovery time");
 
         recover(path, opts)
     }
@@ -1019,6 +1029,7 @@ impl OptiDBImpl {
             .map(|v| KeyValue::from(&v.value))
             .collect::<Vec<_>>();
         let mut final_values: Vec<Value> = vec![];
+
         for (field_idx, field) in metadata
             .schema
             .fields
@@ -1041,7 +1052,6 @@ impl OptiDBImpl {
 
             final_values.push(Value::null(field.data_type()));
         }
-
         let mut log = tbl.log.lock();
         let logged = _log(
             LogOp::Insert(pk_values.clone(), final_values.clone()),
@@ -1068,7 +1078,7 @@ impl OptiDBImpl {
             // }
         }
         histogram!("store.insert_time_sec",start_time.elapsed(),"table"=>tbl_name.to_string());
-        // !@#debug!("insert finished in {:?}", duration);
+        // !@#debug!("insert finished in {: ?}", duration);
         Ok(())
     }
 
@@ -1078,7 +1088,7 @@ impl OptiDBImpl {
             .unwrap();
     }
 
-    pub fn flush(&mut self) -> Result<()> {
+    pub fn flush(&self) -> Result<()> {
         let mut tbls = self.tables.read();
         for tbl in tbls.iter() {
             let mut log = tbl.log.lock();
@@ -1150,7 +1160,7 @@ impl OptiDBImpl {
         for (level_id, level) in partition.levels.into_iter().enumerate() {
             for part in level.parts {
                 let path = part_path(&self.path, tbl_name, partition.id, level_id, part.id);
-                let rdr = File::open(path)?;
+                let rdr = BufReader::new(File::open(path)?);
                 rdrs.push(rdr);
             }
         }
@@ -1193,7 +1203,7 @@ impl OptiDBImpl {
         Ok(())
     }
 
-    pub fn create_table(&mut self, tbl_name: &str, opts: TableOptions) -> Result<()> {
+    pub fn create_table(&self, tbl_name: &str, opts: TableOptions) -> Result<()> {
         let path = self.path.join("tables").join(tbl_name);
         fs::create_dir_all(&path)?;
         let new_tbl = try_recover_table(path, tbl_name.to_string(), Some(opts))?;
@@ -1277,7 +1287,7 @@ mod tests {
     #[test]
     fn it_works() {
         // let path = temp_dir().join("db");
-        let path = PathBuf::from("/opt/homebrew/Caskroom/clickhouse/user_files");
+        let path = PathBuf::from(" / opt / homebrew / Caskroom / clickhouse / user_files");
         fs::remove_dir_all(&path).unwrap();
         fs::create_dir_all(&path).unwrap();
 
@@ -1349,7 +1359,7 @@ mod tests {
                 .collect::<Vec<_>>();
 
             // for bb in b {
-            //     println!("{:?}", bb);
+            //     println!("{: ?}", bb);
             // }
         }
         db.flush().unwrap();
@@ -1360,7 +1370,7 @@ mod tests {
 
     #[test]
     fn test_schema_evolution() {
-        let path = PathBuf::from("/opt/homebrew/Caskroom/clickhouse/user_files");
+        let path = PathBuf::from(" / opt / homebrew / Caskroom / clickhouse / user_files");
         fs::remove_dir_all(&path).unwrap();
         fs::create_dir_all(&path).unwrap();
 
@@ -1381,7 +1391,6 @@ mod tests {
             merge_max_l1_part_size_bytes: 1024 * 1024,
             merge_part_size_multiplier: 10,
             merge_row_group_values_limit: 1000,
-            read_chunk_size: 10,
         };
 
         db.create_table("t1", topts).unwrap();

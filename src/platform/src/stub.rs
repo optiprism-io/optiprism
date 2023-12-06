@@ -9,6 +9,7 @@ use common::rbac::ProjectRole;
 use common::rbac::Role;
 use lazy_static::lazy_static;
 use serde_json::Value;
+use common::types::DType;
 
 use crate::accounts;
 use crate::accounts::Account;
@@ -29,8 +30,6 @@ use crate::dashboards::CreateDashboardRequest;
 use crate::dashboards::Dashboard;
 use crate::dashboards::Panel;
 use crate::dashboards::UpdateDashboardRequest;
-use crate::datatype::DataType;
-use crate::datatype::DictionaryType;
 use crate::event_records;
 use crate::event_records::EventRecord;
 use crate::event_records::ListEventRecordsRequest;
@@ -43,7 +42,7 @@ use crate::group_records::GroupRecord;
 use crate::group_records::ListGroupRecordsRequest;
 use crate::group_records::UpdateGroupRecordRequest;
 use crate::properties;
-use crate::properties::Property;
+use crate::properties::{DictionaryType, Property};
 use crate::properties::UpdatePropertyRequest;
 use crate::queries;
 use crate::queries::event_segmentation;
@@ -375,13 +374,13 @@ impl Properties {
             display_name: Some("display_name".to_string()),
             description: Some("description".to_string()),
             typ: properties::Type::Event,
-            data_type: properties::DataType::Decimal,
+            data_type: DType::Decimal,
             status: properties::Status::Enabled,
             is_system: true,
             nullable: true,
             is_array: true,
             is_dictionary: true,
-            dictionary_type: Some(DictionaryType::UInt8),
+            dictionary_type: Some(DictionaryType::Int8),
         }
     }
 }
@@ -519,7 +518,7 @@ impl queries::Provider for Queries {
             typ: ColumnType::Dimension,
             name: "name".to_string(),
             is_nullable: true,
-            data_type: DataType::Decimal,
+            data_type: DType::Decimal,
             data: vec![Value::from(1)],
             step: Some(1),
             compare_values: Some(vec![Value::from(2)]),
