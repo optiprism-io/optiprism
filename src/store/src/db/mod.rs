@@ -1023,6 +1023,12 @@ impl OptiDBImpl {
         drop(tables);
 
         let mut metadata = tbl.metadata.lock();
+        for v in values.iter() {
+            match metadata.schema.fields.iter().find(|v| v.name == v.name) {
+                None => return Err(StoreError::Internal(format!("column {} not found in schema", v.name))),
+                _=>{}
+            }
+        }
 
         let pk_values = values
             .drain(0..metadata.opts.index_cols)

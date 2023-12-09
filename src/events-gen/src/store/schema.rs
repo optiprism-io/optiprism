@@ -29,6 +29,20 @@ pub fn create_entities(
         org_id,
         proj_id,
         CreatePropertyMainRequest {
+            name: COLUMN_PROJECT_ID.to_string(),
+            typ: Type::Event,
+            data_type: DType::Int64,
+            nullable: false,
+            dict: None,
+        },
+        &db,
+    )?;
+
+    create_property(
+        md,
+        org_id,
+        proj_id,
+        CreatePropertyMainRequest {
             name: COLUMN_USER_ID.to_string(),
             typ: Type::Event,
             data_type: DType::Int64,

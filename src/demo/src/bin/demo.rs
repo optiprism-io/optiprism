@@ -182,39 +182,19 @@ async fn main() -> Result<(), anyhow::Error> {
         };
     }
 
-    let data_provider: Arc<dyn TableProvider> = match &args.command {
+    match &args.command {
         Some(cmd) => match cmd {
             Commands::Shop(shop) => {
-                let partitions = gen_store(&args, shop, &md, &db)?;
-                info!("successfully generated!");
-                let mut data_size_bytes: usize = 0;
-                for partition in partitions.iter() {
-                    for batch in partition.iter() {
-                        for column in batch.columns() {
-                            data_size_bytes += column.get_array_memory_size();
-                        }
-                    }
-                }
-                debug!(
-            "partitions: {}, batches: {}",
-        partitions.len(),
-        partitions[0].len()
-    );
-                debug!(
-        "uncompressed dataset in-memory size: {}",
-        ByteSize::b(data_size_bytes as u64)
-    );
-                Arc::new(MemTable::try_new(partitions[0][0].schema(), partitions)?)
+                gen_store(&args, shop, &md, &db)?;
             }
             Commands::Test { .. } => {
                 gen_test(&args, &md, &db)?;
-                info!("successfully generated!");
-                Arc::new(LocalTable::try_new(db.clone(), "events".to_string())?)
             }
         },
         _ => unreachable!(),
     };
-
+    info!("successfully generated!");
+    let data_provider: Arc<dyn TableProvider> = Arc::new(LocalTable::try_new(db.clone(), "events".to_string())?);
 
 
     if let Some(path) = args.out_parquet {
@@ -272,7 +252,7 @@ fn gen_store(
     cmd_args: &Shop,
     md: &Arc<MetadataProvider>,
     db: &Arc<OptiDBImpl>,
-) -> anyhow::Result<Vec<Vec<RecordBatch>>> {
+) -> anyhow::Result<()> {
     let to_date = match &cmd_args.to_date {
         None => Utc::now(),
         Some(dt) => dt.parse::<DateTimeUtc>()?.0.with_timezone(&Utc),
@@ -321,13 +301,6 @@ fn gen_store(
     };
 
     let result = shop::gen(md, db, store_cfg)?;
-    let mut rows: usize = 0;
-    for partition in result.iter() {
-        for batch in partition.iter() {
-            rows += batch.num_rows();
-        }
-    }
-    debug!("average {} event(s) per 1 user", rows as i64 / total_users);
 
     Ok(result)
 }
