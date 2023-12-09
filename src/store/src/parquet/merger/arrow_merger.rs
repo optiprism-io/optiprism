@@ -292,6 +292,7 @@ impl ArrowChunk {
 pub struct Options {
     pub index_cols: usize,
     pub array_size: usize,
+    pub chunk_size: usize,
     pub fields: Vec<String>,
 }
 
@@ -304,6 +305,7 @@ impl MemChunkIterator {
         Self { chunk }
     }
 }
+
 impl Iterator for MemChunkIterator {
     type Item = Result<Chunk<Box<dyn Array>>>;
 
@@ -311,8 +313,9 @@ impl Iterator for MemChunkIterator {
         self.chunk.take().map(|v| Ok(v))
     }
 }
+
 pub struct MergingIterator<R>
-where R: Read + Seek
+    where R: Read + Seek
 {
     // list of index cols (partitions) in parquet file
     index_cols: Vec<ColumnDescriptor>,
@@ -332,7 +335,7 @@ where R: Read + Seek
 }
 
 impl<R> MergingIterator<R>
-where R: Read + Seek
+    where R: Read + Seek
 {
     // Create new merger
     pub fn new(
@@ -355,7 +358,7 @@ where R: Read + Seek
 
         let arrow_streams = readers
             .into_iter()
-            .map(|v| ArrowIterator::new(v, opts.fields.clone()).unwrap())
+            .map(|v| ArrowIterator::new(v, opts.fields.clone(), arrow_schema.clone(),opts.chunk_size).unwrap())
             .collect::<Vec<_>>();
 
         let mut mr = Self {
@@ -562,7 +565,7 @@ mod tests {
                     Some(idx * 10 + 10),
                     10,
                 )
-                .unwrap();
+                    .unwrap();
 
                 w
             })

@@ -127,6 +127,7 @@ pub fn init(
         merge_max_l1_part_size_bytes: 1024 * 1024,
         merge_part_size_multiplier: 10,
         merge_row_group_values_limit: 1000,
+        merge_chunk_size: 1024*8*8,
     };
     db.create_table("events", topts)?;
     create_property(

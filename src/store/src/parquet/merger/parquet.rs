@@ -420,12 +420,13 @@ impl<R: Read + Seek> ArrowIterator<R> {
         mut rdr: R,
         fields: Vec<String>,
         required_schema: Schema,
+        chunk_size:usize,
     ) -> Result<Self> {
         // we can read its metadata:
         let metadata = io::parquet::read::read_metadata(&mut rdr)?;
         let schema = io::parquet::read::infer_schema(&metadata)?;
         let schema = schema.filter(|_, f| fields.contains(&f.name));
-        let frdr = io::parquet::read::FileReader::new(rdr, metadata.row_groups, schema.clone(), Some(1024 * 8 * 8) /*todo define*/, None, None);
+        let frdr = io::parquet::read::FileReader::new(rdr, metadata.row_groups, schema.clone(), Some(chunk_size) /*todo define*/, None, None);
         Ok(Self {
             rdr: frdr,
             schema,

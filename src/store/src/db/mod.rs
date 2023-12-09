@@ -313,6 +313,7 @@ pub struct TableOptions {
     pub merge_data_page_size_limit_bytes: Option<usize>,
     pub merge_row_group_values_limit: usize,
     pub merge_array_size: usize,
+    pub merge_chunk_size: usize,
     pub merge_array_page_size: usize,
 }
 
@@ -463,6 +464,7 @@ fn try_recover_table(path: PathBuf, name: String, opts: Option<TableOptions>) ->
         merge_data_page_size_limit_bytes: None,
         merge_row_group_values_limit: 0,
         merge_array_size: 0,
+        merge_chunk_size: 0,
         merge_array_page_size: 0,
     });
 
@@ -1170,6 +1172,7 @@ impl OptiDBImpl {
             let opts = arrow_merger::Options {
                 index_cols: metadata.opts.merge_index_cols,
                 array_size: metadata.opts.merge_array_size,
+                chunk_size: metadata.opts.merge_chunk_size,
                 fields: fields.clone(),
             };
             Box::new(MergingIterator::new(rdrs, mem_chunk, opts)?)
@@ -1389,6 +1392,7 @@ mod tests {
             merge_max_l1_part_size_bytes: 1024 * 1024,
             merge_part_size_multiplier: 10,
             merge_row_group_values_limit: 1000,
+            merge_chunk_size: 1024 * 8 * 8,
         };
 
         db.create_table("t1", topts).unwrap();

@@ -190,6 +190,7 @@ mod tests {
             merge_array_size: 100,
             levels: 7,
             merge_part_size_multiplier: 0,
+            merge_chunk_size: 1024*8*8,
         };
         let mut db = OptiDBImpl::open(path, Options {}).unwrap();
         db.create_table("events", opts).unwrap();
