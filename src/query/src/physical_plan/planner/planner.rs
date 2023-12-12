@@ -143,7 +143,6 @@ impl DFExtensionPlanner for ExtensionPlanner {
                 })
                 .collect::<Result<Vec<_>>>()
                 .map_err(|err| DataFusionError::Plan(err.to_string()))?;
-
             let exec = SegmentedAggregateExec::try_new(
                 physical_inputs[0].clone(),
                 partition_inputs,
@@ -151,7 +150,6 @@ impl DFExtensionPlanner for ExtensionPlanner {
                 agg_expr,
             )
             .map_err(|err| DataFusionError::Plan(err.to_string()))?;
-
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<SegmentNode>() {
             let partition_col = Column::new(

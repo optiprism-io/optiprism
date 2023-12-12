@@ -18,7 +18,7 @@ use test_util::CreatePropertyMainRequest;
 use crate::error::Result;
 use crate::store::events::Event;
 
-pub fn create_entities(
+pub fn create_properties(
     org_id: u64,
     proj_id: u64,
     md: &Arc<MetadataProvider>,

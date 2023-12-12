@@ -5,16 +5,19 @@ use arrow::error::ArrowError;
 use chrono::OutOfRangeError;
 use common::error::CommonError;
 use datafusion::error::DataFusionError;
+use maxminddb::MaxMindDBError;
 use events_gen::error::EventsGenError;
 use metadata::error::MetadataError;
 use platform::PlatformError;
 use query::error::QueryError;
 use thiserror::Error;
+use ingester::error::IngesterError;
+use store::error::StoreError;
 
-pub type Result<T> = result::Result<T, DemoError>;
+pub type Result<T> = result::Result<T, Error>;
 
 #[derive(Error, Debug)]
-pub enum DemoError {
+pub enum Error {
     #[error("PlatformError: {0:?}")]
     Platform(#[from] PlatformError),
     #[error("Internal: {0:?}")]
@@ -32,9 +35,13 @@ pub enum DemoError {
     #[error("CommonError: {0:?}")]
     Common(#[from] CommonError),
     #[error("MetadataError: {0:?}")]
+    Store(#[from] StoreError),
+    #[error("StoreError: {0:?}")]
     Metadata(#[from] MetadataError),
     #[error("EventsGenError: {0:?}")]
     EventsGen(#[from] EventsGenError),
+    #[error("IngesterError: {0:?}")]
+    Ingester(#[from] IngesterError),
     #[error("DataFusionError: {0:?}")]
     DataFusion(#[from] DataFusionError),
     #[error("ArrowError: {0:?}")]
@@ -47,4 +54,10 @@ pub enum DemoError {
     Other(#[from] anyhow::Error),
     #[error("TimeDurationOutOfRange: {0:?}")]
     TimeDurationOutOfRange(#[from] OutOfRangeError),
+    #[error("Crossbeam: {0:?}")]
+    CrossbeamError(#[from] crossbeam_channel::RecvError),
+    #[error("maxmind: {0:?}")]
+    Maxmind(#[from] MaxMindDBError),
+    #[error("hyper: {0:?}")]
+    Hyper(#[from] hyper::Error),
 }

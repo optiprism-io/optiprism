@@ -52,7 +52,7 @@ use arrow2::datatypes::{DataType, TimeUnit};
 use arrow2::datatypes::Field;
 use arrow2::datatypes::Schema;
 use arrow2::datatypes::SchemaRef;
-use arrow2::io::parquet;
+use arrow2::io::{parquet, print};
 use arrow2::io::parquet::read;
 use arrow2::io::parquet::read::FileReader;
 use arrow2::io::parquet::write::transverse;
@@ -1024,9 +1024,9 @@ impl OptiDBImpl {
 
         let mut metadata = tbl.metadata.lock();
         for v in values.iter() {
-            match metadata.schema.fields.iter().find(|v| v.name == v.name) {
+            match metadata.schema.fields.iter().find(|f| f.name == v.name) {
                 None => return Err(StoreError::Internal(format!("column {} not found in schema", v.name))),
-                _=>{}
+                _ => {}
             }
         }
 

@@ -57,7 +57,7 @@ pub fn create_property(
         name: main_req.name.clone(),
         description: None,
         display_name: None,
-        typ: main_req.typ,
+        typ: main_req.typ.clone(),
         data_type: main_req.data_type.clone(),
         status: properties::Status::Enabled,
         is_system: false,
@@ -67,7 +67,10 @@ pub fn create_property(
         dictionary_type: main_req.dict.clone(),
     };
 
-    let prop = md.event_properties.get_or_create(org_id, proj_id, req)?;
+    let prop = match main_req.typ {
+        Type::Event => md.event_properties.get_or_create(org_id, proj_id, req)?,
+        Type::User => md.user_properties.get_or_create(org_id, proj_id, req)?
+    };
 
     let t = if let Some(v) = main_req.dict {
         match v {

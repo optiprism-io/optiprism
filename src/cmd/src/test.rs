@@ -1,4 +1,7 @@
+use std::fs;
+use std::net::SocketAddr;
 use std::ops::Add;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use arrow::array::ArrayBuilder;
@@ -22,10 +25,18 @@ use arrow::array::UInt8Builder;
 use arrow::datatypes::SchemaRef;
 use arrow::datatypes::TimeUnit;
 use arrow::record_batch::RecordBatch;
+use axum::Router;
 use chrono::Duration;
 use chrono::DurationRound;
 use chrono::NaiveDateTime;
 use chrono::Utc;
+use clap::Parser;
+use datafusion::datasource::TableProvider;
+use hyper::Server;
+use scan_dir::ScanDir;
+use tokio::select;
+use tokio::signal::unix::SignalKind;
+use tracing::{debug, info};
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 use common::types::{COLUMN_EVENT, COLUMN_PROJECT_ID, COLUMN_CREATED_AT, COLUMN_USER_ID, DType};
@@ -33,11 +44,32 @@ use metadata::error::MetadataError;
 use metadata::properties::DictionaryType;
 use metadata::properties::Type;
 use metadata::MetadataProvider;
-use store::db::{OptiDBImpl, TableOptions};
+use platform::auth;
+use query::datasources::local::LocalTable;
+use query::ProviderImpl;
+use service::tracing::TracingCliArgs;
+use store::db::{OptiDBImpl, Options, TableOptions};
 use store::{NamedValue, Value};
 use test_util::create_event;
 use test_util::create_property;
 use test_util::CreatePropertyMainRequest;
+use crate::error::Error;
+use crate::test;
+
+
+#[derive(Parser, Clone)]
+pub struct Test {
+    #[arg(long)]
+    path: PathBuf,
+    #[arg(long, default_value = "0.0.0.0:8080")]
+    host: SocketAddr,
+    #[arg(long)]
+    out_parquet: PathBuf,
+    #[arg(long)]
+    partitions: Option<usize>,
+    #[arg(long, default_value = "4096")]
+    batch_size: usize,
+}
 
 struct Builders {
     b_project_id: Int64Builder,
@@ -127,7 +159,7 @@ pub fn init(
         merge_max_l1_part_size_bytes: 1024 * 1024,
         merge_part_size_multiplier: 10,
         merge_row_group_values_limit: 1000,
-        merge_chunk_size: 1024*8*8,
+        merge_chunk_size: 1024 * 8 * 8,
     };
     db.create_table("events", topts)?;
     create_property(
@@ -223,9 +255,9 @@ pub fn init(
 }
 
 pub fn gen_mem(partitions: usize,
-           batch_size: usize,
-           db: &Arc<OptiDBImpl>,
-           proj_id: u64) -> Result<Vec<Vec<RecordBatch>>, anyhow::Error> {
+               batch_size: usize,
+               db: &Arc<OptiDBImpl>,
+               proj_id: u64) -> Result<Vec<Vec<RecordBatch>>, anyhow::Error> {
     let now = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0)
         .unwrap()
         .duration_trunc(Duration::days(1))?;
@@ -244,7 +276,7 @@ pub fn gen_mem(partitions: usize,
         for _day in 0..days {
             let mut event_time = cur_time;
             for event in 0..events {
-                builders[partition].b_project_id.append_value(1);
+                builders[partition].b_project_id.append_value(proj_id as i64);
                 builders[partition].b_user_id.append_value(user as i64);
                 builders[partition]
                     .b_created_at
@@ -295,9 +327,19 @@ pub fn gen_mem(partitions: usize,
     Ok(res)
 }
 
-pub fn gen(
-    db: &Arc<OptiDBImpl>,
-    proj_id: u64) -> Result<(), anyhow::Error> {
+pub async fn gen(args: &Test, proj_id: u64) -> Result<(), anyhow::Error> {
+    debug!("db path: {:?}", args.path);
+
+    fs::remove_dir_all(&args.path).unwrap();
+    let rocks = Arc::new(metadata::rocksdb::new(args.path.join("md"))?);
+    let md = Arc::new(MetadataProvider::try_new(rocks)?);
+    let db = Arc::new(OptiDBImpl::open(args.path.join("store"), Options {})?);
+
+
+    info!("starting sample data generation...");
+    let partitions = args.partitions.unwrap_or_else(num_cpus::get);
+    init(partitions, &md, &db, 1, proj_id)?;
+
     let now = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0)
         .unwrap()
         .duration_trunc(Duration::days(1))?;
@@ -313,7 +355,7 @@ pub fn gen(
             for event in 0..events {
                 vals.truncate(0);
                 vals.push(NamedValue::new("event_project_id".to_string(), Value::Int64(Some(proj_id as i64))));
-                vals.push(NamedValue::new("event_user_id".to_string(), Value::Int64(Some(user as i64+1))));
+                vals.push(NamedValue::new("event_user_id".to_string(), Value::Int64(Some(user as i64 + 1))));
                 vals.push(NamedValue::new("event_created_at".to_string(), Value::Int64(Some(event_time.timestamp_nanos()))));
                 vals.push(NamedValue::new("event_event".to_string(), Value::Int64(Some(1))));
                 vals.push(NamedValue::new("event_i_8".to_string(), Value::Int8(Some(event as i8))));
@@ -329,7 +371,7 @@ pub fn gen(
                 if user % 2 == 0 {
                     vals.push(NamedValue::new("event_v".to_string(), Value::Int64(Some(event))));
                 } else {
-                    vals.push(NamedValue::new("v".to_string(), Value::Int64(Some(event * 2))));
+                    vals.push(NamedValue::new("event_v".to_string(), Value::Int64(Some(event * 2))));
                 }
 
                 db.insert("events", vals.clone())?;
@@ -340,6 +382,53 @@ pub fn gen(
             cur_time = cur_time.add(Duration::days(1));
         }
     }
+    db.flush()?;
 
-    Ok(())
+    info!("successfully generated!");
+    let data_provider: Arc<dyn TableProvider> = Arc::new(LocalTable::try_new(db.clone(), "events".to_string())?);
+
+
+    let all_parquet_files: Vec<_> = ScanDir::files().walk(args.path.join("store/tables/events"), |iter| {
+        iter.filter(|&(_, ref name)| name.ends_with(".parquet"))
+            .map(|(ref entry, _)| entry.path())
+            .collect()
+    }).unwrap();
+
+    for ppath in all_parquet_files {
+        fs::copy(ppath.clone(), args.out_parquet.join(ppath.file_name().unwrap()))?;
+    }
+
+    let query_provider = Arc::new(ProviderImpl::try_new_from_provider(
+        md.clone(),
+        data_provider,
+    )?);
+
+    let auth_cfg = auth::Config {
+        access_token_duration: Duration::days(1),
+        access_token_key: "access".to_owned(),
+        refresh_token_duration: Duration::days(1),
+        refresh_token_key: "refresh".to_owned(),
+    };
+
+    let platform_provider = Arc::new(platform::PlatformProvider::new(
+        md.clone(),
+        query_provider,
+        auth_cfg.clone(),
+    ));
+
+    let mut router = Router::new();
+    router = platform::http::attach_routes(router, &md, &platform_provider, auth_cfg, None);
+    let server = Server::bind(&args.host).serve(router.into_make_service());
+    let graceful = server.with_graceful_shutdown(async {
+        let mut sig_int = tokio::signal::unix::signal(SignalKind::interrupt())
+            .expect("failed to install signal");
+        let mut sig_term = tokio::signal::unix::signal(SignalKind::terminate())
+            .expect("failed to install signal");
+        select! {
+                _=sig_int.recv()=>info!("SIGINT received"),
+                _=sig_term.recv()=>info!("SIGTERM received"),
+            }
+    });
+
+    Ok(graceful.await?)
 }

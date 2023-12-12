@@ -12,7 +12,7 @@ RUN rustup default nightly
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/home/root/app/target \
     --mount=type=ssh \
-    cargo build --bin demo --release
+    cargo build --cmd demo --release
 
 FROM debian:stable-slim AS runtime
 WORKDIR /app

@@ -95,7 +95,7 @@ impl TryFrom<DType> for datatypes::DataType {
                 DType::Decimal => DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
                 DType::Boolean => DataType::Boolean,
                 DType::Timestamp => DataType::Timestamp(TIME_UNIT, None),
-                _ => return Err(CommonError::General("Unsupported type".to_string()))
+                _ => return Err(CommonError::General("Unsupported type1".to_string()))
             }
         })
     }
@@ -113,6 +113,7 @@ impl TryFrom<DataType> for DType {
             DataType::Int64 => DType::Int64,
             DataType::Timestamp(_, _) => DType::Timestamp,
             DataType::Utf8 => DType::String,
+            DataType::Decimal128(_, _) => DType::Decimal,
             DataType::List(f) => match f.data_type() {
                 DataType::Boolean => DType::Boolean,
                 DataType::Int8 => DType::Int8,
@@ -121,9 +122,10 @@ impl TryFrom<DataType> for DType {
                 DataType::Int64 => DType::Int64,
                 DataType::Timestamp(_, _) => DType::Timestamp,
                 DataType::Utf8 => DType::String,
-                _ => return Err(CommonError::General("Unsupported type".to_string()))
+                DataType::Decimal128(_, _) => DType::Decimal,
+                _ => return Err(CommonError::General("Unsupported type2".to_string()))
             }
-            _ => return Err(CommonError::General("Unsupported type".to_string()))
+            _ => return Err(CommonError::General(format!("Unsupported type {:?}", dt)))
         })
     }
 }
@@ -149,7 +151,7 @@ impl TryFrom<DType> for DataType2 {
                 DType::Decimal => DataType2::Decimal(DECIMAL_PRECISION as usize, DECIMAL_SCALE as usize),
                 DType::Boolean => DataType2::Boolean,
                 DType::Timestamp => DataType2::Timestamp(arrow2::datatypes::TimeUnit::Nanosecond, None),
-                _ => return Err(CommonError::General("Unsupported type".to_string()))
+                _ => return Err(CommonError::General("Unsupported type4".to_string()))
             }
         })
     }
@@ -176,9 +178,9 @@ impl TryFrom<DataType2> for DType {
                 DataType2::Int64 => DType::Int64,
                 DataType2::Timestamp(_, _) => DType::Timestamp,
                 DataType2::Utf8 => DType::String,
-                _ => return Err(CommonError::General("Unsupported type".to_string()))
+                _ => return Err(CommonError::General("Unsupported type5".to_string()))
             }
-            _ => return Err(CommonError::General("Unsupported type".to_string()))
+            _ => return Err(CommonError::General("Unsupported type6".to_string()))
         })
     }
 }

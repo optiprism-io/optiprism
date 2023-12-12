@@ -61,103 +61,58 @@ pub struct Service {
     addr: SocketAddr,
 }
 
-impl Service {
-    pub fn new(
-        md: &Arc<MetadataProvider>,
-        platform: &Arc<PlatformProvider>,
-        auth_cfg: crate::auth::Config,
-        addr: SocketAddr,
-    ) -> Self {
-        let mut router = Router::new();
-
-        info!("attaching api routes...");
-        router = accounts::attach_routes(router);
-        router = auth::attach_routes(router);
-        router = events::attach_routes(router);
-        router = custom_events::attach_routes(router);
-        router = properties::attach_event_routes(router);
-        router = properties::attach_user_routes(router);
-        router = custom_properties::attach_routes(router);
-        router = queries::attach_routes(router);
-        router = dashboards::attach_routes(router);
-        router = reports::attach_routes(router);
-        router = event_records::attach_routes(router);
-        router = group_records::attach_routes(router);
-        // fixme get rid of cloning
-        router = router.clone().nest("/api/v1", router);
-        router = router
-            .layer(Extension(md.accounts.clone()))
-            .layer(Extension(platform.accounts.clone()))
-            .layer(Extension(platform.auth.clone()))
-            .layer(Extension(platform.events.clone()))
-            .layer(Extension(platform.custom_events.clone()))
-            .layer(Extension(platform.event_properties.clone()))
-            .layer(Extension(platform.user_properties.clone()))
-            .layer(Extension(platform.custom_properties.clone()))
-            .layer(Extension(auth_cfg))
-            .layer(Extension(platform.query.clone()))
-            .layer(Extension(platform.dashboards.clone()))
-            .layer(Extension(platform.reports.clone()))
-            .layer(Extension(platform.event_records.clone()))
-            .layer(Extension(platform.group_records.clone()));
-
-        router = router
-            .layer(CookieManagerLayer::new())
-            .layer(TraceLayer::new_for_http())
-            .layer(middleware::from_fn(print_request_response));
-
-        let cors = CorsLayer::new()
-            .allow_methods(Any)
-            .allow_origin(Any)
-            .allow_headers(Any);
-
-        router = router.layer(cors);
-
-        Self { router, addr }
-    }
-
-    pub fn set_ui(self, maybe_path: Option<PathBuf>) -> Self {
-        let path = if let Some(path) = maybe_path {
-            path
-        } else {
-            return self;
-        };
-
-        //        let error_handler = |error: io::Error| async move {
-        // (
-        // StatusCode::INTERNAL_SERVER_ERROR,
-        // format!("Unhandled internal error: {}", error),
-        // )
-        // };
-        let router = self.router;
+pub fn attach_routes(mut router: Router, md: &Arc<MetadataProvider>,
+                     platform: &Arc<PlatformProvider>,
+                     auth_cfg: crate::auth::Config, ui: Option<PathBuf>) -> Router {
+    info!("attaching platform routes...");
+    router = accounts::attach_routes(router);
+    router = auth::attach_routes(router);
+    router = events::attach_routes(router);
+    router = custom_events::attach_routes(router);
+    router = properties::attach_event_routes(router);
+    router = properties::attach_user_routes(router);
+    router = custom_properties::attach_routes(router);
+    router = queries::attach_routes(router);
+    router = dashboards::attach_routes(router);
+    router = reports::attach_routes(router);
+    router = event_records::attach_routes(router);
+    router = group_records::attach_routes(router);
+    if let Some(path) = ui {
         info!("attaching ui static files handler...");
-        let router = router.nest_service(
+        router = router.nest_service(
             "/assets",
             ServeDir::new(path.join("assets")).not_found_service(ServeFile::new("index.html")),
         );
-
-        Self {
-            router,
-            addr: self.addr,
-        }
     }
-    pub async fn serve(self) -> Result<()> {
-        let server = Server::bind(&self.addr).serve(self.router.into_make_service());
-        let graceful = server.with_graceful_shutdown(async {
-            let mut sig_int = tokio::signal::unix::signal(SignalKind::interrupt())
-                .expect("failed to install signal");
-            let mut sig_term = tokio::signal::unix::signal(SignalKind::terminate())
-                .expect("failed to install signal");
-            select! {
-                _=sig_int.recv()=>info!("SIGINT received"),
-                _=sig_term.recv()=>info!("SIGTERM received"),
-            }
-        });
+    // fixme get rid of cloning
+    router = router.clone().nest("/api/v1", router);
+    router = router
+        .layer(Extension(md.accounts.clone()))
+        .layer(Extension(platform.accounts.clone()))
+        .layer(Extension(platform.auth.clone()))
+        .layer(Extension(platform.events.clone()))
+        .layer(Extension(platform.custom_events.clone()))
+        .layer(Extension(platform.event_properties.clone()))
+        .layer(Extension(platform.user_properties.clone()))
+        .layer(Extension(platform.custom_properties.clone()))
+        .layer(Extension(auth_cfg))
+        .layer(Extension(platform.query.clone()))
+        .layer(Extension(platform.dashboards.clone()))
+        .layer(Extension(platform.reports.clone()))
+        .layer(Extension(platform.event_records.clone()))
+        .layer(Extension(platform.group_records.clone()));
 
-        Ok(graceful.await?)
-    }
+    router = router
+        .layer(CookieManagerLayer::new())
+        .layer(TraceLayer::new_for_http())
+        .layer(middleware::from_fn(print_request_response));
+
+    let cors = CorsLayer::new()
+        .allow_methods(Any)
+        .allow_origin(Any)
+        .allow_headers(Any);
+
+    router = router.layer(cors);
+
+    router
 }
-
-// async fn fallback(uri: Uri) -> impl IntoResponse {
-//     PlatformError::NotFound(format!("No route for {}", uri))
-// }
