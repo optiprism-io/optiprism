@@ -304,11 +304,6 @@ impl App {
     }
 }
 
-pub struct Service {
-    router: Router,
-    addr: SocketAddr,
-}
-
 pub fn attach_routes(router: Router, track_exec: Executor<crate::Track>,
                      identify_exec: Executor<crate::Identify>) -> Router {
     let app = App {

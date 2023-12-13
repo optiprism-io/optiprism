@@ -5,7 +5,7 @@ use arrow::datatypes::TimeUnit;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 use enum_iterator::all;
-use common::types::{COLUMN_EVENT, COLUMN_PROJECT_ID, COLUMN_CREATED_AT, COLUMN_USER_ID, DType};
+use common::types::{COLUMN_EVENT, COLUMN_PROJECT_ID, COLUMN_CREATED_AT, COLUMN_USER_ID, DType, COLUMN_EVENT_ID};
 use metadata::error::MetadataError;
 use metadata::properties::DictionaryType;
 use metadata::properties::Type;
@@ -60,6 +60,20 @@ pub fn create_properties(
             name: COLUMN_CREATED_AT.to_string(),
             typ: Type::Event,
             data_type: DType::Timestamp,
+            nullable: false,
+            dict: None,
+        },
+        &db,
+    )?;
+
+    create_property(
+        md,
+        org_id,
+        proj_id,
+        CreatePropertyMainRequest {
+            name: COLUMN_EVENT_ID.to_string(),
+            typ: Type::Event,
+            data_type: DType::Int64,
             nullable: false,
             dict: None,
         },

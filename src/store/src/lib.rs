@@ -54,6 +54,14 @@ impl NamedValue {
     pub fn new(name: String, value: Value) -> Self {
         Self { name, value }
     }
+
+    pub fn new_event(name: String, value: Value) -> Self {
+        Self { name: format!("event_{name}"), value }
+    }
+
+    pub fn new_user(name: String, value: Value) -> Self {
+        Self { name: format!("user_{name}"), value }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]

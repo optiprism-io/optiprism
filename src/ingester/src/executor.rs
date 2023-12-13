@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use chrono::Utc;
-use common::types::{DICT_USERS, DType};
+use common::types::{DICT_USERS, DType, TABLE_EVENTS, TABLE_USERS};
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 use futures::executor::block_on;
@@ -14,6 +14,8 @@ use metadata::properties;
 use metadata::properties::CreatePropertyRequest;
 use metadata::properties::DictionaryType;
 use metadata::properties::Status;
+use store::db::OptiDBImpl;
+use store::error::StoreError;
 
 use crate::error::IngesterError;
 use crate::error::Result;
@@ -29,6 +31,7 @@ use crate::Transformer;
 fn resolve_property(
     ctx: &RequestContext,
     properties: &Arc<dyn properties::Provider>,
+    db: &Arc<OptiDBImpl>,
     typ: properties::Type,
     name: String,
     val: &PropValue,
@@ -51,7 +54,7 @@ fn resolve_property(
         name: name.clone(),
         description: None,
         display_name: None,
-        typ,
+        typ:typ.clone(),
         data_type,
         status: Status::Enabled,
         is_system: false,
@@ -61,8 +64,21 @@ fn resolve_property(
         dictionary_type,
     };
 
-    let prop =
+    let (prop, created) =
         properties.get_or_create(ctx.organization_id.unwrap(), ctx.project_id.unwrap(), req)?;
+    if created {
+        let tbl = if typ == properties::Type::Event {
+            TABLE_EVENTS
+        } else {
+            TABLE_USERS
+        };
+
+        match db.add_field(tbl, prop.column_name().as_str(), prop.data_type.clone(), true) {
+            Ok(_) => {}
+            Err(StoreError::AlreadyExists(d)) => {}
+            Err(err) => return Err(err.into()),
+        }
+    }
     Ok(PropertyAndValue {
         property: prop,
         value: val.to_owned().into(),
@@ -72,12 +88,13 @@ fn resolve_property(
 fn resolve_properties(
     ctx: &RequestContext,
     properties: &Arc<dyn properties::Provider>,
+    db: &Arc<OptiDBImpl>,
     typ: properties::Type,
     props: &HashMap<String, PropValue>,
 ) -> Result<Vec<PropertyAndValue>> {
     let resolved_props = props
         .iter()
-        .map(|(k, v)| resolve_property(&ctx, properties, typ.clone(), k.to_owned(), v))
+        .map(|(k, v)| resolve_property(&ctx, properties, db, typ.clone(), k.to_owned(), v))
         .collect::<Result<Vec<PropertyAndValue>>>()?;
     Ok(resolved_props)
 }
@@ -85,6 +102,7 @@ fn resolve_properties(
 pub struct Executor<T> {
     transformers: Vec<Arc<dyn Transformer<T>>>,
     destinations: Vec<Arc<dyn Destination<T>>>,
+    db: Arc<OptiDBImpl>,
     event_properties: Arc<dyn properties::Provider>,
     user_properties: Arc<dyn properties::Provider>,
     events: Arc<dyn events::Provider>,
@@ -96,6 +114,7 @@ impl Executor<Track> {
     pub fn new(
         transformers: Vec<Arc<dyn Transformer<Track>>>,
         destinations: Vec<Arc<dyn Destination<Track>>>,
+        db: Arc<OptiDBImpl>,
         event_properties: Arc<dyn properties::Provider>,
         user_properties: Arc<dyn properties::Provider>,
         events: Arc<dyn events::Provider>,
@@ -105,6 +124,7 @@ impl Executor<Track> {
         Self {
             transformers,
             destinations,
+            db,
             event_properties,
             user_properties,
             events,
@@ -144,6 +164,7 @@ impl Executor<Track> {
             req.resolved_properties = Some(resolve_properties(
                 &ctx,
                 &self.event_properties,
+                &self.db,
                 properties::Type::Event,
                 props,
             )?);
@@ -153,6 +174,7 @@ impl Executor<Track> {
             req.resolved_user_properties = Some(resolve_properties(
                 &ctx,
                 &self.user_properties,
+                &self.db,
                 properties::Type::Event,
                 props,
             )?);
@@ -205,6 +227,7 @@ impl Executor<Identify> {
     pub fn new(
         transformers: Vec<Arc<dyn Transformer<Identify>>>,
         destinations: Vec<Arc<dyn Destination<Identify>>>,
+        db: Arc<OptiDBImpl>,
         event_properties: Arc<dyn properties::Provider>,
         user_properties: Arc<dyn properties::Provider>,
         events: Arc<dyn events::Provider>,
@@ -214,6 +237,7 @@ impl Executor<Identify> {
         Self {
             transformers,
             destinations,
+            db,
             event_properties,
             user_properties,
             events,

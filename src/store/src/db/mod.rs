@@ -1196,7 +1196,7 @@ impl OptiDBImpl {
         let mut metadata = tbl.metadata.lock();
         for f in &metadata.schema.fields {
             if f.name == field_name {
-                return Err(StoreError::Internal(format!(
+                return Err(StoreError::AlreadyExists(format!(
                     "Field with name {} already exists",
                     field_name
                 )));

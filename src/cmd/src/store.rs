@@ -136,6 +136,7 @@ pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
             Err(err) => md.projects.get_by_id(1, 1)?,
         };
 
+        info!("token: {}",proj1.token);
         let _user = match md.accounts.create(CreateAccountRequest {
             created_by: Some(admin.id),
             password_hash: make_password_hash("test")?,
@@ -210,13 +211,6 @@ pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
         data_provider,
     )?);
 
-    let auth_cfg = auth::Config {
-        access_token_duration: Duration::days(1),
-        access_token_key: "access".to_owned(),
-        refresh_token_duration: Duration::days(1),
-        refresh_token_key: "refresh".to_owned(),
-    };
-
     let mut track_transformers = Vec::new();
     let ua_parser = UserAgentParser::from_file(File::open(args.ua_db_path.clone())?)
         .map_err(|e| Error::Internal(e.to_string()))?;
@@ -239,6 +233,7 @@ pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
     let track_exec = Executor::<Track>::new(
         track_transformers.clone(),
         track_destinations.clone(),
+        db.clone(),
         md.event_properties.clone(),
         md.user_properties.clone(),
         md.events.clone(),
@@ -263,6 +258,7 @@ pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
     let identify_exec = Executor::<Identify>::new(
         identify_transformers,
         identify_destinations,
+        db.clone(),
         md.event_properties.clone(),
         md.user_properties.clone(),
         md.events.clone(),
@@ -270,6 +266,12 @@ pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
         md.dictionaries.clone(),
     );
 
+    let auth_cfg = auth::Config {
+        access_token_duration: Duration::days(1),
+        access_token_key: "access".to_owned(),
+        refresh_token_duration: Duration::days(1),
+        refresh_token_key: "refresh".to_owned(),
+    };
     let platform_provider = Arc::new(platform::PlatformProvider::new(
         md.clone(),
         query_provider,
@@ -280,7 +282,7 @@ pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
     router = platform::http::attach_routes(router, &md, &platform_provider, auth_cfg, None);
     router = ingester::sources::http::attach_routes(router, track_exec, identify_exec);
 
-    let server = Server::bind(&args.host).serve(router.into_make_service());
+    let server = Server::bind(&args.host).serve(router.into_make_service_with_connect_info::<SocketAddr>());
     info!("start listening on {}", args.host);
     let graceful = server.with_graceful_shutdown(async {
         let mut sig_int = tokio::signal::unix::signal(SignalKind::interrupt())
@@ -426,11 +428,13 @@ pub fn gen<R>(
         }
     });
 
+    let mut idx = 0;
     while let Some(event) = tx.recv()? {
         let mut vals = vec![];
         vals.push(NamedValue::new("event_project_id".to_string(), Value::Int64(Some(cfg.project_id as i64))));
         vals.push(NamedValue::new("event_user_id".to_string(), Value::Int64(Some(event.user_id))));
         vals.push(NamedValue::new("event_created_at".to_string(), Value::Int64(Some(event.created_at))));
+        vals.push(NamedValue::new("event_event_id".to_string(), Value::Int64(Some(idx))));
         vals.push(NamedValue::new("event_event".to_string(), Value::Int64(Some(event.event))));
         vals.push(NamedValue::new("event_product_name".to_string(), Value::Int16(event.product_name)));
         vals.push(NamedValue::new("event_product_category".to_string(), Value::Int16(event.product_category)));
@@ -450,6 +454,7 @@ pub fn gen<R>(
         vals.push(NamedValue::new("user_os".to_string(), Value::Int16(event.os)));
         vals.push(NamedValue::new("user_os_version".to_string(), Value::Int16(event.os_version)));
         db.insert("events", vals)?;
+        idx += 1;
     }
 
     Ok(())

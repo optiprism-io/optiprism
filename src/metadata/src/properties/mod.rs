@@ -29,7 +29,7 @@ pub trait Provider: Sync + Send {
         organization_id: u64,
         project_id: u64,
         req: CreatePropertyRequest,
-    ) -> Result<Property>;
+    ) -> Result<(Property, bool)>;
     fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Property>;
     fn get_by_name(&self, organization_id: u64, project_id: u64, name: &str) -> Result<Property>;
     fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Property>>;

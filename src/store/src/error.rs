@@ -11,6 +11,8 @@ pub type Result<T> = result::Result<T, StoreError>;
 pub enum StoreError {
     #[error("internal {0:?}")]
     Internal(String),
+    #[error("already exists {0:?}")]
+    AlreadyExists(String),
     #[error("invalid parameter {0:?}")]
     InvalidParameter(String),
     #[error("not yet supported {0:?}")]

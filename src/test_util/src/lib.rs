@@ -82,7 +82,7 @@ pub fn create_property(
     } else {
         main_req.data_type
     };
-    db.add_field("events", prop.column_name().as_str(), t, main_req.nullable)?;
+    db.add_field("events", prop.0.column_name().as_str(), t, main_req.nullable)?;
 
-    Ok(prop)
+    Ok(prop.0)
 }

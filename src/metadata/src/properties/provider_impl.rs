@@ -45,7 +45,7 @@ fn index_keys(
         index_name_key(organization_id, project_id, typ, name),
         index_display_name_key(organization_id, project_id, typ, display_name),
     ]
-    .to_vec()
+        .to_vec()
 }
 
 fn index_name_key(
@@ -60,7 +60,7 @@ fn index_name_key(
             IDX_NAME,
             name,
         )
-        .to_vec(),
+            .to_vec(),
     )
 }
 
@@ -76,7 +76,7 @@ fn index_display_name_key(
             IDX_DISPLAY_NAME,
             v.as_str(),
         )
-        .to_vec()
+            .to_vec()
     })
 }
 
@@ -216,18 +216,18 @@ impl Provider for ProviderImpl {
         organization_id: u64,
         project_id: u64,
         req: CreatePropertyRequest,
-    ) -> Result<Property> {
+    ) -> Result<(Property, bool)> {
         let tx = self.db.transaction();
         match self._get_by_name(&tx, organization_id, project_id, req.name.as_str()) {
-            Ok(event) => return Ok(event),
+            Ok(event) => return Ok((event, false)),
             Err(MetadataError::NotFound(_)) => {}
-            other => return other,
+            Err(err) => return Err(err),
         }
         let ret = self._create(&tx, organization_id, project_id, req)?;
 
         tx.commit()?;
 
-        Ok(ret)
+        Ok((ret, true))
     }
 
     fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Property> {
@@ -359,7 +359,7 @@ impl Provider for ProviderImpl {
                 &prop.name,
                 prop.display_name.clone(),
             )
-            .as_ref(),
+                .as_ref(),
         )?;
         tx.commit()?;
         Ok(prop)
