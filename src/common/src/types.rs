@@ -23,6 +23,18 @@ pub const COLUMN_CREATED_AT: &str = "created_at";
 pub const COLUMN_EVENT_ID: &str = "event_id";
 pub const COLUMN_EVENT: &str = "event";
 
+pub const EVENT_PROPERTY_A_NAME: &str = "A Name";
+pub const EVENT_PROPERTY_A_HREF: &str = "A Href";
+pub const EVENT_PROPERTY_A_ID: &str = "A ID";
+pub const EVENT_PROPERTY_A_CLASS: &str = "A Class";
+pub const EVENT_PROPERTY_A_STYLE: &str = "A Style";
+
+pub const EVENT_PROPERTY_PAGE_PATH: &str = "Page Path";
+pub const EVENT_PROPERTY_PAGE_REFERER: &str = "Page Referer";
+pub const EVENT_PROPERTY_PAGE_SEARCH: &str = "Page Search";
+pub const EVENT_PROPERTY_PAGE_TITLE: &str = "Page Title";
+pub const EVENT_PROPERTY_PAGE_URL: &str = "Page URL";
+
 pub const USER_PROPERTY_CLIENT_FAMILY: &str = "Client Family";
 pub const USER_PROPERTY_CLIENT_VERSION_MINOR: &str = "Client Version Minor";
 pub const USER_PROPERTY_CLIENT_VERSION_MAJOR: &str = "Client Version Major";

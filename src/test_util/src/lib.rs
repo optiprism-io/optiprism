@@ -49,7 +49,6 @@ pub fn create_property(
     org_id: u64,
     proj_id: u64,
     main_req: CreatePropertyMainRequest,
-    db: &Arc<OptiDBImpl>,
 ) -> anyhow::Result<Property> {
     let req = CreatePropertyRequest {
         created_by: 0,
@@ -82,7 +81,6 @@ pub fn create_property(
     } else {
         main_req.data_type
     };
-    db.add_field("events", prop.0.column_name().as_str(), t, main_req.nullable)?;
 
     Ok(prop.0)
 }

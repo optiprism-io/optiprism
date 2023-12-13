@@ -5,9 +5,10 @@ use async_trait::async_trait;
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::Utc;
-use common::types::OptionalProperty;
+use common::types::{OptionalProperty, TABLE_EVENTS};
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
+use store::db::OptiDBImpl;
 
 use crate::error;
 use crate::error::MetadataError;
@@ -82,20 +83,23 @@ fn index_display_name_key(
 
 pub struct ProviderImpl {
     db: Arc<TransactionDB>,
+    optiDb: Arc<OptiDBImpl>,
     typ: Type,
 }
 
 impl ProviderImpl {
-    pub fn new_user(db: Arc<TransactionDB>) -> Self {
+    pub fn new_user(db: Arc<TransactionDB>, optiDb: Arc<OptiDBImpl>) -> Self {
         ProviderImpl {
             db,
+            optiDb,
             typ: Type::User,
         }
     }
 
-    pub fn new_event(db: Arc<TransactionDB>) -> Self {
+    pub fn new_event(db: Arc<TransactionDB>, optiDb: Arc<OptiDBImpl>) -> Self {
         ProviderImpl {
             db,
+            optiDb,
             typ: Type::Event,
         }
     }
@@ -174,7 +178,7 @@ impl ProviderImpl {
             description: req.description,
             display_name: req.display_name,
             typ: req.typ,
-            data_type: req.data_type,
+            data_type: req.data_type.clone(),
             status: req.status,
             nullable: req.nullable,
             is_array: req.is_array,
@@ -192,7 +196,10 @@ impl ProviderImpl {
             &data,
         )?;
 
+
         insert_index(&tx, idx_keys.as_ref(), &data)?;
+
+        self.optiDb.add_field(TABLE_EVENTS, prop.column_name().as_str(), req.data_type, req.nullable)?;
         Ok(prop)
     }
 }
@@ -216,10 +223,10 @@ impl Provider for ProviderImpl {
         organization_id: u64,
         project_id: u64,
         req: CreatePropertyRequest,
-    ) -> Result<(Property, bool)> {
+    ) -> Result<Property> {
         let tx = self.db.transaction();
         match self._get_by_name(&tx, organization_id, project_id, req.name.as_str()) {
-            Ok(event) => return Ok((event, false)),
+            Ok(event) => return Ok(event),
             Err(MetadataError::NotFound(_)) => {}
             Err(err) => return Err(err),
         }
@@ -227,7 +234,7 @@ impl Provider for ProviderImpl {
 
         tx.commit()?;
 
-        Ok((ret, true))
+        Ok(ret)
     }
 
     fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Property> {

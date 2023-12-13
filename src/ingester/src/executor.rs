@@ -64,21 +64,9 @@ fn resolve_property(
         dictionary_type,
     };
 
-    let (prop, created) =
+    let prop =
         properties.get_or_create(ctx.organization_id.unwrap(), ctx.project_id.unwrap(), req)?;
-    if created {
-        let tbl = if typ == properties::Type::Event {
-            TABLE_EVENTS
-        } else {
-            TABLE_USERS
-        };
 
-        match db.add_field(tbl, prop.column_name().as_str(), prop.data_type.clone(), true) {
-            Ok(_) => {}
-            Err(StoreError::AlreadyExists(d)) => {}
-            Err(err) => return Err(err.into()),
-        }
-    }
     Ok(PropertyAndValue {
         property: prop,
         value: val.to_owned().into(),

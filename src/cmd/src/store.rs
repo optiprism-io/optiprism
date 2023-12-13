@@ -48,6 +48,7 @@ use store::db::{OptiDBImpl, Options, TableOptions};
 use store::{NamedValue, Value};
 use test_util::{create_property, CreatePropertyMainRequest};
 use crate::error::Error;
+use crate::init_project;
 
 #[derive(Parser, Clone)]
 pub struct Shop {
@@ -87,6 +88,56 @@ pub struct Config<R> {
     pub partitions: usize,
 }
 
+fn init_org_structure(md: &Arc<MetadataProvider>) -> Result<(u64, u64)> {
+    let admin = match md.accounts.create(CreateAccountRequest {
+        created_by: None,
+        password_hash: make_password_hash("admin")?,
+        email: "admin@email.com".to_string(),
+        first_name: Some("admin".to_string()),
+        last_name: None,
+        role: Some(Role::Admin),
+        organizations: None,
+        projects: None,
+        teams: None,
+    }) {
+        Ok(acc) => acc,
+        Err(err) => md.accounts.get_by_email("admin@email.com")?,
+    };
+    let org = match md.organizations.create(CreateOrganizationRequest {
+        created_by: admin.id,
+        name: "Test Organization".to_string(),
+    }) {
+        Ok(org) => org,
+        Err(err) => md.organizations.get_by_id(1)?,
+    };
+
+    let proj = match md.projects.create(org.id, CreateProjectRequest {
+        created_by: admin.id,
+        name: "Test Project".to_string(),
+    }) {
+        Ok(proj) => proj,
+        Err(err) => md.projects.get_by_id(1, 1)?,
+    };
+
+    info!("token: {}",proj.token);
+    let _user = match md.accounts.create(CreateAccountRequest {
+        created_by: Some(admin.id),
+        password_hash: make_password_hash("test")?,
+        email: "user@test.com".to_string(),
+        first_name: Some("user".to_string()),
+        last_name: None,
+        role: None,
+        organizations: Some(vec![(org.id, OrganizationRole::Member)]),
+        projects: Some(vec![(proj.id, ProjectRole::Reader)]),
+        teams: None,
+    }) {
+        Ok(acc) => acc,
+        Err(err) => md.accounts.get_by_email("user@test.com")?,
+    };
+
+    Ok((org.id, proj.id))
+}
+
 pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
     debug!("db path: {:?}", args.path);
 
@@ -105,53 +156,9 @@ pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
     }
 
     info!("creating org structure and admin account...");
-    {
-        let admin = match md.accounts.create(CreateAccountRequest {
-            created_by: None,
-            password_hash: make_password_hash("admin")?,
-            email: "admin@email.com".to_string(),
-            first_name: Some("admin".to_string()),
-            last_name: None,
-            role: Some(Role::Admin),
-            organizations: None,
-            projects: None,
-            teams: None,
-        }) {
-            Ok(acc) => acc,
-            Err(err) => md.accounts.get_by_email("admin@email.com")?,
-        };
-        let org = match md.organizations.create(CreateOrganizationRequest {
-            created_by: admin.id,
-            name: "Test Organization".to_string(),
-        }) {
-            Ok(org) => org,
-            Err(err) => md.organizations.get_by_id(1)?,
-        };
 
-        let proj1 = match md.projects.create(org.id, CreateProjectRequest {
-            created_by: admin.id,
-            name: "Test Project".to_string(),
-        }) {
-            Ok(proj) => proj,
-            Err(err) => md.projects.get_by_id(1, 1)?,
-        };
-
-        info!("token: {}",proj1.token);
-        let _user = match md.accounts.create(CreateAccountRequest {
-            created_by: Some(admin.id),
-            password_hash: make_password_hash("test")?,
-            email: "user@test.com".to_string(),
-            first_name: Some("user".to_string()),
-            last_name: None,
-            role: None,
-            organizations: Some(vec![(org.id, OrganizationRole::Member)]),
-            projects: Some(vec![(proj1.id, ProjectRole::Reader)]),
-            teams: None,
-        }) {
-            Ok(acc) => acc,
-            Err(err) => md.accounts.get_by_email("user@test.com")?,
-        };
-    }
+    let (org_id, proj_id) = init_org_structure(&md)?;
+    init_project(org_id, proj_id, &md)?;
 
     let to_date = match &args.to_date {
         None => Utc::now(),
@@ -205,11 +212,24 @@ pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
 
     info!("successfully generated!");
     let data_provider: Arc<dyn TableProvider> = Arc::new(LocalTable::try_new(db.clone(), "events".to_string())?);
-
     let query_provider = Arc::new(ProviderImpl::try_new_from_provider(
         md.clone(),
         data_provider,
     )?);
+
+    let auth_cfg = auth::Config {
+        access_token_duration: Duration::days(1),
+        access_token_key: "access".to_owned(),
+        refresh_token_duration: Duration::days(1),
+        refresh_token_key: "refresh".to_owned(),
+    };
+
+    let platform_provider = Arc::new(platform::PlatformProvider::new(
+        md.clone(),
+        query_provider,
+        auth_cfg.clone(),
+    ));
+
 
     let mut track_transformers = Vec::new();
     let ua_parser = UserAgentParser::from_file(File::open(args.ua_db_path.clone())?)
@@ -266,18 +286,6 @@ pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
         md.dictionaries.clone(),
     );
 
-    let auth_cfg = auth::Config {
-        access_token_duration: Duration::days(1),
-        access_token_key: "access".to_owned(),
-        refresh_token_duration: Duration::days(1),
-        refresh_token_key: "refresh".to_owned(),
-    };
-    let platform_provider = Arc::new(platform::PlatformProvider::new(
-        md.clone(),
-        query_provider,
-        auth_cfg.clone(),
-    ));
-
     let mut router = Router::new();
     router = platform::http::attach_routes(router, &md, &platform_provider, auth_cfg, None);
     router = ingester::sources::http::attach_routes(router, track_exec, identify_exec);
@@ -329,35 +337,6 @@ pub fn gen<R>(
     db.create_table("events", topts)?;
     info!("creating properties...");
     create_properties(cfg.org_id, cfg.project_id, md, db)?;
-
-    let props = vec![
-        USER_PROPERTY_CLIENT_FAMILY,
-        USER_PROPERTY_CLIENT_VERSION_MINOR,
-        USER_PROPERTY_CLIENT_VERSION_MAJOR,
-        USER_PROPERTY_CLIENT_VERSION_PATCH,
-        USER_PROPERTY_DEVICE_FAMILY,
-        USER_PROPERTY_DEVICE_BRAND,
-        USER_PROPERTY_DEVICE_MODEL,
-        USER_PROPERTY_OS_FAMILY,
-        USER_PROPERTY_OS_VERSION_MAJOR,
-        USER_PROPERTY_OS_VERSION_MINOR,
-        USER_PROPERTY_OS_VERSION_PATCH,
-        USER_PROPERTY_OS_VERSION_PATCH_MINOR,
-    ];
-    for prop in props {
-        create_property(
-            md,
-            cfg.org_id, cfg.project_id,
-            CreatePropertyMainRequest {
-                name: prop.to_string(),
-                typ: Type::User,
-                data_type: DType::String,
-                nullable: true,
-                dict: Some(DictionaryType::Int64),
-            },
-            &db,
-        )?;
-    }
 
     info!("loading profiles...");
     let profiles = ProfileProvider::try_new_from_csv(
