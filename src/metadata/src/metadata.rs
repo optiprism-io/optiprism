@@ -3,6 +3,7 @@ use std::sync::Arc;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
+use store::db::OptiDBImpl;
 
 use crate::accounts;
 use crate::custom_events;
@@ -32,15 +33,15 @@ pub struct MetadataProvider {
 }
 
 impl MetadataProvider {
-    pub fn try_new(db: Arc<TransactionDB>) -> Result<Self> {
+    pub fn try_new(db: Arc<TransactionDB>,optiDb:Arc<OptiDBImpl>) -> Result<Self> {
         let events = Arc::new(events::ProviderImpl::new(db.clone()));
         Ok(MetadataProvider {
             dashboards: Arc::new(dashboards::ProviderImpl::new(db.clone())),
             reports: Arc::new(reports::ProviderImpl::new(db.clone())),
             events: events.clone(),
             custom_events: Arc::new(custom_events::ProviderImpl::new(db.clone(), events)),
-            event_properties: Arc::new(properties::ProviderImpl::new_event(db.clone())),
-            user_properties: Arc::new(properties::ProviderImpl::new_user(db.clone())),
+            event_properties: Arc::new(properties::ProviderImpl::new_event(db.clone(),optiDb.clone())),
+            user_properties: Arc::new(properties::ProviderImpl::new_user(db.clone(),optiDb.clone())),
             custom_properties: Arc::new(custom_properties::ProviderImpl::new(db.clone())),
             organizations: Arc::new(organizations::ProviderImpl::new(db.clone())),
             projects: Arc::new(projects::ProviderImpl::new(db.clone())),

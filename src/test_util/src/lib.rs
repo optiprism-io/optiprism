@@ -82,5 +82,5 @@ pub fn create_property(
         main_req.data_type
     };
 
-    Ok(prop.0)
+    Ok(prop)
 }

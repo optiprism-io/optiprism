@@ -20,6 +20,8 @@ pub enum MetadataError {
     BadRequest(String),
     #[error("internal: {0:?}")]
     Internal(String),
+    #[error("store {0:?}")]
+    Store(#[from] store::error::StoreError),
     #[error("rocksdb: {0:?}")]
     RocksDb(#[from] rocksdb::Error),
     #[error("from utf {0:?}")]

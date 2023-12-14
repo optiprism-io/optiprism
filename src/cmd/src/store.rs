@@ -88,129 +88,7 @@ pub struct Config<R> {
     pub partitions: usize,
 }
 
-fn init_org_structure(md: &Arc<MetadataProvider>) -> Result<(u64, u64)> {
-    let admin = match md.accounts.create(CreateAccountRequest {
-        created_by: None,
-        password_hash: make_password_hash("admin")?,
-        email: "admin@email.com".to_string(),
-        first_name: Some("admin".to_string()),
-        last_name: None,
-        role: Some(Role::Admin),
-        organizations: None,
-        projects: None,
-        teams: None,
-    }) {
-        Ok(acc) => acc,
-        Err(err) => md.accounts.get_by_email("admin@email.com")?,
-    };
-    let org = match md.organizations.create(CreateOrganizationRequest {
-        created_by: admin.id,
-        name: "Test Organization".to_string(),
-    }) {
-        Ok(org) => org,
-        Err(err) => md.organizations.get_by_id(1)?,
-    };
-
-    let proj = match md.projects.create(org.id, CreateProjectRequest {
-        created_by: admin.id,
-        name: "Test Project".to_string(),
-    }) {
-        Ok(proj) => proj,
-        Err(err) => md.projects.get_by_id(1, 1)?,
-    };
-
-    info!("token: {}",proj.token);
-    let _user = match md.accounts.create(CreateAccountRequest {
-        created_by: Some(admin.id),
-        password_hash: make_password_hash("test")?,
-        email: "user@test.com".to_string(),
-        first_name: Some("user".to_string()),
-        last_name: None,
-        role: None,
-        organizations: Some(vec![(org.id, OrganizationRole::Member)]),
-        projects: Some(vec![(proj.id, ProjectRole::Reader)]),
-        teams: None,
-    }) {
-        Ok(acc) => acc,
-        Err(err) => md.accounts.get_by_email("user@test.com")?,
-    };
-
-    Ok((org.id, proj.id))
-}
-
-pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
-    debug!("db path: {:?}", args.path);
-
-    fs::remove_dir_all(&args.path).unwrap();
-    let rocks = Arc::new(metadata::rocksdb::new(args.path.join("md"))?);
-    let md = Arc::new(MetadataProvider::try_new(rocks)?);
-    let db = Arc::new(OptiDBImpl::open(args.path.join("store"), Options {})?);
-
-    if let Some(ui_path) = &args.ui_path {
-        if !ui_path.try_exists()? {
-            return Err(
-                Error::FileNotFound(format!("ui path {ui_path:?} doesn't exist")).into(),
-            );
-        }
-        debug!("ui path: {:?}", ui_path);
-    }
-
-    info!("creating org structure and admin account...");
-
-    let (org_id, proj_id) = init_org_structure(&md)?;
-    init_project(org_id, proj_id, &md)?;
-
-    let to_date = match &args.to_date {
-        None => Utc::now(),
-        Some(dt) => dt.parse::<DateTimeUtc>()?.0.with_timezone(&Utc),
-    };
-
-    let duration = Duration::from_std(parse_duration::parse(
-        args.duration.clone().unwrap().as_str(),
-    )?)?;
-    let from_date = to_date - duration;
-
-    if !args.demo_data_path.try_exists()? {
-        return Err(Error::FileNotFound(format!(
-            "demo data path {:?} doesn't exist",
-            args.demo_data_path
-        ))
-            .into());
-    }
-    info!("store initialization...");
-    debug!("demo data path: {:?}", args.demo_data_path);
-    debug!("from date {}", from_date);
-    let date_diff = to_date - from_date;
-    debug!("to date {}", to_date);
-    debug!(
-        "time range: {}",
-        humantime::format_duration(date_diff.to_std()?)
-    );
-    debug!("new daily users: {}", args.new_daily_users);
-    let total_users = args.new_daily_users as i64 * date_diff.num_days();
-    info!("expecting total unique users: {total_users}");
-    info!("starting sample data generation...");
-
-    let store_cfg = Config {
-        org_id: 1,
-        project_id: proj_id,
-        from_date,
-        to_date,
-        products_rdr: File::open(args.demo_data_path.join("products.csv"))
-            .map_err(|err| Error::Internal(format!("can't open products.csv: {err}")))?,
-        geo_rdr: File::open(args.demo_data_path.join("geo.csv"))
-            .map_err(|err| Error::Internal(format!("can't open geo.csv: {err}")))?,
-        device_rdr: File::open(args.demo_data_path.join("device.csv"))
-            .map_err(|err| Error::Internal(format!("can't open device.csv: {err}")))?,
-        new_daily_users: args.new_daily_users,
-        batch_size: 4096,
-        partitions: args.partitions.unwrap_or_else(num_cpus::get),
-    };
-
-    gen(&md, &db, store_cfg)?;
-    db.flush()?;
-
-    info!("successfully generated!");
+fn init_platform(md: &Arc<MetadataProvider>, db: &Arc<OptiDBImpl>, router: Router) -> Result<Router> {
     let data_provider: Arc<dyn TableProvider> = Arc::new(LocalTable::try_new(db.clone(), "events".to_string())?);
     let query_provider = Arc::new(ProviderImpl::try_new_from_provider(
         md.clone(),
@@ -230,7 +108,10 @@ pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
         auth_cfg.clone(),
     ));
 
+    Ok(platform::http::attach_routes(router, &md, &platform_provider, auth_cfg, None))
+}
 
+fn init_ingester(args: &Shop, md: &Arc<MetadataProvider>, db: &Arc<OptiDBImpl>, router: Router) -> Result<Router> {
     let mut track_transformers = Vec::new();
     let ua_parser = UserAgentParser::from_file(File::open(args.ua_db_path.clone())?)
         .map_err(|e| Error::Internal(e.to_string()))?;
@@ -286,9 +167,139 @@ pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
         md.dictionaries.clone(),
     );
 
+    Ok(ingester::sources::http::attach_routes(router, track_exec, identify_exec))
+}
+
+fn init_org_structure(md: &Arc<MetadataProvider>) -> Result<(u64, u64)> {
+    let admin = match md.accounts.create(CreateAccountRequest {
+        created_by: None,
+        password_hash: make_password_hash("admin")?,
+        email: "admin@email.com".to_string(),
+        first_name: Some("admin".to_string()),
+        last_name: None,
+        role: Some(Role::Admin),
+        organizations: None,
+        projects: None,
+        teams: None,
+    }) {
+        Ok(acc) => acc,
+        Err(err) => md.accounts.get_by_email("admin@email.com")?,
+    };
+    let org = match md.organizations.create(CreateOrganizationRequest {
+        created_by: admin.id,
+        name: "Test Organization".to_string(),
+    }) {
+        Ok(org) => org,
+        Err(err) => md.organizations.get_by_id(1)?,
+    };
+
+    let proj = match md.projects.create(org.id, CreateProjectRequest {
+        created_by: admin.id,
+        name: "Test Project".to_string(),
+    }) {
+        Ok(proj) => proj,
+        Err(err) => md.projects.get_by_id(1, 1)?,
+    };
+
+    info!("token: {}",proj.token);
+    let _user = match md.accounts.create(CreateAccountRequest {
+        created_by: Some(admin.id),
+        password_hash: make_password_hash("test")?,
+        email: "user@test.com".to_string(),
+        first_name: Some("user".to_string()),
+        last_name: None,
+        role: None,
+        organizations: Some(vec![(org.id, OrganizationRole::Member)]),
+        projects: Some(vec![(proj.id, ProjectRole::Reader)]),
+        teams: None,
+    }) {
+        Ok(acc) => acc,
+        Err(err) => md.accounts.get_by_email("user@test.com")?,
+    };
+
+    Ok((org.id, proj.id))
+}
+
+pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
+    debug!("db path: {:?}", args.path);
+
+    fs::remove_dir_all(&args.path).unwrap();
+    let rocks = Arc::new(metadata::rocksdb::new(args.path.join("md"))?);
+    let db = Arc::new(OptiDBImpl::open(args.path.join("store"), Options {})?);
+    let md = Arc::new(MetadataProvider::try_new(rocks,db.clone())?);
+
+    if let Some(ui_path) = &args.ui_path {
+        if !ui_path.try_exists()? {
+            return Err(
+                Error::FileNotFound(format!("ui path {ui_path:?} doesn't exist")).into(),
+            );
+        }
+        debug!("ui path: {:?}", ui_path);
+    }
+
+    if !args.demo_data_path.try_exists()? {
+        return Err(Error::FileNotFound(format!(
+            "demo data path {:?} doesn't exist",
+            args.demo_data_path
+        ))
+            .into());
+    }
+
+    let to_date = match &args.to_date {
+        None => Utc::now(),
+        Some(dt) => dt.parse::<DateTimeUtc>()?.0.with_timezone(&Utc),
+    };
+
+    let duration = Duration::from_std(parse_duration::parse(
+        args.duration.clone().unwrap().as_str(),
+    )?)?;
+    let from_date = to_date - duration;
+
+    info!("creating org structure and admin account...");
+    let (org_id, proj_id) = init_org_structure(&md)?;
+    info!("project initialization...");
+    init_project(org_id, proj_id, &md)?;
+
+    info!("store initialization...");
+    debug!("demo data path: {:?}", args.demo_data_path);
+    debug!("from date {}", from_date);
+    let date_diff = to_date - from_date;
+    debug!("to date {}", to_date);
+    debug!(
+        "time range: {}",
+        humantime::format_duration(date_diff.to_std()?)
+    );
+    debug!("new daily users: {}", args.new_daily_users);
+    let total_users = args.new_daily_users as i64 * date_diff.num_days();
+    info!("expecting total unique users: {total_users}");
+    info!("starting sample data generation...");
+
+    let store_cfg = Config {
+        org_id: 1,
+        project_id: proj_id,
+        from_date,
+        to_date,
+        products_rdr: File::open(args.demo_data_path.join("products.csv"))
+            .map_err(|err| Error::Internal(format!("can't open products.csv: {err}")))?,
+        geo_rdr: File::open(args.demo_data_path.join("geo.csv"))
+            .map_err(|err| Error::Internal(format!("can't open geo.csv: {err}")))?,
+        device_rdr: File::open(args.demo_data_path.join("device.csv"))
+            .map_err(|err| Error::Internal(format!("can't open device.csv: {err}")))?,
+        new_daily_users: args.new_daily_users,
+        batch_size: 4096,
+        partitions: args.partitions.unwrap_or_else(num_cpus::get),
+    };
+
+    gen(&md, &db, store_cfg)?;
+    db.flush()?;
+
+    info!("successfully generated!");
+
     let mut router = Router::new();
-    router = platform::http::attach_routes(router, &md, &platform_provider, auth_cfg, None);
-    router = ingester::sources::http::attach_routes(router, track_exec, identify_exec);
+    info!("initializing platform...");
+    let router = init_platform(&md, &db, router)?;
+    info!("initializing ingester...");
+    let router = init_ingester(args, &md, &db, router)?;
 
     let server = Server::bind(&args.host).serve(router.into_make_service_with_connect_info::<SocketAddr>());
     info!("start listening on {}", args.host);

@@ -24,75 +24,6 @@ pub fn create_properties(
     md: &Arc<MetadataProvider>,
     db: &Arc<OptiDBImpl>,
 ) -> Result<()> {
-    create_property(
-        md,
-        org_id,
-        proj_id,
-        CreatePropertyMainRequest {
-            name: COLUMN_PROJECT_ID.to_string(),
-            typ: Type::Event,
-            data_type: DType::Int64,
-            nullable: false,
-            dict: None,
-        },
-        &db,
-    )?;
-
-    create_property(
-        md,
-        org_id,
-        proj_id,
-        CreatePropertyMainRequest {
-            name: COLUMN_USER_ID.to_string(),
-            typ: Type::Event,
-            data_type: DType::Int64,
-            nullable: false,
-            dict: None,
-        },
-        &db,
-    )?;
-
-    create_property(
-        md,
-        org_id,
-        proj_id,
-        CreatePropertyMainRequest {
-            name: COLUMN_CREATED_AT.to_string(),
-            typ: Type::Event,
-            data_type: DType::Timestamp,
-            nullable: false,
-            dict: None,
-        },
-        &db,
-    )?;
-
-    create_property(
-        md,
-        org_id,
-        proj_id,
-        CreatePropertyMainRequest {
-            name: COLUMN_EVENT_ID.to_string(),
-            typ: Type::Event,
-            data_type: DType::Int64,
-            nullable: false,
-            dict: None,
-        },
-        &db,
-    )?;
-
-    create_property(
-        md,
-        org_id,
-        proj_id,
-        CreatePropertyMainRequest {
-            name: COLUMN_EVENT.to_string(),
-            typ: Type::Event,
-            data_type: DType::String,
-            nullable: false,
-            dict: Some(DictionaryType::Int64),
-        },
-        &db,
-    )?;
 
     // create event props
     create_property(
@@ -106,7 +37,6 @@ pub fn create_properties(
             nullable: true,
             dict: Some(DictionaryType::Int16),
         },
-        &db,
     )?;
 
     create_property(
@@ -120,7 +50,6 @@ pub fn create_properties(
             nullable: true,
             dict: Some(DictionaryType::Int16),
         },
-        &db,
     )?;
 
     create_property(
@@ -134,7 +63,6 @@ pub fn create_properties(
             nullable: true,
             dict: Some(DictionaryType::Int16),
         },
-        &db,
     )?;
 
     create_property(
@@ -148,7 +76,6 @@ pub fn create_properties(
             nullable: true,
             dict: Some(DictionaryType::Int16),
         },
-        &db,
     )?;
 
     create_property(
@@ -162,7 +89,6 @@ pub fn create_properties(
             nullable: true,
             dict: None,
         },
-        &db,
     )?;
 
     create_property(
@@ -176,7 +102,6 @@ pub fn create_properties(
             nullable: true,
             dict: None,
         },
-        &db,
     )?;
 
     create_property(
@@ -190,7 +115,6 @@ pub fn create_properties(
             nullable: true,
             dict: None,
         },
-        &db,
     )?;
 
     create_property(
@@ -204,7 +128,6 @@ pub fn create_properties(
             nullable: true,
             dict: None,
         },
-        &db,
     )?;
 
     create_property(
@@ -218,7 +141,6 @@ pub fn create_properties(
             nullable: true,
             dict: None,
         },
-        &db,
     )?;
 
     create_property(
@@ -232,7 +154,6 @@ pub fn create_properties(
             nullable: true,
             dict: None,
         },
-        &db,
     )?;
 
     create_property(
@@ -246,7 +167,6 @@ pub fn create_properties(
             nullable: true,
             dict: None,
         },
-        &db,
     )?;
 
     create_property(
@@ -260,7 +180,6 @@ pub fn create_properties(
             nullable: true,
             dict: Some(DictionaryType::Int16),
         },
-        &db,
     )?;
 
     create_property(
@@ -274,7 +193,6 @@ pub fn create_properties(
             nullable: true,
             dict: Some(DictionaryType::Int16),
         },
-        &db,
     )?;
 
     create_property(
@@ -288,7 +206,6 @@ pub fn create_properties(
             nullable: true,
             dict: Some(DictionaryType::Int16),
         },
-        &db,
     )?;
 
     create_property(
@@ -302,7 +219,6 @@ pub fn create_properties(
             nullable: true,
             dict: Some(DictionaryType::Int16),
         },
-        &db,
     )?;
 
     create_property(
@@ -316,7 +232,6 @@ pub fn create_properties(
             nullable: true,
             dict: Some(DictionaryType::Int16),
         },
-        &db,
     )?;
 
     create_property(
@@ -330,7 +245,6 @@ pub fn create_properties(
             nullable: true,
             dict: Some(DictionaryType::Int16),
         },
-        &db,
     )?;
 
     for event in all::<Event>() {

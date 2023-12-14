@@ -332,8 +332,8 @@ pub async fn gen(args: &Test, proj_id: u64) -> Result<(), anyhow::Error> {
 
     fs::remove_dir_all(&args.path).unwrap();
     let rocks = Arc::new(metadata::rocksdb::new(args.path.join("md"))?);
-    let md = Arc::new(MetadataProvider::try_new(rocks)?);
     let db = Arc::new(OptiDBImpl::open(args.path.join("store"), Options {})?);
+    let md = Arc::new(MetadataProvider::try_new(rocks,db.clone())?);
 
 
     info!("starting sample data generation...");

@@ -476,8 +476,8 @@ impl properties::Provider for Properties {
         _organization_id: u64,
         _project_id: u64,
         _req: CreatePropertyRequest,
-    ) -> Result<(Property,bool)> {
-        Ok((Properties::property(),false))
+    ) -> Result<Property> {
+        Ok(Properties::property())
     }
 
     fn get_by_id(&self, _organization_id: u64, _project_id: u64, _id: u64) -> Result<Property> {

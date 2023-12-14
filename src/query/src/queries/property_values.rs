@@ -70,6 +70,7 @@ impl LogicalPlanBuilder {
         input: LogicalPlan,
         req: PropertyValues,
     ) -> Result<LogicalPlan> {
+        // todo make obligatory
         let input = match &req.event {
             Some(event) => LogicalPlan::Filter(PlanFilter::try_new(
                 event_expression(&ctx, &metadata, event)?,

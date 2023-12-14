@@ -354,7 +354,7 @@ pub mod test_util {
     use metadata::MetadataProvider;
     use uuid::Uuid;
     use common::types::DType;
-    use store::db::OptiDBImpl;
+    use store::db::{OptiDBImpl, Options, TableOptions};
 
     use crate::error::Result;
     use crate::event_fields;
@@ -408,7 +408,7 @@ pub mod test_util {
 
     pub async fn create_entities(
         md: Arc<MetadataProvider>,
-        db:&Arc<OptiDBImpl>,
+        db: &Arc<OptiDBImpl>,
         org_id: u64,
         proj_id: u64,
     ) -> Result<()> {
@@ -417,7 +417,7 @@ pub mod test_util {
         db.add_field("events", event_fields::EVENT, DType::Int64, false)?;
         // create user props
 
-        let country_prop = create_property(&md,&db, org_id, proj_id, CreatePropertyRequest {
+        let country_prop = create_property(&md, &db, org_id, proj_id, CreatePropertyRequest {
             created_by: 0,
             tags: None,
             name: "Country".to_string(),
@@ -446,14 +446,14 @@ pub mod test_util {
             "german",
         )?;
 
-        create_property(&md, &db,org_id, proj_id, CreatePropertyRequest {
+        create_property(&md, &db, org_id, proj_id, CreatePropertyRequest {
             created_by: 0,
             tags: None,
             name: "Device".to_string(),
             description: None,
             display_name: None,
             typ: properties::Type::User,
-            data_type:DType::String,
+            data_type: DType::String,
             status: properties::Status::Enabled,
             nullable: true,
             is_array: false,
@@ -462,7 +462,7 @@ pub mod test_util {
             is_system: false,
         })?;
 
-        create_property(&md, &db,org_id, proj_id, CreatePropertyRequest {
+        create_property(&md, &db, org_id, proj_id, CreatePropertyRequest {
             created_by: 0,
             tags: None,
             name: "Is Premium".to_string(),
@@ -506,7 +506,7 @@ pub mod test_util {
             })?;
 
         // create event props
-        create_property(&md, &db,org_id, proj_id, CreatePropertyRequest {
+        create_property(&md, &db, org_id, proj_id, CreatePropertyRequest {
             created_by: 0,
             tags: None,
             name: "Product Name".to_string(),
@@ -522,7 +522,7 @@ pub mod test_util {
             is_system: false,
         })?;
 
-        create_property(&md, &db,org_id, proj_id, CreatePropertyRequest {
+        create_property(&md, &db, org_id, proj_id, CreatePropertyRequest {
             created_by: 0,
             tags: None,
             name: "Revenue".to_string(),
@@ -545,7 +545,9 @@ pub mod test_util {
         let mut path = temp_dir();
         path.push(format!("{}.db", Uuid::new_v4()));
 
-        let store = Arc::new(metadata::rocksdb::new(path)?);
-        Ok(Arc::new(MetadataProvider::try_new(store)?))
+        let store = Arc::new(metadata::rocksdb::new(path.join("md"))?);
+
+        let db = Arc::new(OptiDBImpl::open(path.join("db"),Options {})?);
+        Ok(Arc::new(MetadataProvider::try_new(store, db)?))
     }
 }
