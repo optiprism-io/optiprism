@@ -109,8 +109,21 @@ pub fn create_properties(
         org_id,
         proj_id,
         CreatePropertyMainRequest {
-            name: "Spent Total".to_string(),
+            name: "Revenue".to_string(),
             typ: Type::Event,
+            data_type: DType::Decimal,
+            nullable: true,
+            dict: None,
+        },
+    )?;
+
+    create_property(
+        md,
+        org_id,
+        proj_id,
+        CreatePropertyMainRequest {
+            name: "Spent Total".to_string(),
+            typ: Type::User,
             data_type: DType::Decimal,
             nullable: true,
             dict: None,
@@ -123,7 +136,7 @@ pub fn create_properties(
         proj_id,
         CreatePropertyMainRequest {
             name: "Products Bought".to_string(),
-            typ: Type::Event,
+            typ: Type::User,
             data_type: DType::Int8,
             nullable: true,
             dict: None,
@@ -136,7 +149,7 @@ pub fn create_properties(
         proj_id,
         CreatePropertyMainRequest {
             name: "Cart Items Number".to_string(),
-            typ: Type::Event,
+            typ: Type::User,
             data_type: DType::Int8,
             nullable: true,
             dict: None,
@@ -149,20 +162,7 @@ pub fn create_properties(
         proj_id,
         CreatePropertyMainRequest {
             name: "Cart Amount".to_string(),
-            typ: Type::Event,
-            data_type: DType::Decimal,
-            nullable: true,
-            dict: None,
-        },
-    )?;
-
-    create_property(
-        md,
-        org_id,
-        proj_id,
-        CreatePropertyMainRequest {
-            name: "Revenue".to_string(),
-            typ: Type::Event,
+            typ: Type::User,
             data_type: DType::Decimal,
             nullable: true,
             dict: None,
