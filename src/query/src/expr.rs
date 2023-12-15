@@ -191,6 +191,31 @@ pub fn encode_property_dict_values(
     Ok(ret)
 }
 
+fn prop_expression(ctx: &Context, prop: &Arc<dyn metadata::properties::Provider>, dicts: &Arc<dyn metadata::dictionaries::Provider>, prop_name: &str, operation: &PropValueOperation,
+                   values: Option<Vec<ScalarValue>>) -> Result<Expr> {
+    let prop = prop
+        .get_by_name(ctx.organization_id, ctx.project_id, prop_name)?;
+    let col_name = prop.column_name();
+    let col = col(col_name.as_str());
+
+    if values.is_none() {
+        return named_property_expression(col, operation, None);
+    }
+
+    if let Some(dict_type) = prop.dictionary_type {
+        let dict_values = encode_property_dict_values(
+            ctx,
+            dicts,
+            &dict_type,
+            col_name.as_str(),
+            &values.unwrap(),
+        )?;
+        named_property_expression(col, operation, Some(dict_values))
+    } else {
+        named_property_expression(col, operation, values)
+    }
+}
+
 /// builds name [property] [operation] [value] expression
 pub fn property_expression(
     ctx: &Context,
@@ -200,53 +225,14 @@ pub fn property_expression(
     values: Option<Vec<ScalarValue>>,
 ) -> Result<Expr> {
     match property {
+        PropertyRef::System(prop_name) => {
+            prop_expression(ctx, &md.system_properties, &md.dictionaries, prop_name, operation, values)
+        }
         PropertyRef::User(prop_name) => {
-            let prop =
-                md.user_properties
-                    .get_by_name(ctx.organization_id, ctx.project_id, prop_name)?;
-            let col_name = prop.column_name();
-            let col = col(col_name.as_str());
-
-            if values.is_none() {
-                return named_property_expression(col, operation, None);
-            }
-
-            if let Some(dict_type) = prop.dictionary_type {
-                let dict_values = encode_property_dict_values(
-                    ctx,
-                    &md.dictionaries,
-                    &dict_type,
-                    col_name.as_str(),
-                    &values.unwrap(),
-                )?;
-                named_property_expression(col, operation, Some(dict_values))
-            } else {
-                named_property_expression(col, operation, values)
-            }
+            prop_expression(ctx, &md.user_properties, &md.dictionaries, prop_name, operation, values)
         }
         PropertyRef::Event(prop_name) => {
-            let prop =
-                md.event_properties
-                    .get_by_name(ctx.organization_id, ctx.project_id, prop_name)?;
-            let col_name = prop.column_name();
-            let col = col(col_name.as_str());
-
-            if values.is_none() {
-                return named_property_expression(col, operation, values);
-            }
-
-            if let Some(dict_type) = prop.dictionary_type {
-                let dict_values = encode_property_dict_values(
-                    ctx,
-                    &md.dictionaries,
-                    &dict_type,
-                    col_name.as_str(),
-                    &values.unwrap(),
-                )?;
-                named_property_expression(col, operation, Some(dict_values))
-            } else {
-                named_property_expression(col, operation, values)
-            }
+            prop_expression(ctx, &md.event_properties, &md.dictionaries, prop_name, operation, values)
         }
         PropertyRef::Custom(_) => unimplemented!(),
     }
@@ -258,6 +244,12 @@ pub fn property_col(
     property: &PropertyRef,
 ) -> Result<Expr> {
     Ok(match property {
+        PropertyRef::System(prop_name) => {
+            let prop =
+                md.system_properties
+                    .get_by_name(ctx.organization_id, ctx.project_id, prop_name)?;
+            col(prop.column_name().as_str())
+        }
         PropertyRef::User(prop_name) => {
             let prop =
                 md.user_properties

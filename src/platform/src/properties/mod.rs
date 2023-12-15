@@ -64,6 +64,7 @@ pub enum Status {
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub enum Type {
+    System,
     Event,
     User,
 }
@@ -73,6 +74,7 @@ impl From<metadata::properties::Type> for Type {
         match value {
             metadata::properties::Type::Event => Type::Event,
             metadata::properties::Type::User => Type::User,
+            metadata::properties::Type::System => Type::System,
         }
     }
 }
@@ -82,6 +84,7 @@ impl From<Type> for metadata::properties::Type {
         match value {
             Type::Event => metadata::properties::Type::Event,
             Type::User => metadata::properties::Type::User,
+            Type::System => metadata::properties::Type::System,
         }
     }
 }
@@ -219,6 +222,7 @@ pub struct Property {
     pub display_name: Option<String>,
     pub description: Option<String>,
     pub typ: Type,
+    pub order: u64,
     pub data_type: DType,
     pub status: Status,
     pub is_system: bool,
@@ -244,6 +248,7 @@ impl TryInto<metadata::properties::Property> for Property {
             name: self.name,
             description: self.description,
             display_name: self.display_name,
+            order: self.order,
             typ: self.typ.into(),
             data_type: self.data_type.into(),
             status: self.status.into(),
@@ -280,6 +285,7 @@ impl TryInto<Property> for metadata::properties::Property {
             is_dictionary: self.is_dictionary,
             dictionary_type: self.dictionary_type.map(|v| v.try_into()).transpose()?,
             typ: self.typ.into(),
+            order: self.order,
         })
     }
 }

@@ -52,15 +52,24 @@ pub enum Status {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum Type {
+    System,
     Event,
     User,
 }
 
 impl Type {
-    pub fn as_name(&self) -> &str {
+    pub fn path(&self) -> &str {
         match self {
+            Type::System => "system_properties",
             Type::Event => "event_properties",
             Type::User => "user_properties",
+        }
+    }
+
+    pub fn order_path(&self) -> &str {
+        match self {
+            Type::System => "system_properties/order",
+            _ => "properties/order",
         }
     }
 }
@@ -96,6 +105,7 @@ pub struct Property {
     pub name: String,
     pub description: Option<String>,
     pub display_name: Option<String>,
+    pub order: u64,
     pub typ: Type,
     pub data_type: DType,
     pub status: Status,
@@ -109,19 +119,22 @@ pub struct Property {
 
 impl Property {
     pub fn column_name(&self) -> String {
-        let mut name: String = self
-            .name
-            .chars()
-            .filter(|c| c.is_ascii_alphabetic() || c.is_numeric() || c.is_whitespace() || c == &'_')
-            .collect();
-        name = name.to_case(Case::Snake);
-        name = name.trim().to_string();
-        let prefix = match self.typ {
-            Type::Event => "event".to_string(),
-            Type::User => "user".to_string(),
-        };
+        match self.typ {
+            Type::System => {
+                let mut name: String = self
+                    .name
+                    .chars()
+                    .filter(|c| c.is_ascii_alphabetic() || c.is_numeric() || c.is_whitespace() || c == &'_')
+                    .collect();
+                name = name.to_case(Case::Snake);
+                name = name.trim().to_string();
 
-        format!("{prefix}_{name}")
+                name
+            }
+            _ => {
+                format!("{}_{}", self.data_type.short_name(), self.order)
+            },
+        }
     }
 }
 

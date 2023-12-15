@@ -317,6 +317,28 @@ pub struct TableOptions {
     pub merge_array_page_size: usize,
 }
 
+impl TableOptions {
+    pub fn test() -> Self {
+        TableOptions {
+            levels: 7,
+            merge_array_size: 10000,
+            partitions: 1,
+            index_cols: 1,
+            l1_max_size_bytes: 1024 * 1024 * 10,
+            level_size_multiplier: 10,
+            l0_max_parts: 4,
+            max_log_length_bytes: 1024 * 1024 * 100,
+            merge_array_page_size: 10000,
+            merge_data_page_size_limit_bytes: Some(1024 * 1024),
+            merge_index_cols: 2,
+            merge_max_l1_part_size_bytes: 1024 * 1024,
+            merge_part_size_multiplier: 10,
+            merge_row_group_values_limit: 1000,
+            merge_chunk_size: 1024 * 8 * 8,
+        }
+    }
+}
+
 fn print_partitions(partitions: &[Partition]) {
     for (pid, p) in partitions.iter().enumerate() {
         println!("+-- {}", pid);
@@ -692,7 +714,7 @@ fn memtable_to_partitioned_chunks(
                             let vals = col
                                 .into_iter()
                                 .map(|v| match v {
-                                    Value::Int64(b) => b,
+                                    Value::Timestamp(b) => b,
                                     _ => unreachable!("{:?}", v),
                                 })
                                 .collect::<Vec<_>>();
@@ -1026,7 +1048,19 @@ impl OptiDBImpl {
         for v in values.iter() {
             match metadata.schema.fields.iter().find(|f| f.name == v.name) {
                 None => return Err(StoreError::Internal(format!("column {} not found in schema", v.name))),
-                _ => {}
+                f => {
+                    match (&v.value, &f.unwrap().data_type) {
+                        (Value::Int8(_), DataType::Int8) => {}
+                        (Value::Int16(_), DataType::Int16) => {}
+                        (Value::Int32(_), DataType::Int32) => {}
+                        (Value::Int64(_), DataType::Int64) => {}
+                        (Value::Boolean(_), DataType::Boolean) => {}
+                        (Value::Decimal(_), DataType::Decimal(_, _)) => {}
+                        (Value::String(_), DataType::Utf8) => {}
+                        (Value::Timestamp(_), DataType::Timestamp(_, _)) => {}
+                        _ => return Err(StoreError::Internal(format!("column {} ({:?}) has different type: {:?}", v.name, v.value, f.unwrap().data_type))),
+                    }
+                }
             }
         }
 

@@ -5,14 +5,14 @@ use async_trait::async_trait;
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::Utc;
-use common::types::{OptionalProperty, TABLE_EVENTS};
+use common::types::{DType, OptionalProperty, TABLE_EVENTS};
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use store::db::OptiDBImpl;
 
 use crate::error;
 use crate::error::MetadataError;
-use crate::index::check_insert_constraints;
+use crate::index::{check_insert_constraints, next_zero_seq};
 use crate::index::check_update_constraints;
 use crate::index::delete_index;
 use crate::index::get_index;
@@ -20,7 +20,7 @@ use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
 use crate::metadata::ListResponse;
-use crate::properties::CreatePropertyRequest;
+use crate::properties::{CreatePropertyRequest, DictionaryType};
 use crate::properties::Property;
 use crate::properties::Provider;
 use crate::properties::Type;
@@ -57,7 +57,7 @@ fn index_name_key(
 ) -> Option<Vec<u8>> {
     Some(
         make_index_key(
-            org_proj_ns(organization_id, project_id, typ.as_name().as_bytes()).as_slice(),
+            org_proj_ns(organization_id, project_id, typ.path().as_bytes()).as_slice(),
             IDX_NAME,
             name,
         )
@@ -73,7 +73,7 @@ fn index_display_name_key(
 ) -> Option<Vec<u8>> {
     display_name.map(|v| {
         make_index_key(
-            org_proj_ns(organization_id, project_id, typ.as_name().as_bytes()).as_slice(),
+            org_proj_ns(organization_id, project_id, typ.path().as_bytes()).as_slice(),
             IDX_DISPLAY_NAME,
             v.as_str(),
         )
@@ -104,6 +104,14 @@ impl ProviderImpl {
         }
     }
 
+    pub fn new_system(db: Arc<TransactionDB>, optiDb: Arc<OptiDBImpl>) -> Self {
+        ProviderImpl {
+            db,
+            optiDb,
+            typ: Type::System,
+        }
+    }
+
     fn _get_by_name(
         &self,
         tx: &Transaction<TransactionDB>,
@@ -114,7 +122,7 @@ impl ProviderImpl {
         let data = get_index(
             &tx,
             make_index_key(
-                org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
+                org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
                 IDX_NAME,
                 name,
             ),
@@ -131,7 +139,7 @@ impl ProviderImpl {
         id: u64,
     ) -> Result<Property> {
         let key = make_data_value_key(
-            org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
+            org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
             id,
         );
 
@@ -161,8 +169,13 @@ impl ProviderImpl {
         let id = next_seq(
             &tx,
             make_id_seq_key(
-                org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
+                org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
             ),
+        )?;
+
+        let order = next_zero_seq(
+            &tx,
+            make_id_seq_key(org_proj_ns(organization_id, project_id, format!("{}/{}", self.typ.order_path(),req.data_type.short_name()).as_bytes()).as_slice()),
         )?;
         let created_at = Utc::now();
 
@@ -177,20 +190,21 @@ impl ProviderImpl {
             name: req.name,
             description: req.description,
             display_name: req.display_name,
+            order,
             typ: req.typ,
             data_type: req.data_type.clone(),
             status: req.status,
             nullable: req.nullable,
             is_array: req.is_array,
             is_dictionary: req.is_dictionary,
-            dictionary_type: req.dictionary_type,
+            dictionary_type: req.dictionary_type.clone(),
             is_system: req.is_system,
         };
 
         let data = serialize(&prop)?;
         tx.put(
             make_data_value_key(
-                org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
+                org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
                 prop.id,
             ),
             &data,
@@ -199,7 +213,17 @@ impl ProviderImpl {
 
         insert_index(&tx, idx_keys.as_ref(), &data)?;
 
-        self.optiDb.add_field(TABLE_EVENTS, prop.column_name().as_str(), req.data_type, req.nullable)?;
+        let dt = if let Some(dt) = &req.dictionary_type {
+            match dt {
+                DictionaryType::Int8 => DType::Int8,
+                DictionaryType::Int16 => DType::Int16,
+                DictionaryType::Int32 => DType::Int32,
+                DictionaryType::Int64 => DType::Int64,
+            }
+        } else {
+            req.data_type.clone()
+        };
+        self.optiDb.add_field(TABLE_EVENTS, prop.column_name().as_str(), dt, req.nullable)?;
         Ok(prop)
     }
 }
@@ -251,7 +275,7 @@ impl Provider for ProviderImpl {
         let tx = self.db.transaction();
         list(
             &tx,
-            org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
+            org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
         )
     }
 
@@ -338,7 +362,7 @@ impl Provider for ProviderImpl {
         let data = serialize(&prop)?;
         tx.put(
             make_data_value_key(
-                org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
+                org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
                 prop.id,
             ),
             &data,
@@ -353,7 +377,7 @@ impl Provider for ProviderImpl {
         let tx = self.db.transaction();
         let prop = self._get_by_id(&tx, organization_id, project_id, id)?;
         tx.delete(make_data_value_key(
-            org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
+            org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
             id,
         ))?;
 

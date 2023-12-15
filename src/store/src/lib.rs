@@ -71,6 +71,7 @@ pub enum Value {
     Int32(Option<i32>),
     Int64(Option<i64>),
     Boolean(Option<bool>),
+    Timestamp(Option<i64>),
     Decimal(Option<i128>),
     String(Option<String>),
     ListInt8(Option<Vec<Option<i8>>>),

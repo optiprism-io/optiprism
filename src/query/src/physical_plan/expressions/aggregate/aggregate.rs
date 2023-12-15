@@ -7,6 +7,7 @@ use std::sync::Arc;
 use ahash::RandomState;
 use arrow::array::Array;
 use arrow::array::ArrayRef;
+use arrow::util::pretty::print_batches;
 use arrow::array::BooleanArray;
 use arrow::array::Decimal128Array;
 use arrow::array::Float32Array;
@@ -182,6 +183,7 @@ macro_rules! agg {
                 let mut skip_partition = 0;
                 let mut skip = false;
                 for (row_id, val) in predicate.into_iter().enumerate() {
+                    println!("!");
                     if skip {
                         if partitions.value(row_id) == skip_partition {
                             continue;

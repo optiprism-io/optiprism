@@ -67,19 +67,9 @@ pub fn create_property(
     };
 
     let prop = match main_req.typ {
+        Type::System => md.system_properties.get_or_create(org_id, proj_id, req)?,
         Type::Event => md.event_properties.get_or_create(org_id, proj_id, req)?,
         Type::User => md.user_properties.get_or_create(org_id, proj_id, req)?
-    };
-
-    let t = if let Some(v) = main_req.dict {
-        match v {
-            DictionaryType::Int8 => DType::Int8,
-            DictionaryType::Int16 => DType::Int16,
-            DictionaryType::Int32 => DType::Int32,
-            DictionaryType::Int64 => DType::Int64,
-        }
-    } else {
-        main_req.data_type
     };
 
     Ok(prop)

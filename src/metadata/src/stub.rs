@@ -449,6 +449,7 @@ impl Properties {
             name: "name".to_string(),
             description: Some("description".to_string()),
             display_name: Some("display_name".to_string()),
+            order: 0,
             typ: properties::Type::Event,
             data_type: DType::Int8,
             status: properties::Status::Enabled,

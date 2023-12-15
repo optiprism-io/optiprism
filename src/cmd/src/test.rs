@@ -54,7 +54,7 @@ use test_util::create_event;
 use test_util::create_property;
 use test_util::CreatePropertyMainRequest;
 use crate::error::Error;
-use crate::test;
+use crate::{init_project, init_system, test};
 
 
 #[derive(Parser, Clone)]
@@ -137,122 +137,6 @@ impl Builders {
     }
 }
 
-pub fn init(
-    partitions: usize,
-    md: &Arc<MetadataProvider>,
-    db: &Arc<OptiDBImpl>,
-    org_id: u64,
-    proj_id: u64,
-) -> Result<(), anyhow::Error> {
-    let topts = TableOptions {
-        levels: 7,
-        merge_array_size: 10000,
-        partitions,
-        index_cols: 2,
-        l1_max_size_bytes: 1024 * 1024 * 10,
-        level_size_multiplier: 10,
-        l0_max_parts: 4,
-        max_log_length_bytes: 1024 * 1024 * 100,
-        merge_array_page_size: 10000,
-        merge_data_page_size_limit_bytes: Some(1024 * 1024),
-        merge_index_cols: 2,
-        merge_max_l1_part_size_bytes: 1024 * 1024,
-        merge_part_size_multiplier: 10,
-        merge_row_group_values_limit: 1000,
-        merge_chunk_size: 1024 * 8 * 8,
-    };
-    db.create_table("events", topts)?;
-    create_property(
-        md,
-        org_id,
-        proj_id,
-        CreatePropertyMainRequest {
-            name: COLUMN_PROJECT_ID.to_string(),
-            typ: Type::Event,
-            data_type: DType::Int64,
-            nullable: false,
-            dict: None,
-        },
-        &db,
-    )?;
-
-    create_property(
-        md,
-        org_id,
-        proj_id,
-        CreatePropertyMainRequest {
-            name: COLUMN_USER_ID.to_string(),
-            typ: Type::Event,
-            data_type: DType::Int64,
-            nullable: false,
-            dict: None,
-        },
-        &db,
-    )?;
-
-    create_property(
-        md,
-        org_id,
-        proj_id,
-        CreatePropertyMainRequest {
-            name: COLUMN_CREATED_AT.to_string(),
-            typ: Type::Event,
-            data_type: DType::Timestamp,
-            nullable: false,
-            dict: None,
-        },
-        &db,
-    )?;
-
-    create_property(
-        md,
-        org_id,
-        proj_id,
-        CreatePropertyMainRequest {
-            name: COLUMN_EVENT.to_string(),
-            typ: Type::Event,
-            data_type: DType::String,
-            nullable: false,
-            dict: Some(DictionaryType::Int64),
-        },
-        &db,
-    )?;
-
-    let props = vec![
-        ("i_8", DType::Int8),
-        ("i_16", DType::Int16),
-        ("i_32", DType::Int32),
-        ("i_64", DType::Int64),
-        ("bool", DType::Boolean),
-        ("string", DType::String),
-        ("timestamp", DType::Timestamp),
-        ("decimal", DType::Decimal),
-        ("group", DType::Int64),
-        ("v", DType::Int64),
-    ];
-
-    for (name, dt) in props {
-        create_property(
-            md,
-            org_id,
-            proj_id,
-            CreatePropertyMainRequest {
-                name: name.to_string(),
-                typ: Type::Event,
-                data_type: dt,
-                nullable: true,
-                dict: None,
-            },
-            &db,
-        )?;
-    }
-
-    create_event(md, org_id, proj_id, "event".to_string())?;
-    md.dictionaries
-        .get_key_or_create(1, 1, "event_event", "event")?;
-
-    Ok(())
-}
 
 pub fn gen_mem(partitions: usize,
                batch_size: usize,
@@ -333,20 +217,58 @@ pub async fn gen(args: &Test, proj_id: u64) -> Result<(), anyhow::Error> {
     fs::remove_dir_all(&args.path).unwrap();
     let rocks = Arc::new(metadata::rocksdb::new(args.path.join("md"))?);
     let db = Arc::new(OptiDBImpl::open(args.path.join("store"), Options {})?);
-    let md = Arc::new(MetadataProvider::try_new(rocks,db.clone())?);
+    let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
+    info!("system initialization...");
+    init_system(&md, &db)?;
 
+    info!("creating org structure and admin account...");
+    let (org_id, proj_id) = crate::init_test_org_structure(&md)?;
+
+    info!("project initialization...");
+    init_project(1, proj_id, &md)?;
 
     info!("starting sample data generation...");
     let partitions = args.partitions.unwrap_or_else(num_cpus::get);
-    init(partitions, &md, &db, 1, proj_id)?;
+
+    let props = [
+        ("i_8", DType::Int8),
+        ("i_16", DType::Int16),
+        ("i_32", DType::Int32),
+        ("i_64", DType::Int64),
+        ("bool", DType::Boolean),
+        ("string", DType::String),
+        ("decimal", DType::Decimal),
+        ("group", DType::Int64),
+        ("v", DType::Int64),
+    ];
+
+    for (name, dt) in props {
+        create_property(
+            &md,
+            1,
+            proj_id,
+            CreatePropertyMainRequest {
+                name: name.to_string(),
+                typ: Type::System, // do this to keep property names as is
+                data_type: dt,
+                nullable: true,
+                dict: None,
+            },
+        )?;
+    }
+
+    let e = create_event(&md, 1, proj_id, "event".to_string())?;
+    md.dictionaries
+        .get_key_or_create(1, proj_id, "event", "event")?;
+
 
     let now = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0)
         .unwrap()
         .duration_trunc(Duration::days(1))?;
 
-    let users = 100;
-    let days = 360;
-    let events = 10;
+    let users = 1;
+    let days = 1;
+    let events = 2;
     let mut vals: Vec<NamedValue> = vec![];
     for user in 0..users {
         let mut cur_time = now - Duration::days(days);
@@ -354,24 +276,24 @@ pub async fn gen(args: &Test, proj_id: u64) -> Result<(), anyhow::Error> {
             let mut event_time = cur_time;
             for event in 0..events {
                 vals.truncate(0);
-                vals.push(NamedValue::new("event_project_id".to_string(), Value::Int64(Some(proj_id as i64))));
-                vals.push(NamedValue::new("event_user_id".to_string(), Value::Int64(Some(user as i64 + 1))));
-                vals.push(NamedValue::new("event_created_at".to_string(), Value::Int64(Some(event_time.timestamp_nanos()))));
-                vals.push(NamedValue::new("event_event".to_string(), Value::Int64(Some(1))));
-                vals.push(NamedValue::new("event_i_8".to_string(), Value::Int8(Some(event as i8))));
-                vals.push(NamedValue::new("event_i_16".to_string(), Value::Int16(Some(event as i16))));
-                vals.push(NamedValue::new("event_i_32".to_string(), Value::Int32(Some(event as i32))));
-                vals.push(NamedValue::new("event_i_64".to_string(), Value::Int64(Some(event))));
-                vals.push(NamedValue::new("event_bool".to_string(), Value::Boolean(Some(event % 2 == 0))));
-                vals.push(NamedValue::new("event_string".to_string(), Value::String(Some(format!("event {}", event)))));
-                vals.push(NamedValue::new("event_timestamp".to_string(), Value::Int64(Some(event * 1000))));
-                vals.push(NamedValue::new("event_decimal".to_string(), Value::Decimal(Some(event as i128 * 10_i128.pow(DECIMAL_SCALE as u32) + event as i128 * 100))));
-                vals.push(NamedValue::new("event_group".to_string(), Value::Int64(Some(event % (events / 2)))));
+                vals.push(NamedValue::new("project_id".to_string(), Value::Int64(Some(proj_id as i64))));
+                vals.push(NamedValue::new("user_id".to_string(), Value::Int64(Some(user as i64 + 1))));
+                vals.push(NamedValue::new("created_at".to_string(), Value::Timestamp(Some(event_time.timestamp_nanos()))));
+                vals.push(NamedValue::new("event".to_string(), Value::Int64(Some(e.id as i64))));
+                vals.push(NamedValue::new("i_8".to_string(), Value::Int8(Some(event as i8))));
+                vals.push(NamedValue::new("i_16".to_string(), Value::Int16(Some(event as i16))));
+                vals.push(NamedValue::new("i_32".to_string(), Value::Int32(Some(event as i32))));
+                vals.push(NamedValue::new("i_64".to_string(), Value::Int64(Some(event))));
+                vals.push(NamedValue::new("bool".to_string(), Value::Boolean(Some(event % 2 == 0))));
+                vals.push(NamedValue::new("string".to_string(), Value::String(Some(format!("event {}", event)))));
+                vals.push(NamedValue::new("decimal".to_string(), Value::Decimal(Some(event as i128 * 10_i128.pow(DECIMAL_SCALE as u32) + event as i128 * 100))));
+                vals.push(NamedValue::new("group".to_string(), Value::Int64(Some(event % (events / 2)))));
                 // two group of users with different "v" value to proper integration tests
+                // event value
                 if user % 2 == 0 {
-                    vals.push(NamedValue::new("event_v".to_string(), Value::Int64(Some(event))));
+                    vals.push(NamedValue::new("v".to_string(), Value::Int64(Some(event))));
                 } else {
-                    vals.push(NamedValue::new("event_v".to_string(), Value::Int64(Some(event * 2))));
+                    vals.push(NamedValue::new("v".to_string(), Value::Int64(Some(event * 2))));
                 }
 
                 db.insert("events", vals.clone())?;
@@ -417,7 +339,9 @@ pub async fn gen(args: &Test, proj_id: u64) -> Result<(), anyhow::Error> {
     ));
 
     let mut router = Router::new();
+    info!("attaching platform routes...");
     router = platform::http::attach_routes(router, &md, &platform_provider, auth_cfg, None);
+    info!("listening on {}",args.host);
     let server = Server::bind(&args.host).serve(router.into_make_service());
     let graceful = server.with_graceful_shutdown(async {
         let mut sig_int = tokio::signal::unix::signal(SignalKind::interrupt())

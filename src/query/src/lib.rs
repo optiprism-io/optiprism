@@ -67,9 +67,9 @@ pub mod provider_impl;
 pub mod queries;
 
 pub mod event_fields {
-    pub const EVENT: &str = "event_event";
-    pub const CREATED_AT: &str = "event_created_at";
-    pub const USER_ID: &str = "event_user_id";
+    pub const EVENT: &str = "event";
+    pub const CREATED_AT: &str = "created_at";
+    pub const USER_ID: &str = "user_id";
 }
 
 pub const DEFAULT_BATCH_SIZE: usize = 4096;
@@ -399,6 +399,7 @@ pub mod test_util {
         let prop = match req.typ {
             Type::Event => md.event_properties.create(org_id, proj_id, req)?,
             Type::User => md.user_properties.create(org_id, proj_id, req)?,
+            _=>unimplemented!()
         };
 
         db.add_field("events", prop.column_name().as_str(), prop.data_type.clone().into(), prop.nullable)?;
@@ -413,7 +414,7 @@ pub mod test_util {
         proj_id: u64,
     ) -> Result<()> {
         db.add_field("events", event_fields::USER_ID, DType::Int64, false)?;
-        db.add_field("events", event_fields::CREATED_AT, DType::Timestamp, false)?;
+        db.add_field("events", event_fields::CREATED_AT, DType::Int64, false)?;
         db.add_field("events", event_fields::EVENT, DType::Int64, false)?;
         // create user props
 

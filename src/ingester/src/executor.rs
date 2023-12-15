@@ -37,7 +37,7 @@ fn resolve_property(
     val: &PropValue,
 ) -> Result<PropertyAndValue> {
     let data_type = match val {
-        PropValue::Date(_) => DType::Timestamp,
+        PropValue::Date(_) => DType::Int64,
         PropValue::String(_) => DType::String,
         PropValue::Number(_) => DType::Decimal,
         PropValue::Bool(_) => DType::Boolean,

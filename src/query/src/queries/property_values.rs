@@ -80,6 +80,9 @@ impl LogicalPlanBuilder {
         };
 
         let input = match &req.property {
+            PropertyRef::System(prop_name) => {
+                property_col!(ctx, metadata, input, prop_name, system_properties)
+            }
             PropertyRef::User(prop_name) => {
                 property_col!(ctx, metadata, input, prop_name, user_properties)
             }

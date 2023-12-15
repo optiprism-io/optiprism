@@ -60,6 +60,7 @@ pub struct PlatformProvider {
     pub custom_events: Arc<dyn custom_events::Provider>,
     pub event_properties: Arc<dyn properties::Provider>,
     pub user_properties: Arc<dyn properties::Provider>,
+    pub system_properties: Arc<dyn properties::Provider>,
     pub custom_properties: Arc<dyn custom_properties::Provider>,
     pub accounts: Arc<dyn accounts::Provider>,
     pub auth: Arc<dyn auth::Provider>,
@@ -85,6 +86,9 @@ impl PlatformProvider {
             user_properties: Arc::new(properties::ProviderImpl::new_user(
                 md.user_properties.clone(),
             )),
+            system_properties: Arc::new(properties::ProviderImpl::new_user(
+                md.system_properties.clone(),
+            )),
             custom_properties: Arc::new(stub::CustomProperties {}),
             accounts: Arc::new(accounts::ProviderImpl::new(md.accounts.clone())),
             auth: Arc::new(auth::ProviderImpl::new(md.accounts.clone(), auth_cfg)),
@@ -102,6 +106,7 @@ impl PlatformProvider {
             custom_events: Arc::new(stub::CustomEvents {}),
             event_properties: Arc::new(stub::Properties {}),
             user_properties: Arc::new(stub::Properties {}),
+            system_properties: Arc::new(stub::Properties {}),
             custom_properties: Arc::new(stub::CustomProperties {}),
             accounts: Arc::new(stub::Accounts {}),
             auth: Arc::new(stub::Auth {}),
@@ -373,6 +378,8 @@ impl TryInto<EventRef> for common::query::EventRef {
 #[serde(tag = "propertyType", rename_all = "camelCase")]
 pub enum PropertyRef {
     #[serde(rename_all = "camelCase")]
+    System { property_name: String },
+    #[serde(rename_all = "camelCase")]
     User { property_name: String },
     #[serde(rename_all = "camelCase")]
     Event { property_name: String },
@@ -385,6 +392,7 @@ impl TryInto<common::query::PropertyRef> for PropertyRef {
 
     fn try_into(self) -> std::result::Result<common::query::PropertyRef, Self::Error> {
         Ok(match self {
+            PropertyRef::System { property_name } => common::query::PropertyRef::System(property_name),
             PropertyRef::User { property_name } => common::query::PropertyRef::User(property_name),
             PropertyRef::Event { property_name } => {
                 common::query::PropertyRef::Event(property_name)
@@ -399,6 +407,7 @@ impl TryInto<PropertyRef> for common::query::PropertyRef {
 
     fn try_into(self) -> std::result::Result<PropertyRef, Self::Error> {
         Ok(match self {
+            common::query::PropertyRef::System(property_name) => PropertyRef::System { property_name },
             common::query::PropertyRef::User(property_name) => PropertyRef::User { property_name },
             common::query::PropertyRef::Event(property_name) => {
                 PropertyRef::Event { property_name }

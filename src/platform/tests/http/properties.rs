@@ -1,5 +1,5 @@
 use chrono::Utc;
-use common::types::OptionalProperty;
+use common::types::{DType, OptionalProperty};
 use metadata::metadata::ListResponse;
 use metadata::properties;
 use metadata::properties::CreatePropertyRequest;
@@ -48,7 +48,7 @@ async fn test_event_properties() -> anyhow::Result<()> {
         tags: Some(vec!["sdf".to_string()]),
         name: "qwe".to_string(),
         display_name: Some("dname".to_string()),
-        data_type: DataType::String,
+        data_type: DType::String,
         description: Some("desc".to_string()),
         status: Status::Enabled,
         nullable: true,

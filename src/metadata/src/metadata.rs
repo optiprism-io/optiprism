@@ -25,6 +25,7 @@ pub struct MetadataProvider {
     pub custom_events: Arc<dyn custom_events::Provider>,
     pub event_properties: Arc<dyn properties::Provider>,
     pub user_properties: Arc<dyn properties::Provider>,
+    pub system_properties: Arc<dyn properties::Provider>,
     pub custom_properties: Arc<dyn custom_properties::Provider>,
     pub organizations: Arc<dyn organizations::Provider>,
     pub projects: Arc<dyn projects::Provider>,
@@ -33,15 +34,16 @@ pub struct MetadataProvider {
 }
 
 impl MetadataProvider {
-    pub fn try_new(db: Arc<TransactionDB>,optiDb:Arc<OptiDBImpl>) -> Result<Self> {
+    pub fn try_new(db: Arc<TransactionDB>, optiDb: Arc<OptiDBImpl>) -> Result<Self> {
         let events = Arc::new(events::ProviderImpl::new(db.clone()));
         Ok(MetadataProvider {
             dashboards: Arc::new(dashboards::ProviderImpl::new(db.clone())),
             reports: Arc::new(reports::ProviderImpl::new(db.clone())),
             events: events.clone(),
             custom_events: Arc::new(custom_events::ProviderImpl::new(db.clone(), events)),
-            event_properties: Arc::new(properties::ProviderImpl::new_event(db.clone(),optiDb.clone())),
-            user_properties: Arc::new(properties::ProviderImpl::new_user(db.clone(),optiDb.clone())),
+            event_properties: Arc::new(properties::ProviderImpl::new_event(db.clone(), optiDb.clone())),
+            user_properties: Arc::new(properties::ProviderImpl::new_user(db.clone(), optiDb.clone())),
+            system_properties: Arc::new(properties::ProviderImpl::new_system(db.clone(), optiDb.clone())),
             custom_properties: Arc::new(custom_properties::ProviderImpl::new(db.clone())),
             organizations: Arc::new(organizations::ProviderImpl::new(db.clone())),
             projects: Arc::new(projects::ProviderImpl::new(db.clone())),
@@ -58,6 +60,7 @@ impl MetadataProvider {
             custom_events: Arc::new(stub::CustomEvents {}),
             event_properties: Arc::new(stub::Properties {}),
             user_properties: Arc::new(stub::Properties {}),
+            system_properties: Arc::new(stub::Properties {}),
             custom_properties: Arc::new(stub::CustomProperties {}),
             organizations: Arc::new(stub::Organizations {}),
             projects: Arc::new(stub::Projects {}),

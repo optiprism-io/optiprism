@@ -64,7 +64,6 @@ pub struct Service {
 pub fn attach_routes(mut router: Router, md: &Arc<MetadataProvider>,
                      platform: &Arc<PlatformProvider>,
                      auth_cfg: crate::auth::Config, ui: Option<PathBuf>) -> Router {
-    info!("attaching platform routes...");
     router = accounts::attach_routes(router);
     router = auth::attach_routes(router);
     router = events::attach_routes(router);

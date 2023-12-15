@@ -374,6 +374,7 @@ impl Properties {
             display_name: Some("display_name".to_string()),
             description: Some("description".to_string()),
             typ: properties::Type::Event,
+            order: 0,
             data_type: DType::Decimal,
             status: properties::Status::Enabled,
             is_system: true,

@@ -48,7 +48,7 @@ use store::db::{OptiDBImpl, Options, TableOptions};
 use store::{NamedValue, Value};
 use test_util::{create_property, CreatePropertyMainRequest};
 use crate::error::Error;
-use crate::init_project;
+use crate::{init_project, init_system};
 
 #[derive(Parser, Clone)]
 pub struct Shop {
@@ -108,6 +108,7 @@ fn init_platform(md: &Arc<MetadataProvider>, db: &Arc<OptiDBImpl>, router: Route
         auth_cfg.clone(),
     ));
 
+    info!("attaching platform routes...");
     Ok(platform::http::attach_routes(router, &md, &platform_provider, auth_cfg, None))
 }
 
@@ -167,57 +168,8 @@ fn init_ingester(args: &Shop, md: &Arc<MetadataProvider>, db: &Arc<OptiDBImpl>, 
         md.dictionaries.clone(),
     );
 
+    info!("attaching ingester routes...");
     Ok(ingester::sources::http::attach_routes(router, track_exec, identify_exec))
-}
-
-fn init_org_structure(md: &Arc<MetadataProvider>) -> Result<(u64, u64)> {
-    let admin = match md.accounts.create(CreateAccountRequest {
-        created_by: None,
-        password_hash: make_password_hash("admin")?,
-        email: "admin@email.com".to_string(),
-        first_name: Some("admin".to_string()),
-        last_name: None,
-        role: Some(Role::Admin),
-        organizations: None,
-        projects: None,
-        teams: None,
-    }) {
-        Ok(acc) => acc,
-        Err(err) => md.accounts.get_by_email("admin@email.com")?,
-    };
-    let org = match md.organizations.create(CreateOrganizationRequest {
-        created_by: admin.id,
-        name: "Test Organization".to_string(),
-    }) {
-        Ok(org) => org,
-        Err(err) => md.organizations.get_by_id(1)?,
-    };
-
-    let proj = match md.projects.create(org.id, CreateProjectRequest {
-        created_by: admin.id,
-        name: "Test Project".to_string(),
-    }) {
-        Ok(proj) => proj,
-        Err(err) => md.projects.get_by_id(1, 1)?,
-    };
-
-    info!("token: {}",proj.token);
-    let _user = match md.accounts.create(CreateAccountRequest {
-        created_by: Some(admin.id),
-        password_hash: make_password_hash("test")?,
-        email: "user@test.com".to_string(),
-        first_name: Some("user".to_string()),
-        last_name: None,
-        role: None,
-        organizations: Some(vec![(org.id, OrganizationRole::Member)]),
-        projects: Some(vec![(proj.id, ProjectRole::Reader)]),
-        teams: None,
-    }) {
-        Ok(acc) => acc,
-        Err(err) => md.accounts.get_by_email("user@test.com")?,
-    };
-
-    Ok((org.id, proj.id))
 }
 
 pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
@@ -226,8 +178,9 @@ pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
     fs::remove_dir_all(&args.path).unwrap();
     let rocks = Arc::new(metadata::rocksdb::new(args.path.join("md"))?);
     let db = Arc::new(OptiDBImpl::open(args.path.join("store"), Options {})?);
-    let md = Arc::new(MetadataProvider::try_new(rocks,db.clone())?);
-
+    let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
+    info!("system initialization...");
+    init_system(&md, &db)?;
     if let Some(ui_path) = &args.ui_path {
         if !ui_path.try_exists()? {
             return Err(
@@ -256,7 +209,7 @@ pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
     let from_date = to_date - duration;
 
     info!("creating org structure and admin account...");
-    let (org_id, proj_id) = init_org_structure(&md)?;
+    let (org_id, proj_id) = crate::init_test_org_structure(&md)?;
     info!("project initialization...");
     init_project(org_id, proj_id, &md)?;
 

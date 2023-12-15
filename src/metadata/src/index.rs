@@ -91,3 +91,14 @@ pub fn next_seq<K: AsRef<[u8]>>(tx: &Transaction<TransactionDB>, key: K) -> Resu
 
     Ok(result)
 }
+
+pub fn next_zero_seq<K: AsRef<[u8]>>(tx: &Transaction<TransactionDB>, key: K) -> Result<u64> {
+    let id = tx.get(key.as_ref())?;
+    let result: u64 = match id {
+        Some(v) => u64::from_le_bytes(v.try_into().unwrap()) + 1,
+        None => 0,
+    };
+    tx.put(key, result.to_le_bytes())?;
+
+    Ok(result)
+}

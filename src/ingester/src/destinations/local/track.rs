@@ -41,7 +41,6 @@ impl Local {
         Self {
             db,
             dict,
-
             event_properties,
             user_properties,
         }

@@ -89,6 +89,35 @@ pub enum DType {
     List(Box<DType>),
 }
 
+impl DType {
+    pub fn short_name(&self) -> String {
+        match self {
+            DType::String => "str".to_string(),
+            DType::Int8 => "i8".to_string(),
+            DType::Int16 => "i16".to_string(),
+            DType::Int32 => "i32".to_string(),
+            DType::Int64 => "i64".to_string(),
+            DType::Decimal => "d".to_string(),
+            DType::Boolean => "b".to_string(),
+            DType::Timestamp => "ts".to_string(),
+            DType::List(v) => {
+                let s = match v.as_ref() {
+                    DType::String => "str".to_string(),
+                    DType::Int8 => "i8".to_string(),
+                    DType::Int16 => "i16".to_string(),
+                    DType::Int32 => "i32".to_string(),
+                    DType::Int64 => "i64".to_string(),
+                    DType::Decimal => "d".to_string(),
+                    DType::Boolean => "b".to_string(),
+                    DType::Timestamp => "ts".to_string(),
+                    _ => unimplemented!(),
+                };
+                format!("l_{}", s)
+            }
+        }
+    }
+}
+
 impl TryFrom<DType> for datatypes::DataType {
     type Error = CommonError;
     fn try_from(value: DType) -> Result<Self, Self::Error> {
@@ -126,7 +155,6 @@ impl TryFrom<DataType> for DType {
             DataType::Int16 => DType::Int16,
             DataType::Int32 => DType::Int32,
             DataType::Int64 => DType::Int64,
-            DataType::Timestamp(_, _) => DType::Timestamp,
             DataType::Utf8 => DType::String,
             DataType::Decimal128(_, _) => DType::Decimal,
             DataType::List(f) => match f.data_type() {
@@ -135,7 +163,6 @@ impl TryFrom<DataType> for DType {
                 DataType::Int16 => DType::Int16,
                 DataType::Int32 => DType::Int32,
                 DataType::Int64 => DType::Int64,
-                DataType::Timestamp(_, _) => DType::Timestamp,
                 DataType::Utf8 => DType::String,
                 DataType::Decimal128(_, _) => DType::Decimal,
                 _ => return Err(CommonError::General("Unsupported type2".to_string()))
