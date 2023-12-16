@@ -3284,6 +3284,7 @@ components:
           enum:
             - countEvents
             - countUniqueGroups
+            - dailyActiveGroups
             - weeklyActiveGroups
             - monthlyActiveGroups
     QueryCountPerGroup:
@@ -3459,6 +3460,7 @@ components:
         - event
         - user
         - custom
+        - system
     DataType:
       type: string
       description: data type
