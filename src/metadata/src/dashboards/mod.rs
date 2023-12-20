@@ -54,7 +54,7 @@ pub struct CreateDashboardRequest {
     pub panels: Vec<Panel>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateDashboardRequest {
     pub updated_by: u64,

@@ -216,7 +216,9 @@ impl Stream for UnpivotStream {
             Poll::Ready(Some(Ok(batch))) => {
                 Poll::Ready(Some(Ok(unpivot(&batch, self.schema.clone(), &self.cols)?)))
             }
-            other => other,
+            other => {
+                other
+            },
         };
 
         self.baseline_metrics.record_poll(poll)

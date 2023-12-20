@@ -46,7 +46,8 @@ impl SegmentTime {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum ChartType {
     Line,
-    Bar,
+    Column,
+    Pie
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]

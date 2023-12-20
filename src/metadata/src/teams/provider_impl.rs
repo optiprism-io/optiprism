@@ -65,7 +65,9 @@ impl ProviderImpl {
         let key = make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), team_id);
 
         match tx.get(key)? {
-            None => Err(MetadataError::NotFound("team not found".to_string())),
+            None => Err(MetadataError::NotFound(
+                "team not found".to_string(),
+            )),
             Some(value) => Ok(deserialize(&value)?),
         }
     }

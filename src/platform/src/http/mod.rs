@@ -15,7 +15,6 @@ use std::error::Error;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
-
 use axum::async_trait;
 use axum::body::HttpBody;
 use axum::extract::rejection::JsonRejection;
@@ -61,6 +60,12 @@ pub struct Service {
     addr: SocketAddr,
 }
 
+#[derive(Clone)]
+pub struct Properties {
+    event: Arc<dyn crate::properties::Provider>,
+    user: Arc<dyn crate::properties::Provider>,
+}
+
 pub fn attach_routes(mut router: Router, md: &Arc<MetadataProvider>,
                      platform: &Arc<PlatformProvider>,
                      auth_cfg: crate::auth::Config, ui: Option<PathBuf>) -> Router {
@@ -91,8 +96,10 @@ pub fn attach_routes(mut router: Router, md: &Arc<MetadataProvider>,
         .layer(Extension(platform.auth.clone()))
         .layer(Extension(platform.events.clone()))
         .layer(Extension(platform.custom_events.clone()))
-        .layer(Extension(platform.event_properties.clone()))
-        .layer(Extension(platform.user_properties.clone()))
+        .layer(Extension(Properties {
+            event: platform.event_properties.clone(),
+            user: platform.user_properties.clone(),
+        }))
         .layer(Extension(platform.custom_properties.clone()))
         .layer(Extension(auth_cfg))
         .layer(Extension(platform.query.clone()))

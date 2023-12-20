@@ -78,7 +78,8 @@ impl TryInto<common::query::event_segmentation::SegmentTime> for SegmentTime {
 #[serde(rename_all = "camelCase")]
 pub enum ChartType {
     Line,
-    Bar,
+    Column,
+    Pie
 }
 
 impl TryInto<common::query::event_segmentation::ChartType> for ChartType {
@@ -89,7 +90,8 @@ impl TryInto<common::query::event_segmentation::ChartType> for ChartType {
     ) -> std::result::Result<common::query::event_segmentation::ChartType, Self::Error> {
         Ok(match self {
             ChartType::Line => common::query::event_segmentation::ChartType::Line,
-            ChartType::Bar => common::query::event_segmentation::ChartType::Bar,
+            ChartType::Column => common::query::event_segmentation::ChartType::Column,
+            ChartType::Pie => common::query::event_segmentation::ChartType::Pie,
         })
     }
 }
@@ -100,7 +102,8 @@ impl TryInto<ChartType> for common::query::event_segmentation::ChartType {
     fn try_into(self) -> std::result::Result<ChartType, Self::Error> {
         Ok(match self {
             common::query::event_segmentation::ChartType::Line => ChartType::Line,
-            common::query::event_segmentation::ChartType::Bar => ChartType::Bar,
+            common::query::event_segmentation::ChartType::Column => ChartType::Column,
+            common::query::event_segmentation::ChartType::Pie => ChartType::Pie,
         })
     }
 }

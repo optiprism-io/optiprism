@@ -64,10 +64,11 @@ impl Provider for ProviderImpl {
         )
         .await?;
 
+        println!("sdf {:?}", plan);
         // let plan = LogicalPlanBuilder::from(plan).explain(true, true)?.build()?;
 
         let result = execute_plan(&plan).await?;
-
+        println!("{:?}", result);
         Ok(result.column(0).to_owned())
     }
 
@@ -125,6 +126,7 @@ async fn execute_plan(plan: &LogicalPlan) -> Result<RecordBatch> {
     let exec_ctx = SessionContext::with_state(state.clone());
     debug!("logical plan: {:?}", plan);
     let physical_plan = state.create_physical_plan(plan).await?;
+    println!("{:?}",physical_plan);
     let displayable_plan = displayable(physical_plan.as_ref());
 
     debug!("physical plan: {}", displayable_plan.indent(true));

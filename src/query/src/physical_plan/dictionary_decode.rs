@@ -20,6 +20,7 @@ use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
 use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
+use arrow::util::pretty::print_batches;
 use axum::async_trait;
 use datafusion::execution::context::TaskContext;
 use datafusion::physical_plan::expressions::Column;

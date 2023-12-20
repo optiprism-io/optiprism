@@ -96,27 +96,27 @@ impl Destination<Track> for Local {
     fn send(&self, ctx: &RequestContext, req: Track) -> Result<()> {
         let mut values = Vec::new();
 
-        values.push(NamedValue::new_event(
+        values.push(NamedValue::new(
             COLUMN_PROJECT_ID.to_string(),
             Value::Int64(Some(ctx.project_id.unwrap() as i64)),
         ));
-        values.push(NamedValue::new_event(
+        values.push(NamedValue::new(
             COLUMN_USER_ID.to_string(),
             Value::Int64(Some(req.resolved_user_id.unwrap())),
         ));
-        values.push(NamedValue::new_event(
+        values.push(NamedValue::new(
             COLUMN_CREATED_AT.to_string(),
-            Value::Int64(Some(req.timestamp.timestamp())),
+            Value::Timestamp(Some(req.timestamp.timestamp())),
         ));
-        values.push(NamedValue::new_event(
+        values.push(NamedValue::new(
             COLUMN_EVENT_ID.to_string(),
             Value::Int64(Some(req.resolved_event.as_ref().unwrap().record_id as i64)),
         ));
         let event_id = req.resolved_event.as_ref().unwrap().event.id;
 
-        values.push(NamedValue::new_event(
+        values.push(NamedValue::new(
             COLUMN_EVENT.to_string(),
-            Value::Int16(Some(event_id as i16)),
+            Value::Int64(Some(event_id as i64)),
         ));
 
         let event_props = req

@@ -47,7 +47,9 @@ impl ProviderImpl {
         );
 
         match tx.get(key)? {
-            None => Err(MetadataError::NotFound("dashboard not found".to_string())),
+            None => Err(MetadataError::NotFound(
+                "dashboard not found".to_string(),
+            )),
             Some(value) => Ok(deserialize(&value)?),
         }
     }
@@ -67,7 +69,6 @@ impl Provider for ProviderImpl {
             make_id_seq_key(org_proj_ns(organization_id, project_id, NAMESPACE).as_slice()),
         )?;
 
-        println!("seq {id}");
         let dashboard = Dashboard {
             id,
             created_at,
@@ -88,6 +89,7 @@ impl Provider for ProviderImpl {
             ),
             &data,
         )?;
+
         tx.commit()?;
         Ok(dashboard)
     }

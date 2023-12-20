@@ -183,7 +183,6 @@ macro_rules! agg {
                 let mut skip_partition = 0;
                 let mut skip = false;
                 for (row_id, val) in predicate.into_iter().enumerate() {
-                    println!("!");
                     if skip {
                         if partitions.value(row_id) == skip_partition {
                             continue;
