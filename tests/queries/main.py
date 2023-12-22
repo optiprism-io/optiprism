@@ -12,7 +12,7 @@ def return_type(typ, agg):
     elif agg == "avg":
         return "f64"
     elif agg == "sum":
-        if typ == "i8" or typ == "i16" or typ == "i32":
+        if typ == "i8" or typ == "i16" or typ == "i32" or typ == "ts":
             return "i64"
         elif typ == "u8" or typ == "u16" or typ == "u32":
             return "u64"

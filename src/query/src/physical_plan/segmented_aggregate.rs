@@ -205,11 +205,9 @@ async fn collect_segment(
 ) -> Result<HashMap<i64, (), RandomState>> {
     let mut exist: HashMap<i64, (), RandomState> = ahash::HashMap::new();
 
-    println!("!@#1");
     loop {
         match partition_stream.next().await {
             Some(Ok(batch)) => {
-                println!("!@#2");
                 let vals = partition_col
                     .evaluate(&batch)?
                     .into_array(batch.num_rows())
@@ -224,7 +222,6 @@ async fn collect_segment(
             }
 
             None => {
-                println!("!@#3");
                 break;
             }
             _ => unreachable!(),
@@ -289,8 +286,6 @@ impl Runner {
                     break;
                 }
                 Some(Err(er)) => {
-                    println!("!ff");
-
                     return Err(QueryError::from(er));
                 }
             };

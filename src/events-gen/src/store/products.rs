@@ -51,6 +51,7 @@ impl Product {
 
 pub struct ProductProvider {
     dicts: Arc<dyn dictionaries::Provider>,
+    properties: Arc<dyn metadata::properties::Provider>,
     org_id: u64,
     proj_id: u64,
     pub products: Vec<Product>,
@@ -71,6 +72,7 @@ impl ProductProvider {
         proj_id: u64,
         rng: &mut ThreadRng,
         dicts: Arc<dyn dictionaries::Provider>,
+        properties: Arc<dyn metadata::properties::Provider>,
         rdr: R,
     ) -> Result<Self> {
         let mut rdr = csv::Reader::from_reader(rdr);
@@ -89,13 +91,13 @@ impl ProductProvider {
                 name: dicts.get_key_or_create(
                     org_id,
                     proj_id,
-                    "event_product_name",
+                    properties.get_by_name(org_id, proj_id, "Product Name").unwrap().column_name().as_str(),
                     rec.name.as_str(),
                 )?,
                 category: dicts.get_key_or_create(
                     org_id,
                     proj_id,
-                    "event_product_category",
+                    properties.get_by_name(org_id, proj_id, "Product Category").unwrap().column_name().as_str(),
                     rec.category.as_str(),
                 )?,
                 subcategory: rec
@@ -104,7 +106,7 @@ impl ProductProvider {
                         dicts.get_key_or_create(
                             org_id,
                             proj_id,
-                            "event_product_subcategory",
+                            properties.get_by_name(org_id, proj_id, "Product Subcategory").unwrap().column_name().as_str(),
                             v.as_str(),
                         )
                     })
@@ -112,9 +114,13 @@ impl ProductProvider {
                 brand: rec
                     .brand
                     .map(|v| {
-                        dicts.get_key_or_create(org_id, proj_id, "event_product_brand", v.as_str())
-                    })
-                    .transpose()?,
+                        dicts.get_key_or_create(
+                            org_id,
+                            proj_id,
+                            properties.get_by_name(org_id, proj_id, "Product Brand").unwrap().column_name().as_str(),
+                            v.as_str(),
+                        )
+                    }).transpose()?,
                 price: rec.price,
                 discount_price,
                 margin: 0.,
@@ -153,12 +159,13 @@ impl ProductProvider {
             WeightedIndex::new(probability::calc_cubic_spline(categories.len(), vec![
                 1., 0.5, 0.3, 0.1,
             ])?)
-            .map_err(|err| EventsGenError::Internal(err.to_string()))?;
+                .map_err(|err| EventsGenError::Internal(err.to_string()))?;
 
         // make rating weights from 0 to 5 with 10 bins for each int value
         let rating_weights = probability::calc_cubic_spline(50, vec![0.01, 0.01, 0.1, 0.7, 1.])?;
         Ok(Self {
             dicts,
+            properties,
             org_id,
             proj_id,
             products,
@@ -200,6 +207,6 @@ impl ProductProvider {
     pub fn string_name(&self, key: u64) -> Result<String> {
         Ok(self
             .dicts
-            .get_value(self.org_id, self.proj_id, "event_product_name", key)?)
+            .get_value(self.org_id, self.proj_id, self.properties.get_by_name(self.org_id, self.proj_id, "Product Name").unwrap().column_name().as_str(), key)?)
     }
 }

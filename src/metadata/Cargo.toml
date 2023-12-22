@@ -15,6 +15,7 @@ chronoutil = "0.2.3"
 common = { path = "../common" }
 store = { path = "../store" }
 convert_case = "0.6.0"
+lru = "0.12.1"
 datafusion = "27.0.0"
 datafusion-common = "27.0.0"
 futures = "0.3.25"

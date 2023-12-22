@@ -72,7 +72,6 @@ pub struct State<'a> {
 pub struct Config {
     pub rng: ThreadRng,
     pub gen: Generator,
-    pub schema: SchemaRef,
     pub events_map: HashMap<Event, u64>,
     pub products: ProductProvider,
     pub to: DateTime<Utc>,
@@ -82,7 +81,6 @@ pub struct Config {
 pub struct Scenario {
     pub rng: ThreadRng,
     pub gen: Generator,
-    pub schema: SchemaRef,
     pub events_map: HashMap<Event, u64>,
     pub products: ProductProvider,
     pub to: DateTime<Utc>,
@@ -94,7 +92,6 @@ impl Scenario {
         Self {
             rng: cfg.rng,
             gen: cfg.gen,
-            schema: cfg.schema,
             events_map: cfg.events_map,
             products: cfg.products,
             to: cfg.to,

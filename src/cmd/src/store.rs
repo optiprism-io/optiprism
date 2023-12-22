@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::{fs, io, thread};
 use std::fs::File;
 use std::net::SocketAddr;
@@ -7,7 +7,7 @@ use std::sync::Arc;
 use crate::error::Result;
 use arrow::record_batch::RecordBatch;
 use axum::{Router, Server};
-use chrono::{DateTime, Duration};
+use chrono::{DateTime, Duration, NaiveDateTime};
 use chrono::Utc;
 use clap::Parser;
 use crossbeam_channel::bounded;
@@ -20,7 +20,7 @@ use events_gen::store::events::Event;
 use events_gen::store::products::ProductProvider;
 use events_gen::store::profiles::ProfileProvider;
 use events_gen::store::scenario;
-use events_gen::store::scenario::Scenario;
+use events_gen::store::scenario::{EventRecord, Scenario};
 use events_gen::store::schema::create_properties;
 use futures::executor::block_on;
 use metadata::{MetadataProvider, properties};
@@ -62,6 +62,8 @@ pub struct Shop {
     duration: Option<String>,
     #[arg(long)]
     to_date: Option<String>,
+    #[arg(long, default_value = "10 days")]
+    future_duration: Option<String>,
     #[arg(long, default_value = "10")]
     new_daily_users: usize,
     #[arg(long)]
@@ -180,7 +182,7 @@ pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
     let db = Arc::new(OptiDBImpl::open(args.path.join("store"), Options {})?);
     let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
     info!("system initialization...");
-    init_system(&md, &db)?;
+    init_system(&md, &db, args.partitions.unwrap_or_else(num_cpus::get))?;
     if let Some(ui_path) = &args.ui_path {
         if !ui_path.try_exists()? {
             return Err(
@@ -205,6 +207,9 @@ pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
 
     let duration = Duration::from_std(parse_duration::parse(
         args.duration.clone().unwrap().as_str(),
+    )?)?;
+    let future_duration = Duration::from_std(parse_duration::parse(
+        args.future_duration.clone().unwrap().as_str(),
     )?)?;
     let from_date = to_date - duration;
 
@@ -247,6 +252,23 @@ pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
     db.flush()?;
 
     info!("successfully generated!");
+    info!("starting future data generation...");
+    let store_cfg = Config {
+        org_id: 1,
+        project_id: proj_id,
+        from_date: to_date,
+        to_date: to_date + future_duration,
+        products_rdr: File::open(args.demo_data_path.join("products.csv"))
+            .map_err(|err| Error::Internal(format!("can't open products.csv: {err}")))?,
+        geo_rdr: File::open(args.demo_data_path.join("geo.csv"))
+            .map_err(|err| Error::Internal(format!("can't open geo.csv: {err}")))?,
+        device_rdr: File::open(args.demo_data_path.join("device.csv"))
+            .map_err(|err| Error::Internal(format!("can't open device.csv: {err}")))?,
+        new_daily_users: args.new_daily_users,
+        batch_size: 4096,
+        partitions: args.partitions.unwrap_or_else(num_cpus::get),
+    };
+    future_gen(md.clone(), db.clone(), store_cfg)?;
 
     let mut router = Router::new();
     info!("initializing platform...");
@@ -281,24 +303,6 @@ pub fn gen<R>(
     let mut rng = thread_rng();
     info!("creating entities...");
 
-    let topts = TableOptions {
-        levels: 7,
-        merge_array_size: 10000,
-        partitions: cfg.partitions,
-        index_cols: 2,
-        l1_max_size_bytes: 1024 * 1024 * 10,
-        level_size_multiplier: 10,
-        l0_max_parts: 4,
-        max_log_length_bytes: 1024 * 1024 * 10,
-        merge_array_page_size: 10000,
-        merge_data_page_size_limit_bytes: Some(1024 * 1024),
-        merge_index_cols: 2,
-        merge_max_l1_part_size_bytes: 1024 * 1024,
-        merge_part_size_multiplier: 10,
-        merge_row_group_values_limit: 1000,
-        merge_chunk_size: 1024 * 8 * 8,
-    };
-    db.create_table("events", topts)?;
     info!("creating properties...");
     create_properties(cfg.org_id, cfg.project_id, md, db)?;
 
@@ -307,6 +311,7 @@ pub fn gen<R>(
         cfg.org_id,
         cfg.project_id,
         &md.dictionaries,
+        &md.user_properties,
         cfg.geo_rdr,
         cfg.device_rdr,
     )?;
@@ -316,6 +321,7 @@ pub fn gen<R>(
         cfg.project_id,
         &mut rng,
         md.dictionaries.clone(),
+        md.event_properties.clone(),
         cfg.products_rdr,
     )?;
     let mut events_map: HashMap<Event, u64> = HashMap::default();
@@ -331,7 +337,6 @@ pub fn gen<R>(
 
 
     let (rx, tx) = bounded(1);
-    let schema = db.schema1("events")?;
     // move init to thread because thread_rng is not movable
     // todo parallelize?
     thread::spawn(move || {
@@ -355,7 +360,6 @@ pub fn gen<R>(
         let run_cfg = scenario::Config {
             rng: rng.clone(),
             gen,
-            schema: Arc::new(schema),
             events_map,
             products,
             to: cfg.to_date,
@@ -373,32 +377,136 @@ pub fn gen<R>(
 
     let mut idx = 0;
     while let Some(event) = tx.recv()? {
-        let mut vals = vec![];
-        vals.push(NamedValue::new("project_id".to_string(), Value::Int64(Some(cfg.project_id as i64))));
-        vals.push(NamedValue::new("user_id".to_string(), Value::Int64(Some(event.user_id))));
-        vals.push(NamedValue::new("created_at".to_string(), Value::Timestamp(Some(event.created_at))));
-        vals.push(NamedValue::new("event_id".to_string(), Value::Int64(Some(idx))));
-        vals.push(NamedValue::new("event".to_string(), Value::Int64(Some(event.event))));
-        vals.push(NamedValue::new(md.event_properties.get_by_name(cfg.org_id, cfg.project_id, "Product Name").unwrap().column_name(), Value::Int16(event.product_name)));
-        vals.push(NamedValue::new(md.event_properties.get_by_name(cfg.org_id, cfg.project_id, "Product Category").unwrap().column_name(), Value::Int16(event.product_category)));
-        vals.push(NamedValue::new(md.event_properties.get_by_name(cfg.org_id, cfg.project_id, "Product Subcategory").unwrap().column_name(), Value::Int16(event.product_subcategory)));
-        vals.push(NamedValue::new(md.event_properties.get_by_name(cfg.org_id, cfg.project_id, "Product Brand").unwrap().column_name(), Value::Int16(event.product_brand)));
-        vals.push(NamedValue::new(md.event_properties.get_by_name(cfg.org_id, cfg.project_id, "Product Price").unwrap().column_name(), Value::Decimal(event.product_price)));
-        vals.push(NamedValue::new(md.event_properties.get_by_name(cfg.org_id, cfg.project_id, "Product Discount Price").unwrap().column_name(), Value::Decimal(event.product_discount_price)));
-        vals.push(NamedValue::new(md.event_properties.get_by_name(cfg.org_id, cfg.project_id, "Revenue").unwrap().column_name(), Value::Decimal(event.revenue)));
-        vals.push(NamedValue::new(md.user_properties.get_by_name(cfg.org_id, cfg.project_id, "Spent Total").unwrap().column_name(), Value::Decimal(event.spent_total)));
-        vals.push(NamedValue::new(md.user_properties.get_by_name(cfg.org_id, cfg.project_id, "Products Bought").unwrap().column_name(), Value::Int8(event.products_bought)));
-        vals.push(NamedValue::new(md.user_properties.get_by_name(cfg.org_id, cfg.project_id, "Cart Items Number").unwrap().column_name(), Value::Int8(event.cart_items_number)));
-        vals.push(NamedValue::new(md.user_properties.get_by_name(cfg.org_id, cfg.project_id, "Cart Amount").unwrap().column_name(), Value::Decimal(event.cart_amount)));
-        vals.push(NamedValue::new(md.user_properties.get_by_name(cfg.org_id, cfg.project_id, "Country").unwrap().column_name(), Value::Int16(event.country)));
-        vals.push(NamedValue::new(md.user_properties.get_by_name(cfg.org_id, cfg.project_id, "City").unwrap().column_name(), Value::Int16(event.city)));
-        vals.push(NamedValue::new(md.user_properties.get_by_name(cfg.org_id, cfg.project_id, "Device").unwrap().column_name(), Value::Int16(event.device)));
-        vals.push(NamedValue::new(md.user_properties.get_by_name(cfg.org_id, cfg.project_id, "Device Category").unwrap().column_name(), Value::Int16(event.device_category)));
-        vals.push(NamedValue::new(md.user_properties.get_by_name(cfg.org_id, cfg.project_id, "Os").unwrap().column_name(), Value::Int16(event.os)));
-        vals.push(NamedValue::new(md.user_properties.get_by_name(cfg.org_id, cfg.project_id, "Os Version").unwrap().column_name(), Value::Int16(event.os_version)));
-        db.insert("events", vals)?;
+        write_event(cfg.org_id, cfg.project_id, &db, md, event, idx)?;
         idx += 1;
     }
 
     Ok(())
+}
+
+pub fn future_gen<R>(
+    md: Arc<MetadataProvider>,
+    db: Arc<OptiDBImpl>,
+    cfg: Config<R>,
+) -> Result<()>
+    where
+        R: io::Read,
+{
+    let mut rng = thread_rng();
+    let profiles = ProfileProvider::try_new_from_csv(
+        cfg.org_id,
+        cfg.project_id,
+        &md.dictionaries,
+        &md.user_properties,
+        cfg.geo_rdr,
+        cfg.device_rdr,
+    )?;
+    let products = ProductProvider::try_new_from_csv(
+        cfg.org_id,
+        cfg.project_id,
+        &mut rng,
+        md.dictionaries.clone(),
+        md.event_properties.clone(),
+        cfg.products_rdr,
+    )?;
+    let mut events_map: HashMap<Event, u64> = HashMap::default();
+    for event in all::<Event>() {
+        let md_event =
+            md
+                .events
+                .get_by_name(cfg.org_id, cfg.project_id, event.to_string().as_str()).unwrap();
+        events_map.insert(event, md_event.id);
+        md.dictionaries
+            .get_key_or_create(1, 1, "event_event", event.to_string().as_str()).unwrap();
+    }
+
+    let (rx, tx) = bounded(1);
+
+    // todo parallelize?
+    thread::spawn(move || {
+        let mut rng = thread_rng();
+        let gen_cfg = generator::Config {
+            rng: rng.clone(),
+            profiles,
+            from: cfg.from_date,
+            to: cfg.to_date,
+            new_daily_users: cfg.new_daily_users,
+            traffic_hourly_weights: [
+                0.4, 0.37, 0.39, 0.43, 0.45, 0.47, 0.52, 0.6, 0.8, 0.9, 0.85, 0.8, 0.75, 0.85, 1.,
+                0.85, 0.7, 0.63, 0.62, 0.61, 0.59, 0.57, 0.48, 0.4,
+            ],
+        };
+
+        let gen = Generator::new(gen_cfg);
+
+        let run_cfg = scenario::Config {
+            rng: rng.clone(),
+            gen,
+            events_map,
+            products,
+            to: cfg.to_date,
+            out: rx,
+        };
+
+        let mut scenario = Scenario::new(run_cfg);
+
+        let res = scenario.run();
+        match res {
+            Ok(_) => {}
+            Err(err) => println!("generation error: {:?}", err)
+        }
+    });
+
+    let mut out = BTreeMap::new();
+    while let Some(event) = tx.recv()? {
+        out.insert(event.created_at, event);
+    }
+    thread::spawn(move || {
+        let mut idx = 0;
+        loop {
+            match out.pop_first() {
+                None => break,
+                Some((ts, event)) => {
+                    let cur = Utc::now().timestamp();
+                    let ts = ts / 1000000000;
+                    let d = NaiveDateTime::from_timestamp_opt(ts, 0).unwrap();
+                    if ts > cur {
+                        thread::sleep(std::time::Duration::from_secs((ts - cur) as u64));
+                    }
+                    write_event(cfg.org_id, cfg.project_id, &db, &md, event, 0).unwrap();
+                    idx += 1;
+                }
+            }
+        }
+    });
+    Ok(())
+}
+
+fn write_event(org_id: u64, proj_id: u64, db: &Arc<OptiDBImpl>, md: &Arc<MetadataProvider>, event: EventRecord, idx: i64) -> Result<()> {
+    let mut vals = vec![];
+    vals.push(NamedValue::new("project_id".to_string(), Value::Int64(Some(proj_id as i64))));
+    vals.push(NamedValue::new("user_id".to_string(), Value::Int64(Some(event.user_id))));
+    vals.push(NamedValue::new("created_at".to_string(), Value::Timestamp(Some(event.created_at))));
+    vals.push(NamedValue::new("event_id".to_string(), Value::Int64(Some(idx))));
+    vals.push(NamedValue::new("event".to_string(), Value::Int64(Some(event.event))));
+    vals.push(NamedValue::new(md.event_properties.get_by_name(org_id, proj_id, "Product Name").unwrap().column_name(), Value::Int16(event.product_name)));
+    vals.push(NamedValue::new(md.event_properties.get_by_name(org_id, proj_id, "Product Category").unwrap().column_name(), Value::Int16(event.product_category)));
+    vals.push(NamedValue::new(md.event_properties.get_by_name(org_id, proj_id, "Product Subcategory").unwrap().column_name(), Value::Int16(event.product_subcategory)));
+    vals.push(NamedValue::new(md.event_properties.get_by_name(org_id, proj_id, "Product Brand").unwrap().column_name(), Value::Int16(event.product_brand)));
+    vals.push(NamedValue::new(md.event_properties.get_by_name(org_id, proj_id, "Product Price").unwrap().column_name(), Value::Decimal(event.product_price)));
+    vals.push(NamedValue::new(md.event_properties.get_by_name(org_id, proj_id, "Product Discount Price").unwrap().column_name(), Value::Decimal(event.product_discount_price)));
+    vals.push(NamedValue::new(md.event_properties.get_by_name(org_id, proj_id, "Revenue").unwrap().column_name(), Value::Decimal(event.revenue)));
+    vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, "Spent Total").unwrap().column_name(), Value::Decimal(event.spent_total)));
+    vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, "Products Bought").unwrap().column_name(), Value::Int8(event.products_bought)));
+    vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, "Cart Items Number").unwrap().column_name(), Value::Int8(event.cart_items_number)));
+    vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, "Cart Amount").unwrap().column_name(), Value::Decimal(event.cart_amount)));
+    vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, "Country").unwrap().column_name(), Value::Int16(event.country)));
+    vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, "City").unwrap().column_name(), Value::Int16(event.city)));
+    vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, "Device").unwrap().column_name(), Value::Int16(event.device)));
+    vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, "Device Category").unwrap().column_name(), Value::Int16(event.device_category)));
+    vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, "Os").unwrap().column_name(), Value::Int16(event.os)));
+    vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, "Os Version").unwrap().column_name(), Value::Int16(event.os_version)));
+    db.insert("events", vals)?;
+
+    return Ok(());
 }

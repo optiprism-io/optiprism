@@ -30,6 +30,7 @@ pub enum KeyValue {
     Int32(i32),
     Int64(i64),
     String(String),
+    Timestamp(i64),
 }
 
 impl TryFrom<&merger::parquet::ParquetValue> for KeyValue {
@@ -54,7 +55,6 @@ impl NamedValue {
     pub fn new(name: String, value: Value) -> Self {
         Self { name, value }
     }
-
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
@@ -84,7 +84,8 @@ impl Value {
             DataType::Int8 => Value::Int8(None),
             DataType::Int16 => Int16(None),
             DataType::Int32 => Value::Int32(None),
-            DataType::Int64 | DataType::Timestamp(_, _) => Value::Int64(None),
+            DataType::Int64  => Value::Int64(None),
+            DataType::Timestamp(_,_) => Value::Timestamp(None),
             DataType::Utf8 => Value::String(None),
             DataType::Decimal(_, _) => Value::Decimal(None),
             DataType::List(f) => match f.data_type() {
@@ -92,7 +93,8 @@ impl Value {
                 DataType::Int8 => Value::ListInt8(None),
                 DataType::Int16 => Value::ListInt16(None),
                 DataType::Int32 => Value::ListInt32(None),
-                DataType::Int64 | DataType::Timestamp(_, _) => Value::ListInt64(None),
+                DataType::Int64  => Value::ListInt64(None),
+                DataType::Timestamp(_,_)  => Value::ListTimestamp(None),
                 DataType::Utf8 => Value::ListString(None),
                 DataType::Decimal(_, _) => Value::ListDecimal(None),
                 _ => unimplemented!(),
@@ -110,6 +112,7 @@ impl From<&KeyValue> for Value {
             KeyValue::Int64(v) => Value::Int64(Some(*v)),
             KeyValue::String(v) => Value::String(Some(v.to_owned())),
             KeyValue::Int32(v) => Value::Int32(Some(*v)),
+            KeyValue::Timestamp(v) => Value::Timestamp(Some(*v)),
         }
     }
 }
@@ -122,7 +125,8 @@ impl From<&Value> for KeyValue {
             Value::Int64(Some(v)) => KeyValue::Int64(*v),
             Value::String(Some(v)) => KeyValue::String(v.to_owned()),
             Value::Int32(Some(v)) => KeyValue::Int32(*v),
-            _ => unreachable!(),
+            Value::Timestamp(Some(v)) => KeyValue::Timestamp(*v),
+            _ => unreachable!("{:?}", value),
         }
     }
 }

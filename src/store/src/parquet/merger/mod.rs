@@ -87,6 +87,18 @@ pub fn chunk_min_max(
             let arr = chunk.columns()[id].as_ref();
             match arr.data_type() {
                 // todo move to macro
+                DataType::Int8 => {
+                    let arr = arr.as_any().downcast_ref::<Int8Array>().unwrap();
+                    let min = KeyValue::Int8(arr.value(0));
+                    let max = KeyValue::Int8(arr.value(arr.len() - 1));
+                    (min, max)
+                }
+                DataType::Int16 => {
+                    let arr = arr.as_any().downcast_ref::<Int16Array>().unwrap();
+                    let min = KeyValue::Int16(arr.value(0));
+                    let max = KeyValue::Int16(arr.value(arr.len() - 1));
+                    (min, max)
+                }
                 DataType::Int32 => {
                     let arr = arr.as_any().downcast_ref::<Int32Array>().unwrap();
                     let min = KeyValue::Int32(arr.value(0));
@@ -99,13 +111,20 @@ pub fn chunk_min_max(
                     let max = KeyValue::Int64(arr.value(arr.len() - 1));
                     (min, max)
                 }
-                _ => unimplemented!("only support int32 and int64"),
+                DataType::Timestamp(_, _) => {
+                    let arr = arr.as_any().downcast_ref::<Int64Array>().unwrap();
+                    let min = KeyValue::Timestamp(arr.value(0));
+                    let max = KeyValue::Timestamp(arr.value(arr.len() - 1));
+                    (min, max)
+                }
+                _ => unimplemented!("only support int32 and int64. {:?}", arr.data_type()),
             }
         })
         .unzip();
 
     (min_values, max_values)
 }
+
 pub trait IndexChunk {
     fn min_values(&self) -> Vec<ParquetValue>;
     fn max_values(&self) -> Vec<ParquetValue>;
@@ -147,7 +166,7 @@ pub fn try_merge_arrow_schemas(schemas: Vec<Schema>) -> Result<Schema> {
 pub struct OneColMergeRow<A>(usize, A);
 
 impl<A> Ord for OneColMergeRow<A>
-where A: Ord
+    where A: Ord
 {
     fn cmp(&self, other: &Self) -> Ordering {
         self.1.cmp(&other.1).reverse()
@@ -155,7 +174,7 @@ where A: Ord
 }
 
 impl<A> PartialOrd for OneColMergeRow<A>
-where A: Ord
+    where A: Ord
 {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
@@ -163,7 +182,7 @@ where A: Ord
 }
 
 impl<A> PartialEq for OneColMergeRow<A>
-where A: Eq
+    where A: Eq
 {
     fn eq(&self, other: &Self) -> bool {
         self.1 == other.1
@@ -179,9 +198,9 @@ impl<A> Eq for OneColMergeRow<A> where A: Eq {}
 pub struct TwoColMergeRow<A, B>(usize, A, B);
 
 impl<A, B> Ord for TwoColMergeRow<A, B>
-where
-    A: Ord,
-    B: Ord,
+    where
+        A: Ord,
+        B: Ord,
 {
     fn cmp(&self, other: &Self) -> Ordering {
         (&self.1, &self.2).cmp(&(&other.1, &other.2)).reverse()
@@ -189,9 +208,9 @@ where
 }
 
 impl<A, B> PartialOrd for TwoColMergeRow<A, B>
-where
-    A: Ord,
-    B: Ord,
+    where
+        A: Ord,
+        B: Ord,
 {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
@@ -199,9 +218,9 @@ where
 }
 
 impl<A, B> PartialEq for TwoColMergeRow<A, B>
-where
-    A: Eq,
-    B: Eq,
+    where
+        A: Eq,
+        B: Eq,
 {
     fn eq(&self, other: &Self) -> bool {
         (&self.1, &self.2) == (&other.1, &other.2)
@@ -209,11 +228,10 @@ where
 }
 
 impl<A, B> Eq for TwoColMergeRow<A, B>
-where
-    A: Eq,
-    B: Eq,
-{
-}
+    where
+        A: Eq,
+        B: Eq,
+{}
 
 // this is a temporary array used to merge data pages avoiding downcasting
 

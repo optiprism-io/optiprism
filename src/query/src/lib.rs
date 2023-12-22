@@ -402,7 +402,7 @@ pub mod test_util {
             _=>unimplemented!()
         };
 
-        db.add_field("events", prop.column_name().as_str(), prop.data_type.clone().into(), prop.nullable)?;
+        // db.add_field("events", prop.column_name().as_str(), prop.data_type.clone().into(), prop.nullable)?;
 
         Ok(prop)
     }
@@ -542,13 +542,15 @@ pub mod test_util {
         Ok(())
     }
 
-    pub fn create_md() -> Result<Arc<MetadataProvider>> {
+    pub fn create_md() -> Result<(Arc<MetadataProvider>,Arc<OptiDBImpl>)> {
         let mut path = temp_dir();
         path.push(format!("{}.db", Uuid::new_v4()));
 
         let store = Arc::new(metadata::rocksdb::new(path.join("md"))?);
 
         let db = Arc::new(OptiDBImpl::open(path.join("db"),Options {})?);
-        Ok(Arc::new(MetadataProvider::try_new(store, db)?))
+        let opts = TableOptions::test();
+        db.create_table("events", opts).unwrap();
+        Ok((Arc::new(MetadataProvider::try_new(store, db.clone())?),db))
     }
 }

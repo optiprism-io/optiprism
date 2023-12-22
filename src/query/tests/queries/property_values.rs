@@ -1,3 +1,4 @@
+use std::env::temp_dir;
 use std::sync::Arc;
 
 use arrow::util::pretty::print_batches;
@@ -10,6 +11,7 @@ use datafusion::physical_plan::collect;
 use datafusion::prelude::SessionConfig;
 use datafusion::prelude::SessionContext;
 use datafusion_common::ScalarValue;
+use uuid::Uuid;
 use query::error::Result;
 use query::physical_plan::planner::planner::QueryPlanner;
 use query::queries::property_values::Filter;
@@ -19,10 +21,11 @@ use query::test_util::create_entities;
 use query::test_util::create_md;
 use query::test_util::events_provider;
 use query::Context;
+use store::db::{OptiDBImpl, Options, TableOptions};
 
 #[tokio::test]
 async fn test_property_values() -> Result<()> {
-    let md = create_md()?;
+    let (md,db) = create_md()?;
 
     let org_id = 1;
     let proj_id = 1;
@@ -34,8 +37,8 @@ async fn test_property_values() -> Result<()> {
         cur_time: Default::default(),
     };
 
-    create_entities(md.clone(), org_id, proj_id).await?;
-    let input = events_provider(md.database.clone(), org_id, proj_id).await?;
+    create_entities(md.clone(), &db,org_id, proj_id).await?;
+    let input = events_provider(db, org_id, proj_id).await?;
 
     let req = PropertyValues {
         property: PropertyRef::Event("Product Name".to_string()),

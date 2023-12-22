@@ -16,8 +16,26 @@ pub mod store;
 pub mod test;
 
 
-pub fn init_system(md: &Arc<MetadataProvider>, db: &Arc<OptiDBImpl>) -> error::Result<()> {
-    db.create_table(TABLE_EVENTS, TableOptions::test())?;
+pub fn init_system(md: &Arc<MetadataProvider>, db: &Arc<OptiDBImpl>,partitions:usize) -> error::Result<()> {
+    let topts = TableOptions {
+        levels: 7,
+        merge_array_size: 10000,
+        partitions,
+        index_cols: 3,
+        l1_max_size_bytes: 1024 * 1024 * 10,
+        level_size_multiplier: 10,
+        l0_max_parts: 4,
+        max_log_length_bytes: 1024 * 1024 * 10,
+        merge_array_page_size: 10000,
+        merge_data_page_size_limit_bytes: Some(1024 * 1024),
+        merge_index_cols: 3,
+        merge_max_l1_part_size_bytes: 1024 * 1024,
+        merge_part_size_multiplier: 10,
+        merge_row_group_values_limit: 1000,
+        merge_chunk_size: 1024 * 8 * 8,
+    };
+    db.create_table("events", topts)?;
+
     create_property(
         md,
         0,

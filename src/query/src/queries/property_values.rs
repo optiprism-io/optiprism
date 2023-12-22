@@ -35,12 +35,12 @@ macro_rules! property_col {
             $md.$md_namespace
                 .get_by_name($ctx.organization_id, $ctx.project_id, $prop_name)?;
         let col_name = prop.column_name();
-        let expr = col(col_name.as_str());
 
+        let expr = col(col_name.as_str());
         let _aggr_schema =
             DFSchema::new_with_metadata(exprlist_to_fields(vec![&expr], &$input)?, HashMap::new())?;
         let agg_fn = Aggregate::try_new(Arc::new($input.clone()), vec![expr], vec![])?;
-        let expr = LogicalPlan::Aggregate(agg_fn);
+        let input = LogicalPlan::Aggregate(agg_fn);
 
         match prop.dictionary_type {
             Some(_) => {
@@ -52,14 +52,19 @@ macro_rules! property_col {
                 );
 
                 LogicalPlan::Extension(Extension {
-                    node: Arc::new(DictionaryDecodeNode::try_new($input, vec![(
-                        Column::from_name(col_name),
+                    node: Arc::new(DictionaryDecodeNode::try_new(input, vec![(
+                        Column::from_name(col_name.clone()),
                         Arc::new(dict),
                     )])?),
                 })
             }
-            None => expr,
+            None => {
+                input
+            },
         }
+
+
+
     }};
 }
 
@@ -123,7 +128,6 @@ impl LogicalPlanBuilder {
             input: Arc::new(input),
         });
 
-        println!("{:?}",input);
         Ok(input)
     }
 }

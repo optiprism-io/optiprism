@@ -61,6 +61,7 @@ impl ProfileProvider {
         org_id: u64,
         proj_id: u64,
         dicts: &Arc<dyn dictionaries::Provider>,
+        properties: &Arc<dyn metadata::properties::Provider>,
         geo_rdr: R,
         device_rdr: R,
     ) -> Result<Self> {
@@ -76,12 +77,12 @@ impl ProfileProvider {
                     country: rec
                         .country
                         .map(|v| {
-                            dicts.get_key_or_create(org_id, proj_id, "user_country", v.as_str())
+                            dicts.get_key_or_create(org_id, proj_id, properties.get_by_name(org_id, proj_id, "Country").unwrap().column_name().as_str(), v.as_str())
                         })
                         .transpose()?,
                     city: rec
                         .city
-                        .map(|v| dicts.get_key_or_create(org_id, proj_id, "user_city", v.as_str()))
+                        .map(|v| dicts.get_key_or_create(org_id, proj_id, properties.get_by_name(org_id, proj_id, "City").unwrap().column_name().as_str(), v.as_str()))
                         .transpose()?,
                 };
                 result.push(geo);
@@ -105,7 +106,7 @@ impl ProfileProvider {
                     device: rec
                         .device
                         .map(|v| {
-                            dicts.get_key_or_create(org_id, proj_id, "user_device", v.as_str())
+                            dicts.get_key_or_create(org_id, proj_id, properties.get_by_name(org_id, proj_id, "Device").unwrap().column_name().as_str(), v.as_str())
                         })
                         .transpose()?,
                     device_category: rec
@@ -121,12 +122,12 @@ impl ProfileProvider {
                         .transpose()?,
                     os: rec
                         .os
-                        .map(|v| dicts.get_key_or_create(org_id, proj_id, "user_os", v.as_str()))
+                        .map(|v| dicts.get_key_or_create(org_id, proj_id, properties.get_by_name(org_id, proj_id, "Os").unwrap().column_name().as_str(), v.as_str()))
                         .transpose()?,
                     os_version: rec
                         .os_version
                         .map(|v| {
-                            dicts.get_key_or_create(org_id, proj_id, "user_os_version", v.as_str())
+                            dicts.get_key_or_create(org_id, proj_id, properties.get_by_name(org_id, proj_id, "Os Version").unwrap().column_name().as_str(), v.as_str())
                         })
                         .transpose()?,
                 };

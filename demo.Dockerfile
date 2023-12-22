@@ -12,11 +12,12 @@ RUN rustup default nightly
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/home/root/app/target \
     --mount=type=ssh \
-    cargo build --cmd demo --release
+    cargo build --bin optiprism --release
 
 FROM debian:stable-slim AS runtime
 WORKDIR /app
-COPY --from=rust /app/target/release/demo ./
-COPY data/demo ./demo_data
+COPY --from=rust /app/target/release/optiprism ./
+COPY data ./data
+RUN mkdir -p /app/db/
 EXPOSE 8080
-ENTRYPOINT ["/app/demo","shop","--demo-data-path","/app/demo_data"]
+ENTRYPOINT ["/app/optiprism","shop","--demo-data-path","/app/data/demo","--path","/app/db", "--ua-db-path","/app/data/ingester/regexes.yaml","--geo-city-path","data/ingester/GeoLite2-City.mmdb"]

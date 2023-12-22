@@ -574,6 +574,7 @@ mod tests {
         let opts = Options {
             index_cols: 1,
             array_size: 9,
+            chunk_size: 10,
             fields: vec!["f1".to_string(), "f2".to_string(), "f3".to_string()],
         };
         let mut merger = MergingIterator::new(readers, None, opts).unwrap();

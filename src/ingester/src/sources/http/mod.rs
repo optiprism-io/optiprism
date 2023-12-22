@@ -310,7 +310,6 @@ pub fn attach_routes(router: Router, track_exec: Executor<crate::Track>,
         track: Arc::new(Mutex::new(track_exec)),
         identify: Arc::new(Mutex::new((identify_exec))),
     };
-    info!("attaching ingester routes...");
     let cors = CorsLayer::new()
         .allow_methods(Any)
         .allow_origin(Any)

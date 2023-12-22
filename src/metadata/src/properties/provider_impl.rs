@@ -1,3 +1,4 @@
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 use std::sync::RwLock;
 
@@ -5,6 +6,7 @@ use async_trait::async_trait;
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::Utc;
+use lru::LruCache;
 use common::types::{DType, OptionalProperty, TABLE_EVENTS};
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
@@ -84,30 +86,44 @@ fn index_display_name_key(
 pub struct ProviderImpl {
     db: Arc<TransactionDB>,
     optiDb: Arc<OptiDBImpl>,
+    id_cache: RwLock<LruCache<(u64, u64, u64), Property>>,
+    name_cache: RwLock<LruCache<(u64, u64, String), Property>>,
     typ: Type,
 }
 
 impl ProviderImpl {
     pub fn new_user(db: Arc<TransactionDB>, optiDb: Arc<OptiDBImpl>) -> Self {
+        let mut id_cache = RwLock::new(LruCache::new(NonZeroUsize::new(10 /*todo why 10?*/).unwrap()));
+        let mut name_cache = RwLock::new(LruCache::new(NonZeroUsize::new(10 /*todo why 10?*/).unwrap()));
         ProviderImpl {
             db,
             optiDb,
+            id_cache,
+            name_cache,
             typ: Type::User,
         }
     }
 
     pub fn new_event(db: Arc<TransactionDB>, optiDb: Arc<OptiDBImpl>) -> Self {
+        let mut id_cache = RwLock::new(LruCache::new(NonZeroUsize::new(10 /*todo why 10?*/).unwrap()));
+        let mut name_cache = RwLock::new(LruCache::new(NonZeroUsize::new(10 /*todo why 10?*/).unwrap()));
         ProviderImpl {
             db,
+            id_cache,
+            name_cache,
             optiDb,
             typ: Type::Event,
         }
     }
 
     pub fn new_system(db: Arc<TransactionDB>, optiDb: Arc<OptiDBImpl>) -> Self {
+        let mut id_cache = RwLock::new(LruCache::new(NonZeroUsize::new(10 /*todo why 10?*/).unwrap()));
+        let mut name_cache = RwLock::new(LruCache::new(NonZeroUsize::new(10 /*todo why 10?*/).unwrap()));
         ProviderImpl {
             db,
             optiDb,
+            id_cache,
+            name_cache,
             typ: Type::System,
         }
     }
@@ -119,13 +135,18 @@ impl ProviderImpl {
         project_id: u64,
         name: &str,
     ) -> Result<Property> {
+        if let Some(prop) = self.name_cache.write().unwrap().get(&(organization_id, project_id, name.to_string())) {
+            return Ok(prop.to_owned());
+        }
+
+        let idx_key = make_index_key(
+            org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
+            IDX_NAME,
+            name,
+        );
         let data = get_index(
             &tx,
-            make_index_key(
-                org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
-                IDX_NAME,
-                name,
-            ),
+            idx_key,
         )?;
 
         Ok(deserialize(&data)?)
@@ -138,6 +159,10 @@ impl ProviderImpl {
         project_id: u64,
         id: u64,
     ) -> Result<Property> {
+        if let Some(prop) = self.id_cache.write().unwrap().get(&(organization_id, project_id, id)) {
+            return Ok(prop.to_owned());
+        }
+
         let key = make_data_value_key(
             org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
             id,
@@ -175,7 +200,7 @@ impl ProviderImpl {
 
         let order = next_zero_seq(
             &tx,
-            make_id_seq_key(org_proj_ns(organization_id, project_id, format!("{}/{}", self.typ.order_path(),req.data_type.short_name()).as_bytes()).as_slice()),
+            make_id_seq_key(org_proj_ns(organization_id, project_id, format!("{}/{}", self.typ.order_path(), req.data_type.short_name()).as_bytes()).as_slice()),
         )?;
         let created_at = Utc::now();
 
@@ -201,12 +226,16 @@ impl ProviderImpl {
             is_system: req.is_system,
         };
 
+        let idx_key = make_data_value_key(
+            org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
+            prop.id,
+        );
+        self.name_cache.write().unwrap().put((organization_id, project_id, prop.name.to_string()),prop.clone());
+        self.id_cache.write().unwrap().put((organization_id, project_id, id),prop.clone());
+
         let data = serialize(&prop)?;
         tx.put(
-            make_data_value_key(
-                org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
-                prop.id,
-            ),
+            idx_key,
             &data,
         )?;
 
@@ -293,21 +322,22 @@ impl Provider for ProviderImpl {
 
         let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
         let mut idx_prev_keys: Vec<Option<Vec<u8>>> = Vec::new();
-        if let OptionalProperty::Some(name) = &req.name {
-            idx_keys.push(index_name_key(
-                organization_id,
-                project_id,
-                &self.typ,
-                name.as_str(),
-            ));
-            idx_prev_keys.push(index_name_key(
-                organization_id,
-                project_id,
-                &self.typ,
-                prev_prop.name.as_str(),
-            ));
-            prop.name = name.to_owned();
-        }
+        // name is persistent
+        // if let OptionalProperty::Some(name) = &req.name {
+        //     idx_keys.push(index_name_key(
+        //         organization_id,
+        //         project_id,
+        //         &self.typ,
+        //         name.as_str(),
+        //     ));
+        //     idx_prev_keys.push(index_name_key(
+        //         organization_id,
+        //         project_id,
+        //         &self.typ,
+        //         prev_prop.name.as_str(),
+        //     ));
+        //     prop.name = name.to_owned();
+        // }
         if let OptionalProperty::Some(display_name) = &req.display_name {
             idx_keys.push(index_display_name_key(
                 organization_id,
@@ -359,12 +389,16 @@ impl Provider for ProviderImpl {
             prop.dictionary_type = dictionary_type;
         }
 
+        let idx_key = make_data_value_key(
+            org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
+            prop.id,
+        );
+        self.name_cache.write().unwrap().put((organization_id, project_id, prop.name.to_string()),prop.clone());
+        self.id_cache.write().unwrap().put((organization_id, project_id, prop.id),prop.clone());
+
         let data = serialize(&prop)?;
         tx.put(
-            make_data_value_key(
-                org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
-                prop.id,
-            ),
+            idx_key,
             &data,
         )?;
 
@@ -392,6 +426,8 @@ impl Provider for ProviderImpl {
             )
                 .as_ref(),
         )?;
+        self.name_cache.write().unwrap().pop(&(organization_id, project_id, prop.name.to_string()));
+        self.id_cache.write().unwrap().pop(&(organization_id, project_id, prop.id));
         tx.commit()?;
         Ok(prop)
     }

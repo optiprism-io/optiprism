@@ -604,6 +604,7 @@ fn recover(path: PathBuf, opts: Options) -> Result<OptiDBImpl> {
     // };
     let (compactor_outbox, rx) = std::sync::mpsc::channel();
     let tables = Arc::new(RwLock::new(tables));
+
     let compactor = Compactor::new(tables.clone(), path.clone(), rx);
     thread::spawn(move || compactor.run());
     // if trigger_compact {
@@ -667,8 +668,8 @@ fn memtable_to_partitioned_chunks(
                 pid = pidx as isize;
                 break;
             }
-            continue;
         }
+
         if pid < 0 {
             partitions.push(MemtablePartition::new(
                 phash as usize % metadata.opts.partitions,
@@ -693,7 +694,6 @@ fn memtable_to_partitioned_chunks(
             }
         }
     }
-    // todo make nulls for missing values (schema evolution)
     let v = partitions
         .into_iter()
         .map(|p| {
@@ -1248,7 +1248,6 @@ impl OptiDBImpl {
         let path = self.path.join("tables").join(tbl_name);
         fs::create_dir_all(&path)?;
         let new_tbl = try_recover_table(path, tbl_name.to_string(), Some(opts))?;
-
         let mut tables = self.tables.write();
         tables.push(new_tbl);
 
@@ -1328,7 +1327,7 @@ mod tests {
     #[test]
     fn it_works() {
         // let path = temp_dir().join("db");
-        let path = PathBuf::from(" / opt / homebrew / Caskroom / clickhouse / user_files");
+        let path = PathBuf::from("/opt/homebrew/Caskroom/clickhouse/user_files");
         fs::remove_dir_all(&path).unwrap();
         fs::create_dir_all(&path).unwrap();
 
@@ -1336,20 +1335,20 @@ mod tests {
         let mut db = OptiDBImpl::open(path, opts).unwrap();
         let topts = TableOptions {
             levels: 7,
-            merge_array_size: 10000,
+            merge_array_size: 1000,
             partitions: 2,
             index_cols: 2,
-            l1_max_size_bytes: 1024 * 1024 * 10,
+            l1_max_size_bytes: 1024,
             level_size_multiplier: 10,
             l0_max_parts: 4,
-            max_log_length_bytes: 1024 * 1024 * 100,
+            max_log_length_bytes: 1024,
             merge_array_page_size: 10000,
             merge_data_page_size_limit_bytes: Some(1024 * 1024),
             merge_index_cols: 2,
             merge_max_l1_part_size_bytes: 1024 * 1024,
             merge_part_size_multiplier: 10,
             merge_row_group_values_limit: 1000,
-            read_chunk_size: 10,
+            merge_chunk_size: 1024 * 8 * 8,
         };
 
         // let topts = TableOptions {
@@ -1370,7 +1369,7 @@ mod tests {
         // read_chunk_size: 10,
         // };
 
-        let cols = 100;
+        let cols = 4;
         db.create_table("t1", topts).unwrap();
         for col in 0..cols {
             db.add_field("t1", col.to_string().as_str(), DType::Int64, false)
@@ -1386,12 +1385,12 @@ mod tests {
         for _ in 0..2 {
             for i in input.clone() {
                 let vals = (0..cols)
-                    .map(|v| NamedValue::new(v.to_string(), Value::Int64(Some(v as i64))))
+                    .map(|v| NamedValue::new(v.to_string(), Value::Int64(Some(i as i64))))
                     .collect::<Vec<_>>();
                 db.insert("t1", vals).unwrap();
             }
         }
-        let names = (0..cols).map(|v| v.to_string()).collect::<Vec<_>>();
+        /*let names = (0..cols).map(|v| v.to_string()).collect::<Vec<_>>();
         let streams = db.scan_partition("t1", 2, names).unwrap();
         for stream in streams {
             let b = block_on(stream.collect::<Vec<_>>())
@@ -1403,6 +1402,8 @@ mod tests {
             //     println!("{: ?}", bb);
             // }
         }
+        */
+
         db.flush().unwrap();
         thread::sleep(Duration::from_millis(20));
         // print_partitions(db.tables.read()[0].metadata.lock().partitions.as_ref());
@@ -1411,7 +1412,7 @@ mod tests {
 
     #[test]
     fn test_schema_evolution() {
-        let path = PathBuf::from(" / opt / homebrew / Caskroom / clickhouse / user_files");
+        let path = PathBuf::from("/opt/homebrew/Caskroom/clickhouse/user_files");
         fs::remove_dir_all(&path).unwrap();
         fs::create_dir_all(&path).unwrap();
 

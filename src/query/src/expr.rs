@@ -60,14 +60,12 @@ pub fn event_expression(
     metadata: &Arc<MetadataProvider>,
     event: &EventRef,
 ) -> Result<Expr> {
-    let _v = ScalarValue::from(1);
     Ok(match &event {
         // regular event
         EventRef::RegularName(name) => {
             let e = metadata
                 .events
                 .get_by_name(ctx.organization_id, ctx.project_id, name)?;
-
             binary_expr(
                 col(event_fields::EVENT),
                 Operator::Eq,

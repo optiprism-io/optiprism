@@ -219,7 +219,7 @@ pub async fn gen(args: &Test, proj_id: u64) -> Result<(), anyhow::Error> {
     let db = Arc::new(OptiDBImpl::open(args.path.join("store"), Options {})?);
     let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
     info!("system initialization...");
-    init_system(&md, &db)?;
+    init_system(&md, &db, args.partitions.unwrap_or_else(num_cpus::get))?;
 
     info!("creating org structure and admin account...");
     let (org_id, proj_id) = crate::init_test_org_structure(&md)?;
@@ -235,6 +235,7 @@ pub async fn gen(args: &Test, proj_id: u64) -> Result<(), anyhow::Error> {
         ("i_16", DType::Int16),
         ("i_32", DType::Int32),
         ("i_64", DType::Int64),
+        ("ts", DType::Timestamp),
         ("bool", DType::Boolean),
         ("string", DType::String),
         ("decimal", DType::Decimal),
@@ -284,6 +285,7 @@ pub async fn gen(args: &Test, proj_id: u64) -> Result<(), anyhow::Error> {
                 vals.push(NamedValue::new("i_16".to_string(), Value::Int16(Some(event as i16))));
                 vals.push(NamedValue::new("i_32".to_string(), Value::Int32(Some(event as i32))));
                 vals.push(NamedValue::new("i_64".to_string(), Value::Int64(Some(event))));
+                vals.push(NamedValue::new("ts".to_string(), Value::Timestamp(Some(event))));
                 vals.push(NamedValue::new("bool".to_string(), Value::Boolean(Some(event % 2 == 0))));
                 vals.push(NamedValue::new("string".to_string(), Value::String(Some(format!("event {}", event)))));
                 vals.push(NamedValue::new("decimal".to_string(), Value::Decimal(Some(event as i128 * 10_i128.pow(DECIMAL_SCALE as u32) + event as i128 * 100))));

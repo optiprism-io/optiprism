@@ -4,6 +4,7 @@ use std::time::Instant;
 use arrow::array::ArrayRef;
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
+use arrow::util::pretty::print_batches;
 use async_trait::async_trait;
 use chrono::Utc;
 use common::query::event_segmentation::EventSegmentation;
@@ -64,11 +65,10 @@ impl Provider for ProviderImpl {
         )
         .await?;
 
-        println!("sdf {:?}", plan);
         // let plan = LogicalPlanBuilder::from(plan).explain(true, true)?.build()?;
 
         let result = execute_plan(&plan).await?;
-        println!("{:?}", result);
+        // print_batches(&[result.clone()]);
         Ok(result.column(0).to_owned())
     }
 
@@ -126,7 +126,6 @@ async fn execute_plan(plan: &LogicalPlan) -> Result<RecordBatch> {
     let exec_ctx = SessionContext::with_state(state.clone());
     debug!("logical plan: {:?}", plan);
     let physical_plan = state.create_physical_plan(plan).await?;
-    println!("{:?}",physical_plan);
     let displayable_plan = displayable(physical_plan.as_ref());
 
     debug!("physical plan: {}", displayable_plan.indent(true));
