@@ -271,7 +271,7 @@ pub fn named_property_expression(
     values: Option<Vec<ScalarValue>>,
 ) -> Result<Expr> {
     match operation {
-        PropValueOperation::Eq | PropValueOperation::Neq | PropValueOperation::Like => {
+        PropValueOperation::Eq | PropValueOperation::Neq | PropValueOperation::Gt | PropValueOperation::Gte | PropValueOperation::Lt | PropValueOperation::Lte => {
             // expressions for OR
             let values_vec = values.ok_or_else(|| {
                 QueryError::Plan(format!(
@@ -295,6 +295,29 @@ pub fn named_property_expression(
                                 operation.clone().try_into().unwrap(),
                                 lit(v.to_owned()),
                             )
+                        })
+                        .collect();
+
+                    multi_or(exprs)
+                }
+            })
+        }
+        PropValueOperation::Like => {
+            // expressions for OR
+            let values_vec = values.ok_or_else(|| {
+                QueryError::Plan(format!(
+                    "value should be defined for \"{operation:?}\" operation"
+                ))
+            })?;
+
+            Ok(match values_vec.len() {
+                1=>prop_col.like(lit(values_vec[0].to_owned())),
+                _ => {
+                    // iterate over all possible values
+                    let exprs = values_vec
+                        .iter()
+                        .map(|v| {
+                            prop_col.to_owned().like(lit(v.to_owned()))
                         })
                         .collect();
 

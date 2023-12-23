@@ -20,20 +20,20 @@ mod tests {
     use datafusion_common::ScalarValue;
     use uuid::Uuid;
     use common::types::TABLE_EVENTS;
+    use metadata::test_util::init_db;
     use query::error::Result;
     use query::physical_plan::planner::planner::QueryPlanner;
     use query::queries::property_values::Filter;
     use query::queries::property_values::LogicalPlanBuilder;
     use query::queries::property_values::PropertyValues;
     use query::test_util::create_entities;
-    use query::test_util::create_md;
     use query::test_util::events_provider;
     use query::Context;
     use store::db::{OptiDBImpl, Options, TableOptions};
 
     #[tokio::test]
     async fn test_property_values() -> Result<()> {
-        let (md, db) = create_md()?;
+        let (md, db) = init_db()?;
 
         let org_id = 1;
         let proj_id = 1;
@@ -52,16 +52,17 @@ mod tests {
             property: PropertyRef::Event("Product Name".to_string()),
             event: Some(EventRef::RegularName("View Product".to_string())),
             filter: Some(Filter {
-                operation: PropValueOperation::Eq,
+                operation: PropValueOperation::Like,
                 value: Some(vec![ScalarValue::Utf8(Some("goo%".to_string()))]),
             }),
         };
 
         let plan = LogicalPlanBuilder::build(ctx, md, input, req).await?;
+        println!("{:?}",plan);
         let runtime = Arc::new(RuntimeEnv::default());
         let config = SessionConfig::new().with_target_partitions(1);
         let session_state = SessionState::with_config_rt(config, runtime)
-            .with_query_planner(Arc::new(QueryPlanner {}));
+            .with_query_planner(Arc::new(QueryPlanner {})).with_optimizer_rules(vec![]);
 
         let exec_ctx = SessionContext::with_state(session_state.clone());
         let physical_plan = session_state.create_physical_plan(&plan).await?;

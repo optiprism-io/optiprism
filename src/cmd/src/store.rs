@@ -31,7 +31,7 @@ use tokio::signal::unix::SignalKind;
 use tracing::{debug, info};
 use uaparser::UserAgentParser;
 use common::rbac::{OrganizationRole, ProjectRole, Role};
-use common::types::{COLUMN_PROJECT_ID, DType, USER_PROPERTY_CITY, USER_PROPERTY_CLIENT_FAMILY, USER_PROPERTY_CLIENT_VERSION_MAJOR, USER_PROPERTY_CLIENT_VERSION_MINOR, USER_PROPERTY_CLIENT_VERSION_PATCH, USER_PROPERTY_COUNTRY, USER_PROPERTY_DEVICE_BRAND, USER_PROPERTY_DEVICE_FAMILY, USER_PROPERTY_DEVICE_MODEL, USER_PROPERTY_OS, USER_PROPERTY_OS_FAMILY, USER_PROPERTY_OS_VERSION_MAJOR, USER_PROPERTY_OS_VERSION_MINOR, USER_PROPERTY_OS_VERSION_PATCH, USER_PROPERTY_OS_VERSION_PATCH_MINOR};
+use common::types::{COLUMN_PROJECT_ID, DType, EVENT_PROPERTY_PAGE_PATH, EVENT_PROPERTY_PAGE_TITLE, EVENT_PROPERTY_PAGE_URL, USER_PROPERTY_CITY, USER_PROPERTY_CLIENT_FAMILY, USER_PROPERTY_CLIENT_VERSION_MAJOR, USER_PROPERTY_CLIENT_VERSION_MINOR, USER_PROPERTY_CLIENT_VERSION_PATCH, USER_PROPERTY_COUNTRY, USER_PROPERTY_DEVICE_BRAND, USER_PROPERTY_DEVICE_FAMILY, USER_PROPERTY_DEVICE_MODEL, USER_PROPERTY_OS, USER_PROPERTY_OS_FAMILY, USER_PROPERTY_OS_VERSION_MAJOR, USER_PROPERTY_OS_VERSION_MINOR, USER_PROPERTY_OS_VERSION_PATCH, USER_PROPERTY_OS_VERSION_PATCH_MINOR};
 use ingester::error::IngesterError;
 use ingester::{Destination, Identify, Track, Transformer};
 use ingester::executor::Executor;
@@ -489,6 +489,9 @@ fn write_event(org_id: u64, proj_id: u64, db: &Arc<OptiDBImpl>, md: &Arc<Metadat
     vals.push(NamedValue::new("created_at".to_string(), Value::Timestamp(Some(event.created_at))));
     vals.push(NamedValue::new("event_id".to_string(), Value::Int64(Some(idx))));
     vals.push(NamedValue::new("event".to_string(), Value::Int64(Some(event.event))));
+    vals.push(NamedValue::new(md.event_properties.get_by_name(org_id, proj_id, EVENT_PROPERTY_PAGE_PATH).unwrap().column_name(), Value::String(Some(event.page_path))));
+    vals.push(NamedValue::new(md.event_properties.get_by_name(org_id, proj_id, EVENT_PROPERTY_PAGE_TITLE).unwrap().column_name(), Value::String(Some(event.page_title))));
+    vals.push(NamedValue::new(md.event_properties.get_by_name(org_id, proj_id, EVENT_PROPERTY_PAGE_URL).unwrap().column_name(), Value::String(Some(event.page_url))));
     vals.push(NamedValue::new(md.event_properties.get_by_name(org_id, proj_id, "Product Name").unwrap().column_name(), Value::Int16(event.product_name)));
     vals.push(NamedValue::new(md.event_properties.get_by_name(org_id, proj_id, "Product Category").unwrap().column_name(), Value::Int16(event.product_category)));
     vals.push(NamedValue::new(md.event_properties.get_by_name(org_id, proj_id, "Product Subcategory").unwrap().column_name(), Value::Int16(event.product_subcategory)));

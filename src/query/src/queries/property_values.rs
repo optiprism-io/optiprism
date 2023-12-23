@@ -75,6 +75,7 @@ impl LogicalPlanBuilder {
         input: LogicalPlan,
         req: PropertyValues,
     ) -> Result<LogicalPlan> {
+        // todo add project_id filtering
         // todo make obligatory
         let input = match &req.event {
             Some(event) => LogicalPlan::Filter(PlanFilter::try_new(
@@ -122,11 +123,11 @@ impl LogicalPlanBuilder {
             fetch: None,
         });*/
 
-        let input = LogicalPlan::Limit(Limit {
+        /*let input = LogicalPlan::Limit(Limit {
             skip: 0,
             fetch: Some(1000),
             input: Arc::new(input),
-        });
+        });*/
 
         Ok(input)
     }

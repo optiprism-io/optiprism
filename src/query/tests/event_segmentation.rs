@@ -36,11 +36,11 @@ mod tests {
     use query::physical_plan::planner::planner::QueryPlanner;
     use query::queries::event_segmentation::logical_plan_builder::LogicalPlanBuilder;
     use query::test_util::create_entities;
-    use query::test_util::create_md;
     use query::test_util::events_provider;
     use query::Context;
     use tracing_test::traced_test;
     use uuid::Uuid;
+    use metadata::test_util::init_db;
 
     #[traced_test]
     #[tokio::test]
@@ -158,8 +158,7 @@ mod tests {
 
         let mut path = temp_dir();
         path.push(format!("{}.db", Uuid::new_v4()));
-
-        let md = create_md()?;
+        let (md, db) = init_db()?;
 
         let org_id = 1;
         let proj_id = 1;
@@ -171,8 +170,8 @@ mod tests {
             format: Default::default(),
         };
 
-        create_entities(md.clone(), org_id, proj_id).await?;
-        let _input = Arc::new(events_provider(md.database.clone(), org_id, proj_id).await?);
+        create_entities(md.clone(), &db, org_id, proj_id).await?;
+        let _input = Arc::new(events_provider(db, org_id, proj_id).await?);
 
         // let plan = LogicalPlanBuilder::build(ctx, md.clone(), input, es).await?;
         // let df_plan = plan.to_df_plan()?;
@@ -278,7 +277,7 @@ mod tests {
             segments: None,
         };
 
-        let md = create_md()?;
+        let (md, db) = init_db()?;
 
         let org_id = 1;
         let proj_id = 1;
@@ -290,12 +289,12 @@ mod tests {
             format: Default::default(),
         };
 
-        create_entities(md.clone(), org_id, proj_id).await?;
-        let input = events_provider(md.database.clone(), org_id, proj_id).await?;
+        create_entities(md.clone(), &db, org_id, proj_id).await?;
+        let input = events_provider(db, org_id, proj_id).await?;
         let _cur_time = DateTime::parse_from_rfc3339("2021-09-16T13:49:00.000000+00:00")
             .unwrap()
             .with_timezone(&Utc);
-        let plan = LogicalPlanBuilder::build(ctx, md.clone(), input, es).await?;
+        let plan = LogicalPlanBuilder::build(ctx, md.clone(), input, es)?;
         println!("logical plan: {}", plan.display_indent_schema());
 
         let runtime = Arc::new(RuntimeEnv::default());
@@ -318,8 +317,8 @@ mod tests {
     async fn test_custom_events() -> Result<()> {
         let org_id = 1;
         let proj_id = 1;
-        let md = create_md()?;
-        create_entities(md.clone(), org_id, proj_id).await?;
+        let (md, db) = init_db()?;
+        create_entities(md.clone(), &db, org_id, proj_id).await?;
 
         let custom_event = md
             .custom_events
@@ -355,7 +354,6 @@ mod tests {
                     },
                 ],
             })
-            .await
             .unwrap();
 
         let _from = DateTime::parse_from_rfc3339("2020-09-08T13:42:00.000000+00:00")
@@ -399,11 +397,11 @@ mod tests {
             format: Default::default(),
         };
 
-        let input = events_provider(md.database.clone(), org_id, proj_id).await?;
+        let input = events_provider(db, org_id, proj_id).await?;
         let _cur_time = DateTime::parse_from_rfc3339("2021-09-08T13:42:00.000000+00:00")
             .unwrap()
             .with_timezone(&Utc);
-        let plan = LogicalPlanBuilder::build(ctx, md.clone(), input, es).await?;
+        let plan = LogicalPlanBuilder::build(ctx, md.clone(), input, es)?;
         println!("logical plan: {}", plan.display_indent_schema());
 
         let runtime = Arc::new(RuntimeEnv::default());

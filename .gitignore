@@ -10,6 +10,7 @@ data
 node_modules
 dist
 dist-ssr
+venv
 *.local
 *.ts.snap
 frontend/coverage/

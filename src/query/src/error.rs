@@ -27,6 +27,8 @@ pub enum QueryError {
     Common(#[from] CommonError),
     #[error("store {0:?}")]
     Store(#[from] StoreError),
+    #[error("anyhow {0:?}")]
+    Other(#[from] anyhow::Error),
 }
 
 impl QueryError {

@@ -31,8 +31,11 @@ struct CSVProduct {
 pub struct Product {
     pub id: usize,
     pub name: u64,
+    pub name_str: String,
     pub category: u64,
+    pub category_str: String,
     pub subcategory: Option<u64>,
+    pub subcategory_str: Option<String>,
     pub brand: Option<u64>,
     pub price: Decimal,
     pub discount_price: Option<Decimal>,
@@ -46,6 +49,10 @@ pub struct Product {
 impl Product {
     pub fn final_price(&self) -> Decimal {
         self.discount_price.unwrap_or(self.price)
+    }
+    pub fn path(&self) -> String {
+        let name = self.name_str.replace(" ", "-").to_lowercase();
+        name
     }
 }
 
@@ -94,14 +101,16 @@ impl ProductProvider {
                     properties.get_by_name(org_id, proj_id, "Product Name").unwrap().column_name().as_str(),
                     rec.name.as_str(),
                 )?,
+                name_str: rec.name,
                 category: dicts.get_key_or_create(
                     org_id,
                     proj_id,
                     properties.get_by_name(org_id, proj_id, "Product Category").unwrap().column_name().as_str(),
                     rec.category.as_str(),
                 )?,
+                category_str: rec.category,
                 subcategory: rec
-                    .subcategory
+                    .subcategory.clone()
                     .map(|v| {
                         dicts.get_key_or_create(
                             org_id,
@@ -111,6 +120,7 @@ impl ProductProvider {
                         )
                     })
                     .transpose()?,
+                subcategory_str: rec.subcategory,
                 brand: rec
                     .brand
                     .map(|v| {

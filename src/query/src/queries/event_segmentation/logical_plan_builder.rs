@@ -397,6 +397,8 @@ impl LogicalPlanBuilder {
         // };
         // let cur_time = self.cur_time.duration_trunc(trunc).unwrap();
         // time expression
+
+        // todo add project_id filtering
         let mut expr = time_expression(
             event_fields::CREATED_AT,
             input.schema(),

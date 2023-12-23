@@ -3396,10 +3396,8 @@ components:
         - "false"
         - "exists"
         - "empty"
-        - "arrAll"
-        - "arrAny"
-        - "arrNone"
         - "regex"
+        - "notRegex"
     PropertyRef:
       type: object
       required: ['propertyType']

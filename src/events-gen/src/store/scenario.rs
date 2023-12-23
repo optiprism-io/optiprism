@@ -36,6 +36,12 @@ pub struct EventRecord {
     pub user_id: i64,
     pub created_at: i64,
     pub event: i64,
+    pub page_path: String,
+    pub page_search: String,
+    pub page_title: String,
+    pub page_url: String,
+    pub a_name: String,
+    pub a_href: String,
     pub product_name: Option<i16>,
     pub product_category: Option<i16>,
     pub product_subcategory: Option<i16>,
@@ -327,6 +333,12 @@ impl Scenario {
             user_id: state.user_id,
             created_at: state.cur_timestamp * 10i64.pow(9),
             event: event_id as i64,
+            page_path: "".to_string(),
+            page_search: "".to_string(),
+            page_title: "".to_string(),
+            page_url: "".to_string(),
+            a_name: "".to_string(),
+            a_href: "".to_string(),
             product_name: None,
             product_category: None,
             product_subcategory: None,
@@ -345,7 +357,86 @@ impl Scenario {
             os: None,
             os_version: None,
         };
+        match event {
+            Event::UserRegistered => {
+                rec.page_path = "register".to_string();
+                rec.page_title = "user registration".to_string();
+            }
+            Event::UserLoggedIn => {
+                rec.page_path = "login".to_string();
+                rec.page_title = "user login".to_string();
+            }
+            Event::SubscribedForNewsletter => {
+                rec.page_path = "subscribe".to_string();
+                rec.page_title = "newsletter subscription".to_string();
+            }
+            Event::IndexPageViewed => {
+                rec.page_path = "index".to_string();
+                rec.page_title = "index page".to_string();
+            }
+            Event::DealsViewed => {
+                rec.page_path = "deals".to_string();
+                rec.page_title = "deals".to_string();
+            }
+            Event::ProductSearched => {
+                rec.page_path = "search".to_string();
+                rec.page_title = "search product".to_string();
+                if let Some(query)=&state.search_query {
+                rec.page_search = query.to_owned();
 
+                }
+            }
+            Event::NotFound => {
+                rec.page_path = "not-found".to_string();
+                rec.page_title = "404 not found".to_string();
+            }
+            Event::ProductViewed => {
+                rec.page_path = state.selected_product.unwrap().path();
+                rec.page_title = state.selected_product.unwrap().name_str.clone();
+            }
+            Event::ProductAddedToCart => {
+                rec.page_path = state.selected_product.unwrap().path();
+                rec.page_title = state.selected_product.unwrap().name_str.clone();
+            }
+            Event::BuyNowProduct => {
+                rec.page_path = state.selected_product.unwrap().path();
+                rec.page_title = state.selected_product.unwrap().name_str.clone();
+            }
+            Event::ProductRated => {
+                rec.page_path = state.selected_product.unwrap().path();
+                rec.page_title = state.selected_product.unwrap().name_str.clone();
+            }
+            Event::CartViewed => {
+                rec.page_path = "cart".to_string();
+                rec.page_title = "cart".to_string();
+            }
+            Event::CouponApplied => {
+                rec.page_path = "coupons".to_string();
+                rec.page_title = "coupons".to_string();
+            }
+            Event::CustomerInformationEntered => {
+                rec.page_path = "checkout".to_string();
+                rec.page_title = "checkout".to_string();
+            }
+            Event::ShippingMethodEntered => {
+                rec.page_path = "checkout".to_string();
+                rec.page_title = "checkout".to_string();
+            }
+            Event::PaymentMethodEntered => {
+                rec.page_path = "checkout".to_string();
+                rec.page_title = "checkout".to_string();
+            }
+            Event::OrderVerified => {}
+            Event::OrderCompleted => {
+                rec.page_path = "order-completed".to_string();
+                rec.page_title = "orders".to_string();
+            }
+            Event::ProductRefunded => {}
+            Event::OrdersViewed => {
+                rec.page_path = "orders".to_string();
+                rec.page_title = "my orders".to_string();
+            }
+        }
         match state.selected_product {
             Some(product) => {
                 rec.product_name = Some(product.name as i16);

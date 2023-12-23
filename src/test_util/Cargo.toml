@@ -10,3 +10,5 @@ arrow = { version = "42.0.0", features = ["prettyprint"] }
 metadata = { path = "../metadata" }
 common = { path = "../common" }
 store = { path = "../store" }
+rocksdb = { version = "0.21.0", features = ["multi-threaded-cf"] }
+uuid = { version = "1.2.2", features = ["serde", "v4"] }

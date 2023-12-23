@@ -148,48 +148,9 @@ pub enum Operator {
     Gt,
     /// Left side is greater or equal to right side
     GtEq,
-    /// Addition
-    Plus,
-    /// Subtraction
-    Minus,
-    /// Multiplication operator, like `*`
-    Multiply,
-    /// Division operator, like `/`
-    Divide,
-    /// Remainder operator, like `%`
-    Modulo,
-    /// Logical AND, like `&&`
-    And,
-    /// Logical OR, like `||`
-    Or,
-    /// Matches a wildcard pattern
-    Like,
-    /// Does not match a wildcard pattern
-    NotLike,
-    /// IS DISTINCT FROM
-    IsDistinctFrom,
-    /// IS NOT DISTINCT FROM
-    IsNotDistinctFrom,
-    /// Case sensitive regex match
     RegexMatch,
-    /// Case insensitive regex match
-    RegexIMatch,
     /// Case sensitive regex not match
     RegexNotMatch,
-    /// Case insensitive regex not match
-    RegexNotIMatch,
-    /// Bitwise and, like `&`
-    BitwiseAnd,
-    /// Bitwise or, like `|`
-    BitwiseOr,
-    /// Bitwise xor, like `#`
-    BitwiseXor,
-    /// Bitwise right, like `>>`
-    BitwiseShiftRight,
-    /// Bitwise left, like `<<`
-    BitwiseShiftLeft,
-    /// String concat
-    StringConcat,
 }
 
 impl From<DFOperator> for Operator {
@@ -201,25 +162,9 @@ impl From<DFOperator> for Operator {
             DFOperator::LtEq => Operator::LtEq,
             DFOperator::Gt => Operator::Gt,
             DFOperator::GtEq => Operator::GtEq,
-            DFOperator::Plus => Operator::Plus,
-            DFOperator::Minus => Operator::Minus,
-            DFOperator::Multiply => Operator::Multiply,
-            DFOperator::Divide => Operator::Divide,
-            DFOperator::Modulo => Operator::Modulo,
-            DFOperator::And => Operator::And,
-            DFOperator::Or => Operator::Or,
-            DFOperator::IsDistinctFrom => Operator::IsDistinctFrom,
-            DFOperator::IsNotDistinctFrom => Operator::IsNotDistinctFrom,
             DFOperator::RegexMatch => Operator::RegexMatch,
-            DFOperator::RegexIMatch => Operator::RegexIMatch,
             DFOperator::RegexNotMatch => Operator::RegexNotMatch,
-            DFOperator::RegexNotIMatch => Operator::RegexNotIMatch,
-            DFOperator::BitwiseAnd => Operator::BitwiseAnd,
-            DFOperator::BitwiseOr => Operator::BitwiseOr,
-            DFOperator::BitwiseXor => Operator::BitwiseXor,
-            DFOperator::BitwiseShiftRight => Operator::BitwiseShiftRight,
-            DFOperator::BitwiseShiftLeft => Operator::BitwiseShiftLeft,
-            DFOperator::StringConcat => Operator::StringConcat,
+            _ => unimplemented!("Operator {:?} not supported", o)
         }
     }
 }
@@ -233,26 +178,8 @@ impl From<Operator> for DFOperator {
             Operator::LtEq => DFOperator::LtEq,
             Operator::Gt => DFOperator::Gt,
             Operator::GtEq => DFOperator::GtEq,
-            Operator::Plus => DFOperator::Plus,
-            Operator::Minus => DFOperator::Minus,
-            Operator::Multiply => DFOperator::Multiply,
-            Operator::Divide => DFOperator::Divide,
-            Operator::Modulo => DFOperator::Modulo,
-            Operator::And => DFOperator::And,
-            Operator::Or => DFOperator::Or,
-            Operator::IsDistinctFrom => DFOperator::IsDistinctFrom,
-            Operator::IsNotDistinctFrom => DFOperator::IsNotDistinctFrom,
             Operator::RegexMatch => DFOperator::RegexMatch,
-            Operator::RegexIMatch => DFOperator::RegexIMatch,
             Operator::RegexNotMatch => DFOperator::RegexNotMatch,
-            Operator::RegexNotIMatch => DFOperator::RegexNotIMatch,
-            Operator::BitwiseAnd => DFOperator::BitwiseAnd,
-            Operator::BitwiseOr => DFOperator::BitwiseOr,
-            Operator::BitwiseXor => DFOperator::BitwiseXor,
-            Operator::BitwiseShiftRight => DFOperator::BitwiseShiftRight,
-            Operator::BitwiseShiftLeft => DFOperator::BitwiseShiftLeft,
-            Operator::StringConcat => DFOperator::StringConcat,
-            _ => unreachable!("Operator {:?} not supported", o),
         }
     }
 }
@@ -341,11 +268,7 @@ pub enum PropValueOperation {
     False,
     Exists,
     Empty,
-    ArrAll,
-    ArrAny,
-    ArrNone,
     Like,
-    NotLike,
     Regex,
     NotRegex,
 }
@@ -355,8 +278,13 @@ impl From<PropValueOperation> for Operator {
         match pv {
             PropValueOperation::Eq => Operator::Eq,
             PropValueOperation::Neq => Operator::NotEq,
-            PropValueOperation::Like => Operator::Like,
-            _ => panic!("unreachable"),
+            PropValueOperation::Gt => Operator::Gt,
+            PropValueOperation::Gte => Operator::GtEq,
+            PropValueOperation::Lt => Operator::Lt,
+            PropValueOperation::Lte => Operator::LtEq,
+            PropValueOperation::Regex => Operator::RegexMatch,
+            PropValueOperation::NotRegex => Operator::RegexNotMatch,
+            _ => unimplemented!(),
         }
     }
 }
@@ -368,8 +296,15 @@ impl TryInto<DFOperator> for PropValueOperation {
         Ok(match self {
             PropValueOperation::Eq => DFOperator::Eq,
             PropValueOperation::Neq => DFOperator::NotEq,
-            // PropValueOperation::Like => DFOperator::Like, // todo actualize
-            _ => unimplemented!(),
+            PropValueOperation::Gt => DFOperator::Gt,
+            PropValueOperation::Gte => DFOperator::GtEq,
+            PropValueOperation::Lt => DFOperator::Lt,
+            PropValueOperation::Lte => DFOperator::LtEq,
+            PropValueOperation::True => DFOperator::Eq,
+            PropValueOperation::False => DFOperator::NotEq,
+            PropValueOperation::Regex => DFOperator::RegexMatch,
+            PropValueOperation::NotRegex => DFOperator::RegexNotMatch,
+            _=>unimplemented!()
         })
     }
 }

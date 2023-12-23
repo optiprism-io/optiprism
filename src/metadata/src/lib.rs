@@ -15,6 +15,7 @@ pub mod rocksdb;
 pub mod store;
 pub mod stub;
 pub mod teams;
+pub mod test_util;
 
 pub use error::Result;
 
