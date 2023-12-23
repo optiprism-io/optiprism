@@ -42,6 +42,7 @@ pub const USER_PROPERTY_CLIENT_VERSION_PATCH: &str = "Version Patch";
 pub const USER_PROPERTY_DEVICE_FAMILY: &str = "Device Family";
 pub const USER_PROPERTY_DEVICE_BRAND: &str = "Device Brand";
 pub const USER_PROPERTY_DEVICE_MODEL: &str = "Device Model";
+pub const USER_PROPERTY_OS: &str = "OS";
 pub const USER_PROPERTY_OS_FAMILY: &str = "OS Family";
 pub const USER_PROPERTY_OS_VERSION_MAJOR: &str = "OS Version Major";
 pub const USER_PROPERTY_OS_VERSION_MINOR: &str = "OS Version Minor";
@@ -61,6 +62,7 @@ lazy_static! {
         USER_PROPERTY_DEVICE_FAMILY,
         USER_PROPERTY_DEVICE_BRAND,
         USER_PROPERTY_DEVICE_MODEL,
+        USER_PROPERTY_OS,
         USER_PROPERTY_OS_FAMILY,
         USER_PROPERTY_OS_VERSION_MAJOR,
         USER_PROPERTY_OS_VERSION_MINOR,

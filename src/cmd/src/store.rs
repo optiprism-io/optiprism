@@ -31,7 +31,7 @@ use tokio::signal::unix::SignalKind;
 use tracing::{debug, info};
 use uaparser::UserAgentParser;
 use common::rbac::{OrganizationRole, ProjectRole, Role};
-use common::types::{COLUMN_PROJECT_ID, DType, USER_PROPERTY_CITY, USER_PROPERTY_CLIENT_FAMILY, USER_PROPERTY_CLIENT_VERSION_MAJOR, USER_PROPERTY_CLIENT_VERSION_MINOR, USER_PROPERTY_CLIENT_VERSION_PATCH, USER_PROPERTY_COUNTRY, USER_PROPERTY_DEVICE_BRAND, USER_PROPERTY_DEVICE_FAMILY, USER_PROPERTY_DEVICE_MODEL, USER_PROPERTY_OS_FAMILY, USER_PROPERTY_OS_VERSION_MAJOR, USER_PROPERTY_OS_VERSION_MINOR, USER_PROPERTY_OS_VERSION_PATCH, USER_PROPERTY_OS_VERSION_PATCH_MINOR};
+use common::types::{COLUMN_PROJECT_ID, DType, USER_PROPERTY_CITY, USER_PROPERTY_CLIENT_FAMILY, USER_PROPERTY_CLIENT_VERSION_MAJOR, USER_PROPERTY_CLIENT_VERSION_MINOR, USER_PROPERTY_CLIENT_VERSION_PATCH, USER_PROPERTY_COUNTRY, USER_PROPERTY_DEVICE_BRAND, USER_PROPERTY_DEVICE_FAMILY, USER_PROPERTY_DEVICE_MODEL, USER_PROPERTY_OS, USER_PROPERTY_OS_FAMILY, USER_PROPERTY_OS_VERSION_MAJOR, USER_PROPERTY_OS_VERSION_MINOR, USER_PROPERTY_OS_VERSION_PATCH, USER_PROPERTY_OS_VERSION_PATCH_MINOR};
 use ingester::error::IngesterError;
 use ingester::{Destination, Identify, Track, Transformer};
 use ingester::executor::Executor;
@@ -500,12 +500,13 @@ fn write_event(org_id: u64, proj_id: u64, db: &Arc<OptiDBImpl>, md: &Arc<Metadat
     vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, "Products Bought").unwrap().column_name(), Value::Int8(event.products_bought)));
     vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, "Cart Items Number").unwrap().column_name(), Value::Int8(event.cart_items_number)));
     vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, "Cart Amount").unwrap().column_name(), Value::Decimal(event.cart_amount)));
-    vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, "Country").unwrap().column_name(), Value::Int16(event.country)));
-    vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, "City").unwrap().column_name(), Value::Int16(event.city)));
-    vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, "Device").unwrap().column_name(), Value::Int16(event.device)));
-    vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, "Device Category").unwrap().column_name(), Value::Int16(event.device_category)));
-    vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, "Os").unwrap().column_name(), Value::Int16(event.os)));
-    vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, "Os Version").unwrap().column_name(), Value::Int16(event.os_version)));
+    vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, USER_PROPERTY_COUNTRY).unwrap().column_name(), Value::Int64(event.country.map(|v| v as i64))));
+    vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, USER_PROPERTY_CITY).unwrap().column_name(), Value::Int64(event.city.map(|v| v as i64))));
+    vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, USER_PROPERTY_DEVICE_MODEL).unwrap().column_name(), Value::Int64(event.device.map(|v| v as i64))));
+    // todo remove in favour of Os Family?
+    vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, USER_PROPERTY_OS_FAMILY).unwrap().column_name(), Value::Int64(event.device_category.map(|v| v as i64))));
+    vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, USER_PROPERTY_OS).unwrap().column_name(), Value::Int64(event.os.map(|v| v as i64))));
+    vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, USER_PROPERTY_OS_VERSION_MAJOR).unwrap().column_name(), Value::Int64(event.os_version.map(|v| v as i64))));
     db.insert("events", vals)?;
 
     return Ok(());

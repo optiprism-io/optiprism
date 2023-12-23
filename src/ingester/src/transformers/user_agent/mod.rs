@@ -104,13 +104,43 @@ pub fn resolve_properties(
         user_props.push(prop);
     }
 
-    // os family
+    // os
     {
-        let property = props_prov.get_by_name(org_id, proj_id, types::USER_PROPERTY_OS_FAMILY)?;
+        let property = props_prov.get_by_name(org_id, proj_id, types::USER_PROPERTY_OS)?;
 
         let prop = PropertyAndValue {
             property,
             value: PropValue::String(client.os.family.to_string()),
+        };
+
+        user_props.push(prop);
+    }
+
+    // os family
+    {
+        let property = props_prov.get_by_name(org_id, proj_id, types::USER_PROPERTY_OS_FAMILY)?;
+
+        let mut s = String::new();
+        s.push_str(client.os.family.as_ref());
+        if let Some(major) = &client.os.major {
+            s.push_str(" ");
+            s.push_str(major.to_string().as_ref());
+            if let Some(minor) =&client.os.minor {
+                s.push_str(".");
+                s.push_str(minor.to_string().as_ref());
+                if let Some(patch) = &client.os.patch {
+                    s.push_str(".");
+                    s.push_str(patch.to_string().as_ref());
+                    if let Some(pm) = &client.os.patch_minor {
+                        s.push_str(".");
+                        s.push_str(pm.to_string().as_ref());
+                    }
+                }
+            }
+        }
+        let prop = PropertyAndValue {
+            property,
+            value: PropValue::String(s),
         };
 
         user_props.push(prop);

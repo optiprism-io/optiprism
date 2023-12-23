@@ -62,7 +62,7 @@ use parquet2::write::Version;
 use parquet2::write::WriteOptions;
 
 use crate::error::Result;
-use crate::merge_arrays;
+use crate::{KeyValue, merge_arrays};
 use crate::merge_arrays_inner;
 use crate::merge_list_arrays;
 use crate::merge_list_arrays_inner;
@@ -75,7 +75,7 @@ use crate::parquet::merger::parquet::pages_to_arrays;
 use crate::parquet::merger::parquet::ColumnPath;
 use crate::parquet::merger::parquet::CompressedPageIterator;
 use crate::parquet::merger::parquet::ParquetValue;
-use crate::parquet::merger::try_merge_arrow_schemas;
+use crate::parquet::merger::{ThreeColMergeRow, try_merge_arrow_schemas};
 use crate::parquet::merger::IndexChunk;
 use crate::parquet::merger::OneColMergeRow;
 use crate::parquet::merger::TmpArray;
@@ -135,6 +135,18 @@ impl ArrowIndexChunk {
             .map(|arr| {
                 match arr.data_type() {
                     // todo move to macro
+                    DataType::Int8 => {
+                        let arr = arr.as_any().downcast_ref::<Int8Array>().unwrap();
+                        let min = ParquetValue::from(arr.value(0));
+                        let max = ParquetValue::from(arr.value(arr.len() - 1));
+                        (min, max)
+                    }
+                    DataType::Int16 => {
+                        let arr = arr.as_any().downcast_ref::<Int16Array>().unwrap();
+                        let min = ParquetValue::from(arr.value(0));
+                        let max = ParquetValue::from(arr.value(arr.len() - 1));
+                        (min, max)
+                    }
                     DataType::Int32 => {
                         let arr = arr.as_any().downcast_ref::<Int32Array>().unwrap();
                         let min = ParquetValue::from(arr.value(0));
@@ -147,7 +159,13 @@ impl ArrowIndexChunk {
                         let max = ParquetValue::from(arr.value(arr.len() - 1));
                         (min, max)
                     }
-                    _ => unimplemented!("only support int32 and int64"),
+                    DataType::Timestamp(_, _) => {
+                        let arr = arr.as_any().downcast_ref::<Int64Array>().unwrap();
+                        let min = ParquetValue::from(arr.value(0));
+                        let max = ParquetValue::from(arr.value(arr.len() - 1));
+                        (min, max)
+                    }
+                    _ => unimplemented!("unsupported type {:?}", arr.data_type()),
                 }
             })
             .unzip();
@@ -491,6 +509,83 @@ pub fn merge_two_primitives<T1: NativeType + Ord, T2: NativeType + Ord>(
     Ok(res)
 }
 
+// array_size - size of output arrays
+// todo move to macro?
+pub fn merge_three_primitives<T1: NativeType + Ord, T2: NativeType + Ord, T3: NativeType + Ord>(
+    chunks: Vec<ArrowIndexChunk>,
+    array_size: usize,
+) -> Result<Vec<MergedArrowChunk>> {
+    let mut arr_iters = chunks
+        .iter()
+        .map(|row| {
+            let arr1 = row.cols[0]
+                .as_any()
+                .downcast_ref::<PrimitiveArray<T1>>()
+                .unwrap()
+                .values_iter();
+            let arr2 = row.cols[1]
+                .as_any()
+                .downcast_ref::<PrimitiveArray<T2>>()
+                .unwrap()
+                .values_iter();
+            let arr3 = row.cols[2]
+                .as_any()
+                .downcast_ref::<PrimitiveArray<T3>>()
+                .unwrap()
+                .values_iter();
+            (arr1, arr2, arr3)
+        })
+        .collect::<Vec<_>>();
+
+    let mut sort = BinaryHeap::<ThreeColMergeRow<T1, T2, T3>>::with_capacity(array_size);
+
+    let mut res = vec![];
+    let mut out_col1 = Vec::with_capacity(array_size);
+    let mut out_col2 = Vec::with_capacity(array_size);
+    let mut out_col3 = Vec::with_capacity(array_size);
+    let mut order = Vec::with_capacity(array_size);
+
+    for (row_id, iter) in arr_iters.iter_mut().enumerate().take(chunks.len()) {
+        let mr = ThreeColMergeRow(row_id, *iter.0.next().unwrap(), *iter.1.next().unwrap(), *iter.2.next().unwrap());
+        sort.push(mr);
+    }
+
+    while let Some(ThreeColMergeRow(row_idx, v1, v2, v3)) = sort.pop() {
+        out_col1.push(v1);
+        out_col2.push(v2);
+        out_col3.push(v3);
+        order.push(chunks[row_idx].stream);
+        if let Some(v1) = arr_iters[row_idx].0.next() {
+            let v2 = arr_iters[row_idx].1.next().unwrap();
+            let v3 = arr_iters[row_idx].2.next().unwrap();
+            let mr = ThreeColMergeRow(row_idx, *v1, *v2, *v3);
+            sort.push(mr);
+        }
+
+        if out_col1.len() >= array_size {
+            let out = vec![
+                PrimitiveArray::<T1>::from_vec(out_col1.drain(..).collect()).boxed(),
+                PrimitiveArray::<T2>::from_vec(out_col2.drain(..).collect()).boxed(),
+                PrimitiveArray::<T3>::from_vec(out_col3.drain(..).collect()).boxed(),
+            ];
+            let arr_order = order.drain(..).collect();
+            res.push(MergedArrowChunk::new(out, arr_order));
+        }
+    }
+
+    if !out_col1.is_empty() {
+        let out = vec![
+            PrimitiveArray::<T1>::from_vec(out_col1.drain(..).collect()).boxed(),
+            PrimitiveArray::<T2>::from_vec(out_col2.drain(..).collect()).boxed(),
+            PrimitiveArray::<T3>::from_vec(out_col3.drain(..).collect()).boxed(),
+        ];
+        let arr_order = order.drain(..).collect();
+        res.push(MergedArrowChunk::new(out, arr_order));
+    }
+
+    Ok(res)
+}
+
 // Merge chunks
 
 // Merge multiple chunks into vector of MergedArrowChunk of arrays split by array_size
@@ -529,6 +624,35 @@ pub fn merge_chunks(
                         }
                         (ArrowPrimitiveType::Int64, ArrowPrimitiveType::Int32) => {
                             merge_two_primitives::<i64, i32>(chunks, array_size)
+                        }
+                        _ => unimplemented!(
+                            "merge is not implemented for {a:?} {b:?} primitive types"
+                        ),
+                    }
+                }
+                _ => unimplemented!(
+                    "merge not implemented for {:?} {:?} types",
+                    chunks[0].cols[0].data_type(),
+                    chunks[0].cols[1].data_type()
+                ),
+            }
+        }
+        3 => {
+            match (
+                chunks[0].cols[0].data_type().to_physical_type(),
+                chunks[0].cols[1].data_type().to_physical_type(),
+                chunks[0].cols[2].data_type().to_physical_type(),
+            ) {
+                (
+                    arrow2::datatypes::PhysicalType::Primitive(a),
+                    arrow2::datatypes::PhysicalType::Primitive(b),
+                    arrow2::datatypes::PhysicalType::Primitive(c),
+                ) => {
+                    match (a, b, c) {
+                        // Put here possible combination that you need
+                        // Or find a way to merge any types dynamically without performance penalty
+                        (ArrowPrimitiveType::Int64, ArrowPrimitiveType::Int64, ArrowPrimitiveType::Int64) => {
+                            merge_three_primitives::<i64, i64, i64>(chunks, array_size)
                         }
                         _ => unimplemented!(
                             "merge is not implemented for {a:?} {b:?} primitive types"

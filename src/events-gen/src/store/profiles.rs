@@ -8,6 +8,7 @@ use rand::prelude::*;
 use rand::rngs::ThreadRng;
 use serde::Deserialize;
 use tracing::info;
+use common::types::{USER_PROPERTY_CITY, USER_PROPERTY_COUNTRY, USER_PROPERTY_DEVICE_MODEL, USER_PROPERTY_OS, USER_PROPERTY_OS_FAMILY, USER_PROPERTY_OS_VERSION_MAJOR};
 
 use crate::error::EventsGenError;
 use crate::error::Result;
@@ -77,12 +78,12 @@ impl ProfileProvider {
                     country: rec
                         .country
                         .map(|v| {
-                            dicts.get_key_or_create(org_id, proj_id, properties.get_by_name(org_id, proj_id, "Country").unwrap().column_name().as_str(), v.as_str())
+                            dicts.get_key_or_create(org_id, proj_id, properties.get_by_name(org_id, proj_id, USER_PROPERTY_COUNTRY).unwrap().column_name().as_str(), v.as_str())
                         })
                         .transpose()?,
                     city: rec
                         .city
-                        .map(|v| dicts.get_key_or_create(org_id, proj_id, properties.get_by_name(org_id, proj_id, "City").unwrap().column_name().as_str(), v.as_str()))
+                        .map(|v| dicts.get_key_or_create(org_id, proj_id, properties.get_by_name(org_id, proj_id, USER_PROPERTY_CITY).unwrap().column_name().as_str(), v.as_str()))
                         .transpose()?,
                 };
                 result.push(geo);
@@ -106,28 +107,23 @@ impl ProfileProvider {
                     device: rec
                         .device
                         .map(|v| {
-                            dicts.get_key_or_create(org_id, proj_id, properties.get_by_name(org_id, proj_id, "Device").unwrap().column_name().as_str(), v.as_str())
+                            dicts.get_key_or_create(org_id, proj_id, properties.get_by_name(org_id, proj_id, USER_PROPERTY_DEVICE_MODEL).unwrap().column_name().as_str(), v.as_str())
                         })
                         .transpose()?,
                     device_category: rec
                         .device_category
                         .map(|v| {
-                            dicts.get_key_or_create(
-                                org_id,
-                                proj_id,
-                                "user_device_category",
-                                v.as_str(),
-                            )
+                            dicts.get_key_or_create(org_id, proj_id, properties.get_by_name(org_id, proj_id, USER_PROPERTY_OS_FAMILY).unwrap().column_name().as_str(), v.as_str())
                         })
                         .transpose()?,
                     os: rec
                         .os
-                        .map(|v| dicts.get_key_or_create(org_id, proj_id, properties.get_by_name(org_id, proj_id, "Os").unwrap().column_name().as_str(), v.as_str()))
+                        .map(|v| dicts.get_key_or_create(org_id, proj_id, properties.get_by_name(org_id, proj_id, USER_PROPERTY_OS).unwrap().column_name().as_str(), v.as_str()))
                         .transpose()?,
                     os_version: rec
                         .os_version
                         .map(|v| {
-                            dicts.get_key_or_create(org_id, proj_id, properties.get_by_name(org_id, proj_id, "Os Version").unwrap().column_name().as_str(), v.as_str())
+                            dicts.get_key_or_create(org_id, proj_id, properties.get_by_name(org_id, proj_id, USER_PROPERTY_OS_VERSION_MAJOR).unwrap().column_name().as_str(), v.as_str())
                         })
                         .transpose()?,
                 };

@@ -117,7 +117,7 @@ pub fn chunk_min_max(
                     let max = KeyValue::Timestamp(arr.value(arr.len() - 1));
                     (min, max)
                 }
-                _ => unimplemented!("only support int32 and int64. {:?}", arr.data_type()),
+                _ => unimplemented!("unsupported type {:?}", arr.data_type()),
             }
         })
         .unzip();
@@ -233,6 +233,48 @@ impl<A, B> Eq for TwoColMergeRow<A, B>
         B: Eq,
 {}
 
+pub struct ThreeColMergeRow<A, B, C>(usize, A, B, C);
+
+impl<A, B, C> Ord for crate::parquet::merger::ThreeColMergeRow<A, B, C>
+    where
+        A: Ord,
+        B: Ord,
+        C: Ord,
+{
+    fn cmp(&self, other: &Self) -> Ordering {
+        (&self.1, &self.2, &self.3).cmp(&(&other.1, &other.2, &other.3)).reverse()
+    }
+}
+
+impl<A, B, C> PartialOrd for crate::parquet::merger::ThreeColMergeRow<A, B, C>
+    where
+        A: Ord,
+        B: Ord,
+        C: Ord
+{
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<A, B, C> PartialEq for crate::parquet::merger::ThreeColMergeRow<A, B, C>
+    where
+        A: Eq,
+        B: Eq,
+        C: Eq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        (&self.1, &self.2, &self.3) == (&other.1, &other.2, &other.3)
+    }
+}
+
+impl<A, B, C> Eq for crate::parquet::merger::ThreeColMergeRow<A, B, C>
+    where
+        A: Eq,
+        B: Eq,
+        C: Eq
+
+{}
 // this is a temporary array used to merge data pages avoiding downcasting
 
 enum TmpArray {

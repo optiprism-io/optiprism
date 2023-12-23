@@ -61,6 +61,18 @@ impl From<bool> for ParquetValue {
     }
 }
 
+impl From<i8> for ParquetValue {
+    fn from(value: i8) -> Self {
+        ParquetValue::Int32(value as i32)
+    }
+}
+
+impl From<i16> for ParquetValue {
+    fn from(value: i16) -> Self {
+        ParquetValue::Int32(value as i32)
+    }
+}
+
 impl From<i32> for ParquetValue {
     fn from(value: i32) -> Self {
         ParquetValue::Int32(value)
