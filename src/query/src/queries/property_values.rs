@@ -20,7 +20,6 @@ use datafusion_expr::Sort;
 use metadata::dictionaries::provider_impl::SingleDictionaryProvider;
 use metadata::properties;
 use metadata::MetadataProvider;
-use tracing::debug;
 
 use crate::error::Result;
 use crate::expr::event_expression;
@@ -73,41 +72,25 @@ impl LogicalPlanBuilder {
     ) -> Result<LogicalPlan> {
         // todo add project_id filtering
         // todo make obligatory
-        let decode_filter_first = if let Some(filter) = &req.filter {
-            match filter.operation {
-                PropValueOperation::Like
-                | PropValueOperation::NotLike
-                | PropValueOperation::Regex
-                | PropValueOperation::NotRegex => true,
-                _ => false,
-            }
-        } else {
-            false
-        };
-
-        let input = if decode_filter_first {
-            match &req.property {
-                PropertyRef::System(prop_name) => {
-                    property_col!(ctx, metadata, input, prop_name, system_properties)
-                }
-                PropertyRef::User(prop_name) => {
-                    property_col!(ctx, metadata, input, prop_name, user_properties)
-                }
-                PropertyRef::Event(prop_name) => {
-                    property_col!(ctx, metadata, input, prop_name, event_properties)
-                }
-                PropertyRef::Custom(_id) => unimplemented!(),
-            }
-        } else {
-            input
-        };
-
         let input = match &req.event {
             Some(event) => LogicalPlan::Filter(PlanFilter::try_new(
                 event_expression(&ctx, &metadata, event)?,
                 Arc::new(input),
             )?),
             None => input,
+        };
+
+        let input = match &req.property {
+            PropertyRef::System(prop_name) => {
+                property_col!(ctx, metadata, input, prop_name, system_properties)
+            }
+            PropertyRef::User(prop_name) => {
+                property_col!(ctx, metadata, input, prop_name, user_properties)
+            }
+            PropertyRef::Event(prop_name) => {
+                property_col!(ctx, metadata, input, prop_name, event_properties)
+            }
+            PropertyRef::Custom(_id) => unimplemented!(),
         };
 
         // let expr_col = input.expressions()[0].clone();
@@ -125,24 +108,6 @@ impl LogicalPlanBuilder {
             )?),
             None => input,
         };
-
-        let input = if !decode_filter_first {
-            match &req.property {
-                PropertyRef::System(prop_name) => {
-                    property_col!(ctx, metadata, input, prop_name, system_properties)
-                }
-                PropertyRef::User(prop_name) => {
-                    property_col!(ctx, metadata, input, prop_name, user_properties)
-                }
-                PropertyRef::Event(prop_name) => {
-                    property_col!(ctx, metadata, input, prop_name, event_properties)
-                }
-                PropertyRef::Custom(_id) => unimplemented!(),
-            }
-        } else {
-            input
-        };
-
         // let input = LogicalPlan::Sort(Sort {
         // expr: vec![Expr::Sort(expr::Sort {
         // expr: Box::new(expr_col),

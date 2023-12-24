@@ -103,9 +103,7 @@ impl Provider for ProviderImpl {
         let tx = self.db.transaction();
         let store_key = make_key_key(organization_id, project_id, dict, key);
         match tx.get(store_key.as_slice())? {
-            None => Err(MetadataError::NotFound(format!(
-                "{dict}->{key} key not found"
-            ))),
+            None => Err(MetadataError::NotFound("key not found".to_string())),
             Some(value) => Ok(String::from_utf8(value)?),
         }
     }
@@ -120,9 +118,7 @@ impl Provider for ProviderImpl {
         let tx = self.db.transaction();
         let store_key = make_value_key(organization_id, project_id, dict, value);
         match tx.get(store_key.as_slice())? {
-            None => Err(MetadataError::NotFound(format!(
-                "{dict}->{value} value not found"
-            ))),
+            None => Err(MetadataError::NotFound("key not found".to_string())),
             Some(key) => Ok(LittleEndian::read_u64(key.as_slice())),
         }
     }
