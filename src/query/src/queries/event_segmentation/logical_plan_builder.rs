@@ -9,6 +9,7 @@ use common::query::event_segmentation::Query;
 use common::query::event_segmentation::SegmentCondition;
 use common::query::time_columns;
 use common::query::EventFilter;
+use common::query::PropValueOperation;
 use common::query::PropertyRef;
 use datafusion_common::Column;
 use datafusion_expr::col;
@@ -29,6 +30,7 @@ use metadata::MetadataProvider;
 use tracing::debug;
 
 use crate::context::Format;
+use crate::error::QueryError;
 use crate::error::Result;
 use crate::event_fields;
 use crate::expr::event_expression;
@@ -163,8 +165,13 @@ impl LogicalPlanBuilder {
             None
         };
 
+        let mut cols_hash: HashMap<PropertyRef, ()> = HashMap::new();
+        let mut decode_cols: Vec<(Column, Arc<SingleDictionaryProvider>)> = Vec::new();
+
+        let mut input =
+            builder.decode_filter_dictionaries(input, &mut cols_hash, &mut decode_cols)?;
         // build main query
-        let mut input = match events.len() {
+        input = match events.len() {
             1 => builder.build_event_logical_plan(input.clone(), 0, segment_inputs)?,
             _ => {
                 let mut inputs: Vec<LogicalPlan> = vec![];
@@ -185,8 +192,7 @@ impl LogicalPlanBuilder {
             }
         };
 
-        input = builder.decode_dictionaries(input)?;
-
+        input = builder.decode_breakdowns_dictionaries(input, &mut cols_hash, &mut decode_cols)?;
         Ok(input)
     }
 
@@ -269,10 +275,108 @@ impl LogicalPlanBuilder {
         Ok(expr)
     }
 
-    fn decode_dictionaries(&self, input: LogicalPlan) -> Result<LogicalPlan> {
-        let mut cols_hash: HashMap<PropertyRef, ()> = HashMap::new();
-        let mut decode_cols: Vec<(Column, Arc<SingleDictionaryProvider>)> = Vec::new();
+    fn decode_filter_single_dictionary(
+        &self,
+        cols_hash: &mut HashMap<PropertyRef, ()>,
+        decode_cols: &mut Vec<(Column, Arc<SingleDictionaryProvider>)>,
+        filter: &EventFilter,
+    ) -> Result<()> {
+        match filter {
+            EventFilter::Property {
+                property,
+                operation,
+                value,
+            } => match operation {
+                PropValueOperation::Like
+                | PropValueOperation::NotLike
+                | PropValueOperation::Regex
+                | PropValueOperation::NotRegex => {
+                    let prop = match property {
+                        PropertyRef::System(prop_ref) => {
+                            self.metadata.system_properties.get_by_name(
+                                self.ctx.organization_id,
+                                self.ctx.project_id,
+                                prop_ref.as_str(),
+                            )?
+                        }
+                        PropertyRef::User(prop_ref) => self.metadata.user_properties.get_by_name(
+                            self.ctx.organization_id,
+                            self.ctx.project_id,
+                            prop_ref.as_str(),
+                        )?,
+                        PropertyRef::Event(prop_ref) => {
+                            self.metadata.event_properties.get_by_name(
+                                self.ctx.organization_id,
+                                self.ctx.project_id,
+                                prop_ref.as_str(),
+                            )?
+                        }
+                        PropertyRef::Custom(_) => unreachable!(),
+                    };
 
+                    if !prop.is_dictionary {
+                        return Ok(());
+                    }
+
+                    let col_name = prop.column_name();
+                    let dict = SingleDictionaryProvider::new(
+                        self.ctx.organization_id,
+                        self.ctx.project_id,
+                        col_name.clone(),
+                        self.metadata.dictionaries.clone(),
+                    );
+                    let col = Column::from_name(col_name);
+
+                    decode_cols.push((col, Arc::new(dict)));
+
+                    if cols_hash.contains_key(property) {
+                        return Ok(());
+                    }
+                    cols_hash.insert(property.to_owned(), ());
+                }
+                _ => {
+                    return Err(QueryError::Internal("unsupported operation".to_string()));
+                }
+            },
+        }
+
+        Ok(())
+    }
+    fn decode_filter_dictionaries(
+        &self,
+        input: LogicalPlan,
+        cols_hash: &mut HashMap<PropertyRef, ()>,
+        decode_cols: &mut Vec<(Column, Arc<SingleDictionaryProvider>)>,
+    ) -> Result<LogicalPlan> {
+        for event in &self.es.events {
+            if let Some(filters) = &event.filters {
+                for filter in filters {
+                    self.decode_filter_single_dictionary(cols_hash, decode_cols, filter)?;
+                }
+            }
+        }
+
+        if let Some(filters) = &self.es.filters {
+            for filter in filters {
+                self.decode_filter_single_dictionary(cols_hash, decode_cols, filter)?;
+            }
+        }
+
+        if decode_cols.is_empty() {
+            return Ok(input);
+        }
+
+        Ok(LogicalPlan::Extension(Extension {
+            node: Arc::new(DictionaryDecodeNode::try_new(input, decode_cols.clone())?),
+        }))
+    }
+
+    fn decode_breakdowns_dictionaries(
+        &self,
+        input: LogicalPlan,
+        cols_hash: &mut HashMap<PropertyRef, ()>,
+        decode_cols: &mut Vec<(Column, Arc<SingleDictionaryProvider>)>,
+    ) -> Result<LogicalPlan> {
         for event in &self.es.events {
             if let Some(breakdowns) = &event.breakdowns {
                 breakdowns_to_dicts!(self, breakdowns, cols_hash, decode_cols);
@@ -288,7 +392,7 @@ impl LogicalPlanBuilder {
         }
 
         Ok(LogicalPlan::Extension(Extension {
-            node: Arc::new(DictionaryDecodeNode::try_new(input, decode_cols)?),
+            node: Arc::new(DictionaryDecodeNode::try_new(input, decode_cols.clone())?),
         }))
     }
 

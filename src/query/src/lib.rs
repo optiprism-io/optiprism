@@ -468,7 +468,7 @@ pub mod test_util {
             org_id,
             proj_id,
             country_prop.column_name().as_str(),
-            "german",
+            "germany",
         )?;
 
         create_property(&md, &db, org_id, proj_id, CreatePropertyRequest {
