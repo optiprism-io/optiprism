@@ -250,6 +250,7 @@ pub async fn gen(args: &Test, proj_id: u64) -> Result<(), anyhow::Error> {
         ("i_64", DType::Int64),
         ("ts", DType::Timestamp),
         ("bool", DType::Boolean),
+        ("bool_nullable", DType::Boolean),
         ("string", DType::String),
         ("decimal", DType::Decimal),
         ("group", DType::Int64),
@@ -274,9 +275,9 @@ pub async fn gen(args: &Test, proj_id: u64) -> Result<(), anyhow::Error> {
         .unwrap()
         .duration_trunc(Duration::days(1))?;
 
-    let users = 1;
-    let days = 1;
-    let events = 2;
+    let users = 100;
+    let days = 10;
+    let events = 10;
     let mut vals: Vec<NamedValue> = vec![];
     for user in 0..users {
         let mut cur_time = now - Duration::days(days);
@@ -324,15 +325,28 @@ pub async fn gen(args: &Test, proj_id: u64) -> Result<(), anyhow::Error> {
                     "bool".to_string(),
                     Value::Boolean(Some(event % 3 == 0)),
                 ));
+
+                let bv = match event % 3 {
+                    0 => Some(true),
+                    1 => Some(false),
+                    2 => None,
+                    _ => unimplemented!(),
+                };
+
+                vals.push(NamedValue::new(
+                    "bool_nullable".to_string(),
+                    Value::Boolean(bv),
+                ));
+
                 if event % 3 == 0 {
                     vals.push(NamedValue::new(
                         "string".to_string(),
-                        Value::String(Some("hello".to_string())),
+                        Value::String(Some("привет".to_string())),
                     ));
                 } else {
                     vals.push(NamedValue::new(
                         "string".to_string(),
-                        Value::String(Some("world".to_string())),
+                        Value::String(Some("мир".to_string())),
                     ));
                 }
                 vals.push(NamedValue::new(
@@ -343,11 +357,11 @@ pub async fn gen(args: &Test, proj_id: u64) -> Result<(), anyhow::Error> {
                 ));
                 vals.push(NamedValue::new(
                     "group".to_string(),
-                    Value::Int64(Some(event % (events / 3))),
+                    Value::Int64(Some(event % (events / 2))),
                 ));
                 // two group of users with different "v" value to proper integration tests
                 // event value
-                if user % 2 == 0 {
+                if user % 3 == 0 {
                     vals.push(NamedValue::new("v".to_string(), Value::Int64(Some(event))));
                 } else {
                     vals.push(NamedValue::new(

@@ -124,3 +124,50 @@ def all_aggregates_query(field, group=None, interval="day", period=2, period_int
         group = list(map(lambda x: float(x), resp.json()[1]))
         val = list(map(lambda x: float(x), resp.json()[2]))
         return [ts, group, val]
+
+
+def string_filter_query(query, interval="day", period=2, period_interval="day"):
+    q = """select toUnixTimestamp(date_trunc('{interval}',created_at, 'UTC')) as t, count(1)
+        from file('store/tables/*/*/*/*.parquet', Parquet) as b
+        where b.event = 4
+          and created_at >=
+              now() - INTERVAL {period} {period_interval}
+          and {q} 
+        group by t order by t asc format JSONCompactColumns;""".format(q=query,
+                                                 period=period,
+                                                 period_interval=period_interval,
+                                                 interval=interval)
+
+    print(q)
+    resp = requests.get(ch_addr,
+                        params={"query": q})
+    if not resp.json():
+        return []
+    ts = list(map(lambda x: x * 1000000000, resp.json()[0]))
+
+    val = list(map(lambda x: float(x), resp.json()[1]))
+
+    return [ts, val]
+
+def bool_filter_query(query, interval="day", period=2, period_interval="day"):
+    q = """select toUnixTimestamp(date_trunc('{interval}',created_at, 'UTC')) as t, count(1)
+        from file('store/tables/*/*/*/*.parquet', Parquet) as b
+        where b.event = 4
+          and created_at >=
+              now() - INTERVAL {period} {period_interval}
+          and {q} 
+        group by t order by t asc format JSONCompactColumns;""".format(q=query,
+                                                 period=period,
+                                                 period_interval=period_interval,
+                                                 interval=interval)
+
+    print(q)
+    resp = requests.get(ch_addr,
+                        params={"query": q})
+    if not resp.json():
+        return []
+    ts = list(map(lambda x: x * 1000000000, resp.json()[0]))
+
+    val = list(map(lambda x: float(x), resp.json()[1]))
+
+    return [ts, val]

@@ -159,7 +159,7 @@ def partitioned_aggregate_property_query(agg, outer_agg, typ: str, prop_type="sy
 
 def simple_query(query: str, time_last=2, unit="day",
                  interval_unit="day",
-                 breakdowns=None):
+                 breakdowns=None, filters=None):
     b = []
     if breakdowns is not None:
         for breakdown in breakdowns:
@@ -191,7 +191,7 @@ def simple_query(query: str, time_last=2, unit="day",
                 ],
                 "eventType": "regular",
                 "eventId": 8,
-                "filters": [],
+                "filters": filters,
                 "breakdowns": b,
             }
         ],
@@ -202,7 +202,7 @@ def simple_query(query: str, time_last=2, unit="day",
         "segments": [],
         "breakdowns": []
     }
-
+    print(q)
     resp = requests.post(
         "{0}/organizations/1/projects/1/queries/event-segmentation?format=jsonCompact".format(op_addr),
         json=q,
