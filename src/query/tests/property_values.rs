@@ -1,7 +1,10 @@
 use std::env::temp_dir;
 use std::sync::Arc;
+
+use store::db::OptiDBImpl;
+use store::db::Options;
+use store::db::TableOptions;
 use uuid::Uuid;
-use store::db::{OptiDBImpl, Options, TableOptions};
 
 #[cfg(test)]
 mod tests {
@@ -12,14 +15,13 @@ mod tests {
     use common::query::EventRef;
     use common::query::PropValueOperation;
     use common::query::PropertyRef;
+    use common::types::TABLE_EVENTS;
     use datafusion::execution::context::SessionState;
     use datafusion::execution::runtime_env::RuntimeEnv;
     use datafusion::physical_plan::collect;
     use datafusion::prelude::SessionConfig;
     use datafusion::prelude::SessionContext;
     use datafusion_common::ScalarValue;
-    use uuid::Uuid;
-    use common::types::TABLE_EVENTS;
     use metadata::test_util::init_db;
     use query::error::Result;
     use query::physical_plan::planner::planner::QueryPlanner;
@@ -29,7 +31,10 @@ mod tests {
     use query::test_util::create_entities;
     use query::test_util::events_provider;
     use query::Context;
-    use store::db::{OptiDBImpl, Options, TableOptions};
+    use store::db::OptiDBImpl;
+    use store::db::Options;
+    use store::db::TableOptions;
+    use uuid::Uuid;
 
     #[tokio::test]
     async fn test_property_values() -> Result<()> {
@@ -58,11 +63,12 @@ mod tests {
         };
 
         let plan = LogicalPlanBuilder::build(ctx, md, input, req).await?;
-        println!("{:?}",plan);
+        println!("{:?}", plan);
         let runtime = Arc::new(RuntimeEnv::default());
         let config = SessionConfig::new().with_target_partitions(1);
         let session_state = SessionState::with_config_rt(config, runtime)
-            .with_query_planner(Arc::new(QueryPlanner {})).with_optimizer_rules(vec![]);
+            .with_query_planner(Arc::new(QueryPlanner {}))
+            .with_optimizer_rules(vec![]);
 
         let exec_ctx = SessionContext::with_state(session_state.clone());
         let physical_plan = session_state.create_physical_plan(&plan).await?;

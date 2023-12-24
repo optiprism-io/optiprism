@@ -4,7 +4,8 @@ use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::fs;
 use std::fs::File;
-use std::io::{BufReader, BufWriter};
+use std::io::BufReader;
+use std::io::BufWriter;
 use std::io::Read;
 use std::io::Seek;
 use std::io::Write;
@@ -62,7 +63,7 @@ use parquet2::write::Version;
 use parquet2::write::WriteOptions;
 
 use crate::error::Result;
-use crate::{KeyValue, merge_arrays};
+use crate::merge_arrays;
 use crate::merge_arrays_inner;
 use crate::merge_list_arrays;
 use crate::merge_list_arrays_inner;
@@ -75,11 +76,13 @@ use crate::parquet::merger::parquet::pages_to_arrays;
 use crate::parquet::merger::parquet::ColumnPath;
 use crate::parquet::merger::parquet::CompressedPageIterator;
 use crate::parquet::merger::parquet::ParquetValue;
-use crate::parquet::merger::{ThreeColMergeRow, try_merge_arrow_schemas};
+use crate::parquet::merger::try_merge_arrow_schemas;
 use crate::parquet::merger::IndexChunk;
 use crate::parquet::merger::OneColMergeRow;
+use crate::parquet::merger::ThreeColMergeRow;
 use crate::parquet::merger::TmpArray;
 use crate::parquet::merger::TwoColMergeRow;
+use crate::KeyValue;
 
 #[derive(Debug)]
 // Arrow chunk before being merged
@@ -546,7 +549,12 @@ pub fn merge_three_primitives<T1: NativeType + Ord, T2: NativeType + Ord, T3: Na
     let mut order = Vec::with_capacity(array_size);
 
     for (row_id, iter) in arr_iters.iter_mut().enumerate().take(chunks.len()) {
-        let mr = ThreeColMergeRow(row_id, *iter.0.next().unwrap(), *iter.1.next().unwrap(), *iter.2.next().unwrap());
+        let mr = ThreeColMergeRow(
+            row_id,
+            *iter.0.next().unwrap(),
+            *iter.1.next().unwrap(),
+            *iter.2.next().unwrap(),
+        );
         sort.push(mr);
     }
 
@@ -651,9 +659,11 @@ pub fn merge_chunks(
                     match (a, b, c) {
                         // Put here possible combination that you need
                         // Or find a way to merge any types dynamically without performance penalty
-                        (ArrowPrimitiveType::Int64, ArrowPrimitiveType::Int64, ArrowPrimitiveType::Int64) => {
-                            merge_three_primitives::<i64, i64, i64>(chunks, array_size)
-                        }
+                        (
+                            ArrowPrimitiveType::Int64,
+                            ArrowPrimitiveType::Int64,
+                            ArrowPrimitiveType::Int64,
+                        ) => merge_three_primitives::<i64, i64, i64>(chunks, array_size),
                         _ => unimplemented!(
                             "merge is not implemented for {a:?} {b:?} primitive types"
                         ),
@@ -683,7 +693,7 @@ pub struct Options {
 }
 
 pub struct Merger<R>
-    where R: Read
+where R: Read
 {
     // list of index cols (partitions) in parquet file
     index_cols: Vec<ColumnDescriptor>,
@@ -791,7 +801,7 @@ pub fn merge<R: Read + Seek>(
 }
 
 impl<R> Merger<R>
-    where R: Read + Seek
+where R: Read + Seek
 {
     // Create new merger
 
@@ -936,9 +946,9 @@ impl<R> Merger<R>
                             size_bytes: File::open(
                                 &self.to_path.join(format!("{}.parquet", part_id)),
                             )?
-                                .metadata()
-                                .unwrap()
-                                .size(),
+                            .metadata()
+                            .unwrap()
+                            .size(),
                             id: part_id,
                             min,
                             max,

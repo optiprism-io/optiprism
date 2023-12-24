@@ -1,8 +1,10 @@
 use std::sync::Arc;
 
-use arrow::array::{ArrayRef, Int16Builder, Int8Builder};
+use arrow::array::ArrayRef;
 use arrow::array::Decimal128Builder;
+use arrow::array::Int16Builder;
 use arrow::array::Int64Builder;
+use arrow::array::Int8Builder;
 use arrow::array::TimestampNanosecondBuilder;
 use arrow::array::UInt16Builder;
 use arrow::array::UInt64Builder;

@@ -5,10 +5,12 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use axum::extract::{ConnectInfo, Path};
+use axum::extract::ConnectInfo;
+use axum::extract::Path;
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::{Extension, routing};
+use axum::routing;
+use axum::Extension;
 use axum::Json;
 use axum::Router;
 use axum::Server;
@@ -28,7 +30,8 @@ use tracing::info;
 
 use crate::error::Result;
 use crate::executor::Executor;
-use crate::{Destination, RequestContext};
+use crate::Destination;
+use crate::RequestContext;
 
 pub mod service;
 
@@ -304,8 +307,11 @@ impl App {
     }
 }
 
-pub fn attach_routes(router: Router, track_exec: Executor<crate::Track>,
-                     identify_exec: Executor<crate::Identify>) -> Router {
+pub fn attach_routes(
+    router: Router,
+    track_exec: Executor<crate::Track>,
+    identify_exec: Executor<crate::Identify>,
+) -> Router {
     let app = App {
         track: Arc::new(Mutex::new(track_exec)),
         identify: Arc::new(Mutex::new((identify_exec))),
@@ -371,4 +377,3 @@ mod tests {
         println!("{:?}", res);
     }
 }
-

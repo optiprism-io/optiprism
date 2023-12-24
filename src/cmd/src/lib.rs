@@ -1,22 +1,66 @@
 use std::sync::Arc;
-use tracing::info;
-use ::store::db::{OptiDBImpl, TableOptions};
-use common::rbac::{OrganizationRole, ProjectRole, Role};
-use common::types::{COLUMN_CREATED_AT, COLUMN_EVENT, COLUMN_EVENT_ID, COLUMN_PROJECT_ID, COLUMN_USER_ID, DType, EVENT_CLICK, EVENT_PAGE, EVENT_PROPERTY_A_CLASS, EVENT_PROPERTY_A_HREF, EVENT_PROPERTY_A_ID, EVENT_PROPERTY_A_NAME, EVENT_PROPERTY_A_STYLE, EVENT_PROPERTY_PAGE_PATH, EVENT_PROPERTY_PAGE_REFERER, EVENT_PROPERTY_PAGE_SEARCH, EVENT_PROPERTY_PAGE_TITLE, EVENT_PROPERTY_PAGE_URL, EVENT_SCREEN, TABLE_EVENTS, USER_PROPERTY_CITY, USER_PROPERTY_CLIENT_FAMILY, USER_PROPERTY_CLIENT_VERSION_MAJOR, USER_PROPERTY_CLIENT_VERSION_MINOR, USER_PROPERTY_CLIENT_VERSION_PATCH, USER_PROPERTY_COUNTRY, USER_PROPERTY_DEVICE_BRAND, USER_PROPERTY_DEVICE_FAMILY, USER_PROPERTY_DEVICE_MODEL, USER_PROPERTY_OS, USER_PROPERTY_OS_FAMILY, USER_PROPERTY_OS_VERSION_MAJOR, USER_PROPERTY_OS_VERSION_MINOR, USER_PROPERTY_OS_VERSION_PATCH, USER_PROPERTY_OS_VERSION_PATCH_MINOR};
+
+use ::store::db::OptiDBImpl;
+use ::store::db::TableOptions;
+use common::rbac::OrganizationRole;
+use common::rbac::ProjectRole;
+use common::rbac::Role;
+use common::types::DType;
+use common::types::COLUMN_CREATED_AT;
+use common::types::COLUMN_EVENT;
+use common::types::COLUMN_EVENT_ID;
+use common::types::COLUMN_PROJECT_ID;
+use common::types::COLUMN_USER_ID;
+use common::types::EVENT_CLICK;
+use common::types::EVENT_PAGE;
+use common::types::EVENT_PROPERTY_A_CLASS;
+use common::types::EVENT_PROPERTY_A_HREF;
+use common::types::EVENT_PROPERTY_A_ID;
+use common::types::EVENT_PROPERTY_A_NAME;
+use common::types::EVENT_PROPERTY_A_STYLE;
+use common::types::EVENT_PROPERTY_PAGE_PATH;
+use common::types::EVENT_PROPERTY_PAGE_REFERER;
+use common::types::EVENT_PROPERTY_PAGE_SEARCH;
+use common::types::EVENT_PROPERTY_PAGE_TITLE;
+use common::types::EVENT_PROPERTY_PAGE_URL;
+use common::types::EVENT_SCREEN;
+use common::types::TABLE_EVENTS;
+use common::types::USER_PROPERTY_CITY;
+use common::types::USER_PROPERTY_CLIENT_FAMILY;
+use common::types::USER_PROPERTY_CLIENT_VERSION_MAJOR;
+use common::types::USER_PROPERTY_CLIENT_VERSION_MINOR;
+use common::types::USER_PROPERTY_CLIENT_VERSION_PATCH;
+use common::types::USER_PROPERTY_COUNTRY;
+use common::types::USER_PROPERTY_DEVICE_BRAND;
+use common::types::USER_PROPERTY_DEVICE_FAMILY;
+use common::types::USER_PROPERTY_DEVICE_MODEL;
+use common::types::USER_PROPERTY_OS;
+use common::types::USER_PROPERTY_OS_FAMILY;
+use common::types::USER_PROPERTY_OS_VERSION_MAJOR;
+use common::types::USER_PROPERTY_OS_VERSION_MINOR;
+use common::types::USER_PROPERTY_OS_VERSION_PATCH;
+use common::types::USER_PROPERTY_OS_VERSION_PATCH_MINOR;
 use metadata::accounts::CreateAccountRequest;
-use metadata::MetadataProvider;
 use metadata::organizations::CreateOrganizationRequest;
 use metadata::projects::CreateProjectRequest;
-use metadata::properties::{DictionaryType, Type};
+use metadata::properties::DictionaryType;
+use metadata::properties::Type;
+use metadata::test_util::create_event;
+use metadata::test_util::create_property;
+use metadata::test_util::CreatePropertyMainRequest;
+use metadata::MetadataProvider;
 use platform::auth::password::make_password_hash;
-use test_util::{create_event, create_property, CreatePropertyMainRequest};
+use tracing::info;
 
 pub mod error;
 pub mod store;
 pub mod test;
 
-
-pub fn init_system(md: &Arc<MetadataProvider>, db: &Arc<OptiDBImpl>,partitions:usize) -> error::Result<()> {
+pub fn init_system(
+    md: &Arc<MetadataProvider>,
+    db: &Arc<OptiDBImpl>,
+    partitions: usize,
+) -> error::Result<()> {
     let topts = TableOptions {
         levels: 7,
         merge_array_size: 10000,
@@ -36,71 +80,45 @@ pub fn init_system(md: &Arc<MetadataProvider>, db: &Arc<OptiDBImpl>,partitions:u
     };
     db.create_table("events", topts)?;
 
-    create_property(
-        md,
-        0,
-        0,
-        CreatePropertyMainRequest {
-            name: COLUMN_PROJECT_ID.to_string(),
-            typ: Type::System,
-            data_type: DType::Int64,
-            nullable: false,
-            dict: None,
-        },
-    )?;
+    create_property(md, 0, 0, CreatePropertyMainRequest {
+        name: COLUMN_PROJECT_ID.to_string(),
+        typ: Type::System,
+        data_type: DType::Int64,
+        nullable: false,
+        dict: None,
+    })?;
 
-    create_property(
-        md,
-        0,
-        0,
-        CreatePropertyMainRequest {
-            name: COLUMN_USER_ID.to_string(),
-            typ: Type::System,
-            data_type: DType::Int64,
-            nullable: false,
-            dict: None,
-        },
-    )?;
+    create_property(md, 0, 0, CreatePropertyMainRequest {
+        name: COLUMN_USER_ID.to_string(),
+        typ: Type::System,
+        data_type: DType::Int64,
+        nullable: false,
+        dict: None,
+    })?;
 
-    create_property(
-        md,
-        0,
-        0,
-        CreatePropertyMainRequest {
-            name: COLUMN_CREATED_AT.to_string(),
-            typ: Type::System,
-            data_type: DType::Timestamp,
-            nullable: false,
-            dict: None,
-        },
-    )?;
+    create_property(md, 0, 0, CreatePropertyMainRequest {
+        name: COLUMN_CREATED_AT.to_string(),
+        typ: Type::System,
+        data_type: DType::Timestamp,
+        nullable: false,
+        dict: None,
+    })?;
 
-    create_property(
-        md,
-        0,
-        0,
-        CreatePropertyMainRequest {
-            name: COLUMN_EVENT_ID.to_string(),
-            typ: Type::System,
-            data_type: DType::Int64,
-            nullable: false,
-            dict: None,
-        },
-    )?;
+    create_property(md, 0, 0, CreatePropertyMainRequest {
+        name: COLUMN_EVENT_ID.to_string(),
+        typ: Type::System,
+        data_type: DType::Int64,
+        nullable: false,
+        dict: None,
+    })?;
 
-    create_property(
-        md,
-        0,
-        0,
-        CreatePropertyMainRequest {
-            name: COLUMN_EVENT.to_string(),
-            typ: Type::System,
-            data_type: DType::String,
-            nullable: false,
-            dict: Some(DictionaryType::Int64),
-        },
-    )?;
-
+    create_property(md, 0, 0, CreatePropertyMainRequest {
+        name: COLUMN_EVENT.to_string(),
+        typ: Type::System,
+        data_type: DType::String,
+        nullable: false,
+        dict: Some(DictionaryType::Int64),
+    })?;
 
     Ok(())
 }
@@ -124,20 +142,16 @@ pub fn init_project(org_id: u64, project_id: u64, md: &Arc<MetadataProvider>) ->
         USER_PROPERTY_OS_VERSION_PATCH,
         USER_PROPERTY_OS_VERSION_PATCH_MINOR,
         USER_PROPERTY_COUNTRY,
-        USER_PROPERTY_CITY
+        USER_PROPERTY_CITY,
     ];
     for prop in user_props {
-        create_property(
-            md,
-            org_id, project_id,
-            CreatePropertyMainRequest {
-                name: prop.to_string(),
-                typ: Type::User,
-                data_type: DType::String,
-                nullable: true,
-                dict: Some(DictionaryType::Int64),
-            },
-        )?;
+        create_property(md, org_id, project_id, CreatePropertyMainRequest {
+            name: prop.to_string(),
+            typ: Type::User,
+            data_type: DType::String,
+            nullable: true,
+            dict: Some(DictionaryType::Int64),
+        })?;
     }
 
     let event_props = vec![
@@ -154,17 +168,13 @@ pub fn init_project(org_id: u64, project_id: u64, md: &Arc<MetadataProvider>) ->
     ];
 
     for prop in event_props {
-        create_property(
-            md,
-            org_id, project_id,
-            CreatePropertyMainRequest {
-                name: prop.to_string(),
-                typ: Type::Event,
-                data_type: DType::String,
-                nullable: true,
-                dict: None,
-            },
-        )?;
+        create_property(md, org_id, project_id, CreatePropertyMainRequest {
+            name: prop.to_string(),
+            typ: Type::Event,
+            data_type: DType::String,
+            nullable: true,
+            dict: None,
+        })?;
     }
 
     Ok(())
@@ -201,7 +211,7 @@ fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<(
         Err(err) => md.projects.get_by_id(1, 1)?,
     };
 
-    info!("token: {}",proj.token);
+    info!("token: {}", proj.token);
     let _user = match md.accounts.create(CreateAccountRequest {
         created_by: Some(admin.id),
         password_hash: make_password_hash("test")?,

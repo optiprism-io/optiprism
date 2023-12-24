@@ -8,7 +8,12 @@ use std::net::SocketAddr;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
-use arrow::array::{ArrayRef, Int16Array, Int32Array, Int64Array, Int8Array};
+
+use arrow::array::ArrayRef;
+use arrow::array::Int16Array;
+use arrow::array::Int32Array;
+use arrow::array::Int64Array;
+use arrow::array::Int8Array;
 use arrow::array::StringBuilder;
 use arrow::array::UInt16Array;
 use arrow::array::UInt32Array;
@@ -24,10 +29,13 @@ use chrono::Duration;
 use chrono::Utc;
 use clap::Parser;
 use clap::Subcommand;
+use cmd::store::Shop;
+use cmd::test::Test;
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::rbac::Role;
-use datafusion::datasource::{MemTable, TableProvider};
+use datafusion::datasource::MemTable;
+use datafusion::datasource::TableProvider;
 use datafusion::parquet::arrow::ArrowWriter;
 use datafusion::parquet::basic::Compression;
 use datafusion::parquet::file::properties::WriterProperties;
@@ -36,7 +44,6 @@ use futures::executor::block_on;
 use indicatif::ProgressBar;
 use indicatif::ProgressState;
 use indicatif::ProgressStyle;
-use scan_dir::ScanDir;
 use metadata::accounts::CreateAccountRequest;
 use metadata::organizations::CreateOrganizationRequest;
 use metadata::projects::CreateProjectRequest;
@@ -45,18 +52,18 @@ use metadata::properties::Type;
 use metadata::MetadataProvider;
 use platform::auth;
 use platform::auth::password::make_password_hash;
+use query::datasources::local::LocalTable;
 use query::ProviderImpl;
+use scan_dir::ScanDir;
 use service::tracing::TracingCliArgs;
 use tracing::debug;
 use tracing::info;
 use uuid::Uuid;
-use cmd::store::Shop;
-use cmd::test::Test;
-use query::datasources::local::LocalTable;
 
 extern crate parse_duration;
 
-use cmd::error::{Error, Result};
+use cmd::error::Error;
+use cmd::error::Result;
 use cmd::test;
 
 #[derive(Subcommand, Clone)]
@@ -75,7 +82,6 @@ pub struct Cli {
     tracing: TracingCliArgs,
     #[command(subcommand)]
     command: Option<Commands>,
-
 }
 
 #[tokio::main]
@@ -101,4 +107,3 @@ async fn main() -> Result<()> {
 
     Ok(())
 }
-

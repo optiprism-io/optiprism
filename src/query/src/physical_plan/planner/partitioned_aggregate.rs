@@ -413,7 +413,6 @@ pub fn build_partitioned_aggregate_expr(
                 DataType::Float64 => {
                     let agg = aggregate::<f64>(&outer_fn);
                     partitioned_count!(f64, filter, agg, groups, partition_col, distinct)
-
                 }
                 DataType::Int64 => {
                     let agg = aggregate::<i64>(&outer_fn);
@@ -422,7 +421,6 @@ pub fn build_partitioned_aggregate_expr(
                 DataType::Decimal128(_, _) => {
                     let agg = aggregate::<i128>(&outer_fn);
                     partitioned_count!(i128, filter, agg, groups, partition_col, distinct)
-
                 }
                 _ => unreachable!(),
             };

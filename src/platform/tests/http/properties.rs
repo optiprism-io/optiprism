@@ -1,5 +1,6 @@
 use chrono::Utc;
-use common::types::{DType, OptionalProperty};
+use common::types::DType;
+use common::types::OptionalProperty;
 use metadata::metadata::ListResponse;
 use metadata::properties;
 use metadata::properties::CreatePropertyRequest;

@@ -47,9 +47,7 @@ impl ProviderImpl {
         );
 
         match tx.get(key)? {
-            None => Err(MetadataError::NotFound(
-                "report not found".to_string(),
-            )),
+            None => Err(MetadataError::NotFound("report not found".to_string())),
             Some(value) => Ok(deserialize(&value)?),
         }
     }

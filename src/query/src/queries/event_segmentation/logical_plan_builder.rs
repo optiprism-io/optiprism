@@ -581,7 +581,9 @@ impl LogicalPlanBuilder {
     fn breakdown_expr(&self, breakdown: &Breakdown) -> Result<Expr> {
         match breakdown {
             Breakdown::Property(prop_ref) => match prop_ref {
-                PropertyRef::System(_prop_name)| PropertyRef::User(_prop_name) | PropertyRef::Event(_prop_name) => {
+                PropertyRef::System(_prop_name)
+                | PropertyRef::User(_prop_name)
+                | PropertyRef::Event(_prop_name) => {
                     let prop_col = property_col(&self.ctx, &self.metadata, prop_ref)?;
                     Ok(prop_col)
                 }

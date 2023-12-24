@@ -15,6 +15,7 @@ use std::error::Error;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
+
 use axum::async_trait;
 use axum::body::HttpBody;
 use axum::extract::rejection::JsonRejection;
@@ -66,9 +67,13 @@ pub struct Properties {
     user: Arc<dyn crate::properties::Provider>,
 }
 
-pub fn attach_routes(mut router: Router, md: &Arc<MetadataProvider>,
-                     platform: &Arc<PlatformProvider>,
-                     auth_cfg: crate::auth::Config, ui: Option<PathBuf>) -> Router {
+pub fn attach_routes(
+    mut router: Router,
+    md: &Arc<MetadataProvider>,
+    platform: &Arc<PlatformProvider>,
+    auth_cfg: crate::auth::Config,
+    ui: Option<PathBuf>,
+) -> Router {
     router = accounts::attach_routes(router);
     router = auth::attach_routes(router);
     router = events::attach_routes(router);

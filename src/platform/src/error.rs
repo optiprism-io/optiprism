@@ -109,6 +109,7 @@ impl PlatformError {
                 QueryError::Metadata(err) => ApiError::internal(err.to_string()),
                 QueryError::Common(err) => ApiError::internal(err.to_string()),
                 QueryError::Store(err) => ApiError::internal(err.to_string()),
+                QueryError::Other(err) => ApiError::internal(err.to_string()),
             },
             PlatformError::BadRequest(msg) => ApiError::bad_request(msg),
             PlatformError::Internal(msg) => ApiError::internal(msg),
@@ -118,7 +119,7 @@ impl PlatformError {
                 CommonError::EntityMapping => ApiError::internal(err.to_string()),
                 CommonError::BadRequest(err) => ApiError::bad_request(err),
                 CommonError::Serde(err) => ApiError::bad_request(err.to_string()),
-                CommonError::General(err) => ApiError::internal(err)
+                CommonError::General(err) => ApiError::internal(err),
             },
             PlatformError::Auth(err) => match err {
                 AuthError::InvalidCredentials => ApiError::unauthorized(err),

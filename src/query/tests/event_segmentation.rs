@@ -31,6 +31,7 @@ mod tests {
     use datafusion_common::ScalarValue;
     use metadata::custom_events;
     use metadata::custom_events::CreateCustomEventRequest;
+    use metadata::test_util::init_db;
     use query::error::Result;
     use query::event_fields;
     use query::physical_plan::planner::planner::QueryPlanner;
@@ -40,7 +41,6 @@ mod tests {
     use query::Context;
     use tracing_test::traced_test;
     use uuid::Uuid;
-    use metadata::test_util::init_db;
 
     #[traced_test]
     #[tokio::test]

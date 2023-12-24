@@ -1,15 +1,44 @@
-use std::collections::{BTreeMap, HashMap};
-use std::{fs, io, thread};
+use std::collections::BTreeMap;
+use std::collections::HashMap;
+use std::fs;
 use std::fs::File;
+use std::io;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
-use crate::error::Result;
+use std::thread;
+
 use arrow::record_batch::RecordBatch;
-use axum::{Router, Server};
-use chrono::{DateTime, Duration, NaiveDateTime};
+use axum::Router;
+use axum::Server;
+use chrono::DateTime;
+use chrono::Duration;
+use chrono::NaiveDateTime;
 use chrono::Utc;
 use clap::Parser;
+use common::rbac::OrganizationRole;
+use common::rbac::ProjectRole;
+use common::rbac::Role;
+use common::types::DType;
+use common::types::COLUMN_PROJECT_ID;
+use common::types::EVENT_PROPERTY_PAGE_PATH;
+use common::types::EVENT_PROPERTY_PAGE_TITLE;
+use common::types::EVENT_PROPERTY_PAGE_URL;
+use common::types::USER_PROPERTY_CITY;
+use common::types::USER_PROPERTY_CLIENT_FAMILY;
+use common::types::USER_PROPERTY_CLIENT_VERSION_MAJOR;
+use common::types::USER_PROPERTY_CLIENT_VERSION_MINOR;
+use common::types::USER_PROPERTY_CLIENT_VERSION_PATCH;
+use common::types::USER_PROPERTY_COUNTRY;
+use common::types::USER_PROPERTY_DEVICE_BRAND;
+use common::types::USER_PROPERTY_DEVICE_FAMILY;
+use common::types::USER_PROPERTY_DEVICE_MODEL;
+use common::types::USER_PROPERTY_OS;
+use common::types::USER_PROPERTY_OS_FAMILY;
+use common::types::USER_PROPERTY_OS_VERSION_MAJOR;
+use common::types::USER_PROPERTY_OS_VERSION_MINOR;
+use common::types::USER_PROPERTY_OS_VERSION_PATCH;
+use common::types::USER_PROPERTY_OS_VERSION_PATCH_MINOR;
 use crossbeam_channel::bounded;
 use datafusion::datasource::TableProvider;
 use dateparser::DateTimeUtc;
@@ -20,35 +49,48 @@ use events_gen::store::events::Event;
 use events_gen::store::products::ProductProvider;
 use events_gen::store::profiles::ProfileProvider;
 use events_gen::store::scenario;
-use events_gen::store::scenario::{EventRecord, Scenario};
+use events_gen::store::scenario::EventRecord;
+use events_gen::store::scenario::Scenario;
 use events_gen::store::schema::create_properties;
 use futures::executor::block_on;
-use metadata::{MetadataProvider, properties};
-use rand::thread_rng;
-use scan_dir::ScanDir;
-use tokio::select;
-use tokio::signal::unix::SignalKind;
-use tracing::{debug, info};
-use uaparser::UserAgentParser;
-use common::rbac::{OrganizationRole, ProjectRole, Role};
-use common::types::{COLUMN_PROJECT_ID, DType, EVENT_PROPERTY_PAGE_PATH, EVENT_PROPERTY_PAGE_TITLE, EVENT_PROPERTY_PAGE_URL, USER_PROPERTY_CITY, USER_PROPERTY_CLIENT_FAMILY, USER_PROPERTY_CLIENT_VERSION_MAJOR, USER_PROPERTY_CLIENT_VERSION_MINOR, USER_PROPERTY_CLIENT_VERSION_PATCH, USER_PROPERTY_COUNTRY, USER_PROPERTY_DEVICE_BRAND, USER_PROPERTY_DEVICE_FAMILY, USER_PROPERTY_DEVICE_MODEL, USER_PROPERTY_OS, USER_PROPERTY_OS_FAMILY, USER_PROPERTY_OS_VERSION_MAJOR, USER_PROPERTY_OS_VERSION_MINOR, USER_PROPERTY_OS_VERSION_PATCH, USER_PROPERTY_OS_VERSION_PATCH_MINOR};
 use ingester::error::IngesterError;
-use ingester::{Destination, Identify, Track, Transformer};
 use ingester::executor::Executor;
-use ingester::transformers::{geo, user_agent};
+use ingester::transformers::geo;
+use ingester::transformers::user_agent;
+use ingester::Destination;
+use ingester::Identify;
+use ingester::Track;
+use ingester::Transformer;
 use metadata::accounts::CreateAccountRequest;
 use metadata::organizations::CreateOrganizationRequest;
 use metadata::projects::CreateProjectRequest;
-use metadata::properties::{CreatePropertyRequest, DictionaryType, Status, Type};
+use metadata::properties;
+use metadata::properties::CreatePropertyRequest;
+use metadata::properties::DictionaryType;
+use metadata::properties::Status;
+use metadata::properties::Type;
+use metadata::MetadataProvider;
 use platform::auth;
 use platform::auth::password::make_password_hash;
 use query::datasources::local::LocalTable;
 use query::ProviderImpl;
-use store::db::{OptiDBImpl, Options, TableOptions};
-use store::{NamedValue, Value};
-use test_util::{create_property, CreatePropertyMainRequest};
+use rand::thread_rng;
+use scan_dir::ScanDir;
+use store::db::OptiDBImpl;
+use store::db::Options;
+use store::db::TableOptions;
+use store::NamedValue;
+use store::Value;
+use tokio::select;
+use tokio::signal::unix::SignalKind;
+use tracing::debug;
+use tracing::info;
+use uaparser::UserAgentParser;
+
 use crate::error::Error;
-use crate::{init_project, init_system};
+use crate::error::Result;
+use crate::init_project;
+use crate::init_system;
 
 #[derive(Parser, Clone)]
 pub struct Shop {
@@ -74,7 +116,6 @@ pub struct Shop {
     ua_db_path: PathBuf,
     #[arg(long)]
     geo_city_path: PathBuf,
-
 }
 
 pub struct Config<R> {
@@ -90,8 +131,13 @@ pub struct Config<R> {
     pub partitions: usize,
 }
 
-fn init_platform(md: &Arc<MetadataProvider>, db: &Arc<OptiDBImpl>, router: Router) -> Result<Router> {
-    let data_provider: Arc<dyn TableProvider> = Arc::new(LocalTable::try_new(db.clone(), "events".to_string())?);
+fn init_platform(
+    md: &Arc<MetadataProvider>,
+    db: &Arc<OptiDBImpl>,
+    router: Router,
+) -> Result<Router> {
+    let data_provider: Arc<dyn TableProvider> =
+        Arc::new(LocalTable::try_new(db.clone(), "events".to_string())?);
     let query_provider = Arc::new(ProviderImpl::try_new_from_provider(
         md.clone(),
         data_provider,
@@ -111,10 +157,21 @@ fn init_platform(md: &Arc<MetadataProvider>, db: &Arc<OptiDBImpl>, router: Route
     ));
 
     info!("attaching platform routes...");
-    Ok(platform::http::attach_routes(router, &md, &platform_provider, auth_cfg, None))
+    Ok(platform::http::attach_routes(
+        router,
+        &md,
+        &platform_provider,
+        auth_cfg,
+        None,
+    ))
 }
 
-fn init_ingester(args: &Shop, md: &Arc<MetadataProvider>, db: &Arc<OptiDBImpl>, router: Router) -> Result<Router> {
+fn init_ingester(
+    args: &Shop,
+    md: &Arc<MetadataProvider>,
+    db: &Arc<OptiDBImpl>,
+    router: Router,
+) -> Result<Router> {
     let mut track_transformers = Vec::new();
     let ua_parser = UserAgentParser::from_file(File::open(args.ua_db_path.clone())?)
         .map_err(|e| Error::Internal(e.to_string()))?;
@@ -171,7 +228,11 @@ fn init_ingester(args: &Shop, md: &Arc<MetadataProvider>, db: &Arc<OptiDBImpl>, 
     );
 
     info!("attaching ingester routes...");
-    Ok(ingester::sources::http::attach_routes(router, track_exec, identify_exec))
+    Ok(ingester::sources::http::attach_routes(
+        router,
+        track_exec,
+        identify_exec,
+    ))
 }
 
 pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
@@ -185,9 +246,7 @@ pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
     init_system(&md, &db, args.partitions.unwrap_or_else(num_cpus::get))?;
     if let Some(ui_path) = &args.ui_path {
         if !ui_path.try_exists()? {
-            return Err(
-                Error::FileNotFound(format!("ui path {ui_path:?} doesn't exist")).into(),
-            );
+            return Err(Error::FileNotFound(format!("ui path {ui_path:?} doesn't exist")).into());
         }
         debug!("ui path: {:?}", ui_path);
     }
@@ -197,7 +256,7 @@ pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
             "demo data path {:?} doesn't exist",
             args.demo_data_path
         ))
-            .into());
+        .into());
     }
 
     let to_date = match &args.to_date {
@@ -276,30 +335,25 @@ pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
     info!("initializing ingester...");
     let router = init_ingester(args, &md, &db, router)?;
 
-    let server = Server::bind(&args.host).serve(router.into_make_service_with_connect_info::<SocketAddr>());
+    let server =
+        Server::bind(&args.host).serve(router.into_make_service_with_connect_info::<SocketAddr>());
     info!("start listening on {}", args.host);
     let graceful = server.with_graceful_shutdown(async {
-        let mut sig_int = tokio::signal::unix::signal(SignalKind::interrupt())
-            .expect("failed to install signal");
-        let mut sig_term = tokio::signal::unix::signal(SignalKind::terminate())
-            .expect("failed to install signal");
+        let mut sig_int =
+            tokio::signal::unix::signal(SignalKind::interrupt()).expect("failed to install signal");
+        let mut sig_term =
+            tokio::signal::unix::signal(SignalKind::terminate()).expect("failed to install signal");
         select! {
-                _=sig_int.recv()=>info!("SIGINT received"),
-                _=sig_term.recv()=>info!("SIGTERM received"),
-            }
+            _=sig_int.recv()=>info!("SIGINT received"),
+            _=sig_term.recv()=>info!("SIGTERM received"),
+        }
     });
 
     Ok(graceful.await?)
 }
 
-pub fn gen<R>(
-    md: &Arc<MetadataProvider>,
-    db: &Arc<OptiDBImpl>,
-    cfg: Config<R>,
-) -> Result<()>
-    where
-        R: io::Read,
-{
+pub fn gen<R>(md: &Arc<MetadataProvider>, db: &Arc<OptiDBImpl>, cfg: Config<R>) -> Result<()>
+where R: io::Read {
     let mut rng = thread_rng();
     info!("creating entities...");
 
@@ -326,15 +380,15 @@ pub fn gen<R>(
     )?;
     let mut events_map: HashMap<Event, u64> = HashMap::default();
     for event in all::<Event>() {
-        let md_event =
-            md
-                .events
-                .get_by_name(cfg.org_id, cfg.project_id, event.to_string().as_str()).unwrap();
+        let md_event = md
+            .events
+            .get_by_name(cfg.org_id, cfg.project_id, event.to_string().as_str())
+            .unwrap();
         events_map.insert(event, md_event.id);
         md.dictionaries
-            .get_key_or_create(1, 1, "event_event", event.to_string().as_str()).unwrap();
+            .get_key_or_create(1, 1, "event_event", event.to_string().as_str())
+            .unwrap();
     }
-
 
     let (rx, tx) = bounded(1);
     // move init to thread because thread_rng is not movable
@@ -371,7 +425,7 @@ pub fn gen<R>(
         let res = scenario.run();
         match res {
             Ok(_) => {}
-            Err(err) => println!("generation error: {:?}", err)
+            Err(err) => println!("generation error: {:?}", err),
         }
     });
 
@@ -384,14 +438,8 @@ pub fn gen<R>(
     Ok(())
 }
 
-pub fn future_gen<R>(
-    md: Arc<MetadataProvider>,
-    db: Arc<OptiDBImpl>,
-    cfg: Config<R>,
-) -> Result<()>
-    where
-        R: io::Read,
-{
+pub fn future_gen<R>(md: Arc<MetadataProvider>, db: Arc<OptiDBImpl>, cfg: Config<R>) -> Result<()>
+where R: io::Read {
     let mut rng = thread_rng();
     let profiles = ProfileProvider::try_new_from_csv(
         cfg.org_id,
@@ -411,13 +459,14 @@ pub fn future_gen<R>(
     )?;
     let mut events_map: HashMap<Event, u64> = HashMap::default();
     for event in all::<Event>() {
-        let md_event =
-            md
-                .events
-                .get_by_name(cfg.org_id, cfg.project_id, event.to_string().as_str()).unwrap();
+        let md_event = md
+            .events
+            .get_by_name(cfg.org_id, cfg.project_id, event.to_string().as_str())
+            .unwrap();
         events_map.insert(event, md_event.id);
         md.dictionaries
-            .get_key_or_create(1, 1, "event_event", event.to_string().as_str()).unwrap();
+            .get_key_or_create(1, 1, "event_event", event.to_string().as_str())
+            .unwrap();
     }
 
     let (rx, tx) = bounded(1);
@@ -453,7 +502,7 @@ pub fn future_gen<R>(
         let res = scenario.run();
         match res {
             Ok(_) => {}
-            Err(err) => println!("generation error: {:?}", err)
+            Err(err) => println!("generation error: {:?}", err),
         }
     });
 
@@ -482,34 +531,176 @@ pub fn future_gen<R>(
     Ok(())
 }
 
-fn write_event(org_id: u64, proj_id: u64, db: &Arc<OptiDBImpl>, md: &Arc<MetadataProvider>, event: EventRecord, idx: i64) -> Result<()> {
+fn write_event(
+    org_id: u64,
+    proj_id: u64,
+    db: &Arc<OptiDBImpl>,
+    md: &Arc<MetadataProvider>,
+    event: EventRecord,
+    idx: i64,
+) -> Result<()> {
     let mut vals = vec![];
-    vals.push(NamedValue::new("project_id".to_string(), Value::Int64(Some(proj_id as i64))));
-    vals.push(NamedValue::new("user_id".to_string(), Value::Int64(Some(event.user_id))));
-    vals.push(NamedValue::new("created_at".to_string(), Value::Timestamp(Some(event.created_at))));
-    vals.push(NamedValue::new("event_id".to_string(), Value::Int64(Some(idx))));
-    vals.push(NamedValue::new("event".to_string(), Value::Int64(Some(event.event))));
-    vals.push(NamedValue::new(md.event_properties.get_by_name(org_id, proj_id, EVENT_PROPERTY_PAGE_PATH).unwrap().column_name(), Value::String(Some(event.page_path))));
-    vals.push(NamedValue::new(md.event_properties.get_by_name(org_id, proj_id, EVENT_PROPERTY_PAGE_TITLE).unwrap().column_name(), Value::String(Some(event.page_title))));
-    vals.push(NamedValue::new(md.event_properties.get_by_name(org_id, proj_id, EVENT_PROPERTY_PAGE_URL).unwrap().column_name(), Value::String(Some(event.page_url))));
-    vals.push(NamedValue::new(md.event_properties.get_by_name(org_id, proj_id, "Product Name").unwrap().column_name(), Value::Int16(event.product_name)));
-    vals.push(NamedValue::new(md.event_properties.get_by_name(org_id, proj_id, "Product Category").unwrap().column_name(), Value::Int16(event.product_category)));
-    vals.push(NamedValue::new(md.event_properties.get_by_name(org_id, proj_id, "Product Subcategory").unwrap().column_name(), Value::Int16(event.product_subcategory)));
-    vals.push(NamedValue::new(md.event_properties.get_by_name(org_id, proj_id, "Product Brand").unwrap().column_name(), Value::Int16(event.product_brand)));
-    vals.push(NamedValue::new(md.event_properties.get_by_name(org_id, proj_id, "Product Price").unwrap().column_name(), Value::Decimal(event.product_price)));
-    vals.push(NamedValue::new(md.event_properties.get_by_name(org_id, proj_id, "Product Discount Price").unwrap().column_name(), Value::Decimal(event.product_discount_price)));
-    vals.push(NamedValue::new(md.event_properties.get_by_name(org_id, proj_id, "Revenue").unwrap().column_name(), Value::Decimal(event.revenue)));
-    vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, "Spent Total").unwrap().column_name(), Value::Decimal(event.spent_total)));
-    vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, "Products Bought").unwrap().column_name(), Value::Int8(event.products_bought)));
-    vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, "Cart Items Number").unwrap().column_name(), Value::Int8(event.cart_items_number)));
-    vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, "Cart Amount").unwrap().column_name(), Value::Decimal(event.cart_amount)));
-    vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, USER_PROPERTY_COUNTRY).unwrap().column_name(), Value::Int64(event.country.map(|v| v as i64))));
-    vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, USER_PROPERTY_CITY).unwrap().column_name(), Value::Int64(event.city.map(|v| v as i64))));
-    vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, USER_PROPERTY_DEVICE_MODEL).unwrap().column_name(), Value::Int64(event.device.map(|v| v as i64))));
+    vals.push(NamedValue::new(
+        "project_id".to_string(),
+        Value::Int64(Some(proj_id as i64)),
+    ));
+    vals.push(NamedValue::new(
+        "user_id".to_string(),
+        Value::Int64(Some(event.user_id)),
+    ));
+    vals.push(NamedValue::new(
+        "created_at".to_string(),
+        Value::Timestamp(Some(event.created_at)),
+    ));
+    vals.push(NamedValue::new(
+        "event_id".to_string(),
+        Value::Int64(Some(idx)),
+    ));
+    vals.push(NamedValue::new(
+        "event".to_string(),
+        Value::Int64(Some(event.event)),
+    ));
+    vals.push(NamedValue::new(
+        md.event_properties
+            .get_by_name(org_id, proj_id, EVENT_PROPERTY_PAGE_PATH)
+            .unwrap()
+            .column_name(),
+        Value::String(Some(event.page_path)),
+    ));
+    vals.push(NamedValue::new(
+        md.event_properties
+            .get_by_name(org_id, proj_id, EVENT_PROPERTY_PAGE_TITLE)
+            .unwrap()
+            .column_name(),
+        Value::String(Some(event.page_title)),
+    ));
+    vals.push(NamedValue::new(
+        md.event_properties
+            .get_by_name(org_id, proj_id, EVENT_PROPERTY_PAGE_URL)
+            .unwrap()
+            .column_name(),
+        Value::String(Some(event.page_url)),
+    ));
+    vals.push(NamedValue::new(
+        md.event_properties
+            .get_by_name(org_id, proj_id, "Product Name")
+            .unwrap()
+            .column_name(),
+        Value::Int16(event.product_name),
+    ));
+    vals.push(NamedValue::new(
+        md.event_properties
+            .get_by_name(org_id, proj_id, "Product Category")
+            .unwrap()
+            .column_name(),
+        Value::Int16(event.product_category),
+    ));
+    vals.push(NamedValue::new(
+        md.event_properties
+            .get_by_name(org_id, proj_id, "Product Subcategory")
+            .unwrap()
+            .column_name(),
+        Value::Int16(event.product_subcategory),
+    ));
+    vals.push(NamedValue::new(
+        md.event_properties
+            .get_by_name(org_id, proj_id, "Product Brand")
+            .unwrap()
+            .column_name(),
+        Value::Int16(event.product_brand),
+    ));
+    vals.push(NamedValue::new(
+        md.event_properties
+            .get_by_name(org_id, proj_id, "Product Price")
+            .unwrap()
+            .column_name(),
+        Value::Decimal(event.product_price),
+    ));
+    vals.push(NamedValue::new(
+        md.event_properties
+            .get_by_name(org_id, proj_id, "Product Discount Price")
+            .unwrap()
+            .column_name(),
+        Value::Decimal(event.product_discount_price),
+    ));
+    vals.push(NamedValue::new(
+        md.event_properties
+            .get_by_name(org_id, proj_id, "Revenue")
+            .unwrap()
+            .column_name(),
+        Value::Decimal(event.revenue),
+    ));
+    vals.push(NamedValue::new(
+        md.user_properties
+            .get_by_name(org_id, proj_id, "Spent Total")
+            .unwrap()
+            .column_name(),
+        Value::Decimal(event.spent_total),
+    ));
+    vals.push(NamedValue::new(
+        md.user_properties
+            .get_by_name(org_id, proj_id, "Products Bought")
+            .unwrap()
+            .column_name(),
+        Value::Int8(event.products_bought),
+    ));
+    vals.push(NamedValue::new(
+        md.user_properties
+            .get_by_name(org_id, proj_id, "Cart Items Number")
+            .unwrap()
+            .column_name(),
+        Value::Int8(event.cart_items_number),
+    ));
+    vals.push(NamedValue::new(
+        md.user_properties
+            .get_by_name(org_id, proj_id, "Cart Amount")
+            .unwrap()
+            .column_name(),
+        Value::Decimal(event.cart_amount),
+    ));
+    vals.push(NamedValue::new(
+        md.user_properties
+            .get_by_name(org_id, proj_id, USER_PROPERTY_COUNTRY)
+            .unwrap()
+            .column_name(),
+        Value::Int64(event.country.map(|v| v as i64)),
+    ));
+    vals.push(NamedValue::new(
+        md.user_properties
+            .get_by_name(org_id, proj_id, USER_PROPERTY_CITY)
+            .unwrap()
+            .column_name(),
+        Value::Int64(event.city.map(|v| v as i64)),
+    ));
+    vals.push(NamedValue::new(
+        md.user_properties
+            .get_by_name(org_id, proj_id, USER_PROPERTY_DEVICE_MODEL)
+            .unwrap()
+            .column_name(),
+        Value::Int64(event.device.map(|v| v as i64)),
+    ));
     // todo remove in favour of Os Family?
-    vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, USER_PROPERTY_OS_FAMILY).unwrap().column_name(), Value::Int64(event.device_category.map(|v| v as i64))));
-    vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, USER_PROPERTY_OS).unwrap().column_name(), Value::Int64(event.os.map(|v| v as i64))));
-    vals.push(NamedValue::new(md.user_properties.get_by_name(org_id, proj_id, USER_PROPERTY_OS_VERSION_MAJOR).unwrap().column_name(), Value::Int64(event.os_version.map(|v| v as i64))));
+    vals.push(NamedValue::new(
+        md.user_properties
+            .get_by_name(org_id, proj_id, USER_PROPERTY_OS_FAMILY)
+            .unwrap()
+            .column_name(),
+        Value::Int64(event.device_category.map(|v| v as i64)),
+    ));
+    vals.push(NamedValue::new(
+        md.user_properties
+            .get_by_name(org_id, proj_id, USER_PROPERTY_OS)
+            .unwrap()
+            .column_name(),
+        Value::Int64(event.os.map(|v| v as i64)),
+    ));
+    vals.push(NamedValue::new(
+        md.user_properties
+            .get_by_name(org_id, proj_id, USER_PROPERTY_OS_VERSION_MAJOR)
+            .unwrap()
+            .column_name(),
+        Value::Int64(event.os_version.map(|v| v as i64)),
+    ));
     db.insert("events", vals)?;
 
     return Ok(());

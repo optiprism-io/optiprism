@@ -189,10 +189,15 @@ pub fn encode_property_dict_values(
     Ok(ret)
 }
 
-fn prop_expression(ctx: &Context, prop: &Arc<dyn metadata::properties::Provider>, dicts: &Arc<dyn metadata::dictionaries::Provider>, prop_name: &str, operation: &PropValueOperation,
-                   values: Option<Vec<ScalarValue>>) -> Result<Expr> {
-    let prop = prop
-        .get_by_name(ctx.organization_id, ctx.project_id, prop_name)?;
+fn prop_expression(
+    ctx: &Context,
+    prop: &Arc<dyn metadata::properties::Provider>,
+    dicts: &Arc<dyn metadata::dictionaries::Provider>,
+    prop_name: &str,
+    operation: &PropValueOperation,
+    values: Option<Vec<ScalarValue>>,
+) -> Result<Expr> {
+    let prop = prop.get_by_name(ctx.organization_id, ctx.project_id, prop_name)?;
     let col_name = prop.column_name();
     let col = col(col_name.as_str());
 
@@ -223,15 +228,30 @@ pub fn property_expression(
     values: Option<Vec<ScalarValue>>,
 ) -> Result<Expr> {
     match property {
-        PropertyRef::System(prop_name) => {
-            prop_expression(ctx, &md.system_properties, &md.dictionaries, prop_name, operation, values)
-        }
-        PropertyRef::User(prop_name) => {
-            prop_expression(ctx, &md.user_properties, &md.dictionaries, prop_name, operation, values)
-        }
-        PropertyRef::Event(prop_name) => {
-            prop_expression(ctx, &md.event_properties, &md.dictionaries, prop_name, operation, values)
-        }
+        PropertyRef::System(prop_name) => prop_expression(
+            ctx,
+            &md.system_properties,
+            &md.dictionaries,
+            prop_name,
+            operation,
+            values,
+        ),
+        PropertyRef::User(prop_name) => prop_expression(
+            ctx,
+            &md.user_properties,
+            &md.dictionaries,
+            prop_name,
+            operation,
+            values,
+        ),
+        PropertyRef::Event(prop_name) => prop_expression(
+            ctx,
+            &md.event_properties,
+            &md.dictionaries,
+            prop_name,
+            operation,
+            values,
+        ),
         PropertyRef::Custom(_) => unimplemented!(),
     }
 }
@@ -271,7 +291,14 @@ pub fn named_property_expression(
     values: Option<Vec<ScalarValue>>,
 ) -> Result<Expr> {
     match operation {
-        PropValueOperation::Eq | PropValueOperation::Neq | PropValueOperation::Gt | PropValueOperation::Gte | PropValueOperation::Lt | PropValueOperation::Lte => {
+        PropValueOperation::Eq
+        | PropValueOperation::Neq
+        | PropValueOperation::Gt
+        | PropValueOperation::Gte
+        | PropValueOperation::Lt
+        | PropValueOperation::Lte
+        | PropValueOperation::Regex
+        | PropValueOperation::NotRegex => {
             // expressions for OR
             let values_vec = values.ok_or_else(|| {
                 QueryError::Plan(format!(
@@ -311,14 +338,33 @@ pub fn named_property_expression(
             })?;
 
             Ok(match values_vec.len() {
-                1=>prop_col.like(lit(values_vec[0].to_owned())),
+                1 => prop_col.like(lit(values_vec[0].to_owned())),
                 _ => {
                     // iterate over all possible values
                     let exprs = values_vec
                         .iter()
-                        .map(|v| {
-                            prop_col.to_owned().like(lit(v.to_owned()))
-                        })
+                        .map(|v| prop_col.to_owned().like(lit(v.to_owned())))
+                        .collect();
+
+                    multi_or(exprs)
+                }
+            })
+        }
+        PropValueOperation::NotLike => {
+            // expressions for OR
+            let values_vec = values.ok_or_else(|| {
+                QueryError::Plan(format!(
+                    "value should be defined for \"{operation:?}\" operation"
+                ))
+            })?;
+
+            Ok(match values_vec.len() {
+                1 => prop_col.not_like(lit(values_vec[0].to_owned())),
+                _ => {
+                    // iterate over all possible values
+                    let exprs = values_vec
+                        .iter()
+                        .map(|v| prop_col.to_owned().not_like(lit(v.to_owned())))
                         .collect();
 
                     multi_or(exprs)
@@ -326,6 +372,8 @@ pub fn named_property_expression(
             })
         }
         // for isNull and isNotNull we don't need values at all
+        PropValueOperation::True => Ok(prop_col.is_true()),
+        PropValueOperation::False => Ok(prop_col.is_false()),
         PropValueOperation::Empty => Ok(prop_col.is_null()),
         PropValueOperation::Exists => Ok(prop_col.is_not_null()),
         _ => unimplemented!(),

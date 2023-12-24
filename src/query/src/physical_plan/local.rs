@@ -41,7 +41,12 @@ pub struct LocalExec {
 }
 
 impl LocalExec {
-    pub fn try_new(schema: SchemaRef, db: Arc<OptiDBImpl>, tbl_name: String, fields: Vec<String>) -> Result<Self> {
+    pub fn try_new(
+        schema: SchemaRef,
+        db: Arc<OptiDBImpl>,
+        tbl_name: String,
+        fields: Vec<String>,
+    ) -> Result<Self> {
         Ok(Self {
             schema,
             db,
@@ -98,7 +103,12 @@ impl ExecutionPlan for LocalExec {
     }
 
     fn output_partitioning(&self) -> Partitioning {
-        Partitioning::UnknownPartitioning(self.db.table_options(self.tbl_name.as_str()).unwrap().partitions)
+        Partitioning::UnknownPartitioning(
+            self.db
+                .table_options(self.tbl_name.as_str())
+                .unwrap()
+                .partitions,
+        )
     }
 
     fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {
@@ -126,9 +136,12 @@ impl ExecutionPlan for LocalExec {
         partition: usize,
         _cx: Arc<TaskContext>,
     ) -> datafusion_common::Result<SendableRecordBatchStream> {
-        let stream = self.db.scan_partition(self.tbl_name.as_str(), partition, self.fields.clone()).map_err(|e| {
-            DataFusionError::Execution(format!("Error executing local plan: {:?}", e))
-        })?;
+        let stream = self
+            .db
+            .scan_partition(self.tbl_name.as_str(), partition, self.fields.clone())
+            .map_err(|e| {
+                DataFusionError::Execution(format!("Error executing local plan: {:?}", e))
+            })?;
 
         Ok(Box::pin(PartitionStream {
             local_stream: Box::pin(stream),
@@ -150,6 +163,7 @@ mod tests {
     use arrow::util::pretty::print_batches;
     use arrow2::datatypes::DataType;
     use arrow2::datatypes::Field;
+    use common::types::DType;
     use datafusion::datasource::DefaultTableSource;
     use datafusion::datasource::TableProvider;
     use datafusion::execution::context::SessionState;
@@ -159,12 +173,13 @@ mod tests {
     use datafusion::prelude::SessionConfig;
     use datafusion::prelude::SessionContext;
     use store::arrow_conversion::schema2_to_schema1;
-    use store::db::{OptiDBImpl, Options};
+    use store::db::OptiDBImpl;
+    use store::db::Options;
     use store::db::TableOptions;
-    use store::{KeyValue, NamedValue};
+    use store::KeyValue;
+    use store::NamedValue;
     use store::Value;
     use tracing::debug;
-    use common::types::DType;
 
     use crate::datasources::local::LocalTable;
     use crate::physical_plan::planner::planner::QueryPlanner;
@@ -190,21 +205,22 @@ mod tests {
             merge_array_size: 100,
             levels: 7,
             merge_part_size_multiplier: 0,
-            merge_chunk_size: 1024*8*8,
+            merge_chunk_size: 1024 * 8 * 8,
         };
         let mut db = OptiDBImpl::open(path, Options {}).unwrap();
         db.create_table("events", opts).unwrap();
-        db.add_field("events", "a", DType::Int64, false)
-            .unwrap();
-        db.add_field("events", "b", DType::Int64, false)
-            .unwrap();
-        db.add_field("events", "c", DType::Int64, false)
-            .unwrap();
+        db.add_field("events", "a", DType::Int64, false).unwrap();
+        db.add_field("events", "b", DType::Int64, false).unwrap();
+        db.add_field("events", "c", DType::Int64, false).unwrap();
 
         let a = NamedValue::new("a".to_string(), Value::Int64(None));
         for i in 0..1000 {
-            db.insert("events", vec![NamedValue::new("a".to_string(), Value::Int64(Some(i))), NamedValue::new("b".to_string(), Value::Int64(Some(i))), NamedValue::new("c".to_string(), Value::Int64(Some(i)))])
-                .unwrap();
+            db.insert("events", vec![
+                NamedValue::new("a".to_string(), Value::Int64(Some(i))),
+                NamedValue::new("b".to_string(), Value::Int64(Some(i))),
+                NamedValue::new("c".to_string(), Value::Int64(Some(i))),
+            ])
+            .unwrap();
         }
 
         let schema = schema2_to_schema1(db.schema("events").unwrap());

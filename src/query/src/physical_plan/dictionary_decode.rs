@@ -6,8 +6,12 @@ use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
 
-use arrow::array::{Array, Int16Array, Int32Array, Int64Array, Int8Array};
+use arrow::array::Array;
 use arrow::array::ArrayRef;
+use arrow::array::Int16Array;
+use arrow::array::Int32Array;
+use arrow::array::Int64Array;
+use arrow::array::Int8Array;
 use arrow::array::StringBuilder;
 use arrow::array::UInt16Array;
 use arrow::array::UInt32Array;
@@ -192,7 +196,7 @@ impl DictionaryDecodeStream {
                                 DataType::Int16 => decode_array!(array_ref, Int16Array, dict),
                                 DataType::Int32 => decode_array!(array_ref, Int32Array, dict),
                                 DataType::Int64 => decode_array!(array_ref, Int64Array, dict),
-                                _ => unimplemented!("{:?}",array_ref.data_type()),
+                                _ => unimplemented!("{:?}", array_ref.data_type()),
                             },
                         }
                     })

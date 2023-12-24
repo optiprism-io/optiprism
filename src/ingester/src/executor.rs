@@ -2,7 +2,10 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use chrono::Utc;
-use common::types::{DICT_USERS, DType, TABLE_EVENTS, TABLE_USERS};
+use common::types::DType;
+use common::types::DICT_USERS;
+use common::types::TABLE_EVENTS;
+use common::types::TABLE_USERS;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 use futures::executor::block_on;
@@ -54,7 +57,7 @@ fn resolve_property(
         name: name.clone(),
         description: None,
         display_name: None,
-        typ:typ.clone(),
+        typ: typ.clone(),
         data_type,
         status: Status::Enabled,
         is_system: false,

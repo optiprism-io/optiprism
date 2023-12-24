@@ -22,13 +22,14 @@ use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::pin::Pin;
-use std::sync::{mpsc, OnceLock};
+use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::RecvError;
 use std::sync::mpsc::Sender;
 use std::sync::mpsc::TryRecvError;
 use std::sync::Arc;
 use std::sync::MutexGuard;
+use std::sync::OnceLock;
 use std::task::Context;
 use std::task::Poll;
 use std::thread;
@@ -48,18 +49,23 @@ use arrow2::array::MutablePrimitiveArray;
 use arrow2::array::MutableUtf8Array;
 use arrow2::array::PrimitiveArray;
 use arrow2::chunk::Chunk;
-use arrow2::datatypes::{DataType, TimeUnit};
+use arrow2::datatypes::DataType;
 use arrow2::datatypes::Field;
 use arrow2::datatypes::Schema;
 use arrow2::datatypes::SchemaRef;
-use arrow2::io::{parquet, print};
+use arrow2::datatypes::TimeUnit;
+use arrow2::io::parquet;
 use arrow2::io::parquet::read;
 use arrow2::io::parquet::read::FileReader;
 use arrow2::io::parquet::write::transverse;
+use arrow2::io::print;
 use arrow_buffer::ToByteSlice;
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::format::Item;
+use common::types::DType;
+use common::DECIMAL_PRECISION;
+use common::DECIMAL_SCALE;
 use crossbeam_skiplist::SkipSet;
 use futures::select;
 use futures::Stream;
@@ -89,10 +95,8 @@ use tracing::error;
 use tracing::instrument;
 use tracing::trace;
 use tracing_subscriber::fmt::time::FormatTime;
-use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
-use common::types::DType;
-use crate::arrow_conversion::schema2_to_schema1;
 
+use crate::arrow_conversion::schema2_to_schema1;
 use crate::db::compaction::Compactor;
 use crate::db::compaction::CompactorMessage;
 use crate::error::Result;
@@ -120,7 +124,6 @@ macro_rules! memory_col_to_arrow {
         $arr_ty::from(vals).as_box()
     }};
 }
-
 
 pub enum DBDataType {
     Int32,
@@ -571,7 +574,7 @@ fn try_recover_table(path: PathBuf, name: String, opts: Option<TableOptions>) ->
     // if trigger_compact {
     //     // compactor_outbox.send(CompactorMessage::Compact).unwrap();
     // }
-    histogram!("store.insert_time_sec",start_time.elapsed());
+    histogram!("store.insert_time_sec", start_time.elapsed());
     Ok(Table {
         name,
         memtable: Arc::new(Mutex::new(memtable)),
@@ -701,48 +704,53 @@ fn memtable_to_partitioned_chunks(
                 .cols
                 .into_iter()
                 .enumerate()
-                .map(|(idx, col)| {
-                    match metadata.schema.fields[idx].data_type {
-                        DataType::Boolean => {
-                            memory_col_to_arrow!(col, Boolean, MutableBooleanArray)
-                        }
-                        DataType::Int8 => memory_col_to_arrow!(col, Int8, MutablePrimitiveArray),
-                        DataType::Int16 => memory_col_to_arrow!(col, Int16, MutablePrimitiveArray),
-                        DataType::Int32 => memory_col_to_arrow!(col, Int32, MutablePrimitiveArray),
-                        DataType::Int64 => memory_col_to_arrow!(col, Int64, MutablePrimitiveArray),
-                        DataType::Timestamp(_, _) => {
-                            let vals = col
-                                .into_iter()
-                                .map(|v| match v {
-                                    Value::Timestamp(b) => b,
-                                    _ => unreachable!("{:?}", v),
-                                })
-                                .collect::<Vec<_>>();
-                            MutablePrimitiveArray::<i64>::from(vals).to(DataType::Timestamp(TimeUnit::Nanosecond, None)).as_box()
-                        }
-                        DataType::Utf8 => {
-                            let vals = col
-                                .into_iter()
-                                .map(|v| match v {
-                                    Value::String(b) => b,
-                                    _ => unreachable!("{:?}", v),
-                                })
-                                .collect::<Vec<_>>();
-                            MutableUtf8Array::<i32>::from(vals).as_box()
-                        }
-                        DataType::Decimal(_, _) => {
-                            let vals = col
-                                .into_iter()
-                                .map(|v| match v {
-                                    Value::Decimal(b) => b,
-                                    _ => unreachable!("{:?}", v),
-                                })
-                                .collect::<Vec<_>>();
-                            MutablePrimitiveArray::<i128>::from(vals).to(DataType::Decimal(DECIMAL_PRECISION as usize, DECIMAL_SCALE as usize)).as_box()
-                        }
-                        DataType::List(_) => unimplemented!(),
-                        _ => unimplemented!(),
+                .map(|(idx, col)| match metadata.schema.fields[idx].data_type {
+                    DataType::Boolean => {
+                        memory_col_to_arrow!(col, Boolean, MutableBooleanArray)
                     }
+                    DataType::Int8 => memory_col_to_arrow!(col, Int8, MutablePrimitiveArray),
+                    DataType::Int16 => memory_col_to_arrow!(col, Int16, MutablePrimitiveArray),
+                    DataType::Int32 => memory_col_to_arrow!(col, Int32, MutablePrimitiveArray),
+                    DataType::Int64 => memory_col_to_arrow!(col, Int64, MutablePrimitiveArray),
+                    DataType::Timestamp(_, _) => {
+                        let vals = col
+                            .into_iter()
+                            .map(|v| match v {
+                                Value::Timestamp(b) => b,
+                                _ => unreachable!("{:?}", v),
+                            })
+                            .collect::<Vec<_>>();
+                        MutablePrimitiveArray::<i64>::from(vals)
+                            .to(DataType::Timestamp(TimeUnit::Nanosecond, None))
+                            .as_box()
+                    }
+                    DataType::Utf8 => {
+                        let vals = col
+                            .into_iter()
+                            .map(|v| match v {
+                                Value::String(b) => b,
+                                _ => unreachable!("{:?}", v),
+                            })
+                            .collect::<Vec<_>>();
+                        MutableUtf8Array::<i32>::from(vals).as_box()
+                    }
+                    DataType::Decimal(_, _) => {
+                        let vals = col
+                            .into_iter()
+                            .map(|v| match v {
+                                Value::Decimal(b) => b,
+                                _ => unreachable!("{:?}", v),
+                            })
+                            .collect::<Vec<_>>();
+                        MutablePrimitiveArray::<i128>::from(vals)
+                            .to(DataType::Decimal(
+                                DECIMAL_PRECISION as usize,
+                                DECIMAL_SCALE as usize,
+                            ))
+                            .as_box()
+                    }
+                    DataType::List(_) => unimplemented!(),
+                    _ => unimplemented!(),
                 })
                 .collect::<Vec<_>>();
             (p.id, Chunk::new(arrs))
@@ -800,7 +808,8 @@ fn write_level0(
         );
         // !@#trace!("creating part file {:?}", p);
         let w = OpenOptions::new().create_new(true).write(true).open(path)?;
-        let mut writer = parquet::write::FileWriter::try_new(BufWriter::new(w), metadata.schema.clone(), popts)?;
+        let mut writer =
+            parquet::write::FileWriter::try_new(BufWriter::new(w), metadata.schema.clone(), popts)?;
         // Write the part
         for group in row_groups {
             writer.write(group?)?;
@@ -884,14 +893,14 @@ fn flush(
 }
 
 pub struct ScanStream {
-    iter: Box<dyn Iterator<Item=Result<Chunk<Box<dyn Array>>>> + Send>,
+    iter: Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>,
     start_time: Instant,
     table_name: String, // for metrics
 }
 
 impl ScanStream {
     pub fn new(
-        iter: Box<dyn Iterator<Item=Result<Chunk<Box<dyn Array>>>> + Send>,
+        iter: Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>,
         table_name: String,
     ) -> Self {
         Self {
@@ -911,9 +920,7 @@ impl Stream for ScanStream {
                 histogram!("store.scan_time_sec",self.start_time.elapsed(),"table"=>self.table_name.to_string());
                 Poll::Ready(None)
             }
-            Some(chunk) => {
-                Poll::Ready(Some(chunk))
-            }
+            Some(chunk) => Poll::Ready(Some(chunk)),
         }
     }
 }
@@ -1014,7 +1021,6 @@ fn init_print_logger() {
     metrics::set_boxed_recorder(Box::new(recorder)).unwrap()
 }
 
-
 impl OptiDBImpl {
     // #[instrument(level = "trace")]
     pub fn open(path: PathBuf, opts: Options) -> Result<Self> {
@@ -1029,8 +1035,16 @@ impl OptiDBImpl {
             "scan memtable time"
         );
         describe_counter!("store.compactions_count", "number of compactions");
-        describe_histogram!("store.compaction_time_sec", Unit::Microseconds, "compaction time");
-        describe_histogram!("store.recovery_time_sec", Unit::Microseconds, "recovery time");
+        describe_histogram!(
+            "store.compaction_time_sec",
+            Unit::Microseconds,
+            "compaction time"
+        );
+        describe_histogram!(
+            "store.recovery_time_sec",
+            Unit::Microseconds,
+            "recovery time"
+        );
 
         recover(path, opts)
     }
@@ -1047,20 +1061,30 @@ impl OptiDBImpl {
         let mut metadata = tbl.metadata.lock();
         for v in values.iter() {
             match metadata.schema.fields.iter().find(|f| f.name == v.name) {
-                None => return Err(StoreError::Internal(format!("column {} not found in schema", v.name))),
-                f => {
-                    match (&v.value, &f.unwrap().data_type) {
-                        (Value::Int8(_), DataType::Int8) => {}
-                        (Value::Int16(_), DataType::Int16) => {}
-                        (Value::Int32(_), DataType::Int32) => {}
-                        (Value::Int64(_), DataType::Int64) => {}
-                        (Value::Boolean(_), DataType::Boolean) => {}
-                        (Value::Decimal(_), DataType::Decimal(_, _)) => {}
-                        (Value::String(_), DataType::Utf8) => {}
-                        (Value::Timestamp(_), DataType::Timestamp(_, _)) => {}
-                        _ => return Err(StoreError::Internal(format!("column {} ({:?}) has different type: {:?}", v.name, v.value, f.unwrap().data_type))),
-                    }
+                None => {
+                    return Err(StoreError::Internal(format!(
+                        "column {} not found in schema",
+                        v.name
+                    )));
                 }
+                f => match (&v.value, &f.unwrap().data_type) {
+                    (Value::Int8(_), DataType::Int8) => {}
+                    (Value::Int16(_), DataType::Int16) => {}
+                    (Value::Int32(_), DataType::Int32) => {}
+                    (Value::Int64(_), DataType::Int64) => {}
+                    (Value::Boolean(_), DataType::Boolean) => {}
+                    (Value::Decimal(_), DataType::Decimal(_, _)) => {}
+                    (Value::String(_), DataType::Utf8) => {}
+                    (Value::Timestamp(_), DataType::Timestamp(_, _)) => {}
+                    _ => {
+                        return Err(StoreError::Internal(format!(
+                            "column {} ({:?}) has different type: {:?}",
+                            v.name,
+                            v.value,
+                            f.unwrap().data_type
+                        )));
+                    }
+                },
             }
         }
 
@@ -1185,7 +1209,12 @@ impl OptiDBImpl {
         let _md = tbl.metadata.lock();
         let metadata = _md.clone();
         drop(_md);
-        let partition = metadata.partitions.iter().find(|p| p.id == partition_id).unwrap().to_owned();
+        let partition = metadata
+            .partitions
+            .iter()
+            .find(|p| p.id == partition_id)
+            .unwrap()
+            .to_owned();
         let start_time = Instant::now();
         let memtable = tbl.memtable.lock();
         let mem_chunks = memtable_to_partitioned_chunks(&metadata, &memtable, Some(partition_id))?;
@@ -1207,7 +1236,7 @@ impl OptiDBImpl {
 
         let iter = if rdrs.len() == 0 {
             Box::new(MemChunkIterator::new(mem_chunk))
-                as Box<dyn Iterator<Item=Result<Chunk<Box<dyn Array>>>> + Send>
+                as Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>
         } else {
             let opts = arrow_merger::Options {
                 index_cols: metadata.opts.merge_index_cols,
@@ -1216,13 +1245,19 @@ impl OptiDBImpl {
                 fields: fields.clone(),
             };
             Box::new(MergingIterator::new(rdrs, mem_chunk, opts)?)
-                as Box<dyn Iterator<Item=Result<Chunk<Box<dyn Array>>>> + Send>
+                as Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>
         };
 
         Ok(ScanStream::new(iter, tbl_name.to_string()))
     }
     // #[instrument(level = "trace", skip(self))]
-    pub fn add_field(&self, tbl_name: &str, field_name: &str, dt: DType, is_nullable: bool) -> Result<()> {
+    pub fn add_field(
+        &self,
+        tbl_name: &str,
+        field_name: &str,
+        dt: DType,
+        is_nullable: bool,
+    ) -> Result<()> {
         let tables = self.tables.read();
         let tbl = tables.iter().find(|t| t.name == tbl_name).cloned().unwrap();
         drop(tables);
@@ -1294,6 +1329,7 @@ mod tests {
     use arrow2::datatypes::DataType;
     use arrow2::datatypes::Field;
     use arrow2::datatypes::Schema;
+    use common::types::DType;
     use futures::executor::block_on;
     use futures::Stream;
     use futures::StreamExt;
@@ -1309,7 +1345,6 @@ mod tests {
     use tracing::trace;
     use tracing_subscriber::util::SubscriberInitExt;
     use tracing_test::traced_test;
-    use common::types::DType;
 
     use crate::db::print_partitions;
     use crate::db::Level;
@@ -1390,19 +1425,18 @@ mod tests {
                 db.insert("t1", vals).unwrap();
             }
         }
-        /*let names = (0..cols).map(|v| v.to_string()).collect::<Vec<_>>();
-        let streams = db.scan_partition("t1", 2, names).unwrap();
-        for stream in streams {
-            let b = block_on(stream.collect::<Vec<_>>())
-                .into_iter()
-                .map(|v| v.unwrap())
-                .collect::<Vec<_>>();
-
-            // for bb in b {
-            //     println!("{: ?}", bb);
-            // }
-        }
-        */
+        // let names = (0..cols).map(|v| v.to_string()).collect::<Vec<_>>();
+        // let streams = db.scan_partition("t1", 2, names).unwrap();
+        // for stream in streams {
+        // let b = block_on(stream.collect::<Vec<_>>())
+        // .into_iter()
+        // .map(|v| v.unwrap())
+        // .collect::<Vec<_>>();
+        //
+        // for bb in b {
+        //     println!("{: ?}", bb);
+        // }
+        // }
 
         db.flush().unwrap();
         thread::sleep(Duration::from_millis(20));
@@ -1437,25 +1471,22 @@ mod tests {
         };
 
         db.create_table("t1", topts).unwrap();
-        db.add_field("t1", "k1", DType::Int64, false)
-            .unwrap();
-        db.add_field("t1", "v1", DType::Int64, false)
-            .unwrap();
+        db.add_field("t1", "k1", DType::Int64, false).unwrap();
+        db.add_field("t1", "v1", DType::Int64, false).unwrap();
 
         db.insert("t1", vec![NamedValue::new(
             "v1".to_string(),
             Value::Int64(Some(1)),
         )])
-            .unwrap();
+        .unwrap();
 
-        db.add_field("t1", "v2", DType::Int64, false)
-            .unwrap();
+        db.add_field("t1", "v2", DType::Int64, false).unwrap();
 
         db.insert("t1", vec![
             NamedValue::new("k1".to_string(), Value::Int64(Some(1))),
             NamedValue::new("v1".to_string(), Value::Int64(Some(1))),
         ])
-            .unwrap();
+        .unwrap();
 
         db.flush().unwrap();
     }

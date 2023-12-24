@@ -164,7 +164,7 @@ impl From<DFOperator> for Operator {
             DFOperator::GtEq => Operator::GtEq,
             DFOperator::RegexMatch => Operator::RegexMatch,
             DFOperator::RegexNotMatch => Operator::RegexNotMatch,
-            _ => unimplemented!("Operator {:?} not supported", o)
+            _ => unimplemented!("Operator {:?} not supported", o),
         }
     }
 }
@@ -269,6 +269,7 @@ pub enum PropValueOperation {
     Exists,
     Empty,
     Like,
+    NotLike,
     Regex,
     NotRegex,
 }
@@ -300,11 +301,9 @@ impl TryInto<DFOperator> for PropValueOperation {
             PropValueOperation::Gte => DFOperator::GtEq,
             PropValueOperation::Lt => DFOperator::Lt,
             PropValueOperation::Lte => DFOperator::LtEq,
-            PropValueOperation::True => DFOperator::Eq,
-            PropValueOperation::False => DFOperator::NotEq,
             PropValueOperation::Regex => DFOperator::RegexMatch,
             PropValueOperation::NotRegex => DFOperator::RegexNotMatch,
-            _=>unimplemented!()
+            _ => unimplemented!(),
         })
     }
 }

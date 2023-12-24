@@ -315,7 +315,7 @@ impl Iterator for MemChunkIterator {
 }
 
 pub struct MergingIterator<R>
-    where R: Read + Seek
+where R: Read + Seek
 {
     // list of index cols (partitions) in parquet file
     index_cols: Vec<ColumnDescriptor>,
@@ -335,7 +335,7 @@ pub struct MergingIterator<R>
 }
 
 impl<R> MergingIterator<R>
-    where R: Read + Seek
+where R: Read + Seek
 {
     // Create new merger
     pub fn new(
@@ -358,7 +358,15 @@ impl<R> MergingIterator<R>
 
         let arrow_streams = readers
             .into_iter()
-            .map(|v| ArrowIterator::new(v, opts.fields.clone(), arrow_schema.clone(),opts.chunk_size).unwrap())
+            .map(|v| {
+                ArrowIterator::new(
+                    v,
+                    opts.fields.clone(),
+                    arrow_schema.clone(),
+                    opts.chunk_size,
+                )
+                .unwrap()
+            })
             .collect::<Vec<_>>();
 
         let mut mr = Self {
@@ -565,7 +573,7 @@ mod tests {
                     Some(idx * 10 + 10),
                     10,
                 )
-                    .unwrap();
+                .unwrap();
 
                 w
             })

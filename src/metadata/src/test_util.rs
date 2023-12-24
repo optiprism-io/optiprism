@@ -1,11 +1,20 @@
 use std::env::temp_dir;
 use std::sync::Arc;
-use uuid::Uuid;
+
 use common::types::DType;
-use store::db::{OptiDBImpl, Options, TableOptions};
+use store::db::OptiDBImpl;
+use store::db::Options;
+use store::db::TableOptions;
+use uuid::Uuid;
+
+use crate::events;
 use crate::events::Event;
-use crate::{events, MetadataProvider, properties};
-use crate::properties::{CreatePropertyRequest, DictionaryType, Property, Type};
+use crate::properties;
+use crate::properties::CreatePropertyRequest;
+use crate::properties::DictionaryType;
+use crate::properties::Property;
+use crate::properties::Type;
+use crate::MetadataProvider;
 
 pub fn init_db() -> anyhow::Result<(Arc<MetadataProvider>, Arc<OptiDBImpl>)> {
     let mut path = temp_dir();
@@ -13,10 +22,10 @@ pub fn init_db() -> anyhow::Result<(Arc<MetadataProvider>, Arc<OptiDBImpl>)> {
 
     let store = Arc::new(crate::rocksdb::new(path.join("md"))?);
 
-    let db = Arc::new(OptiDBImpl::open(path.join("db"),Options {})?);
+    let db = Arc::new(OptiDBImpl::open(path.join("db"), Options {})?);
     let opts = TableOptions::test();
     db.create_table("events", opts).unwrap();
-    Ok((Arc::new(MetadataProvider::try_new(store, db.clone())?),db))
+    Ok((Arc::new(MetadataProvider::try_new(store, db.clone())?), db))
 }
 
 pub fn create_event(
@@ -73,7 +82,7 @@ pub fn create_property(
     let prop = match main_req.typ {
         Type::System => md.system_properties.get_or_create(org_id, proj_id, req)?,
         Type::Event => md.event_properties.get_or_create(org_id, proj_id, req)?,
-        Type::User => md.user_properties.get_or_create(org_id, proj_id, req)?
+        Type::User => md.user_properties.get_or_create(org_id, proj_id, req)?,
     };
 
     Ok(prop)

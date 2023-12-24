@@ -5,14 +5,14 @@ use arrow::error::ArrowError;
 use chrono::OutOfRangeError;
 use common::error::CommonError;
 use datafusion::error::DataFusionError;
-use maxminddb::MaxMindDBError;
 use events_gen::error::EventsGenError;
+use ingester::error::IngesterError;
+use maxminddb::MaxMindDBError;
 use metadata::error::MetadataError;
 use platform::PlatformError;
 use query::error::QueryError;
-use thiserror::Error;
-use ingester::error::IngesterError;
 use store::error::StoreError;
+use thiserror::Error;
 
 pub type Result<T> = result::Result<T, Error>;
 

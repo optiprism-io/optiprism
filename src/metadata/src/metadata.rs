@@ -41,9 +41,18 @@ impl MetadataProvider {
             reports: Arc::new(reports::ProviderImpl::new(db.clone())),
             events: events.clone(),
             custom_events: Arc::new(custom_events::ProviderImpl::new(db.clone(), events)),
-            event_properties: Arc::new(properties::ProviderImpl::new_event(db.clone(), optiDb.clone())),
-            user_properties: Arc::new(properties::ProviderImpl::new_user(db.clone(), optiDb.clone())),
-            system_properties: Arc::new(properties::ProviderImpl::new_system(db.clone(), optiDb.clone())),
+            event_properties: Arc::new(properties::ProviderImpl::new_event(
+                db.clone(),
+                optiDb.clone(),
+            )),
+            user_properties: Arc::new(properties::ProviderImpl::new_user(
+                db.clone(),
+                optiDb.clone(),
+            )),
+            system_properties: Arc::new(properties::ProviderImpl::new_system(
+                db.clone(),
+                optiDb.clone(),
+            )),
             custom_properties: Arc::new(custom_properties::ProviderImpl::new(db.clone())),
             organizations: Arc::new(organizations::ProviderImpl::new(db.clone())),
             projects: Arc::new(projects::ProviderImpl::new(db.clone())),

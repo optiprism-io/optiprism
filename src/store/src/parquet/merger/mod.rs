@@ -166,7 +166,7 @@ pub fn try_merge_arrow_schemas(schemas: Vec<Schema>) -> Result<Schema> {
 pub struct OneColMergeRow<A>(usize, A);
 
 impl<A> Ord for OneColMergeRow<A>
-    where A: Ord
+where A: Ord
 {
     fn cmp(&self, other: &Self) -> Ordering {
         self.1.cmp(&other.1).reverse()
@@ -174,7 +174,7 @@ impl<A> Ord for OneColMergeRow<A>
 }
 
 impl<A> PartialOrd for OneColMergeRow<A>
-    where A: Ord
+where A: Ord
 {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
@@ -182,7 +182,7 @@ impl<A> PartialOrd for OneColMergeRow<A>
 }
 
 impl<A> PartialEq for OneColMergeRow<A>
-    where A: Eq
+where A: Eq
 {
     fn eq(&self, other: &Self) -> bool {
         self.1 == other.1
@@ -198,9 +198,9 @@ impl<A> Eq for OneColMergeRow<A> where A: Eq {}
 pub struct TwoColMergeRow<A, B>(usize, A, B);
 
 impl<A, B> Ord for TwoColMergeRow<A, B>
-    where
-        A: Ord,
-        B: Ord,
+where
+    A: Ord,
+    B: Ord,
 {
     fn cmp(&self, other: &Self) -> Ordering {
         (&self.1, &self.2).cmp(&(&other.1, &other.2)).reverse()
@@ -208,9 +208,9 @@ impl<A, B> Ord for TwoColMergeRow<A, B>
 }
 
 impl<A, B> PartialOrd for TwoColMergeRow<A, B>
-    where
-        A: Ord,
-        B: Ord,
+where
+    A: Ord,
+    B: Ord,
 {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
@@ -218,9 +218,9 @@ impl<A, B> PartialOrd for TwoColMergeRow<A, B>
 }
 
 impl<A, B> PartialEq for TwoColMergeRow<A, B>
-    where
-        A: Eq,
-        B: Eq,
+where
+    A: Eq,
+    B: Eq,
 {
     fn eq(&self, other: &Self) -> bool {
         (&self.1, &self.2) == (&other.1, &other.2)
@@ -228,29 +228,32 @@ impl<A, B> PartialEq for TwoColMergeRow<A, B>
 }
 
 impl<A, B> Eq for TwoColMergeRow<A, B>
-    where
-        A: Eq,
-        B: Eq,
-{}
+where
+    A: Eq,
+    B: Eq,
+{
+}
 
 pub struct ThreeColMergeRow<A, B, C>(usize, A, B, C);
 
 impl<A, B, C> Ord for crate::parquet::merger::ThreeColMergeRow<A, B, C>
-    where
-        A: Ord,
-        B: Ord,
-        C: Ord,
+where
+    A: Ord,
+    B: Ord,
+    C: Ord,
 {
     fn cmp(&self, other: &Self) -> Ordering {
-        (&self.1, &self.2, &self.3).cmp(&(&other.1, &other.2, &other.3)).reverse()
+        (&self.1, &self.2, &self.3)
+            .cmp(&(&other.1, &other.2, &other.3))
+            .reverse()
     }
 }
 
 impl<A, B, C> PartialOrd for crate::parquet::merger::ThreeColMergeRow<A, B, C>
-    where
-        A: Ord,
-        B: Ord,
-        C: Ord
+where
+    A: Ord,
+    B: Ord,
+    C: Ord,
 {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
@@ -258,10 +261,10 @@ impl<A, B, C> PartialOrd for crate::parquet::merger::ThreeColMergeRow<A, B, C>
 }
 
 impl<A, B, C> PartialEq for crate::parquet::merger::ThreeColMergeRow<A, B, C>
-    where
-        A: Eq,
-        B: Eq,
-        C: Eq,
+where
+    A: Eq,
+    B: Eq,
+    C: Eq,
 {
     fn eq(&self, other: &Self) -> bool {
         (&self.1, &self.2, &self.3) == (&other.1, &other.2, &other.3)
@@ -269,12 +272,12 @@ impl<A, B, C> PartialEq for crate::parquet::merger::ThreeColMergeRow<A, B, C>
 }
 
 impl<A, B, C> Eq for crate::parquet::merger::ThreeColMergeRow<A, B, C>
-    where
-        A: Eq,
-        B: Eq,
-        C: Eq
-
-{}
+where
+    A: Eq,
+    B: Eq,
+    C: Eq,
+{
+}
 // this is a temporary array used to merge data pages avoiding downcasting
 
 enum TmpArray {

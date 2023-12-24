@@ -12,7 +12,8 @@ use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
 use common::DECIMAL_SCALE;
-use crossbeam_channel::{Sender, tick};
+use crossbeam_channel::tick;
+use crossbeam_channel::Sender;
 use rand::prelude::*;
 use rand::rngs::ThreadRng;
 use rust_decimal::Decimal;
@@ -319,15 +320,12 @@ impl Scenario {
 
         info!("total events: {overall_events}");
 
-
         self.out.send(None).unwrap();
 
         Ok(())
     }
 
-    fn write_event(&self, event: Event,
-                   state: &State,
-                   profile: &Profile) {
+    fn write_event(&self, event: Event, state: &State, profile: &Profile) {
         let event_id = *self.events_map.get(&event).unwrap();
         let mut rec = EventRecord {
             user_id: state.user_id,
@@ -381,9 +379,8 @@ impl Scenario {
             Event::ProductSearched => {
                 rec.page_path = "search".to_string();
                 rec.page_title = "search product".to_string();
-                if let Some(query)=&state.search_query {
-                rec.page_search = query.to_owned();
-
+                if let Some(query) = &state.search_query {
+                    rec.page_search = query.to_owned();
                 }
             }
             Event::NotFound => {

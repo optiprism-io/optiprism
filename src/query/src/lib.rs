@@ -333,7 +333,11 @@ pub mod test_util {
     use std::path::PathBuf;
     use std::sync::Arc;
 
-    use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
+    use arrow::datatypes::DataType;
+    use arrow::datatypes::Field;
+    use arrow::datatypes::Schema;
+    use arrow::datatypes::TimeUnit;
+    use common::types::DType;
     use common::DECIMAL_PRECISION;
     use common::DECIMAL_SCALE;
     use datafusion::datasource::listing::ListingTable;
@@ -352,9 +356,10 @@ pub mod test_util {
     use metadata::properties::Property;
     use metadata::properties::Type;
     use metadata::MetadataProvider;
+    use store::db::OptiDBImpl;
+    use store::db::Options;
+    use store::db::TableOptions;
     use uuid::Uuid;
-    use common::types::DType;
-    use store::db::{OptiDBImpl, Options, TableOptions};
 
     use crate::error::Result;
     use crate::event_fields;
@@ -366,13 +371,21 @@ pub mod test_util {
     ) -> Result<LogicalPlan> {
         let schema = Schema::new(vec![
             Field::new("user_id", DataType::Int64, false),
-            Field::new("created_at", DataType::Timestamp(TimeUnit::Nanosecond, None), false),
+            Field::new(
+                "created_at",
+                DataType::Timestamp(TimeUnit::Nanosecond, None),
+                false,
+            ),
             Field::new("event", DataType::Int64, true),
             Field::new("user_country", DataType::Int64, true),
             Field::new("user_device", DataType::Utf8, true),
             Field::new("user_is_premium", DataType::Boolean, true),
             Field::new("event_product_name", DataType::Utf8, true),
-            Field::new("event_revenue", DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE), true),
+            Field::new(
+                "event_revenue",
+                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                true,
+            ),
         ]);
         let mut options = CsvReadOptions::new();
         options.schema = Some(&schema);
@@ -410,7 +423,7 @@ pub mod test_util {
         let prop = match req.typ {
             Type::Event => md.event_properties.create(org_id, proj_id, req)?,
             Type::User => md.user_properties.create(org_id, proj_id, req)?,
-            _ => unimplemented!()
+            _ => unimplemented!(),
         };
 
         // db.add_field("events", prop.column_name().as_str(), prop.data_type.clone().into(), prop.nullable)?;

@@ -16,10 +16,10 @@ use common::query::TimeIntervalUnit;
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::rbac::Role;
+use common::types::DType;
 use datafusion::arrow::datatypes::DataType;
 use datafusion_common::ScalarValue;
 use lazy_static::lazy_static;
-use common::types::DType;
 
 use crate::accounts;
 use crate::accounts::Account;

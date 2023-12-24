@@ -58,13 +58,8 @@ macro_rules! property_col {
                     )])?),
                 })
             }
-            None => {
-                input
-            },
+            None => input,
         }
-
-
-
     }};
 }
 
@@ -113,21 +108,21 @@ impl LogicalPlanBuilder {
             )?),
             None => input,
         };
-        /*let input = LogicalPlan::Sort(Sort {
-            expr: vec![Expr::Sort(expr::Sort {
-                expr: Box::new(expr_col),
-                asc: true,
-                nulls_first: false,
-            })],
-            input: Arc::new(input),
-            fetch: None,
-        });*/
+        // let input = LogicalPlan::Sort(Sort {
+        // expr: vec![Expr::Sort(expr::Sort {
+        // expr: Box::new(expr_col),
+        // asc: true,
+        // nulls_first: false,
+        // })],
+        // input: Arc::new(input),
+        // fetch: None,
+        // });
 
-        /*let input = LogicalPlan::Limit(Limit {
-            skip: 0,
-            fetch: Some(1000),
-            input: Arc::new(input),
-        });*/
+        // let input = LogicalPlan::Limit(Limit {
+        // skip: 0,
+        // fetch: Some(1000),
+        // input: Arc::new(input),
+        // });
 
         Ok(input)
     }

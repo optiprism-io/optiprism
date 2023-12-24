@@ -3,11 +3,12 @@ mod provider_impl;
 use axum::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
-use common::types::{DType, OptionalProperty};
+use common::types::DType;
+use common::types::OptionalProperty;
+use metadata::properties;
 pub use provider_impl::ProviderImpl;
 use serde::Deserialize;
 use serde::Serialize;
-use metadata::properties;
 
 use crate::Context;
 use crate::ListResponse;
@@ -88,7 +89,6 @@ impl From<Type> for metadata::properties::Type {
         }
     }
 }
-//
 // #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 // #[serde(rename_all = "camelCase")]
 // pub enum DataType {
@@ -165,7 +165,6 @@ impl From<Status> for metadata::properties::Status {
     }
 }
 
-
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub enum DictionaryType {
@@ -205,7 +204,6 @@ impl TryInto<DictionaryType> for properties::DictionaryType {
         })
     }
 }
-
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]

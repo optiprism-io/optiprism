@@ -6,23 +6,27 @@ use async_trait::async_trait;
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::Utc;
+use common::types::DType;
+use common::types::OptionalProperty;
+use common::types::TABLE_EVENTS;
 use lru::LruCache;
-use common::types::{DType, OptionalProperty, TABLE_EVENTS};
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use store::db::OptiDBImpl;
 
 use crate::error;
 use crate::error::MetadataError;
-use crate::index::{check_insert_constraints, next_zero_seq};
+use crate::index::check_insert_constraints;
 use crate::index::check_update_constraints;
 use crate::index::delete_index;
 use crate::index::get_index;
 use crate::index::insert_index;
 use crate::index::next_seq;
+use crate::index::next_zero_seq;
 use crate::index::update_index;
 use crate::metadata::ListResponse;
-use crate::properties::{CreatePropertyRequest, DictionaryType};
+use crate::properties::CreatePropertyRequest;
+use crate::properties::DictionaryType;
 use crate::properties::Property;
 use crate::properties::Provider;
 use crate::properties::Type;
@@ -48,7 +52,7 @@ fn index_keys(
         index_name_key(organization_id, project_id, typ, name),
         index_display_name_key(organization_id, project_id, typ, display_name),
     ]
-        .to_vec()
+    .to_vec()
 }
 
 fn index_name_key(
@@ -63,7 +67,7 @@ fn index_name_key(
             IDX_NAME,
             name,
         )
-            .to_vec(),
+        .to_vec(),
     )
 }
 
@@ -79,7 +83,7 @@ fn index_display_name_key(
             IDX_DISPLAY_NAME,
             v.as_str(),
         )
-            .to_vec()
+        .to_vec()
     })
 }
 
@@ -93,8 +97,12 @@ pub struct ProviderImpl {
 
 impl ProviderImpl {
     pub fn new_user(db: Arc<TransactionDB>, optiDb: Arc<OptiDBImpl>) -> Self {
-        let mut id_cache = RwLock::new(LruCache::new(NonZeroUsize::new(10 /*todo why 10?*/).unwrap()));
-        let mut name_cache = RwLock::new(LruCache::new(NonZeroUsize::new(10 /*todo why 10?*/).unwrap()));
+        let mut id_cache = RwLock::new(LruCache::new(
+            NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
+        ));
+        let mut name_cache = RwLock::new(LruCache::new(
+            NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
+        ));
         ProviderImpl {
             db,
             optiDb,
@@ -105,8 +113,12 @@ impl ProviderImpl {
     }
 
     pub fn new_event(db: Arc<TransactionDB>, optiDb: Arc<OptiDBImpl>) -> Self {
-        let mut id_cache = RwLock::new(LruCache::new(NonZeroUsize::new(10 /*todo why 10?*/).unwrap()));
-        let mut name_cache = RwLock::new(LruCache::new(NonZeroUsize::new(10 /*todo why 10?*/).unwrap()));
+        let mut id_cache = RwLock::new(LruCache::new(
+            NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
+        ));
+        let mut name_cache = RwLock::new(LruCache::new(
+            NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
+        ));
         ProviderImpl {
             db,
             id_cache,
@@ -117,8 +129,12 @@ impl ProviderImpl {
     }
 
     pub fn new_system(db: Arc<TransactionDB>, optiDb: Arc<OptiDBImpl>) -> Self {
-        let mut id_cache = RwLock::new(LruCache::new(NonZeroUsize::new(10 /*todo why 10?*/).unwrap()));
-        let mut name_cache = RwLock::new(LruCache::new(NonZeroUsize::new(10 /*todo why 10?*/).unwrap()));
+        let mut id_cache = RwLock::new(LruCache::new(
+            NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
+        ));
+        let mut name_cache = RwLock::new(LruCache::new(
+            NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
+        ));
         ProviderImpl {
             db,
             optiDb,
@@ -135,7 +151,12 @@ impl ProviderImpl {
         project_id: u64,
         name: &str,
     ) -> Result<Property> {
-        if let Some(prop) = self.name_cache.write().unwrap().get(&(organization_id, project_id, name.to_string())) {
+        if let Some(prop) =
+            self.name_cache
+                .write()
+                .unwrap()
+                .get(&(organization_id, project_id, name.to_string()))
+        {
             return Ok(prop.to_owned());
         }
 
@@ -144,10 +165,7 @@ impl ProviderImpl {
             IDX_NAME,
             name,
         );
-        let data = get_index(
-            &tx,
-            idx_key,
-        )?;
+        let data = get_index(&tx, idx_key)?;
 
         Ok(deserialize(&data)?)
     }
@@ -159,7 +177,12 @@ impl ProviderImpl {
         project_id: u64,
         id: u64,
     ) -> Result<Property> {
-        if let Some(prop) = self.id_cache.write().unwrap().get(&(organization_id, project_id, id)) {
+        if let Some(prop) = self
+            .id_cache
+            .write()
+            .unwrap()
+            .get(&(organization_id, project_id, id))
+        {
             return Ok(prop.to_owned());
         }
 
@@ -200,7 +223,14 @@ impl ProviderImpl {
 
         let order = next_zero_seq(
             &tx,
-            make_id_seq_key(org_proj_ns(organization_id, project_id, format!("{}/{}", self.typ.order_path(), req.data_type.short_name()).as_bytes()).as_slice()),
+            make_id_seq_key(
+                org_proj_ns(
+                    organization_id,
+                    project_id,
+                    format!("{}/{}", self.typ.order_path(), req.data_type.short_name()).as_bytes(),
+                )
+                .as_slice(),
+            ),
         )?;
         let created_at = Utc::now();
 
@@ -230,15 +260,17 @@ impl ProviderImpl {
             org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
             prop.id,
         );
-        self.name_cache.write().unwrap().put((organization_id, project_id, prop.name.to_string()),prop.clone());
-        self.id_cache.write().unwrap().put((organization_id, project_id, id),prop.clone());
+        self.name_cache.write().unwrap().put(
+            (organization_id, project_id, prop.name.to_string()),
+            prop.clone(),
+        );
+        self.id_cache
+            .write()
+            .unwrap()
+            .put((organization_id, project_id, id), prop.clone());
 
         let data = serialize(&prop)?;
-        tx.put(
-            idx_key,
-            &data,
-        )?;
-
+        tx.put(idx_key, &data)?;
 
         insert_index(&tx, idx_keys.as_ref(), &data)?;
 
@@ -252,7 +284,8 @@ impl ProviderImpl {
         } else {
             req.data_type.clone()
         };
-        self.optiDb.add_field(TABLE_EVENTS, prop.column_name().as_str(), dt, req.nullable)?;
+        self.optiDb
+            .add_field(TABLE_EVENTS, prop.column_name().as_str(), dt, req.nullable)?;
         Ok(prop)
     }
 }
@@ -393,14 +426,17 @@ impl Provider for ProviderImpl {
             org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
             prop.id,
         );
-        self.name_cache.write().unwrap().put((organization_id, project_id, prop.name.to_string()),prop.clone());
-        self.id_cache.write().unwrap().put((organization_id, project_id, prop.id),prop.clone());
+        self.name_cache.write().unwrap().put(
+            (organization_id, project_id, prop.name.to_string()),
+            prop.clone(),
+        );
+        self.id_cache
+            .write()
+            .unwrap()
+            .put((organization_id, project_id, prop.id), prop.clone());
 
         let data = serialize(&prop)?;
-        tx.put(
-            idx_key,
-            &data,
-        )?;
+        tx.put(idx_key, &data)?;
 
         update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)?;
         tx.commit()?;
@@ -424,10 +460,16 @@ impl Provider for ProviderImpl {
                 &prop.name,
                 prop.display_name.clone(),
             )
-                .as_ref(),
+            .as_ref(),
         )?;
-        self.name_cache.write().unwrap().pop(&(organization_id, project_id, prop.name.to_string()));
-        self.id_cache.write().unwrap().pop(&(organization_id, project_id, prop.id));
+        self.name_cache
+            .write()
+            .unwrap()
+            .pop(&(organization_id, project_id, prop.name.to_string()));
+        self.id_cache
+            .write()
+            .unwrap()
+            .pop(&(organization_id, project_id, prop.id));
         tx.commit()?;
         Ok(prop)
     }

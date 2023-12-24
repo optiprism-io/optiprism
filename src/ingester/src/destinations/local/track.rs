@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use common::types::{COLUMN_EVENT, DType};
+use common::types::DType;
+use common::types::COLUMN_CREATED_AT;
+use common::types::COLUMN_EVENT;
 use common::types::COLUMN_EVENT_ID;
 use common::types::COLUMN_PROJECT_ID;
-use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_USER_ID;
 use futures::executor::block_on;
 use metadata::dictionaries;
@@ -120,7 +121,8 @@ impl Destination<Track> for Local {
         ));
 
         let event_props = req
-            .resolved_properties.as_ref()
+            .resolved_properties
+            .as_ref()
             .map(|v| v.clone())
             .unwrap_or_else(|| vec![]);
 
@@ -130,7 +132,8 @@ impl Destination<Track> for Local {
         }
 
         let user_props = req
-            .resolved_properties.as_ref()
+            .resolved_properties
+            .as_ref()
             .map(|v| v.clone())
             .unwrap_or_else(|| vec![]);
 

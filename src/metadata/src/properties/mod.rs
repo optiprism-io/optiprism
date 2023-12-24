@@ -4,7 +4,8 @@ use arrow::datatypes;
 use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
-use common::types::{DType, OptionalProperty};
+use common::types::DType;
+use common::types::OptionalProperty;
 use common::types::TIME_UNIT;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
@@ -124,7 +125,9 @@ impl Property {
                 let mut name: String = self
                     .name
                     .chars()
-                    .filter(|c| c.is_ascii_alphabetic() || c.is_numeric() || c.is_whitespace() || c == &'_')
+                    .filter(|c| {
+                        c.is_ascii_alphabetic() || c.is_numeric() || c.is_whitespace() || c == &'_'
+                    })
                     .collect();
                 name = name.to_case(Case::Snake);
                 name = name.trim().to_string();
@@ -133,7 +136,7 @@ impl Property {
             }
             _ => {
                 format!("{}_{}", self.data_type.short_name(), self.order)
-            },
+            }
         }
     }
 }

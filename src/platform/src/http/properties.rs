@@ -6,11 +6,11 @@ use axum::routing;
 use axum::Router;
 use common::http::Json;
 
+use crate::http::Properties;
 use crate::properties;
 use crate::properties::Property;
 use crate::properties::UpdatePropertyRequest;
 use crate::Context;
-use crate::http::Properties;
 use crate::ListResponse;
 use crate::Result;
 
@@ -20,7 +20,8 @@ async fn get_event_by_id(
     Path((organization_id, project_id, property_id)): Path<(u64, u64, u64)>,
 ) -> Result<Json<Property>> {
     Ok(Json(
-        provider.event
+        provider
+            .event
             .get_by_id(ctx, organization_id, project_id, property_id)
             .await?,
     ))
@@ -32,7 +33,8 @@ async fn get_user_by_id(
     Path((organization_id, project_id, property_id)): Path<(u64, u64, u64)>,
 ) -> Result<Json<Property>> {
     Ok(Json(
-        provider.user
+        provider
+            .user
             .get_by_id(ctx, organization_id, project_id, property_id)
             .await?,
     ))
@@ -44,7 +46,8 @@ async fn get_event_by_name(
     Path((organization_id, project_id, prop_name)): Path<(u64, u64, String)>,
 ) -> Result<Json<Property>> {
     Ok(Json(
-        provider.event
+        provider
+            .event
             .get_by_name(ctx, organization_id, project_id, &prop_name)
             .await?,
     ))
@@ -56,7 +59,8 @@ async fn get_user_by_name(
     Path((organization_id, project_id, prop_name)): Path<(u64, u64, String)>,
 ) -> Result<Json<Property>> {
     Ok(Json(
-        provider.user
+        provider
+            .user
             .get_by_name(ctx, organization_id, project_id, &prop_name)
             .await?,
     ))
@@ -67,7 +71,12 @@ async fn list_event(
     Extension(provider): Extension<Properties>,
     Path((organization_id, project_id)): Path<(u64, u64)>,
 ) -> Result<Json<ListResponse<Property>>> {
-    Ok(Json(provider.event.list(ctx, organization_id, project_id).await?))
+    Ok(Json(
+        provider
+            .event
+            .list(ctx, organization_id, project_id)
+            .await?,
+    ))
 }
 
 async fn list_user(
@@ -75,7 +84,9 @@ async fn list_user(
     Extension(provider): Extension<Properties>,
     Path((organization_id, project_id)): Path<(u64, u64)>,
 ) -> Result<Json<ListResponse<Property>>> {
-    Ok(Json(provider.user.list(ctx, organization_id, project_id).await?))
+    Ok(Json(
+        provider.user.list(ctx, organization_id, project_id).await?,
+    ))
 }
 
 async fn update_event(
@@ -85,7 +96,8 @@ async fn update_event(
     Json(request): Json<UpdatePropertyRequest>,
 ) -> Result<Json<Property>> {
     Ok(Json(
-        provider.event
+        provider
+            .event
             .update(ctx, organization_id, project_id, prop_id, request)
             .await?,
     ))
@@ -98,7 +110,8 @@ async fn update_user(
     Json(request): Json<UpdatePropertyRequest>,
 ) -> Result<Json<Property>> {
     Ok(Json(
-        provider.user
+        provider
+            .user
             .update(ctx, organization_id, project_id, prop_id, request)
             .await?,
     ))
@@ -110,7 +123,8 @@ async fn delete_event(
     Path((organization_id, project_id, prop_id)): Path<(u64, u64, u64)>,
 ) -> Result<Json<Property>> {
     Ok(Json(
-        provider.event
+        provider
+            .event
             .delete(ctx, organization_id, project_id, prop_id)
             .await?,
     ))
@@ -122,7 +136,8 @@ async fn delete_user(
     Path((organization_id, project_id, prop_id)): Path<(u64, u64, u64)>,
 ) -> Result<Json<Property>> {
     Ok(Json(
-        provider.user
+        provider
+            .user
             .delete(ctx, organization_id, project_id, prop_id)
             .await?,
     ))
@@ -135,7 +150,9 @@ pub fn attach_user_routes(router: Router) -> Router {
             .route("/", routing::get(list_user))
             .route(
                 "/:prop_id",
-                routing::get(get_user_by_id).delete(delete_user).put(update_user),
+                routing::get(get_user_by_id)
+                    .delete(delete_user)
+                    .put(update_user),
             )
             .route("/name/:prop_name", routing::get(get_user_by_name)),
     )
@@ -148,7 +165,9 @@ pub fn attach_event_routes(router: Router) -> Router {
             .route("/", routing::get(list_event))
             .route(
                 "/:prop_id",
-                routing::get(get_event_by_id).delete(delete_event).put(update_event),
+                routing::get(get_event_by_id)
+                    .delete(delete_event)
+                    .put(update_event),
             )
             .route("/name/:prop_name", routing::get(get_event_by_name)),
     )

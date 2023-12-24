@@ -31,31 +31,41 @@ use chrono::DurationRound;
 use chrono::NaiveDateTime;
 use chrono::Utc;
 use clap::Parser;
-use datafusion::datasource::TableProvider;
-use hyper::Server;
-use scan_dir::ScanDir;
-use tokio::select;
-use tokio::signal::unix::SignalKind;
-use tracing::{debug, info};
+use common::types::DType;
+use common::types::COLUMN_CREATED_AT;
+use common::types::COLUMN_EVENT;
+use common::types::COLUMN_PROJECT_ID;
+use common::types::COLUMN_USER_ID;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
-use common::types::{COLUMN_EVENT, COLUMN_PROJECT_ID, COLUMN_CREATED_AT, COLUMN_USER_ID, DType};
+use datafusion::datasource::TableProvider;
+use hyper::Server;
 use metadata::error::MetadataError;
 use metadata::properties::DictionaryType;
 use metadata::properties::Type;
+use metadata::test_util::create_event;
+use metadata::test_util::create_property;
+use metadata::test_util::CreatePropertyMainRequest;
 use metadata::MetadataProvider;
 use platform::auth;
 use query::datasources::local::LocalTable;
 use query::ProviderImpl;
+use scan_dir::ScanDir;
 use service::tracing::TracingCliArgs;
-use store::db::{OptiDBImpl, Options, TableOptions};
-use store::{NamedValue, Value};
-use test_util::create_event;
-use test_util::create_property;
-use test_util::CreatePropertyMainRequest;
-use crate::error::Error;
-use crate::{init_project, init_system, test};
+use store::db::OptiDBImpl;
+use store::db::Options;
+use store::db::TableOptions;
+use store::NamedValue;
+use store::Value;
+use tokio::select;
+use tokio::signal::unix::SignalKind;
+use tracing::debug;
+use tracing::info;
 
+use crate::error::Error;
+use crate::init_project;
+use crate::init_system;
+use crate::test;
 
 #[derive(Parser, Clone)]
 pub struct Test {
@@ -137,11 +147,12 @@ impl Builders {
     }
 }
 
-
-pub fn gen_mem(partitions: usize,
-               batch_size: usize,
-               db: &Arc<OptiDBImpl>,
-               proj_id: u64) -> Result<Vec<Vec<RecordBatch>>, anyhow::Error> {
+pub fn gen_mem(
+    partitions: usize,
+    batch_size: usize,
+    db: &Arc<OptiDBImpl>,
+    proj_id: u64,
+) -> Result<Vec<Vec<RecordBatch>>, anyhow::Error> {
     let now = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0)
         .unwrap()
         .duration_trunc(Duration::days(1))?;
@@ -160,7 +171,9 @@ pub fn gen_mem(partitions: usize,
         for _day in 0..days {
             let mut event_time = cur_time;
             for event in 0..events {
-                builders[partition].b_project_id.append_value(proj_id as i64);
+                builders[partition]
+                    .b_project_id
+                    .append_value(proj_id as i64);
                 builders[partition].b_user_id.append_value(user as i64);
                 builders[partition]
                     .b_created_at
@@ -244,24 +257,18 @@ pub async fn gen(args: &Test, proj_id: u64) -> Result<(), anyhow::Error> {
     ];
 
     for (name, dt) in props {
-        create_property(
-            &md,
-            1,
-            proj_id,
-            CreatePropertyMainRequest {
-                name: name.to_string(),
-                typ: Type::System, // do this to keep property names as is
-                data_type: dt,
-                nullable: true,
-                dict: None,
-            },
-        )?;
+        create_property(&md, 1, proj_id, CreatePropertyMainRequest {
+            name: name.to_string(),
+            typ: Type::System, // do this to keep property names as is
+            data_type: dt,
+            nullable: true,
+            dict: None,
+        })?;
     }
 
     let e = create_event(&md, 1, proj_id, "event".to_string())?;
     md.dictionaries
         .get_key_or_create(1, proj_id, "event", "event")?;
-
 
     let now = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0)
         .unwrap()
@@ -277,25 +284,76 @@ pub async fn gen(args: &Test, proj_id: u64) -> Result<(), anyhow::Error> {
             let mut event_time = cur_time;
             for event in 0..events {
                 vals.truncate(0);
-                vals.push(NamedValue::new("project_id".to_string(), Value::Int64(Some(proj_id as i64))));
-                vals.push(NamedValue::new("user_id".to_string(), Value::Int64(Some(user as i64 + 1))));
-                vals.push(NamedValue::new("created_at".to_string(), Value::Timestamp(Some(event_time.timestamp_nanos()))));
-                vals.push(NamedValue::new("event".to_string(), Value::Int64(Some(e.id as i64))));
-                vals.push(NamedValue::new("i_8".to_string(), Value::Int8(Some(event as i8))));
-                vals.push(NamedValue::new("i_16".to_string(), Value::Int16(Some(event as i16))));
-                vals.push(NamedValue::new("i_32".to_string(), Value::Int32(Some(event as i32))));
-                vals.push(NamedValue::new("i_64".to_string(), Value::Int64(Some(event))));
-                vals.push(NamedValue::new("ts".to_string(), Value::Timestamp(Some(event))));
-                vals.push(NamedValue::new("bool".to_string(), Value::Boolean(Some(event % 2 == 0))));
-                vals.push(NamedValue::new("string".to_string(), Value::String(Some(format!("event {}", event)))));
-                vals.push(NamedValue::new("decimal".to_string(), Value::Decimal(Some(event as i128 * 10_i128.pow(DECIMAL_SCALE as u32) + event as i128 * 100))));
-                vals.push(NamedValue::new("group".to_string(), Value::Int64(Some(event % (events / 2)))));
+                vals.push(NamedValue::new(
+                    "project_id".to_string(),
+                    Value::Int64(Some(proj_id as i64)),
+                ));
+                vals.push(NamedValue::new(
+                    "user_id".to_string(),
+                    Value::Int64(Some(user as i64 + 1)),
+                ));
+                vals.push(NamedValue::new(
+                    "created_at".to_string(),
+                    Value::Timestamp(Some(event_time.timestamp_nanos())),
+                ));
+                vals.push(NamedValue::new(
+                    "event".to_string(),
+                    Value::Int64(Some(e.id as i64)),
+                ));
+                vals.push(NamedValue::new(
+                    "i_8".to_string(),
+                    Value::Int8(Some(event as i8)),
+                ));
+                vals.push(NamedValue::new(
+                    "i_16".to_string(),
+                    Value::Int16(Some(event as i16)),
+                ));
+                vals.push(NamedValue::new(
+                    "i_32".to_string(),
+                    Value::Int32(Some(event as i32)),
+                ));
+                vals.push(NamedValue::new(
+                    "i_64".to_string(),
+                    Value::Int64(Some(event)),
+                ));
+                vals.push(NamedValue::new(
+                    "ts".to_string(),
+                    Value::Timestamp(Some(event)),
+                ));
+                vals.push(NamedValue::new(
+                    "bool".to_string(),
+                    Value::Boolean(Some(event % 3 == 0)),
+                ));
+                if event % 3 == 0 {
+                    vals.push(NamedValue::new(
+                        "string".to_string(),
+                        Value::String(Some("hello".to_string())),
+                    ));
+                } else {
+                    vals.push(NamedValue::new(
+                        "string".to_string(),
+                        Value::String(Some("world".to_string())),
+                    ));
+                }
+                vals.push(NamedValue::new(
+                    "decimal".to_string(),
+                    Value::Decimal(Some(
+                        event as i128 * 10_i128.pow(DECIMAL_SCALE as u32) + event as i128 * 100,
+                    )),
+                ));
+                vals.push(NamedValue::new(
+                    "group".to_string(),
+                    Value::Int64(Some(event % (events / 3))),
+                ));
                 // two group of users with different "v" value to proper integration tests
                 // event value
                 if user % 2 == 0 {
                     vals.push(NamedValue::new("v".to_string(), Value::Int64(Some(event))));
                 } else {
-                    vals.push(NamedValue::new("v".to_string(), Value::Int64(Some(event * 2))));
+                    vals.push(NamedValue::new(
+                        "v".to_string(),
+                        Value::Int64(Some(event * 2)),
+                    ));
                 }
 
                 db.insert("events", vals.clone())?;
@@ -309,17 +367,22 @@ pub async fn gen(args: &Test, proj_id: u64) -> Result<(), anyhow::Error> {
     db.flush()?;
 
     info!("successfully generated!");
-    let data_provider: Arc<dyn TableProvider> = Arc::new(LocalTable::try_new(db.clone(), "events".to_string())?);
+    let data_provider: Arc<dyn TableProvider> =
+        Arc::new(LocalTable::try_new(db.clone(), "events".to_string())?);
 
-
-    let all_parquet_files: Vec<_> = ScanDir::files().walk(args.path.join("store/tables/events"), |iter| {
-        iter.filter(|&(_, ref name)| name.ends_with(".parquet"))
-            .map(|(ref entry, _)| entry.path())
-            .collect()
-    }).unwrap();
+    let all_parquet_files: Vec<_> = ScanDir::files()
+        .walk(args.path.join("store/tables/events"), |iter| {
+            iter.filter(|&(_, ref name)| name.ends_with(".parquet"))
+                .map(|(ref entry, _)| entry.path())
+                .collect()
+        })
+        .unwrap();
 
     for ppath in all_parquet_files {
-        fs::copy(ppath.clone(), args.out_parquet.join(ppath.file_name().unwrap()))?;
+        fs::copy(
+            ppath.clone(),
+            args.out_parquet.join(ppath.file_name().unwrap()),
+        )?;
     }
 
     let query_provider = Arc::new(ProviderImpl::try_new_from_provider(
@@ -343,17 +406,17 @@ pub async fn gen(args: &Test, proj_id: u64) -> Result<(), anyhow::Error> {
     let mut router = Router::new();
     info!("attaching platform routes...");
     router = platform::http::attach_routes(router, &md, &platform_provider, auth_cfg, None);
-    info!("listening on {}",args.host);
+    info!("listening on {}", args.host);
     let server = Server::bind(&args.host).serve(router.into_make_service());
     let graceful = server.with_graceful_shutdown(async {
-        let mut sig_int = tokio::signal::unix::signal(SignalKind::interrupt())
-            .expect("failed to install signal");
-        let mut sig_term = tokio::signal::unix::signal(SignalKind::terminate())
-            .expect("failed to install signal");
+        let mut sig_int =
+            tokio::signal::unix::signal(SignalKind::interrupt()).expect("failed to install signal");
+        let mut sig_term =
+            tokio::signal::unix::signal(SignalKind::terminate()).expect("failed to install signal");
         select! {
-                _=sig_int.recv()=>info!("SIGINT received"),
-                _=sig_term.recv()=>info!("SIGTERM received"),
-            }
+            _=sig_int.recv()=>info!("SIGINT received"),
+            _=sig_term.recv()=>info!("SIGTERM received"),
+        }
     });
 
     Ok(graceful.await?)

@@ -125,7 +125,7 @@ pub fn resolve_properties(
         if let Some(major) = &client.os.major {
             s.push_str(" ");
             s.push_str(major.to_string().as_ref());
-            if let Some(minor) =&client.os.minor {
+            if let Some(minor) = &client.os.minor {
                 s.push_str(".");
                 s.push_str(minor.to_string().as_ref());
                 if let Some(patch) = &client.os.patch {

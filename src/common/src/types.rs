@@ -1,12 +1,14 @@
 use arrow::datatypes;
-use arrow_schema::{DataType, TimeUnit};
 use arrow2::datatypes::DataType as DataType2;
+use arrow_schema::DataType;
+use arrow_schema::TimeUnit;
 use datafusion::parquet::data_type;
 use lazy_static::lazy_static;
 use serde::Deserialize;
 use serde::Deserializer;
 use serde::Serialize;
 use serde::Serializer;
+
 use crate::error::CommonError;
 
 pub const DECIMAL_PRECISION: u8 = 28;
@@ -76,7 +78,6 @@ pub const EVENT_CLICK: &str = "Click";
 pub const EVENT_PAGE: &str = "Page";
 pub const EVENT_SCREEN: &str = "Screen";
 
-
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum DType {
@@ -141,8 +142,8 @@ impl TryFrom<DType> for datatypes::DataType {
                 DType::Decimal => DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
                 DType::Boolean => DataType::Boolean,
                 DType::Timestamp => DataType::Timestamp(TIME_UNIT, None),
-                _ => return Err(CommonError::General("Unsupported type1".to_string()))
-            }
+                _ => return Err(CommonError::General("Unsupported type1".to_string())),
+            },
         })
     }
 }
@@ -167,9 +168,9 @@ impl TryFrom<DataType> for DType {
                 DataType::Int64 => DType::Int64,
                 DataType::Utf8 => DType::String,
                 DataType::Decimal128(_, _) => DType::Decimal,
-                _ => return Err(CommonError::General("Unsupported type2".to_string()))
-            }
-            _ => return Err(CommonError::General(format!("Unsupported type {:?}", dt)))
+                _ => return Err(CommonError::General("Unsupported type2".to_string())),
+            },
+            _ => return Err(CommonError::General(format!("Unsupported type {:?}", dt))),
         })
     }
 }
@@ -183,7 +184,9 @@ impl TryFrom<DType> for DataType2 {
             DType::Int16 => DataType2::Int16,
             DType::Int32 => DataType2::Int32,
             DType::Int64 => DataType2::Int64,
-            DType::Decimal => DataType2::Decimal(DECIMAL_PRECISION as usize, DECIMAL_SCALE as usize),
+            DType::Decimal => {
+                DataType2::Decimal(DECIMAL_PRECISION as usize, DECIMAL_SCALE as usize)
+            }
             DType::Boolean => DataType2::Boolean,
             DType::Timestamp => DataType2::Timestamp(arrow2::datatypes::TimeUnit::Nanosecond, None),
             DType::List(dt) => match dt.as_ref() {
@@ -192,15 +195,18 @@ impl TryFrom<DType> for DataType2 {
                 DType::Int16 => DataType2::Int16,
                 DType::Int32 => DataType2::Int32,
                 DType::Int64 => DataType2::Int64,
-                DType::Decimal => DataType2::Decimal(DECIMAL_PRECISION as usize, DECIMAL_SCALE as usize),
+                DType::Decimal => {
+                    DataType2::Decimal(DECIMAL_PRECISION as usize, DECIMAL_SCALE as usize)
+                }
                 DType::Boolean => DataType2::Boolean,
-                DType::Timestamp => DataType2::Timestamp(arrow2::datatypes::TimeUnit::Nanosecond, None),
-                _ => return Err(CommonError::General("Unsupported type4".to_string()))
-            }
+                DType::Timestamp => {
+                    DataType2::Timestamp(arrow2::datatypes::TimeUnit::Nanosecond, None)
+                }
+                _ => return Err(CommonError::General("Unsupported type4".to_string())),
+            },
         })
     }
 }
-
 
 impl TryFrom<DataType2> for DType {
     type Error = CommonError;
@@ -222,9 +228,9 @@ impl TryFrom<DataType2> for DType {
                 DataType2::Int64 => DType::Int64,
                 DataType2::Timestamp(_, _) => DType::Timestamp,
                 DataType2::Utf8 => DType::String,
-                _ => return Err(CommonError::General("Unsupported type5".to_string()))
-            }
-            _ => return Err(CommonError::General("Unsupported type6".to_string()))
+                _ => return Err(CommonError::General("Unsupported type5".to_string())),
+            },
+            _ => return Err(CommonError::General("Unsupported type6".to_string())),
         })
     }
 }
@@ -246,7 +252,7 @@ impl<T> OptionalProperty<T> {
     }
 
     pub fn into<X>(self) -> OptionalProperty<X>
-        where T: Into<X> {
+    where T: Into<X> {
         match self {
             OptionalProperty::None => OptionalProperty::None,
             OptionalProperty::Some(v) => OptionalProperty::Some(v.into()),
@@ -254,7 +260,7 @@ impl<T> OptionalProperty<T> {
     }
 
     pub fn try_into<X>(self) -> std::result::Result<OptionalProperty<X>, <T as TryInto<X>>::Error>
-        where T: TryInto<X> {
+    where T: TryInto<X> {
         Ok(match self {
             OptionalProperty::None => OptionalProperty::None,
             OptionalProperty::Some(v) => OptionalProperty::Some(v.try_into()?),
@@ -262,7 +268,7 @@ impl<T> OptionalProperty<T> {
     }
 
     pub fn map<F, U>(self, f: F) -> OptionalProperty<U>
-        where F: FnOnce(T) -> U {
+    where F: FnOnce(T) -> U {
         match self {
             OptionalProperty::None => OptionalProperty::None,
             OptionalProperty::Some(v) => OptionalProperty::Some(f(v)),
@@ -271,10 +277,10 @@ impl<T> OptionalProperty<T> {
 }
 
 impl<T> Serialize for OptionalProperty<T>
-    where T: Serialize
+where T: Serialize
 {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-        where S: Serializer {
+    where S: Serializer {
         match self {
             OptionalProperty::None => panic!("!"),
             OptionalProperty::Some(v) => serializer.serialize_some(v),
@@ -283,10 +289,10 @@ impl<T> Serialize for OptionalProperty<T>
 }
 
 impl<'de, T> Deserialize<'de> for OptionalProperty<T>
-    where T: Deserialize<'de>
+where T: Deserialize<'de>
 {
     fn deserialize<D>(de: D) -> std::result::Result<Self, D::Error>
-        where D: Deserializer<'de> {
+    where D: Deserializer<'de> {
         let a = Deserialize::deserialize(de);
         a.map(OptionalProperty::Some)
     }

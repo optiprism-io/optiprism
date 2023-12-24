@@ -98,24 +98,37 @@ impl ProductProvider {
                 name: dicts.get_key_or_create(
                     org_id,
                     proj_id,
-                    properties.get_by_name(org_id, proj_id, "Product Name").unwrap().column_name().as_str(),
+                    properties
+                        .get_by_name(org_id, proj_id, "Product Name")
+                        .unwrap()
+                        .column_name()
+                        .as_str(),
                     rec.name.as_str(),
                 )?,
                 name_str: rec.name,
                 category: dicts.get_key_or_create(
                     org_id,
                     proj_id,
-                    properties.get_by_name(org_id, proj_id, "Product Category").unwrap().column_name().as_str(),
+                    properties
+                        .get_by_name(org_id, proj_id, "Product Category")
+                        .unwrap()
+                        .column_name()
+                        .as_str(),
                     rec.category.as_str(),
                 )?,
                 category_str: rec.category,
                 subcategory: rec
-                    .subcategory.clone()
+                    .subcategory
+                    .clone()
                     .map(|v| {
                         dicts.get_key_or_create(
                             org_id,
                             proj_id,
-                            properties.get_by_name(org_id, proj_id, "Product Subcategory").unwrap().column_name().as_str(),
+                            properties
+                                .get_by_name(org_id, proj_id, "Product Subcategory")
+                                .unwrap()
+                                .column_name()
+                                .as_str(),
                             v.as_str(),
                         )
                     })
@@ -127,10 +140,15 @@ impl ProductProvider {
                         dicts.get_key_or_create(
                             org_id,
                             proj_id,
-                            properties.get_by_name(org_id, proj_id, "Product Brand").unwrap().column_name().as_str(),
+                            properties
+                                .get_by_name(org_id, proj_id, "Product Brand")
+                                .unwrap()
+                                .column_name()
+                                .as_str(),
                             v.as_str(),
                         )
-                    }).transpose()?,
+                    })
+                    .transpose()?,
                 price: rec.price,
                 discount_price,
                 margin: 0.,
@@ -169,7 +187,7 @@ impl ProductProvider {
             WeightedIndex::new(probability::calc_cubic_spline(categories.len(), vec![
                 1., 0.5, 0.3, 0.1,
             ])?)
-                .map_err(|err| EventsGenError::Internal(err.to_string()))?;
+            .map_err(|err| EventsGenError::Internal(err.to_string()))?;
 
         // make rating weights from 0 to 5 with 10 bins for each int value
         let rating_weights = probability::calc_cubic_spline(50, vec![0.01, 0.01, 0.1, 0.7, 1.])?;
@@ -215,8 +233,15 @@ impl ProductProvider {
     }
 
     pub fn string_name(&self, key: u64) -> Result<String> {
-        Ok(self
-            .dicts
-            .get_value(self.org_id, self.proj_id, self.properties.get_by_name(self.org_id, self.proj_id, "Product Name").unwrap().column_name().as_str(), key)?)
+        Ok(self.dicts.get_value(
+            self.org_id,
+            self.proj_id,
+            self.properties
+                .get_by_name(self.org_id, self.proj_id, "Product Name")
+                .unwrap()
+                .column_name()
+                .as_str(),
+            key,
+        )?)
     }
 }

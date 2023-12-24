@@ -73,8 +73,16 @@ impl PartialEq for DictionaryDecodeNode {
         if !res {
             return false;
         }
-        let cols = self.decode_cols.iter().map(|v| v.0.clone()).collect::<Vec<_>>();
-        let other_cols = other.decode_cols.iter().map(|v| v.0.clone()).collect::<Vec<_>>();
+        let cols = self
+            .decode_cols
+            .iter()
+            .map(|v| v.0.clone())
+            .collect::<Vec<_>>();
+        let other_cols = other
+            .decode_cols
+            .iter()
+            .map(|v| v.0.clone())
+            .collect::<Vec<_>>();
         cols == other_cols
     }
 }

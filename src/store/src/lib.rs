@@ -84,8 +84,8 @@ impl Value {
             DataType::Int8 => Value::Int8(None),
             DataType::Int16 => Int16(None),
             DataType::Int32 => Value::Int32(None),
-            DataType::Int64  => Value::Int64(None),
-            DataType::Timestamp(_,_) => Value::Timestamp(None),
+            DataType::Int64 => Value::Int64(None),
+            DataType::Timestamp(_, _) => Value::Timestamp(None),
             DataType::Utf8 => Value::String(None),
             DataType::Decimal(_, _) => Value::Decimal(None),
             DataType::List(f) => match f.data_type() {
@@ -93,8 +93,8 @@ impl Value {
                 DataType::Int8 => Value::ListInt8(None),
                 DataType::Int16 => Value::ListInt16(None),
                 DataType::Int32 => Value::ListInt32(None),
-                DataType::Int64  => Value::ListInt64(None),
-                DataType::Timestamp(_,_)  => Value::ListTimestamp(None),
+                DataType::Int64 => Value::ListInt64(None),
+                DataType::Timestamp(_, _) => Value::ListTimestamp(None),
                 DataType::Utf8 => Value::ListString(None),
                 DataType::Decimal(_, _) => Value::ListDecimal(None),
                 _ => unimplemented!(),
@@ -870,7 +870,7 @@ pub mod test_util {
             }
             _ => unimplemented!("{:?}", pt),
         }
-            .boxed()
+        .boxed()
     }
 
     pub fn gen_utf8_data_list_array<O: Offset, O2: Offset>(

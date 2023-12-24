@@ -6,7 +6,8 @@ use axum::extract::ConnectInfo;
 use axum::extract::Path;
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::{Extension, routing};
+use axum::routing;
+use axum::Extension;
 use axum::Router;
 use axum::Server;
 use axum_macros::debug_handler;
@@ -222,8 +223,11 @@ pub struct Service {
     addr: SocketAddr,
 }
 
-pub fn attach_routes(router: Router, track_exec: Executor<crate::Track>,
-                     identify_exec: Executor<crate::Identify>) -> Router {
+pub fn attach_routes(
+    router: Router,
+    track_exec: Executor<crate::Track>,
+    identify_exec: Executor<crate::Identify>,
+) -> Router {
     let app = App {
         track: Arc::new(Mutex::new(track_exec)),
         identify: Arc::new(Mutex::new((identify_exec))),

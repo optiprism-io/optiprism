@@ -37,6 +37,7 @@ use arrow::array::UInt32Array;
 use arrow::array::UInt64Array;
 use arrow::array::UInt8Array;
 use arrow::datatypes::TimeUnit;
+use common::types::DType;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 pub use context::Context;
@@ -53,7 +54,6 @@ use serde::Serialize;
 use serde_json::json;
 use serde_json::Number;
 use serde_json::Value;
-use common::types::DType;
 
 pub struct PlatformProvider {
     pub events: Arc<dyn events::Provider>,
@@ -272,9 +272,6 @@ pub enum PropValueOperation {
     False,
     Exists,
     Empty,
-    ArrAll,
-    ArrAny,
-    ArrNone,
     Regex,
     Like,
     NotLike,
@@ -296,9 +293,6 @@ impl TryInto<common::query::PropValueOperation> for PropValueOperation {
             PropValueOperation::False => common::query::PropValueOperation::False,
             PropValueOperation::Exists => common::query::PropValueOperation::Exists,
             PropValueOperation::Empty => common::query::PropValueOperation::Empty,
-            PropValueOperation::ArrAll => common::query::PropValueOperation::ArrAll,
-            PropValueOperation::ArrAny => common::query::PropValueOperation::ArrAny,
-            PropValueOperation::ArrNone => common::query::PropValueOperation::ArrNone,
             PropValueOperation::Regex => common::query::PropValueOperation::Regex,
             PropValueOperation::Like => common::query::PropValueOperation::Like,
             PropValueOperation::NotLike => common::query::PropValueOperation::NotLike,
@@ -322,9 +316,6 @@ impl TryInto<PropValueOperation> for common::query::PropValueOperation {
             common::query::PropValueOperation::False => PropValueOperation::False,
             common::query::PropValueOperation::Exists => PropValueOperation::Exists,
             common::query::PropValueOperation::Empty => PropValueOperation::Empty,
-            common::query::PropValueOperation::ArrAll => PropValueOperation::ArrAll,
-            common::query::PropValueOperation::ArrAny => PropValueOperation::ArrAny,
-            common::query::PropValueOperation::ArrNone => PropValueOperation::ArrNone,
             common::query::PropValueOperation::Regex => PropValueOperation::Regex,
             common::query::PropValueOperation::Like => PropValueOperation::Like,
             common::query::PropValueOperation::NotLike => PropValueOperation::NotLike,
@@ -392,7 +383,9 @@ impl TryInto<common::query::PropertyRef> for PropertyRef {
 
     fn try_into(self) -> std::result::Result<common::query::PropertyRef, Self::Error> {
         Ok(match self {
-            PropertyRef::System { property_name } => common::query::PropertyRef::System(property_name),
+            PropertyRef::System { property_name } => {
+                common::query::PropertyRef::System(property_name)
+            }
             PropertyRef::User { property_name } => common::query::PropertyRef::User(property_name),
             PropertyRef::Event { property_name } => {
                 common::query::PropertyRef::Event(property_name)
@@ -407,7 +400,9 @@ impl TryInto<PropertyRef> for common::query::PropertyRef {
 
     fn try_into(self) -> std::result::Result<PropertyRef, Self::Error> {
         Ok(match self {
-            common::query::PropertyRef::System(property_name) => PropertyRef::System { property_name },
+            common::query::PropertyRef::System(property_name) => {
+                PropertyRef::System { property_name }
+            }
             common::query::PropertyRef::User(property_name) => PropertyRef::User { property_name },
             common::query::PropertyRef::Event(property_name) => {
                 PropertyRef::Event { property_name }

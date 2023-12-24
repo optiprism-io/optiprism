@@ -21,10 +21,7 @@ pub struct LocalTable {
 
 impl LocalTable {
     pub fn try_new(db: Arc<OptiDBImpl>, tbl_name: String) -> Result<Self> {
-        Ok(Self {
-            db,
-            tbl_name,
-        })
+        Ok(Self { db, tbl_name })
     }
 }
 

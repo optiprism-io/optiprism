@@ -79,7 +79,7 @@ impl TryInto<common::query::event_segmentation::SegmentTime> for SegmentTime {
 pub enum ChartType {
     Line,
     Column,
-    Pie
+    Pie,
 }
 
 impl TryInto<common::query::event_segmentation::ChartType> for ChartType {

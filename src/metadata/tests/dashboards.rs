@@ -2,12 +2,15 @@ use std::env::temp_dir;
 use std::sync::Arc;
 
 use common::types::OptionalProperty;
+use metadata::dashboards::CreateDashboardRequest;
+use metadata::dashboards::Provider;
+use metadata::dashboards::ProviderImpl;
+use metadata::dashboards::UpdateDashboardRequest;
 use metadata::error::Result;
 use metadata::events::CreateEventRequest;
 use metadata::events::Status;
 use metadata::events::UpdateEventRequest;
 use uuid::Uuid;
-use metadata::dashboards::{CreateDashboardRequest, Provider, ProviderImpl, UpdateDashboardRequest};
 
 #[test]
 fn test_dashboards() -> Result<()> {
@@ -23,7 +26,6 @@ fn test_dashboards() -> Result<()> {
         description: None,
         panels: vec![],
     };
-
 
     let update_dash_req = UpdateDashboardRequest {
         updated_by: 0,

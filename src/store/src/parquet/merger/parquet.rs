@@ -359,71 +359,70 @@ impl<R: Read + Seek> CompressedPageIterator<R> {
     }
 }
 
-/*#[derive(Debug)]
-pub struct ArrowIterator<R: Read + Seek> {
-    page_iter: CompressedPageIterator<R>,
-    fields: Vec<ColumnDescriptor>,
-    schema: Schema,
-}
-
-impl<R: Read + Seek> ArrowIterator<R> {
-    pub fn new(
-        page_iter: CompressedPageIterator<R>,
-        fields: Vec<ColumnDescriptor>,
-        schema: Schema,
-    ) -> Self {
-        Self {
-            page_iter,
-            fields,
-            schema,
-        }
-    }
-
-    pub fn contains_column(&self, col_path: &ColumnPath) -> bool {
-        self.page_iter.contains_column(col_path)
-    }
-
-    pub fn next(&mut self) -> Result<Option<Chunk<Box<dyn Array>>>> {
-        let mut ret = vec![];
-
-        let mut num_rows = 0;
-        for (idx, cd) in self.fields.iter().enumerate() {
-            let page = self.page_iter.next_page(&cd.path_in_schema)?;
-            match page {
-                None => {
-                    // no more pages
-                    if idx == 0 {
-                        return Ok(None);
-                    }
-
-                    ret.push(new_null_array(
-                        self.schema.fields[idx].data_type().clone(),
-                        num_rows,
-                    ))
-                }
-                Some(page) => {
-                    let mut buf = vec![];
-                    let mut arrs = pages_to_arrays(vec![page], cd, None, &mut buf)?;
-                    let arr = arrs.pop().unwrap();
-                    // set rows. Assume that first column is always present
-                    if idx == 0 {
-                        num_rows = arr.len();
-                    }
-                    ret.push(arr);
-                }
-            }
-        }
-
-        ret.iter().for_each(|v| println!("{:?}", v.len()));
-        Ok(Some(Chunk::new(ret)))
-    }
-}*/
-
+// #[derive(Debug)]
+// pub struct ArrowIterator<R: Read + Seek> {
+// page_iter: CompressedPageIterator<R>,
+// fields: Vec<ColumnDescriptor>,
+// schema: Schema,
+// }
+//
+// impl<R: Read + Seek> ArrowIterator<R> {
+// pub fn new(
+// page_iter: CompressedPageIterator<R>,
+// fields: Vec<ColumnDescriptor>,
+// schema: Schema,
+// ) -> Self {
+// Self {
+// page_iter,
+// fields,
+// schema,
+// }
+// }
+//
+// pub fn contains_column(&self, col_path: &ColumnPath) -> bool {
+// self.page_iter.contains_column(col_path)
+// }
+//
+// pub fn next(&mut self) -> Result<Option<Chunk<Box<dyn Array>>>> {
+// let mut ret = vec![];
+//
+// let mut num_rows = 0;
+// for (idx, cd) in self.fields.iter().enumerate() {
+// let page = self.page_iter.next_page(&cd.path_in_schema)?;
+// match page {
+// None => {
+// no more pages
+// if idx == 0 {
+// return Ok(None);
+// }
+//
+// ret.push(new_null_array(
+// self.schema.fields[idx].data_type().clone(),
+// num_rows,
+// ))
+// }
+// Some(page) => {
+// let mut buf = vec![];
+// let mut arrs = pages_to_arrays(vec![page], cd, None, &mut buf)?;
+// let arr = arrs.pop().unwrap();
+// set rows. Assume that first column is always present
+// if idx == 0 {
+// num_rows = arr.len();
+// }
+// ret.push(arr);
+// }
+// }
+// }
+//
+// ret.iter().for_each(|v| println!("{:?}", v.len()));
+// Ok(Some(Chunk::new(ret)))
+// }
+// }
 
 pub struct ArrowIterator<R: Read + Seek> {
     rdr: io::parquet::read::FileReader<R>,
     schema: Schema,
-    required_schema:Schema,
+    required_schema: Schema,
     fields: Vec<String>,
 }
 
@@ -432,13 +431,20 @@ impl<R: Read + Seek> ArrowIterator<R> {
         mut rdr: R,
         fields: Vec<String>,
         required_schema: Schema,
-        chunk_size:usize,
+        chunk_size: usize,
     ) -> Result<Self> {
         // we can read its metadata:
         let metadata = io::parquet::read::read_metadata(&mut rdr)?;
         let schema = io::parquet::read::infer_schema(&metadata)?;
         let schema = schema.filter(|_, f| fields.contains(&f.name));
-        let frdr = io::parquet::read::FileReader::new(rdr, metadata.row_groups, schema.clone(), Some(chunk_size) /*todo define*/, None, None);
+        let frdr = io::parquet::read::FileReader::new(
+            rdr,
+            metadata.row_groups,
+            schema.clone(),
+            Some(chunk_size), // todo define
+            None,
+            None,
+        );
         Ok(Self {
             rdr: frdr,
             schema,
@@ -450,9 +456,7 @@ impl<R: Read + Seek> ArrowIterator<R> {
     pub fn next(&mut self) -> Result<Option<Chunk<Box<dyn Array>>>> {
         match self.rdr.next() {
             None => Ok(None),
-            Some(Ok(chunk)) => {
-                Ok(Some(chunk))
-            }
+            Some(Ok(chunk)) => Ok(Some(chunk)),
             Some(Err(err)) => Err(err.into()),
         }
     }
