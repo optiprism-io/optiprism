@@ -205,6 +205,16 @@ fn prop_expression(
         return named_property_expression(col, operation, None);
     }
 
+    match operation {
+        PropValueOperation::Like
+        | PropValueOperation::NotLike
+        | PropValueOperation::Regex
+        | PropValueOperation::NotRegex => {
+            return named_property_expression(col, operation, values);
+        }
+        _ => {}
+    }
+
     if let Some(dict_type) = prop.dictionary_type {
         let dict_values = encode_property_dict_values(
             ctx,

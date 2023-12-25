@@ -494,7 +494,7 @@ pub mod test_util {
             description: None,
             display_name: None,
             typ: Type::User,
-            data_type: DType::String,
+            data_type: DType::Boolean,
             status: properties::Status::Enabled,
             is_system: false,
             nullable: false,

@@ -107,3 +107,17 @@ def test_false_filter():
     op = optiprism.simple_query("countEvents", filters=filters)
 
     assert ch == op
+
+
+def test_dict_exact_filter():
+    ch = clickhouse.string_filter_query("string_dict=1")
+    filters = [{
+        "type": "property",
+        "propertyType": "system",
+        "propertyName": "string_dict",
+        "operation": "like",
+        "value": ["прив%"]
+    }]
+    op = optiprism.simple_query("countEvents", filters=filters)
+
+    assert ch == op

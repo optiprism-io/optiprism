@@ -267,6 +267,18 @@ pub async fn gen(args: &Test, proj_id: u64) -> Result<(), anyhow::Error> {
         })?;
     }
 
+    create_property(&md, 1, proj_id, CreatePropertyMainRequest {
+        name: "string_dict".to_string(),
+        typ: Type::System,
+        data_type: DType::String,
+        nullable: true,
+        dict: Some(DictionaryType::Int8),
+    })?;
+
+    md.dictionaries
+        .get_key_or_create(1, 1, "string_dict", "привет")?;
+    md.dictionaries
+        .get_key_or_create(1, 1, "string_dict", "мир")?;
     let e = create_event(&md, 1, proj_id, "event".to_string())?;
     md.dictionaries
         .get_key_or_create(1, proj_id, "event", "event")?;
@@ -343,10 +355,20 @@ pub async fn gen(args: &Test, proj_id: u64) -> Result<(), anyhow::Error> {
                         "string".to_string(),
                         Value::String(Some("привет".to_string())),
                     ));
+
+                    vals.push(NamedValue::new(
+                        "string_dict".to_string(),
+                        Value::Int8(Some(1)),
+                    ));
                 } else {
                     vals.push(NamedValue::new(
                         "string".to_string(),
                         Value::String(Some("мир".to_string())),
+                    ));
+
+                    vals.push(NamedValue::new(
+                        "string_dict".to_string(),
+                        Value::Int8(Some(2)),
                     ));
                 }
                 vals.push(NamedValue::new(
