@@ -3,6 +3,7 @@ use std::net::SocketAddr;
 use std::ops::Add;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration as STDDuration;
 
 use arrow::array::ArrayBuilder;
 use arrow::array::ArrayRef;
@@ -47,6 +48,11 @@ use metadata::test_util::create_event;
 use metadata::test_util::create_property;
 use metadata::test_util::CreatePropertyMainRequest;
 use metadata::MetadataProvider;
+use metrics::counter;
+use metrics::describe_counter;
+use metrics::gauge;
+use metrics_exporter_prometheus::PrometheusBuilder;
+use metrics_util::MetricKindMask;
 use platform::auth;
 use query::datasources::local::LocalTable;
 use query::ProviderImpl;
@@ -225,6 +231,19 @@ pub fn gen_mem(
 }
 
 pub async fn gen(args: &Test, proj_id: u64) -> Result<(), anyhow::Error> {
+    let builder = PrometheusBuilder::new();
+    builder
+        .idle_timeout(
+            MetricKindMask::COUNTER | MetricKindMask::HISTOGRAM,
+            Some(STDDuration::from_secs(10)),
+        )
+        .install()
+        .expect("failed to install Prometheus recorder");
+    describe_counter!(
+        "tcp_server_loops",
+        "The iterations of the TCP server event loop so far."
+    );
+    counter!("idle_metric").increment(1);
     debug!("db path: {:?}", args.path);
 
     fs::remove_dir_all(&args.path).unwrap();
