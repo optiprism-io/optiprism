@@ -162,9 +162,9 @@ pub fn gen_mem(
     for _p in 0..partitions {
         builders.push(Builders::new());
     }
-    let users = 100;
-    let days = 60;
-    let events = 10;
+    let users = 1;
+    let days = 1;
+    let events = 2;
     for user in 0..users {
         let partition = user % partitions;
         let mut cur_time = now - Duration::days(days);
@@ -287,10 +287,11 @@ pub async fn gen(args: &Test, proj_id: u64) -> Result<(), anyhow::Error> {
         .unwrap()
         .duration_trunc(Duration::days(1))?;
 
-    let users = 100;
-    let days = 10;
-    let events = 10;
+    let users = 1;
+    let days = 1;
+    let events = 5;
     let mut vals: Vec<NamedValue> = vec![];
+    let mut i = 0;
     for user in 0..users {
         let mut cur_time = now - Duration::days(days);
         for _day in 0..days {
@@ -312,6 +313,10 @@ pub async fn gen(args: &Test, proj_id: u64) -> Result<(), anyhow::Error> {
                 vals.push(NamedValue::new(
                     "event".to_string(),
                     Value::Int64(Some(e.id as i64)),
+                ));
+                vals.push(NamedValue::new(
+                    "event_id".to_string(),
+                    Value::Int64(Some(i)),
                 ));
                 vals.push(NamedValue::new(
                     "i_8".to_string(),
@@ -396,6 +401,7 @@ pub async fn gen(args: &Test, proj_id: u64) -> Result<(), anyhow::Error> {
                 let d = Duration::days(1).num_seconds() / events;
                 let diff = Duration::seconds(d);
                 event_time = event_time.add(diff);
+                i += 1;
             }
             cur_time = cur_time.add(Duration::days(1));
         }

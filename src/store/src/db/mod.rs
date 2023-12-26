@@ -920,7 +920,10 @@ impl Stream for ScanStream {
                 histogram!("store.scan_time_sec",self.start_time.elapsed(),"table"=>self.table_name.to_string());
                 Poll::Ready(None)
             }
-            Some(chunk) => Poll::Ready(Some(chunk)),
+            Some(chunk) => {
+                println!("{:?}", chunk);
+                Poll::Ready(Some(chunk))
+            }
         }
     }
 }
