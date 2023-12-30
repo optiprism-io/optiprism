@@ -690,6 +690,7 @@ fn memtable_to_partitioned_chunks(
     metadata: &Metadata,
     memtable: &SkipSet<MemOp>,
     partition_id: Option<usize>,
+    fields: Option<Vec<String>>,
 ) -> Result<Vec<MemtablePartitionChunk>> {
     let start_time = Instant::now();
     let mut partitions: Vec<MemtablePartition> = vec![];
@@ -819,7 +820,7 @@ fn write_level0(
     path: PathBuf,
 ) -> Result<Vec<(usize, Part)>> {
     let mut ret = vec![];
-    let partitioned_chunks = memtable_to_partitioned_chunks(metadata, memtable, None)?;
+    let partitioned_chunks = memtable_to_partitioned_chunks(metadata, memtable, None, None)?;
     for chunk in partitioned_chunks.into_iter() {
         let (min, max) = chunk_min_max(&chunk.chunk, metadata.opts.index_cols);
 
@@ -1149,7 +1150,12 @@ impl OptiDBImpl {
         let start_time = Instant::now();
         debug!("ppp");
         let memtable = tbl.memtable.lock();
-        let mem_chunks = memtable_to_partitioned_chunks(&metadata, &memtable, Some(partition_id))?;
+        let mem_chunks = memtable_to_partitioned_chunks(
+            &metadata,
+            &memtable,
+            Some(partition_id),
+            Some(fields.clone()),
+        )?;
         drop(memtable);
         histogram!("store.scan_memtable_seconds","table"=>tbl_name.to_string())
             .record(start_time.elapsed());

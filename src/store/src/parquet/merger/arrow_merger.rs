@@ -72,7 +72,7 @@ use crate::merge_primitive_arrays;
 use crate::parquet::merger;
 use crate::parquet::merger::chunk_min_max;
 use crate::parquet::merger::parquet::data_page_to_array;
-use crate::parquet::merger::parquet::ArrowIterator;
+use crate::parquet::merger::parquet::ArrowIteratorImpl;
 use crate::parquet::merger::parquet::ColumnPath;
 use crate::parquet::merger::parquet::CompressedPageIterator;
 use crate::parquet::merger::parquet::ParquetValue;
@@ -315,9 +315,7 @@ impl Iterator for MemChunkIterator {
     }
 }
 
-pub struct MergingIterator<R>
-where R: Read + Seek
-{
+pub struct MergingIterator {
     // list of index cols (partitions) in parquet file
     index_cols: Vec<ColumnDescriptor>,
     array_size: usize,
@@ -326,21 +324,18 @@ where R: Read + Seek
     // final arrow schema
     arrow_schema: Schema,
     // list of streams to merge
-    streams: Vec<ArrowIterator<R>>,
+    streams: Vec<Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>>,
     // sorter for pages chunk from parquet
     sorter: BinaryHeap<ArrowChunk>,
-    mem_chunk: Option<ArrowChunk>,
     // pages chunk merge queue
     // merge result
     merge_result_buffer: VecDeque<Chunk<Box<dyn Array>>>,
 }
 
-impl<R> MergingIterator<R>
-where R: Read + Seek
-{
+impl MergingIterator {
     // Create new merger
     pub fn new(
-        mut readers: Vec<R>,
+        mut readers: Vec<BufReader<File>>,
         mem_chunk: Option<Chunk<Box<dyn Array>>>,
         opts: Options,
     ) -> Result<Self> {
@@ -357,19 +352,25 @@ where R: Read + Seek
             .map(|idx| parquet_schema.columns()[idx].to_owned())
             .collect::<Vec<_>>();
 
-        let arrow_streams = readers
+        let mut arrow_streams = readers
             .into_iter()
             .map(|v| {
-                ArrowIterator::new(
-                    v,
-                    opts.fields.clone(),
-                    arrow_schema.clone(),
-                    opts.chunk_size,
-                )
-                .unwrap()
+                Box::new(
+                    ArrowIteratorImpl::new(
+                        v,
+                        opts.fields.clone(),
+                        arrow_schema.clone(),
+                        opts.chunk_size,
+                    )
+                    .unwrap(),
+                ) as Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>
             })
             .collect::<Vec<_>>();
 
+        if let (chunk) = mem_chunk {
+            arrow_streams.push(Box::new(MemChunkIterator::new(chunk))
+                as Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>);
+        }
         let mut mr = Self {
             index_cols,
             array_size: opts.array_size,
@@ -377,7 +378,6 @@ where R: Read + Seek
             arrow_schema,
             streams: arrow_streams,
             sorter: BinaryHeap::new(),
-            mem_chunk: mem_chunk.map(|chunk| ArrowChunk::new(chunk, 0, opts.index_cols)),
             merge_result_buffer: VecDeque::with_capacity(10),
         };
         for stream_id in 0..mr.streams.len() {
@@ -434,20 +434,20 @@ where R: Read + Seek
     }
 
     fn next_stream_chunk(&mut self, stream_id: usize) -> Result<Option<ArrowChunk>> {
-        let maybe_chunk = self.streams[stream_id].next()?;
+        let maybe_chunk = self.streams[stream_id].next();
         if maybe_chunk.is_none() {
             return Ok(None);
         }
 
         Ok(Some(ArrowChunk::new(
-            maybe_chunk.unwrap(),
+            maybe_chunk.unwrap()?,
             stream_id,
             self.index_cols.len(),
         )))
     }
 }
 
-impl<R: Read + Seek> Iterator for MergingIterator<R> {
+impl Iterator for MergingIterator {
     type Item = Result<Chunk<Box<dyn Array>>>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -456,19 +456,15 @@ impl<R: Read + Seek> Iterator for MergingIterator<R> {
         }
 
         let mut merge_queue: Vec<ArrowChunk> = vec![];
-        let chunk = if let Some(chunk) = self.mem_chunk.take() {
-            chunk
-        } else if let Some(chunk) = self.sorter.pop() {
+        if let Some(chunk) = self.sorter.pop() {
             if let Some(chunk) = self.next_stream_chunk(chunk.stream).ok()? {
                 // return Some(Ok(chunk.chunk.clone()));
                 self.sorter.push(chunk);
             }
-            chunk
+            merge_queue.push(chunk);
         } else {
             return None;
         };
-
-        merge_queue.push(chunk);
 
         while check_intersection(&merge_queue, self.sorter.peek()) {
             // in case of intersection, take chunk and add it to merge queue

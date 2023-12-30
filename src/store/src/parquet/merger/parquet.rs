@@ -2,6 +2,8 @@ use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::collections::VecDeque;
+use std::fs::File;
+use std::io::BufReader;
 use std::io::Read;
 use std::io::Seek;
 use std::sync::Arc;
@@ -42,6 +44,7 @@ use parquet2::write::Version;
 
 use crate::error::Result;
 use crate::error::StoreError;
+use crate::parquet::merger::arrow_merger::MemChunkIterator;
 use crate::parquet::merger::IndexChunk;
 
 #[derive(Eq, PartialEq, PartialOrd, Ord, Debug, Clone)]
@@ -359,76 +362,16 @@ impl<R: Read + Seek> CompressedPageIterator<R> {
     }
 }
 
-// #[derive(Debug)]
-// pub struct ArrowIterator<R: Read + Seek> {
-// page_iter: CompressedPageIterator<R>,
-// fields: Vec<ColumnDescriptor>,
-// schema: Schema,
-// }
-//
-// impl<R: Read + Seek> ArrowIterator<R> {
-// pub fn new(
-// page_iter: CompressedPageIterator<R>,
-// fields: Vec<ColumnDescriptor>,
-// schema: Schema,
-// ) -> Self {
-// Self {
-// page_iter,
-// fields,
-// schema,
-// }
-// }
-//
-// pub fn contains_column(&self, col_path: &ColumnPath) -> bool {
-// self.page_iter.contains_column(col_path)
-// }
-//
-// pub fn next(&mut self) -> Result<Option<Chunk<Box<dyn Array>>>> {
-// let mut ret = vec![];
-//
-// let mut num_rows = 0;
-// for (idx, cd) in self.fields.iter().enumerate() {
-// let page = self.page_iter.next_page(&cd.path_in_schema)?;
-// match page {
-// None => {
-// no more pages
-// if idx == 0 {
-// return Ok(None);
-// }
-//
-// ret.push(new_null_array(
-// self.schema.fields[idx].data_type().clone(),
-// num_rows,
-// ))
-// }
-// Some(page) => {
-// let mut buf = vec![];
-// let mut arrs = pages_to_arrays(vec![page], cd, None, &mut buf)?;
-// let arr = arrs.pop().unwrap();
-// set rows. Assume that first column is always present
-// if idx == 0 {
-// num_rows = arr.len();
-// }
-// ret.push(arr);
-// }
-// }
-// }
-//
-// ret.iter().for_each(|v| println!("{:?}", v.len()));
-// Ok(Some(Chunk::new(ret)))
-// }
-// }
-
-pub struct ArrowIterator<R: Read + Seek> {
-    rdr: io::parquet::read::FileReader<R>,
+pub struct ArrowIteratorImpl {
+    rdr: io::parquet::read::FileReader<BufReader<File>>,
     schema: Schema,
     required_schema: Schema,
     fields: Vec<String>,
 }
 
-impl<R: Read + Seek> ArrowIterator<R> {
+impl ArrowIteratorImpl {
     pub fn new(
-        mut rdr: R,
+        mut rdr: BufReader<File>,
         fields: Vec<String>,
         required_schema: Schema,
         chunk_size: usize,
@@ -452,12 +395,16 @@ impl<R: Read + Seek> ArrowIterator<R> {
             fields,
         })
     }
+}
 
-    pub fn next(&mut self) -> Result<Option<Chunk<Box<dyn Array>>>> {
+impl Iterator for ArrowIteratorImpl {
+    type Item = Result<Chunk<Box<dyn Array>>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
         match self.rdr.next() {
-            None => Ok(None),
-            Some(Ok(chunk)) => Ok(Some(chunk)),
-            Some(Err(err)) => Err(err.into()),
+            None => None,
+            Some(Ok(chunk)) => Some(Ok(chunk)),
+            Some(Err(err)) => Some(Err(err.into())),
         }
     }
 }
