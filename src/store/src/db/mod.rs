@@ -39,6 +39,7 @@ use std::time::Instant;
 
 use arrow::compute::concat;
 use arrow::ipc::Time;
+use arrow2::array::clone;
 use arrow2::array::Array;
 use arrow2::array::Int32Array;
 use arrow2::array::Int64Array;
@@ -73,11 +74,13 @@ use lazy_static::lazy_static;
 use metrics::counter;
 use metrics::describe_counter;
 use metrics::describe_histogram;
+use metrics::gauge;
 use metrics::histogram;
 use metrics::Counter;
 use metrics::Gauge;
 use metrics::Histogram;
 use metrics::Unit;
+use num_traits::ToPrimitive;
 use parking_lot::Mutex;
 use parking_lot::RwLock;
 use parquet2::metadata::FileMetaData;
@@ -112,6 +115,45 @@ use crate::KeyValue;
 use crate::NamedValue;
 use crate::Value;
 
+fn collect_metrics(tables: Arc<RwLock<Vec<Table>>>) {
+    loop {
+        let tables = tables.read();
+        let tbl = tables.clone();
+        drop(tables);
+
+        for t in tbl {
+            let md_mx = t.metadata.lock();
+            let md = md_mx.clone();
+            drop(md_mx);
+
+            let mem_mx = t.memtable.lock();
+            histogram!("store.memtable_rows","table"=>t.name.to_string())
+                .record(mem_mx.len().to_f64().unwrap());
+            drop(mem_mx);
+
+            gauge!("store.table_fields", "table"=>t.name.to_string())
+                .set(md.schema.fields.len().to_f64().unwrap());
+            gauge!("store.sequence","table"=>t.name.to_string()).set(md.seq_id.to_f64().unwrap());
+            for (pid, partition) in md.partitions.iter().enumerate() {
+                for (lvlid, lvl) in partition.levels.iter().enumerate() {
+                    let sz = lvl.parts.iter().map(|v| v.size_bytes).sum::<u64>();
+                    let values = lvl.parts.iter().map(|v| v.values).sum::<usize>();
+                    gauge!("store.parts_size_bytes","table"=>t.name.to_string(),"level"=>lvlid.to_string()).set(sz.to_f64().unwrap());
+                    for part in lvl.parts.iter() {
+                        // trace
+                        histogram!("store.part_size_bytes","table"=>t.name.to_string(),"level"=>lvlid.to_string()).record(part.size_bytes.to_f64().unwrap());
+                        histogram!("store.part_values","table"=>t.name.to_string(),"level"=>lvlid.to_string()).record(part.values.to_f64().unwrap());
+                    }
+                    gauge!("store.parts","table"=>t.name.to_string(),"level"=>lvlid.to_string())
+                        .set(lvl.parts.len().to_f64().unwrap());
+                    gauge!("store.parts_values","table"=>t.name.to_string(),"level"=>lvlid.to_string()).set(values.to_f64().unwrap());
+                }
+            }
+        }
+        thread::sleep(Duration::from_secs(1));
+    }
+}
+
 macro_rules! memory_col_to_arrow {
     ($col:expr, $dt:ident,$arr_ty:ident) => {{
         let vals = $col
@@ -141,6 +183,7 @@ pub enum DBDataType {
 pub struct Part {
     id: usize,
     size_bytes: u64,
+    values: usize,
     min: Vec<KeyValue>,
     max: Vec<KeyValue>,
 }
@@ -189,10 +232,6 @@ pub struct Table {
     metadata: Arc<Mutex<Metadata>>,
     vfs: Arc<Vfs>,
     log: Arc<Mutex<BufWriter<File>>>,
-}
-
-struct TableStats {
-    insert_time_ms: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -318,6 +357,7 @@ pub struct TableOptions {
     pub merge_array_size: usize,
     pub merge_chunk_size: usize,
     pub merge_array_page_size: usize,
+    pub merge_max_page_size: usize,
 }
 
 impl TableOptions {
@@ -338,6 +378,7 @@ impl TableOptions {
             merge_part_size_multiplier: 10,
             merge_row_group_values_limit: 1000,
             merge_chunk_size: 1024 * 8 * 8,
+            merge_max_page_size: 1024 * 1024,
         }
     }
 }
@@ -491,6 +532,7 @@ fn try_recover_table(path: PathBuf, name: String, opts: Option<TableOptions>) ->
         merge_array_size: 0,
         merge_chunk_size: 0,
         merge_array_page_size: 0,
+        merge_max_page_size: 1024 * 1024,
     });
 
     for pid in 0..opts.partitions {
@@ -574,7 +616,7 @@ fn try_recover_table(path: PathBuf, name: String, opts: Option<TableOptions>) ->
     // if trigger_compact {
     //     // compactor_outbox.send(CompactorMessage::Compact).unwrap();
     // }
-    histogram!("store.insert_time_sec", start_time.elapsed());
+    histogram!("store.recovery_time_seconds").record(start_time.elapsed());
     Ok(Table {
         name,
         memtable: Arc::new(Mutex::new(memtable)),
@@ -613,6 +655,8 @@ fn recover(path: PathBuf, opts: Options) -> Result<OptiDBImpl> {
     // if trigger_compact {
     //     // compactor_outbox.send(CompactorMessage::Compact).unwrap();
     // }
+    let tables_cloned = tables.clone();
+    thread::spawn(move || collect_metrics(tables_cloned));
     Ok(OptiDBImpl {
         opts,
         tables,
@@ -647,6 +691,7 @@ fn memtable_to_partitioned_chunks(
     memtable: &SkipSet<MemOp>,
     partition_id: Option<usize>,
 ) -> Result<Vec<MemtablePartitionChunk>> {
+    let start_time = Instant::now();
     let mut partitions: Vec<MemtablePartition> = vec![];
 
     for op in memtable.iter() {
@@ -786,6 +831,7 @@ fn write_level0(
             data_pagesize_limit: None,
         };
 
+        let chunk_len = chunk.chunk.len();
         let encodings = metadata
             .schema
             .fields
@@ -818,6 +864,7 @@ fn write_level0(
         ret.push((chunk.partition_id, Part {
             id: metadata.partitions[chunk.partition_id].levels[0].part_id,
             size_bytes: sz,
+            values: chunk_len,
             min,
             max,
         }))
@@ -888,7 +935,8 @@ fn flush(
         metadata.log_id - 1
     )))?;
 
-    histogram!("store.flush_time_sec", start_time.elapsed());
+    histogram!("store.flush_time_seconds").record(start_time.elapsed());
+    counter!("store.flushes_total").increment(1);
     Ok(())
 }
 
@@ -917,144 +965,23 @@ impl Stream for ScanStream {
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         match self.iter.next() {
             None => {
-                histogram!("store.scan_time_sec",self.start_time.elapsed(),"table"=>self.table_name.to_string());
+                histogram!("store.scan_time_seconds","table"=>self.table_name.to_string())
+                    .record(self.start_time.elapsed());
                 Poll::Ready(None)
             }
-            Some(chunk) => {
-                println!("{:?}", chunk);
-                Poll::Ready(Some(chunk))
-            }
+            Some(chunk) => Poll::Ready(Some(chunk)),
         }
     }
-}
-
-struct PrintHandle(metrics::Key);
-
-impl metrics::CounterFn for PrintHandle {
-    fn increment(&self, value: u64) {
-        println!("counter increment for '{}': {}", self.0, value);
-    }
-
-    fn absolute(&self, value: u64) {
-        println!("counter absolute for '{}': {}", self.0, value);
-    }
-}
-
-impl metrics::GaugeFn for PrintHandle {
-    fn increment(&self, value: f64) {
-        println!("gauge increment for '{}': {}", self.0, value);
-    }
-
-    fn decrement(&self, value: f64) {
-        println!("gauge decrement for '{}': {}", self.0, value);
-    }
-
-    fn set(&self, value: f64) {
-        println!("gauge set for '{}': {}", self.0, value);
-    }
-}
-
-impl metrics::HistogramFn for PrintHandle {
-    fn record(&self, value: f64) {
-        println!("histogram record for '{}': {}", self.0, value);
-    }
-}
-
-#[derive(Default)]
-struct PrintRecorder;
-
-impl metrics::Recorder for PrintRecorder {
-    fn describe_counter(
-        &self,
-        key_name: metrics::KeyName,
-        unit: Option<Unit>,
-        description: metrics::SharedString,
-    ) {
-        println!(
-            "(counter) registered key {} with unit {:?} and description {:?}",
-            key_name.as_str(),
-            unit,
-            description
-        );
-    }
-
-    fn describe_gauge(
-        &self,
-        key_name: metrics::KeyName,
-        unit: Option<Unit>,
-        description: metrics::SharedString,
-    ) {
-        println!(
-            "(gauge) registered key {} with unit {:?} and description {:?}",
-            key_name.as_str(),
-            unit,
-            description
-        );
-    }
-
-    fn describe_histogram(
-        &self,
-        key_name: metrics::KeyName,
-        unit: Option<Unit>,
-        description: metrics::SharedString,
-    ) {
-        println!(
-            "(histogram) registered key {} with unit {:?} and description {:?}",
-            key_name.as_str(),
-            unit,
-            description
-        );
-    }
-
-    fn register_counter(&self, key: &metrics::Key) -> Counter {
-        Counter::from_arc(Arc::new(PrintHandle(key.clone())))
-    }
-
-    fn register_gauge(&self, key: &metrics::Key) -> Gauge {
-        Gauge::from_arc(Arc::new(PrintHandle(key.clone())))
-    }
-
-    fn register_histogram(&self, key: &metrics::Key) -> Histogram {
-        Histogram::from_arc(Arc::new(PrintHandle(key.clone())))
-    }
-}
-
-fn init_print_logger() {
-    let recorder = PrintRecorder::default();
-    metrics::set_boxed_recorder(Box::new(recorder)).unwrap()
 }
 
 impl OptiDBImpl {
     // #[instrument(level = "trace")]
     pub fn open(path: PathBuf, opts: Options) -> Result<Self> {
-        // init_print_logger();
-        describe_counter!("store.inserts_count", "number of inserts processed");
-        describe_histogram!("store.insert_time_sec", Unit::Seconds, "insert time");
-        describe_counter!("store.scans_count", "number of scans processed");
-        describe_histogram!("store.scan_time_sec", Unit::Seconds, "scan time");
-        describe_histogram!(
-            "store.scan_memtable_time_sec",
-            Unit::Seconds,
-            "scan memtable time"
-        );
-        describe_counter!("store.compactions_count", "number of compactions");
-        describe_histogram!(
-            "store.compaction_time_sec",
-            Unit::Microseconds,
-            "compaction time"
-        );
-        describe_histogram!(
-            "store.recovery_time_sec",
-            Unit::Microseconds,
-            "recovery time"
-        );
-
         recover(path, opts)
     }
 
     // #[instrument(level = "trace", skip(self))]
     pub fn insert(&self, tbl_name: &str, mut values: Vec<NamedValue>) -> Result<()> {
-        counter!("store.inserts_count", 1,"table"=>tbl_name.to_string());
         let start_time = Instant::now();
         let tables = self.tables.read();
         let tbl = tables.iter().find(|t| t.name == tbl_name).cloned().unwrap();
@@ -1144,7 +1071,9 @@ impl OptiDBImpl {
             //         .unwrap();
             // }
         }
-        histogram!("store.insert_time_sec",start_time.elapsed(),"table"=>tbl_name.to_string());
+        counter!("store.inserts_total", "table"=>tbl_name.to_string()).increment(1);
+        histogram!("store.insert_time_seconds","table"=>tbl_name.to_string())
+            .record(start_time.elapsed());
         // !@#debug!("insert finished in {: ?}", duration);
         Ok(())
     }
@@ -1198,7 +1127,6 @@ impl OptiDBImpl {
         partition_id: usize,
         fields: Vec<String>,
     ) -> Result<ScanStream> {
-        counter!("store.scans_count", 1, "table"=>tbl_name.to_string());
         let tables = self.tables.read();
         let tbl = tables.iter().find(|t| t.name == tbl_name);
         let mut tbl = match tbl {
@@ -1219,10 +1147,12 @@ impl OptiDBImpl {
             .unwrap()
             .to_owned();
         let start_time = Instant::now();
+        debug!("ppp");
         let memtable = tbl.memtable.lock();
         let mem_chunks = memtable_to_partitioned_chunks(&metadata, &memtable, Some(partition_id))?;
         drop(memtable);
-        histogram!("store.scan_memtable_time_sec",start_time.elapsed(),"table"=>tbl_name.to_string());
+        histogram!("store.scan_memtable_seconds","table"=>tbl_name.to_string())
+            .record(start_time.elapsed());
         let mut rdrs = vec![];
         let mem_chunk = mem_chunks
             .iter()
@@ -1236,7 +1166,8 @@ impl OptiDBImpl {
                 rdrs.push(rdr);
             }
         }
-
+        counter!("store.scan_parts_total", "table"=>tbl_name.to_string())
+            .increment(rdrs.len() as u64);
         let iter = if rdrs.len() == 0 {
             Box::new(MemChunkIterator::new(mem_chunk))
                 as Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>
@@ -1251,6 +1182,7 @@ impl OptiDBImpl {
                 as Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>
         };
 
+        counter!("store.scans_total", "table"=>tbl_name.to_string()).increment(1);
         Ok(ScanStream::new(iter, tbl_name.to_string()))
     }
     // #[instrument(level = "trace", skip(self))]
@@ -1471,6 +1403,7 @@ mod tests {
             merge_part_size_multiplier: 10,
             merge_row_group_values_limit: 1000,
             merge_chunk_size: 1024 * 8 * 8,
+            merge_max_page_size: 1024 * 1024,
         };
 
         db.create_table("t1", topts).unwrap();

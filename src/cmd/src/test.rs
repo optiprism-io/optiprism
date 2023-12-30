@@ -3,7 +3,6 @@ use std::net::SocketAddr;
 use std::ops::Add;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration as STDDuration;
 
 use arrow::array::ArrayBuilder;
 use arrow::array::ArrayRef;
@@ -69,6 +68,7 @@ use tracing::debug;
 use tracing::info;
 
 use crate::error::Error;
+use crate::init_metrics;
 use crate::init_project;
 use crate::init_system;
 use crate::test;
@@ -231,25 +231,12 @@ pub fn gen_mem(
 }
 
 pub async fn gen(args: &Test, proj_id: u64) -> Result<(), anyhow::Error> {
-    let builder = PrometheusBuilder::new();
-    builder
-        .idle_timeout(
-            MetricKindMask::COUNTER | MetricKindMask::HISTOGRAM,
-            Some(STDDuration::from_secs(10)),
-        )
-        .install()
-        .expect("failed to install Prometheus recorder");
-    describe_counter!(
-        "tcp_server_loops",
-        "The iterations of the TCP server event loop so far."
-    );
-    counter!("idle_metric").increment(1);
-    debug!("db path: {:?}", args.path);
-
     fs::remove_dir_all(&args.path).unwrap();
     let rocks = Arc::new(metadata::rocksdb::new(args.path.join("md"))?);
     let db = Arc::new(OptiDBImpl::open(args.path.join("store"), Options {})?);
     let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
+    info!("metrics initialization...");
+    init_metrics();
     info!("system initialization...");
     init_system(&md, &db, args.partitions.unwrap_or_else(num_cpus::get))?;
 
@@ -306,9 +293,9 @@ pub async fn gen(args: &Test, proj_id: u64) -> Result<(), anyhow::Error> {
         .unwrap()
         .duration_trunc(Duration::days(1))?;
 
-    let users = 1;
-    let days = 1;
-    let events = 5;
+    let users = 1000;
+    let days = 100;
+    let events = 200;
     let mut vals: Vec<NamedValue> = vec![];
     let mut i = 0;
     for user in 0..users {

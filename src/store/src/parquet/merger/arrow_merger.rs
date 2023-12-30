@@ -53,6 +53,7 @@ use arrow2::io::parquet::write::add_arrow_schema;
 use arrow2::io::parquet::write::to_parquet_schema;
 use arrow2::offset::OffsetsBuffer;
 use arrow2::types::NativeType;
+use metrics::counter;
 use parquet2::metadata::ColumnDescriptor;
 use parquet2::metadata::SchemaDescriptor;
 use parquet2::page::CompressedPage;
@@ -391,6 +392,7 @@ where R: Read + Seek
         &self,
         queue: &Vec<&Chunk<Box<dyn Array>>>,
     ) -> Result<Vec<Chunk<Box<dyn Array>>>> {
+        counter!("store.scan_merges_total").increment(1);
         let arrs = queue
             .iter()
             .map(|chunk| chunk.columns())
@@ -458,6 +460,7 @@ impl<R: Read + Seek> Iterator for MergingIterator<R> {
             chunk
         } else if let Some(chunk) = self.sorter.pop() {
             if let Some(chunk) = self.next_stream_chunk(chunk.stream).ok()? {
+                // return Some(Ok(chunk.chunk.clone()));
                 self.sorter.push(chunk);
             }
             chunk

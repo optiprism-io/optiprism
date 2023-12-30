@@ -395,7 +395,7 @@ pub mod test_util {
                 .to_str()
                 .unwrap(),
         )?;
-        let target_partitions = 1;
+        let target_partitions = 12;
         let session_config = SessionConfig::new().with_target_partitions(target_partitions);
         let listing_options = options.to_listing_options(&session_config);
 

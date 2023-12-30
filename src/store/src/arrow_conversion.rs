@@ -144,7 +144,6 @@ pub mod arrow1_to_arrow2 {
     use crate::error::Result;
 
     pub fn convert(arr: ArrayRef) -> Result<Box<dyn Array>> {
-        println!("CCCCC");
         let arr1_ffi = FFI_ArrowArray::new(&arr.to_data());
 
         let arr2_ffi = unsafe { mem::transmute(arr1_ffi) };

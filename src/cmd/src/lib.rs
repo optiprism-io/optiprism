@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Duration as STDDuration;
 
 use ::store::db::OptiDBImpl;
 use ::store::db::TableOptions;
@@ -49,12 +50,48 @@ use metadata::test_util::create_event;
 use metadata::test_util::create_property;
 use metadata::test_util::CreatePropertyMainRequest;
 use metadata::MetadataProvider;
+use metrics::describe_counter;
+use metrics::describe_histogram;
+use metrics::Unit;
+use metrics_exporter_prometheus::PrometheusBuilder;
+use metrics_util::MetricKindMask;
 use platform::auth::password::make_password_hash;
 use tracing::info;
 
 pub mod error;
 pub mod store;
 pub mod test;
+
+pub fn init_metrics() {
+    let builder = PrometheusBuilder::new();
+    builder
+        .install()
+        .expect("failed to install Prometheus recorder");
+
+    describe_counter!("store.inserts_total", "number of inserts processed");
+    describe_histogram!("store.insert_time_seconds", Unit::Seconds, "insert time");
+    describe_counter!("store.scans_total", "number of scans processed");
+    describe_counter!("store.scan_merges_total", "number of merges during scan");
+    describe_histogram!("store.scan_time_seconds", Unit::Microseconds, "scan time");
+    describe_histogram!(
+        "store.scan_memtable_seconds",
+        Unit::Seconds,
+        "scan memtable time"
+    );
+    describe_counter!("store.compactions_total", "number of compactions");
+    describe_histogram!(
+        "store.compaction_time_seconds",
+        Unit::Seconds,
+        "compaction time"
+    );
+    describe_histogram!(
+        "store.recovery_time_seconds",
+        Unit::Seconds,
+        "recovery time"
+    );
+
+    describe_histogram!("store.flush_time_seconds", Unit::Seconds, "recovery time");
+}
 
 pub fn init_system(
     md: &Arc<MetadataProvider>,
@@ -69,14 +106,15 @@ pub fn init_system(
         l1_max_size_bytes: 1024 * 1024 * 10,
         level_size_multiplier: 10,
         l0_max_parts: 4,
-        max_log_length_bytes: 1024 * 1024 * 10,
-        merge_array_page_size: 10000,
-        merge_data_page_size_limit_bytes: Some(1024 * 1024),
+        max_log_length_bytes: 1024 * 1024 * 100,
+        merge_array_page_size: 100000,
+        merge_data_page_size_limit_bytes: Some(1024 * 1024 * 1000),
         merge_index_cols: 2,
-        merge_max_l1_part_size_bytes: 1024 * 1024,
+        merge_max_l1_part_size_bytes: 1024 * 1024 * 10,
         merge_part_size_multiplier: 10,
         merge_row_group_values_limit: 1000,
         merge_chunk_size: 1024 * 8 * 8,
+        merge_max_page_size: 1024 * 1024 * 10,
     };
     db.create_table("events", topts)?;
 

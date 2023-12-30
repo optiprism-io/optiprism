@@ -12,6 +12,7 @@ use std::time;
 use std::time::Instant;
 
 use log::trace;
+use metrics::counter;
 use metrics::histogram;
 use parking_lot::RwLock;
 use tracing::error;
@@ -112,7 +113,7 @@ impl Compactor {
                     let start = Instant::now();
                     match compact(
                         table.name.as_str(),
-                        &partition.levels,
+                        partition.levels.clone(),
                         pid,
                         &self.path,
                         &metadata.opts,
@@ -170,7 +171,6 @@ impl Compactor {
                             continue;
                         }
                     }
-                    histogram!("store.compaction_time_sec",start.elapsed(),"table"=>table.name.to_string(),"partition"=>pid.to_string());
                 }
             }
             // !@#debug!("compaction finished in {:?}", duration);
@@ -243,17 +243,17 @@ fn determine_compaction(
 
 fn compact(
     tbl_name: &str,
-    levels: &[Level],
+    levels: Vec<Level>,
     partition_id: usize,
     path: &PathBuf,
     opts: &TableOptions,
 ) -> Result<Option<CompactResult>> {
+    let init_time = Instant::now();
     let mut fs_ops = vec![];
     let mut l0_rem: Vec<(usize)> = Vec::new();
-    let mut tmp_levels = levels.to_owned().clone();
+    let mut tmp_levels = levels.clone();
     let mut compacted = false;
     for level_id in 0..tmp_levels.len() - 2 {
-        let start_time = Instant::now();
         let mut v = None;
         v = determine_compaction(
             level_id,
@@ -270,6 +270,8 @@ fn compact(
                 }
             }
             Some(to_compact) => {
+                let start_time = Instant::now();
+
                 compacted = true;
                 // println!("to compact {:?}", to_compact);
                 if to_compact.len() == 1 {
@@ -326,22 +328,24 @@ fn compact(
                     .unwrap();
                 let max_part_size_bytes = opts.merge_max_l1_part_size_bytes
                     * opts.merge_part_size_multiplier.pow(level_id as u32 + 1);
-                // println!("max max {max_part_size_bytes} {level_id}");
                 let merger_opts = parquet_merger::Options {
                     index_cols: opts.merge_index_cols,
                     data_page_size_limit_bytes: opts.merge_data_page_size_limit_bytes,
                     row_group_values_limit: opts.merge_row_group_values_limit,
                     array_page_size: opts.merge_array_page_size,
                     out_part_id,
+                    merge_max_page_size: opts.merge_max_page_size,
                     max_part_size_bytes: Some(max_part_size_bytes),
                 };
-                let merge_result = merge(rdrs, out_path, out_part_id, merger_opts)?;
+                let merge_result =
+                    merge(rdrs, out_path, out_part_id, tbl_name, level_id, merger_opts)?;
                 // !@#println!("merge result {:#?}", merge_result);
                 for f in merge_result {
                     let final_part = {
                         Part {
                             id: tmp_levels[level_id + 1].part_id + 1,
                             size_bytes: f.size_bytes,
+                            values: f.values,
                             min: f
                                 .min
                                 .iter()
@@ -366,11 +370,13 @@ fn compact(
                         .as_mut(),
                 );
                 // !@#println!("after compaction");
+                histogram!("store.level_compaction_time_seconds","table"=>tbl_name.to_string(),"level"=>level_id.to_string()).record(start_time.elapsed());
             }
         }
-
-        histogram!("store.level_compaction_time_sec",start_time.elapsed(),"table"=>tbl_name.to_string(),"partition"=>partition_id.to_string(),"level"=>level_id.to_string());
     }
+    counter!("store.compactions_total","table"=>tbl_name.to_string()).increment(1);
+    histogram!("store.compaction_time_seconds","table"=>tbl_name.to_string())
+        .record(init_time.elapsed());
 
     // !@#println!("return lvl");
     Ok(Some(CompactResult {
@@ -378,10 +384,4 @@ fn compact(
         levels: tmp_levels,
         fs_ops,
     }))
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn determine_compaction() {}
 }

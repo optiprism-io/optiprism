@@ -89,6 +89,7 @@ use uaparser::UserAgentParser;
 
 use crate::error::Error;
 use crate::error::Result;
+use crate::init_metrics;
 use crate::init_project;
 use crate::init_system;
 
@@ -108,6 +109,8 @@ pub struct Shop {
     future_duration: Option<String>,
     #[arg(long, default_value = "10")]
     new_daily_users: usize,
+    #[arg(long, default_value = "false")]
+    generate: bool,
     #[arg(long)]
     ui_path: Option<PathBuf>,
     #[arg(long)]
@@ -238,10 +241,14 @@ fn init_ingester(
 pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
     debug!("db path: {:?}", args.path);
 
-    fs::remove_dir_all(&args.path).unwrap();
+    if args.generate {
+        fs::remove_dir_all(&args.path).unwrap();
+    }
     let rocks = Arc::new(metadata::rocksdb::new(args.path.join("md"))?);
     let db = Arc::new(OptiDBImpl::open(args.path.join("store"), Options {})?);
     let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
+    info!("metrics initialization...");
+    init_metrics();
     info!("system initialization...");
     init_system(&md, &db, args.partitions.unwrap_or_else(num_cpus::get))?;
     if let Some(ui_path) = &args.ui_path {
@@ -279,55 +286,68 @@ pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
 
     info!("store initialization...");
     debug!("demo data path: {:?}", args.demo_data_path);
-    debug!("from date {}", from_date);
-    let date_diff = to_date - from_date;
-    debug!("to date {}", to_date);
-    debug!(
-        "time range: {}",
-        humantime::format_duration(date_diff.to_std()?)
-    );
-    debug!("new daily users: {}", args.new_daily_users);
-    let total_users = args.new_daily_users as i64 * date_diff.num_days();
-    info!("expecting total unique users: {total_users}");
-    info!("starting sample data generation...");
+    // todo move outside
+    if args.generate {
+        debug!("from date {}", from_date);
+        let date_diff = to_date - from_date;
+        debug!("to date {}", to_date);
+        debug!(
+            "time range: {}",
+            humantime::format_duration(date_diff.to_std()?)
+        );
+        debug!("new daily users: {}", args.new_daily_users);
+        let total_users = args.new_daily_users as i64 * date_diff.num_days();
+        info!("expecting total unique users: {total_users}");
+        info!("starting sample data generation...");
 
-    let store_cfg = Config {
-        org_id: 1,
-        project_id: proj_id,
-        from_date,
-        to_date,
-        products_rdr: File::open(args.demo_data_path.join("products.csv"))
-            .map_err(|err| Error::Internal(format!("can't open products.csv: {err}")))?,
-        geo_rdr: File::open(args.demo_data_path.join("geo.csv"))
-            .map_err(|err| Error::Internal(format!("can't open geo.csv: {err}")))?,
-        device_rdr: File::open(args.demo_data_path.join("device.csv"))
-            .map_err(|err| Error::Internal(format!("can't open device.csv: {err}")))?,
-        new_daily_users: args.new_daily_users,
-        batch_size: 4096,
-        partitions: args.partitions.unwrap_or_else(num_cpus::get),
-    };
+        let db_clone = db.clone();
+        let md_clone = md.clone();
+        let db_clone = db.clone();
+        let args_clone = args.clone();
+        thread::spawn(move || {
+            let store_cfg = Config {
+                org_id: 1,
+                project_id: proj_id,
+                from_date,
+                to_date,
+                products_rdr: File::open(args_clone.demo_data_path.join("products.csv"))
+                    .map_err(|err| Error::Internal(format!("can't open products.csv: {err}")))
+                    .unwrap(),
+                geo_rdr: File::open(args_clone.demo_data_path.join("geo.csv"))
+                    .map_err(|err| Error::Internal(format!("can't open geo.csv: {err}")))
+                    .unwrap(),
+                device_rdr: File::open(args_clone.demo_data_path.join("device.csv"))
+                    .map_err(|err| Error::Internal(format!("can't open device.csv: {err}")))
+                    .unwrap(),
+                new_daily_users: args_clone.new_daily_users,
+                batch_size: 4096,
+                partitions: args_clone.partitions.unwrap_or_else(num_cpus::get),
+            };
 
-    gen(&md, &db, store_cfg)?;
-    db.flush()?;
+            gen(md_clone, db_clone.clone(), store_cfg).unwrap();
+            db_clone.flush().unwrap();
+        });
 
-    info!("successfully generated!");
-    info!("starting future data generation...");
-    let store_cfg = Config {
-        org_id: 1,
-        project_id: proj_id,
-        from_date: to_date,
-        to_date: to_date + future_duration,
-        products_rdr: File::open(args.demo_data_path.join("products.csv"))
-            .map_err(|err| Error::Internal(format!("can't open products.csv: {err}")))?,
-        geo_rdr: File::open(args.demo_data_path.join("geo.csv"))
-            .map_err(|err| Error::Internal(format!("can't open geo.csv: {err}")))?,
-        device_rdr: File::open(args.demo_data_path.join("device.csv"))
-            .map_err(|err| Error::Internal(format!("can't open device.csv: {err}")))?,
-        new_daily_users: args.new_daily_users,
-        batch_size: 4096,
-        partitions: args.partitions.unwrap_or_else(num_cpus::get),
-    };
-    future_gen(md.clone(), db.clone(), store_cfg)?;
+        info!("successfully generated!");
+
+        info!("starting future data generation...");
+        let store_cfg = Config {
+            org_id: 1,
+            project_id: proj_id,
+            from_date: to_date,
+            to_date: to_date + future_duration,
+            products_rdr: File::open(args.demo_data_path.join("products.csv"))
+                .map_err(|err| Error::Internal(format!("can't open products.csv: {err}")))?,
+            geo_rdr: File::open(args.demo_data_path.join("geo.csv"))
+                .map_err(|err| Error::Internal(format!("can't open geo.csv: {err}")))?,
+            device_rdr: File::open(args.demo_data_path.join("device.csv"))
+                .map_err(|err| Error::Internal(format!("can't open device.csv: {err}")))?,
+            new_daily_users: args.new_daily_users,
+            batch_size: 4096,
+            partitions: args.partitions.unwrap_or_else(num_cpus::get),
+        };
+        future_gen(md.clone(), db.clone(), store_cfg)?;
+    }
 
     let mut router = Router::new();
     info!("initializing platform...");
@@ -352,13 +372,13 @@ pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
     Ok(graceful.await?)
 }
 
-pub fn gen<R>(md: &Arc<MetadataProvider>, db: &Arc<OptiDBImpl>, cfg: Config<R>) -> Result<()>
+pub fn gen<R>(md: Arc<MetadataProvider>, db: Arc<OptiDBImpl>, cfg: Config<R>) -> Result<()>
 where R: io::Read {
     let mut rng = thread_rng();
     info!("creating entities...");
 
     info!("creating properties...");
-    create_properties(cfg.org_id, cfg.project_id, md, db)?;
+    create_properties(cfg.org_id, cfg.project_id, &md, &db)?;
 
     info!("loading profiles...");
     let profiles = ProfileProvider::try_new_from_csv(
@@ -431,8 +451,11 @@ where R: io::Read {
 
     let mut idx = 0;
     while let Some(event) = tx.recv()? {
-        write_event(cfg.org_id, cfg.project_id, &db, md, event, idx)?;
+        write_event(cfg.org_id, cfg.project_id, &db, &md, event, idx)?;
         idx += 1;
+        if idx % 1000000 == 0 {
+            println!("{idx}");
+        }
     }
 
     Ok(())

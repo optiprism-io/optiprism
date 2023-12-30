@@ -52,6 +52,9 @@ use arrow2::io::parquet::write::to_parquet_schema;
 use arrow2::io::parquet::write::WriteOptions as ArrowWriteOptions;
 use arrow2::offset::OffsetsBuffer;
 use arrow2::types::NativeType;
+use metrics::gauge;
+use metrics::histogram;
+use num_traits::ToPrimitive;
 use parquet2::compression::CompressionOptions;
 use parquet2::encoding::Encoding;
 use parquet2::metadata::ColumnDescriptor;
@@ -689,6 +692,7 @@ pub struct Options {
     pub row_group_values_limit: usize,
     pub array_page_size: usize,
     pub out_part_id: usize,
+    pub merge_max_page_size: usize,
     pub max_part_size_bytes: Option<usize>,
 }
 
@@ -746,6 +750,7 @@ pub struct FileMergeOptions {
 #[derive(Debug, Clone)]
 pub struct MergedFile {
     pub size_bytes: u64,
+    pub values: usize,
     pub id: usize,
     pub min: Vec<ParquetValue>,
     pub max: Vec<ParquetValue>,
@@ -755,6 +760,8 @@ pub fn merge<R: Read + Seek>(
     mut readers: Vec<R>,
     to_path: PathBuf,
     out_part_id: usize,
+    tbl_name: &str,
+    level_id: usize,
     opts: Options,
 ) -> Result<Vec<MergedFile>> {
     // get arrow schemas of streams
@@ -770,7 +777,7 @@ pub fn merge<R: Read + Seek>(
     let page_streams = readers
         .into_iter()
         // todo make dynamic page size
-        .map(|r| CompressedPageIterator::try_new(r, 1024 * 1024))
+        .map(|r| CompressedPageIterator::try_new(r, opts.merge_max_page_size))
         .collect::<Result<Vec<_>>>()?;
     let streams_n = page_streams.len();
 
@@ -797,7 +804,7 @@ pub fn merge<R: Read + Seek>(
         max_part_file_size_bytes: opts.max_part_size_bytes,
     };
 
-    Ok(mr.merge()?)
+    Ok(mr.merge(tbl_name, level_id)?)
 }
 
 impl<R> Merger<R>
@@ -832,7 +839,7 @@ where R: Read + Seek
     }
 
     // Main merge loop
-    pub fn merge(&mut self) -> Result<Vec<MergedFile>> {
+    pub fn merge(&mut self, tbl_name: &str, level_id: usize) -> Result<Vec<MergedFile>> {
         // Init sorter with chunk per stream
         for stream_id in 0..self.page_streams.len() {
             if let Some(chunk) = self.next_stream_index_chunk(stream_id)? {
@@ -854,9 +861,9 @@ where R: Read + Seek
 
             let mut min: Vec<ParquetValue> = Vec::new();
             let mut max: Vec<ParquetValue> = Vec::new();
-
+            let mut num_values = 0;
+            let mut index_pages = 0;
             let mut first = true;
-            let mut end = true;
             let mut some = false;
             // Request merge of index column
             'l2: while let Some(chunks) = self.next_index_chunk()? {
@@ -867,12 +874,20 @@ where R: Read + Seek
                     min = chunks[0].0.min_values.clone();
                 }
                 max = chunks.last().unwrap().0.max_values.clone();
-
                 first = false;
                 for col_id in 0..self.index_cols.len() {
                     for chunk in chunks.iter() {
+                        if col_id == 0 {
+                            num_values += chunk.num_values();
+                            index_pages += 1;
+                        }
+
                         for page in chunk.0.cols[col_id].iter() {
                             // write index pages
+                            if let CompressedPage::Data(dp) = page {
+                                histogram!("store.merger.uncompressed_index_page_size_bytes","table"=>tbl_name.to_string(),"level"=>level_id.to_string()).record(dp.uncompressed_size().to_f64().unwrap());
+                                histogram!("store.merger.compressed_index_page_size_bytes","table"=>tbl_name.to_string(),"level"=>level_id.to_string()).record(dp.compressed_size().to_f64().unwrap());
+                            }
                             seq_writer.write_page(page)?;
                         }
                     }
@@ -926,13 +941,18 @@ where R: Read + Seek
                         };
 
                         // Write pages for column
-                        for page in pages {
+                        for page in &pages {
+                            if let CompressedPage::Data(dp) = page {
+                                histogram!("store.merger.uncompressed_data_page_size_bytes","table"=>tbl_name.to_string(),"level"=>level_id.to_string()).record(dp.uncompressed_size().to_f64().unwrap());
+                                histogram!("store.merger.compressed_data_page_size_bytes","table"=>tbl_name.to_string(),"level"=>level_id.to_string()).record(dp.compressed_size().to_f64().unwrap());
+                            }
                             seq_writer.write_page(&page)?;
                         }
                     }
 
                     seq_writer.end_column()?;
                 }
+                histogram!("store.merger.row_group_index_pages","table"=>tbl_name.to_string(),"level"=>level_id.to_string()).record(index_pages.to_f64().unwrap());
                 seq_writer.end_row_group()?;
 
                 if let Some(max_part_file_size) = self.max_part_file_size_bytes {
@@ -949,6 +969,7 @@ where R: Read + Seek
                             .metadata()
                             .unwrap()
                             .size(),
+                            values: num_values,
                             id: part_id,
                             min,
                             max,
@@ -968,6 +989,7 @@ where R: Read + Seek
                         .metadata()
                         .unwrap()
                         .size(),
+                    values: num_values,
                     id: part_id,
                     min,
                     max,

@@ -14,6 +14,7 @@ use datafusion::execution::context::SessionState;
 use datafusion::execution::runtime_env::RuntimeEnv;
 use datafusion::physical_plan::coalesce_batches::concat_batches;
 use datafusion::physical_plan::collect;
+use datafusion::physical_plan::display::DisplayableExecutionPlan;
 use datafusion::physical_plan::displayable;
 use datafusion::prelude::SessionConfig;
 use datafusion::prelude::SessionContext;
@@ -119,15 +120,17 @@ impl Provider for ProviderImpl {
 async fn execute_plan(plan: &LogicalPlan) -> Result<RecordBatch> {
     let start = Instant::now();
     let runtime = Arc::new(RuntimeEnv::default());
-    let state =
-        SessionState::with_config_rt(SessionConfig::new().with_target_partitions(1), runtime)
-            .with_query_planner(Arc::new(QueryPlanner {}))
-            .with_optimizer_rules(vec![]);
+    let state = SessionState::with_config_rt(
+        SessionConfig::new()
+            .with_collect_statistics(true)
+            .with_target_partitions(12),
+        runtime,
+    )
+    .with_query_planner(Arc::new(QueryPlanner {}));
     let exec_ctx = SessionContext::with_state(state.clone());
     debug!("logical plan: {:?}", plan);
     let physical_plan = state.create_physical_plan(plan).await?;
-    let displayable_plan = displayable(physical_plan.as_ref());
-
+    let displayable_plan = DisplayableExecutionPlan::with_full_metrics(physical_plan.as_ref());
     debug!("physical plan: {}", displayable_plan.indent(true));
     let batches = collect(physical_plan, exec_ctx.task_ctx()).await?;
     let duration = start.elapsed();

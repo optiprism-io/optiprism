@@ -27,6 +27,9 @@ use store::arrow_conversion::arrow2_to_arrow1;
 use store::db::OptiDBImpl;
 use store::db::ScanStream;
 use store::error::StoreError;
+use tracing::debug;
+use tracing::info;
+use tracing::trace;
 
 use crate::error::QueryError;
 use crate::error::Result;
@@ -136,6 +139,7 @@ impl ExecutionPlan for LocalExec {
         partition: usize,
         _cx: Arc<TaskContext>,
     ) -> datafusion_common::Result<SendableRecordBatchStream> {
+        debug!("pp {partition}");
         let stream = self
             .db
             .scan_partition(self.tbl_name.as_str(), partition, self.fields.clone())
@@ -235,7 +239,7 @@ mod tests {
 
         let runtime = Arc::new(RuntimeEnv::default());
         let state =
-            SessionState::with_config_rt(SessionConfig::new().with_target_partitions(1), runtime)
+            SessionState::with_config_rt(SessionConfig::new().with_target_partitions(12), runtime)
                 .with_query_planner(Arc::new(QueryPlanner {}))
                 .with_optimizer_rules(vec![]);
         let exec_ctx = SessionContext::with_state(state.clone());
