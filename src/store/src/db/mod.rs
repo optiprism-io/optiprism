@@ -69,6 +69,7 @@ use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 use crossbeam_skiplist::SkipSet;
 use futures::select;
+use futures::SinkExt;
 use futures::Stream;
 use lazy_static::lazy_static;
 use metrics::counter;
@@ -458,17 +459,20 @@ pub struct OptiDBImpl {
     path: PathBuf,
 }
 
-fn _log(op: LogOp, metadata: &mut Metadata, log: &mut File) -> Result<usize> {
+fn _log(op: LogOp, log: &mut File) -> Result<usize> {
     let data = serialize(&op)?;
 
+    let mut a = Vec::with_capacity(1024 * 10);
     let crc = hash_crc32(&data);
-    // !@#trace!("crc32: {}", crc);
-    log.write_all(&crc.to_le_bytes())?;
-    log.write_all(&(data.len() as u64).to_le_bytes())?;
-    log.write_all(&data)?;
+    let vv = crc.to_le_bytes();
+    a.push(vv.as_slice());
+    let vv = (data.len() as u64).to_le_bytes();
+    a.push(vv.as_slice());
+    a.push(&data);
+    log.write_all(a.concat().as_slice())?;
     let logged_size = 8 + 4 + data.len();
     // !@#trace!("logged size: {}", logged_size);
-
+    // log.flush()?;
     Ok(logged_size)
 }
 
@@ -490,7 +494,7 @@ fn recover_op(op: LogOp, memtable: &mut SkipSet<MemOp>, metadata: &mut Metadata)
 
 fn log_metadata(log: &mut File, metadata: &mut Metadata) -> Result<()> {
     // !@#trace!("log metadata");
-    _log(LogOp::Metadata(metadata.clone()), metadata, log)?;
+    _log(LogOp::Metadata(metadata.clone()), log)?;
     metadata.seq_id += 1;
 
     Ok(())
@@ -879,13 +883,9 @@ fn flush(
     memtable: &mut SkipSet<MemOp>,
     metadata: &mut Metadata,
     path: &PathBuf,
-) -> Result<()> {
+) -> Result<File> {
     let start_time = Instant::now();
     // in case when it is flushed by another thread
-    if memtable.len() == 0 {
-        return Ok(());
-    }
-    // !@#trace!("flushing log file");
     log.flush()?;
     log.sync_all()?;
     // swap memtable
@@ -938,7 +938,7 @@ fn flush(
 
     histogram!("store.flush_time_seconds").record(start_time.elapsed());
     counter!("store.flushes_total").increment(1);
-    Ok(())
+    Ok(log)
 }
 
 pub struct ScanStream {
@@ -1050,7 +1050,6 @@ impl OptiDBImpl {
         let mut log = tbl.log.lock();
         let logged = _log(
             LogOp::Insert(pk_values.clone(), final_values.clone()),
-            &mut metadata,
             log.get_mut(),
         )?;
         metadata.stats.logged_bytes += logged as u64;
@@ -1063,8 +1062,11 @@ impl OptiDBImpl {
             seq_id: metadata.seq_id,
         });
 
-        if metadata.stats.logged_bytes as usize > metadata.opts.max_log_length_bytes {
-            flush(log.get_mut(), &mut memtable, &mut metadata, &self.path)?;
+        if memtable.len() > 0
+            && metadata.stats.logged_bytes as usize > metadata.opts.max_log_length_bytes
+        {
+            let l = flush(log.get_mut(), &mut memtable, &mut metadata, &self.path)?;
+            *log = BufWriter::new(l);
 
             // if md.levels[0].parts.len() > 0 && md.levels[0].parts.len() > self.opts.l0_max_parts {
             //     self.compactor_outbox
@@ -1128,6 +1130,7 @@ impl OptiDBImpl {
         partition_id: usize,
         fields: Vec<String>,
     ) -> Result<ScanStream> {
+        println!("fff: {:?}", fields);
         let tables = self.tables.read();
         let tbl = tables.iter().find(|t| t.name == tbl_name);
         let mut tbl = match tbl {
@@ -1165,13 +1168,18 @@ impl OptiDBImpl {
             .find(|c| c.partition_id == partition.id)
             .map(|c| c.chunk.clone());
 
-        for (level_id, level) in partition.levels.into_iter().enumerate() {
-            for part in level.parts {
-                let path = part_path(&self.path, tbl_name, partition.id, level_id, part.id);
-                let rdr = BufReader::new(File::open(path)?);
-                rdrs.push(rdr);
-            }
-        }
+        let rdr = BufReader::new(File::open(
+            "/opt/homebrew/Caskroom/clickhouse/user_files/store/tables/events/0/4/3.parquet",
+        )?);
+        rdrs.push(rdr);
+
+        // for (level_id, level) in partition.levels.into_iter().enumerate() {
+        //     for part in level.parts {
+        //         let path = part_path(&self.path, tbl_name, partition.id, level_id, part.id);
+        //         let rdr = BufReader::new(File::open(path)?);
+        //         rdrs.push(rdr);
+        //     }
+        // }
         counter!("store.scan_parts_total", "table"=>tbl_name.to_string())
             .increment(rdrs.len() as u64);
         let iter = if rdrs.len() == 0 {
@@ -1324,6 +1332,7 @@ mod tests {
             merge_max_l1_part_size_bytes: 1024 * 1024,
             merge_part_size_multiplier: 10,
             merge_row_group_values_limit: 1000,
+            merge_max_page_size: 100,
             merge_chunk_size: 1024 * 8 * 8,
         };
 

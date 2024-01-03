@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::fmt::Formatter;
 use std::fs::File;
 use std::mem;
 use std::pin::Pin;
@@ -13,6 +14,8 @@ use arrow2::array::Array;
 use arrow2::chunk::Chunk;
 use datafusion::execution::TaskContext;
 use datafusion::physical_expr::PhysicalSortExpr;
+use datafusion::physical_plan::DisplayAs;
+use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::physical_plan::Partitioning;
 use datafusion::physical_plan::RecordBatchStream;
@@ -96,6 +99,12 @@ impl Stream for PartitionStream {
     }
 }
 
+impl DisplayAs for LocalExec {
+    fn fmt_as(&self, t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "LocalExec")
+    }
+}
+
 impl ExecutionPlan for LocalExec {
     fn as_any(&self) -> &dyn Any {
         self
@@ -153,8 +162,8 @@ impl ExecutionPlan for LocalExec {
         }))
     }
 
-    fn statistics(&self) -> Statistics {
-        Statistics::default()
+    fn statistics(&self) -> DFResult<Statistics> {
+        Ok(Statistics::new_unknown(self.schema.as_ref()))
     }
 }
 

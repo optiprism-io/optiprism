@@ -160,7 +160,7 @@ macro_rules! agg {
                             .clone()
                             .unwrap()
                             .evaluate(batch)?
-                            .into_array(batch.num_rows())
+                            .into_array(batch.num_rows())?
                             .as_any()
                             .downcast_ref::<BooleanArray>()
                             .unwrap()
@@ -176,7 +176,7 @@ macro_rules! agg {
                         .iter()
                         .map(|e| {
                             e.evaluate(batch)
-                                .and_then(|v| Ok(v.into_array(batch.num_rows()).clone()))
+                                .and_then(|v| Ok(v.into_array(batch.num_rows()).unwrap().clone()))
                         })
                         .collect::<result::Result<Vec<_>, _>>()?;
 
@@ -188,7 +188,7 @@ macro_rules! agg {
                 let predicate = self
                     .predicate
                     .evaluate(batch)?
-                    .into_array(batch.num_rows())
+                    .into_array(batch.num_rows())?
                     .as_any()
                     .downcast_ref::<$array_ty>()
                     .unwrap()
@@ -197,7 +197,7 @@ macro_rules! agg {
                 let partitions = self
                     .partition_col
                     .evaluate(batch)?
-                    .into_array(batch.num_rows())
+                    .into_array(batch.num_rows())?
                     .as_any()
                     .downcast_ref::<Int64Array>()
                     .unwrap()

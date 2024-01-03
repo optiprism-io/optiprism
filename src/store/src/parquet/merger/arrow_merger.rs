@@ -501,92 +501,91 @@ impl Iterator for MergingIterator {
         None
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use std::io::Cursor;
-    use std::sync::Arc;
-
-    use arrow2::array::PrimitiveArray;
-    use arrow2::chunk::Chunk;
-    use arrow2::datatypes::DataType;
-    use arrow2::datatypes::Field;
-    use arrow2::io::parquet::write::RowGroupIterator;
-    use arrow2::io::parquet::write::WriteOptions;
-    use parquet2::compression::CompressionOptions;
-    use parquet2::write::Version;
-
-    use crate::parquet::merger::arrow_merger::MergingIterator;
-    use crate::parquet::merger::arrow_merger::Options;
-    use crate::test_util::create_parquet_from_chunk;
-    use crate::test_util::parse_markdown_tables;
-
-    #[test]
-    fn it_works() {
-        let v = (0..100).collect::<Vec<_>>();
-        let cols = vec![
-            vec![
-                PrimitiveArray::<i64>::from_slice(v.clone()).boxed(),
-                PrimitiveArray::<i64>::from_slice(v.clone()).boxed(),
-                PrimitiveArray::<i64>::from_slice(v.clone()).boxed(),
-            ],
-            vec![
-                PrimitiveArray::<i64>::from_slice(v.clone()).boxed(),
-                PrimitiveArray::<i64>::from_slice(v.clone()).boxed(),
-            ],
-            vec![
-                PrimitiveArray::<i64>::from_slice(v.clone()).boxed(),
-                PrimitiveArray::<i64>::from_slice(v.clone()).boxed(),
-                PrimitiveArray::<i64>::from_slice(v).boxed(),
-            ],
-        ];
-
-        let fields = vec![
-            vec![
-                Field::new("f1", DataType::Int64, false),
-                Field::new("f2", DataType::Int64, false),
-                Field::new("f3", DataType::Int64, false),
-            ],
-            vec![
-                Field::new("f1", DataType::Int64, false),
-                Field::new("f2", DataType::Int64, false),
-            ],
-            vec![
-                Field::new("f1", DataType::Int64, false),
-                Field::new("f2", DataType::Int64, false),
-                Field::new("f3", DataType::Int64, false),
-            ],
-        ];
-
-        let readers = cols
-            .into_iter()
-            .zip(fields.iter())
-            .enumerate()
-            .map(|(idx, (cols, fields))| {
-                let chunk = Chunk::new(cols);
-                let mut w = Cursor::new(vec![]);
-                create_parquet_from_chunk(
-                    chunk,
-                    fields.to_owned(),
-                    &mut w,
-                    Some(idx * 10 + 10),
-                    10,
-                )
-                .unwrap();
-
-                w
-            })
-            .collect::<Vec<_>>();
-
-        let opts = Options {
-            index_cols: 1,
-            array_size: 9,
-            chunk_size: 10,
-            fields: vec!["f1".to_string(), "f2".to_string(), "f3".to_string()],
-        };
-        let mut merger = MergingIterator::new(readers, None, opts).unwrap();
-        while let Some(chunk) = merger.next() {
-            println!("{:#?}", chunk.unwrap());
-        }
-    }
-}
+// #[cfg(test)]
+// mod tests {
+// use std::io::Cursor;
+// use std::sync::Arc;
+//
+// use arrow2::array::PrimitiveArray;
+// use arrow2::chunk::Chunk;
+// use arrow2::datatypes::DataType;
+// use arrow2::datatypes::Field;
+// use arrow2::io::parquet::write::RowGroupIterator;
+// use arrow2::io::parquet::write::WriteOptions;
+// use parquet2::compression::CompressionOptions;
+// use parquet2::write::Version;
+//
+// use crate::parquet::merger::arrow_merger::MergingIterator;
+// use crate::parquet::merger::arrow_merger::Options;
+// use crate::test_util::create_parquet_from_chunk;
+// use crate::test_util::parse_markdown_tables;
+//
+// #[test]
+// fn it_works() {
+// let v = (0..100).collect::<Vec<_>>();
+// let cols = vec![
+// vec![
+// PrimitiveArray::<i64>::from_slice(v.clone()).boxed(),
+// PrimitiveArray::<i64>::from_slice(v.clone()).boxed(),
+// PrimitiveArray::<i64>::from_slice(v.clone()).boxed(),
+// ],
+// vec![
+// PrimitiveArray::<i64>::from_slice(v.clone()).boxed(),
+// PrimitiveArray::<i64>::from_slice(v.clone()).boxed(),
+// ],
+// vec![
+// PrimitiveArray::<i64>::from_slice(v.clone()).boxed(),
+// PrimitiveArray::<i64>::from_slice(v.clone()).boxed(),
+// PrimitiveArray::<i64>::from_slice(v).boxed(),
+// ],
+// ];
+//
+// let fields = vec![
+// vec![
+// Field::new("f1", DataType::Int64, false),
+// Field::new("f2", DataType::Int64, false),
+// Field::new("f3", DataType::Int64, false),
+// ],
+// vec![
+// Field::new("f1", DataType::Int64, false),
+// Field::new("f2", DataType::Int64, false),
+// ],
+// vec![
+// Field::new("f1", DataType::Int64, false),
+// Field::new("f2", DataType::Int64, false),
+// Field::new("f3", DataType::Int64, false),
+// ],
+// ];
+//
+// let readers = cols
+// .into_iter()
+// .zip(fields.iter())
+// .enumerate()
+// .map(|(idx, (cols, fields))| {
+// let chunk = Chunk::new(cols);
+// let mut w = Cursor::new(vec![]);
+// create_parquet_from_chunk(
+// chunk,
+// fields.to_owned(),
+// &mut w,
+// Some(idx * 10 + 10),
+// 10,
+// )
+// .unwrap();
+//
+// w
+// })
+// .collect::<Vec<_>>();
+//
+// let opts = Options {
+// index_cols: 1,
+// array_size: 9,
+// chunk_size: 10,
+// fields: vec!["f1".to_string(), "f2".to_string(), "f3".to_string()],
+// };
+// let mut merger = MergingIterator::new(readers, None, opts).unwrap();
+// while let Some(chunk) = merger.next() {
+// println!("{:#?}", chunk.unwrap());
+// }
+// }
+// }

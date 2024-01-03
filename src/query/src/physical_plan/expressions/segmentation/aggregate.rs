@@ -212,7 +212,7 @@ macro_rules! agg {
                 let ts = self
                     .ts_col
                     .evaluate(batch)?
-                    .into_array(batch.num_rows())
+                    .into_array(batch.num_rows())?
                     .as_any()
                     .downcast_ref::<TimestampMillisecondArray>()
                     .unwrap()
@@ -221,7 +221,7 @@ macro_rules! agg {
                 let filter = self
                     .filter
                     .evaluate(batch)?
-                    .into_array(batch.num_rows())
+                    .into_array(batch.num_rows())?
                     .as_any()
                     .downcast_ref::<BooleanArray>()
                     .unwrap()
@@ -230,7 +230,7 @@ macro_rules! agg {
                 let predicate = self
                     .predicate
                     .evaluate(batch)?
-                    .into_array(batch.num_rows())
+                    .into_array(batch.num_rows())?
                     .as_any()
                     .downcast_ref::<$array_ty>()
                     .unwrap()

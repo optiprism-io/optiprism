@@ -14,6 +14,7 @@ use common::query::PropertyRef;
 use datafusion_common::Column;
 use datafusion_expr::col;
 use datafusion_expr::expr;
+use datafusion_expr::expr::Alias;
 use datafusion_expr::expr::ScalarFunction;
 use datafusion_expr::expr_fn::and;
 use datafusion_expr::lit;
@@ -23,6 +24,7 @@ use datafusion_expr::ExprSchemable;
 use datafusion_expr::Extension;
 use datafusion_expr::Filter;
 use datafusion_expr::LogicalPlan;
+use datafusion_expr::ScalarFunctionDefinition;
 use datafusion_expr::Sort;
 use futures::executor;
 use metadata::dictionaries::provider_impl::SingleDictionaryProvider;
@@ -537,7 +539,7 @@ impl LogicalPlanBuilder {
 
         let ts_col = Expr::Column(Column::from_qualified_name(event_fields::CREATED_AT));
         let expr_fn = ScalarFunction {
-            fun: BuiltinScalarFunction::DateTrunc,
+            func_def: ScalarFunctionDefinition::BuiltIn(BuiltinScalarFunction::DateTrunc),
             args: vec![lit(self.es.interval_unit.as_str()), ts_col],
         };
         let time_expr = Expr::ScalarFunction(expr_fn);
@@ -546,10 +548,11 @@ impl LogicalPlanBuilder {
         // Box::new(lit(event.event.name())),
         // event_fields::EVENT.to_string(),
         // ));
-        group_expr.push(Expr::Alias(
-            Box::new(time_expr),
-            event_fields::CREATED_AT.to_string(),
-        ));
+        group_expr.push(Expr::Alias(Alias {
+            expr: Box::new(time_expr),
+            relation: None,
+            name: event_fields::CREATED_AT.to_string(),
+        }));
 
         // event groups
         if let Some(breakdowns) = &event.breakdowns {

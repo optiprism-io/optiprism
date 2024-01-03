@@ -1,8 +1,7 @@
 use std::mem;
 use std::sync::Arc;
 
-use arrow::ffi::ArrowArray;
-use arrow::ffi::ArrowArrayRef;
+use arrow::ffi::from_ffi;
 use arrow::ipc::RecordBatch;
 use arrow2::chunk::Chunk;
 use arrow2::datatypes::DataType;
@@ -25,8 +24,9 @@ pub fn arrow2_to_arrow1(
 
     let arr1_ffi = unsafe { mem::transmute(arr2_ffi) }; // todo get rid of transmute?
     let schema1_ffi = unsafe { mem::transmute(schema2_ffi) };
+    let data = from_ffi(arr1_ffi, &schema1_ffi)?;
 
-    let arr = make_array(ArrowArray::new(arr1_ffi, schema1_ffi).try_into()?);
+    let arr = make_array(data);
     let f = field2_to_field1(field);
     Ok((arr, f))
 }
@@ -111,7 +111,7 @@ fn field2_to_field1(field: Field) -> arrow_schema::Field {
 pub mod arrow2_to_arrow1 {
     use std::mem;
 
-    use arrow::ffi::ArrowArray;
+    use arrow::ffi::from_ffi;
     use arrow2::datatypes::Field;
     use arrow_array::make_array;
 
@@ -125,7 +125,8 @@ pub mod arrow2_to_arrow1 {
         let arr1_ffi = unsafe { mem::transmute(arr2_ffi) }; // todo get rid of transmute?
         let schema1_ffi = unsafe { mem::transmute(schema2_ffi) };
 
-        let arr = make_array(ArrowArray::new(arr1_ffi, schema1_ffi).try_into()?);
+        let data = from_ffi(arr1_ffi, &schema1_ffi)?;
+        let arr = make_array(data);
         Ok(arr)
     }
 }
@@ -133,7 +134,6 @@ pub mod arrow2_to_arrow1 {
 pub mod arrow1_to_arrow2 {
     use std::mem;
 
-    use arrow::ffi::ArrowArrayRef;
     use arrow2::array::Array;
     use arrow2::datatypes::DataType;
     use arrow2::datatypes::Field;

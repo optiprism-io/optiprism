@@ -2,6 +2,7 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Debug;
+use std::fmt::Formatter;
 use std::pin::Pin;
 // use std::sync::mpsc::Sender;
 use std::sync::Arc;
@@ -42,6 +43,7 @@ use datafusion::physical_plan::metrics::BaselineMetrics;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
 use datafusion::physical_plan::metrics::MetricsSet;
 use datafusion::physical_plan::AggregateExpr as DFAggregateExpr;
+use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::physical_plan::Partitioning;
@@ -54,6 +56,8 @@ use datafusion_common::ScalarValue;
 use futures::executor::block_on;
 use futures::Stream;
 use futures::StreamExt;
+use metrics::histogram;
+use tokio::time::Instant;
 
 use crate::error::QueryError;
 use crate::physical_plan::expressions::aggregate;
@@ -106,7 +110,7 @@ macro_rules! combine_results {
                     Ok(col_idx) => Ok(batch.column(col_idx).clone()),
                     Err(_) => {
                         let v = ScalarValue::try_from(field.data_type())?;
-                        Ok(v.to_array_of_size(batch.column(0).len()))
+                        Ok(v.to_array_of_size(batch.column(0).len())?)
                     }
                 },
             )
@@ -210,7 +214,7 @@ async fn collect_segment(
             Some(Ok(batch)) => {
                 let vals = partition_col
                     .evaluate(&batch)?
-                    .into_array(batch.num_rows())
+                    .into_array(batch.num_rows())?
                     .as_any()
                     .downcast_ref::<Int64Array>()
                     .unwrap()
@@ -261,6 +265,8 @@ impl Runner {
     }
 
     fn run(&mut self, tx: Sender<RecordBatch>) -> Result<()> {
+        let start_time = Instant::now();
+
         let segments_count = if let Some(streams) = &self.partitions {
             streams.len()
         } else {
@@ -299,7 +305,7 @@ impl Runner {
                     .finalize()
                     .map_err(QueryError::into_datafusion_execution_error)?;
                 let seg_col =
-                    ScalarValue::Int64(Some(segment as i64)).to_array_of_size(agg_cols[0].len());
+                    ScalarValue::Int64(Some(segment as i64)).to_array_of_size(agg_cols[0].len())?;
                 let cols = vec![vec![seg_col], agg_cols].concat();
                 let schema = self.agg_schemas[agg_idx].clone();
                 let schema = Arc::new(Schema::new(
@@ -319,7 +325,7 @@ impl Runner {
                             Ok(col_idx) => Ok(batch.column(col_idx).clone()),
                             Err(_) => {
                                 let v = ScalarValue::try_from(field.data_type())?;
-                                Ok(v.to_array_of_size(batch.column(0).len()))
+                                Ok(v.to_array_of_size(batch.column(0).len())?)
                             }
                         },
                     )
@@ -332,7 +338,10 @@ impl Runner {
         let batch = concat_batches(&self.schema, batches.iter().collect::<Vec<_>>())?;
 
         tx.send(batch)
-            .map_err(|err| QueryError::Internal(err.to_string()))
+            .map_err(|err| QueryError::Internal(err.to_string()))?;
+
+        histogram!("query.segmented_aggregate_run_seconds").record(start_time.elapsed());
+        Ok(())
     }
 }
 
@@ -340,6 +349,12 @@ fn run(runners: Vec<Runner>, tx: Sender<RecordBatch>) {
     for mut runner in runners.into_iter() {
         let tx = tx.clone();
         spawn(move || runner.run(tx).unwrap());
+    }
+}
+
+impl DisplayAs for SegmentedAggregateExec {
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "SegmentedAggregateExec")
     }
 }
 
@@ -661,12 +676,8 @@ impl ExecutionPlan for SegmentedAggregateExec {
         Some(self.metrics.clone_inner())
     }
 
-    fn fmt_as(&self, _t: DisplayFormatType, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "SegmentedAggregateExec")
-    }
-
-    fn statistics(&self) -> Statistics {
-        Statistics::default()
+    fn statistics(&self) -> DFResult<Statistics> {
+        Ok(Statistics::new_unknown(self.schema.as_ref()))
     }
 }
 

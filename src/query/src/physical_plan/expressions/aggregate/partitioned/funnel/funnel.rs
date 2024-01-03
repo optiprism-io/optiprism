@@ -422,7 +422,7 @@ impl PartitionedAggregateExpr for Funnel {
         let partitions = self
             .partition_col
             .evaluate(batch)?
-            .into_array(batch.num_rows())
+            .into_array(batch.num_rows())?
             .as_any()
             .downcast_ref::<Int64Array>()
             .unwrap()
@@ -432,7 +432,10 @@ impl PartitionedAggregateExpr for Funnel {
             let arrs = groups
                 .exprs
                 .iter()
-                .map(|e| e.evaluate(batch).map(|v| v.into_array(batch.num_rows())))
+                .map(|e| {
+                    e.evaluate(batch)
+                        .map(|v| v.into_array(batch.num_rows()).unwrap())
+                })
                 .collect::<result::Result<Vec<_>, _>>()?;
 
             Some(groups.row_converter.convert_columns(&arrs)?)
@@ -697,7 +700,7 @@ impl PartitionedAggregateExpr for Funnel {
                     .map(|arr| {
                         // make scalar value from group and stretch it to array size of buckets len
                         ScalarValue::try_from_array(arr.as_ref(), group_id)
-                            .map(|v| v.to_array_of_size(buckets.len()))
+                            .map(|v| v.to_array_of_size(buckets.len()).unwrap())
                     })
                     .collect::<Result<Vec<_>, _>>()?;
                 arrs = [garr, arrs].concat();
