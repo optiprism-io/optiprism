@@ -266,7 +266,6 @@ impl Runner {
 
     fn run(&mut self, tx: Sender<RecordBatch>) -> Result<()> {
         let start_time = Instant::now();
-
         let segments_count = if let Some(streams) = &self.partitions {
             streams.len()
         } else {
@@ -296,7 +295,6 @@ impl Runner {
                 }
             };
         }
-
         let mut batches: Vec<RecordBatch> = Vec::with_capacity(10); // todo why 10?
         for segment in 0..segments_count {
             for (agg_idx, aggrm) in self.agg_expr[segment].iter().enumerate() {
@@ -449,13 +447,15 @@ impl ExecutionPlan for SegmentedAggregateExec {
                     agg_expr: agg_expr.clone(),
                     baseline_metrics: BaselineMetrics::new(&self.metrics, partition),
                 };
+                println!("!@#1");
                 Runner::new(opts, partition, context.clone())
             })
             .collect::<DFResult<Vec<_>>>()?;
         let (tx, rx) = bounded(5); // todo why 5?
         // let (tx, rx) = mpsc::channel();
+        println!("!@#2");
         run(runners, tx);
-
+        println!("!@#3");
         let mut completed = partition_count;
         let mut batches: Vec<RecordBatch> = Vec::with_capacity(partition_count);
         while let batch = rx.recv().unwrap() {

@@ -311,7 +311,8 @@ impl Iterator for MemChunkIterator {
     type Item = Result<Chunk<Box<dyn Array>>>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.chunk.take().map(|v| Ok(v))
+        let chunk = self.chunk.take().map(|v| Ok(v));
+        chunk
     }
 }
 
@@ -493,12 +494,12 @@ impl Iterator for MergingIterator {
         } else {
             // queue contains only one chunk, so we can just push it to result
             let chunk = merge_queue.pop().unwrap();
+
             return Some(Ok(chunk.chunk));
         }
 
-        return self.merge_result_buffer.pop_front().map(|v| Ok(v));
-
-        None
+        let chunk = self.merge_result_buffer.pop_front().map(|v| Ok(v));
+        chunk
     }
 }
 // #[cfg(test)]

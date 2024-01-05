@@ -1130,7 +1130,6 @@ impl OptiDBImpl {
         partition_id: usize,
         fields: Vec<String>,
     ) -> Result<ScanStream> {
-        println!("fff: {:?}", fields);
         let tables = self.tables.read();
         let tbl = tables.iter().find(|t| t.name == tbl_name);
         let mut tbl = match tbl {
@@ -1163,23 +1162,21 @@ impl OptiDBImpl {
         histogram!("store.scan_memtable_seconds","table"=>tbl_name.to_string())
             .record(start_time.elapsed());
         let mut rdrs = vec![];
+        // todo remove?
         let mem_chunk = mem_chunks
             .iter()
             .find(|c| c.partition_id == partition.id)
             .map(|c| c.chunk.clone());
 
-        let rdr = BufReader::new(File::open(
-            "/opt/homebrew/Caskroom/clickhouse/user_files/store/tables/events/0/4/3.parquet",
-        )?);
-        rdrs.push(rdr);
-
-        // for (level_id, level) in partition.levels.into_iter().enumerate() {
-        //     for part in level.parts {
-        //         let path = part_path(&self.path, tbl_name, partition.id, level_id, part.id);
-        //         let rdr = BufReader::new(File::open(path)?);
-        //         rdrs.push(rdr);
-        //     }
-        // }
+        println!("dd3 {:?}", partition.levels);
+        for (level_id, level) in partition.levels.into_iter().enumerate() {
+            for part in level.parts {
+                let path = part_path(&self.path, tbl_name, partition.id, level_id, part.id);
+                println!("%%@# path: {:?}", path);
+                let rdr = BufReader::new(File::open(path)?);
+                rdrs.push(rdr);
+            }
+        }
         counter!("store.scan_parts_total", "table"=>tbl_name.to_string())
             .increment(rdrs.len() as u64);
         let iter = if rdrs.len() == 0 {
@@ -1192,7 +1189,8 @@ impl OptiDBImpl {
                 chunk_size: metadata.opts.merge_chunk_size,
                 fields: fields.clone(),
             };
-            Box::new(MergingIterator::new(rdrs, mem_chunk, opts)?)
+            // todo fix
+            Box::new(MergingIterator::new(rdrs, None, opts)?)
                 as Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>
         };
 
@@ -1309,7 +1307,7 @@ mod tests {
 
     #[traced_test]
     #[test]
-    fn it_works() {
+    fn gen() {
         // let path = temp_dir().join("db");
         let path = PathBuf::from("/opt/homebrew/Caskroom/clickhouse/user_files");
         fs::remove_dir_all(&path).unwrap();

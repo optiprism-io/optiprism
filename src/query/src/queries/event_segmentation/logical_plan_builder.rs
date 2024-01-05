@@ -24,6 +24,7 @@ use datafusion_expr::ExprSchemable;
 use datafusion_expr::Extension;
 use datafusion_expr::Filter;
 use datafusion_expr::LogicalPlan;
+use datafusion_expr::Projection;
 use datafusion_expr::ScalarFunctionDefinition;
 use datafusion_expr::Sort;
 use futures::executor;
@@ -471,6 +472,9 @@ impl LogicalPlanBuilder {
                 })
             };
         }
+
+        // let exprx = input.expressions();
+        // let input = LogicalPlan::Projection(Projection::try_new(exprx, Arc::new(input))?);
         Ok(input)
     }
 

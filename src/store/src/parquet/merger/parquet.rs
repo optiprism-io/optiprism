@@ -381,7 +381,6 @@ impl ArrowIteratorImpl {
         let schema = io::parquet::read::infer_schema(&metadata)?;
         let schema = schema.filter(|_, f| fields.contains(&f.name));
         println!("{:?}", schema);
-        panic!("!!");
         let frdr = io::parquet::read::FileReader::new(
             rdr,
             metadata.row_groups,
@@ -403,21 +402,10 @@ impl Iterator for ArrowIteratorImpl {
     type Item = Result<Chunk<Box<dyn Array>>>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let a = self.rdr.next();
-        println!("{:?}", a);
-        match a {
+        match self.rdr.next() {
             None => None,
             Some(Ok(chunk)) => Some(Ok(chunk)),
             Some(Err(err)) => Some(Err(err.into())),
         }
-        // let chunk = self.rdr.next().unwrap();
-        //
-        // while let Some(_) = self.rdr.next() {}
-        // return Some(Ok(chunk.unwrap()));
-        // match self.rdr.next() {
-        // None => None,
-        // Some(Ok(chunk)) => Some(Ok(chunk)),
-        // Some(Err(err)) => Some(Err(err.into())),
-        // }
     }
 }

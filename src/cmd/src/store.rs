@@ -134,15 +134,12 @@ pub struct Config<R> {
     pub partitions: usize,
 }
 
-fn init_platform(
-    md: &Arc<MetadataProvider>,
-    db: &Arc<OptiDBImpl>,
-    router: Router,
-) -> Result<Router> {
+fn init_platform(md: Arc<MetadataProvider>, db: Arc<OptiDBImpl>, router: Router) -> Result<Router> {
     let data_provider: Arc<dyn TableProvider> =
         Arc::new(LocalTable::try_new(db.clone(), "events".to_string())?);
     let query_provider = Arc::new(ProviderImpl::try_new_from_provider(
         md.clone(),
+        db.clone(),
         data_provider,
     )?);
 
@@ -351,7 +348,7 @@ pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
 
     let mut router = Router::new();
     info!("initializing platform...");
-    let router = init_platform(&md, &db, router)?;
+    let router = init_platform(md.clone(), db.clone(), router)?;
     info!("initializing ingester...");
     let router = init_ingester(args, &md, &db, router)?;
 

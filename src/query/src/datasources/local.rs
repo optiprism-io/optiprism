@@ -1,6 +1,8 @@
 use std::any::Any;
 use std::sync::Arc;
 
+use arrow::datatypes::Fields;
+use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
 use async_trait::async_trait;
 use datafusion::datasource::TableProvider;
@@ -32,7 +34,8 @@ impl TableProvider for LocalTable {
     }
 
     fn schema(&self) -> SchemaRef {
-        Arc::new(self.db.schema1(self.tbl_name.as_str()).unwrap())
+        let s = self.db.schema1(self.tbl_name.as_str()).unwrap();
+        Arc::new(s)
     }
 
     fn table_type(&self) -> TableType {
@@ -75,6 +78,7 @@ impl TableProvider for LocalTable {
                     })
                     .collect::<Vec<_>>();
 
+                println!("pppr {:?}", fields);
                 (schema, fields)
             }
         };

@@ -11,6 +11,7 @@ opt-level = 3
 [dependencies]
 rand = "0.8.4"
 anyhow = "1.0.66"
+fail = "0.5.1"
 shuffle = "0.1.7"
 arrow = { version = "49.0.0", features = ["ffi"] }
 arrow-array = "49.0.0"

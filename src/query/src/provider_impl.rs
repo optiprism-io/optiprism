@@ -7,7 +7,15 @@ use arrow::record_batch::RecordBatch;
 use arrow::util::pretty::print_batches;
 use async_trait::async_trait;
 use chrono::Utc;
+use common::query::event_segmentation::Breakdown;
 use common::query::event_segmentation::EventSegmentation;
+use common::query::event_segmentation::Query;
+use common::query::EventFilter;
+use common::query::PropertyRef;
+use common::types::COLUMN_CREATED_AT;
+use common::types::COLUMN_EVENT;
+use common::types::COLUMN_PROJECT_ID;
+use common::types::COLUMN_USER_ID;
 use datafusion::datasource::DefaultTableSource;
 use datafusion::datasource::TableProvider;
 use datafusion::execution::context::SessionState;
@@ -20,6 +28,7 @@ use datafusion::prelude::SessionConfig;
 use datafusion::prelude::SessionContext;
 use datafusion_expr::LogicalPlan;
 use metadata::MetadataProvider;
+use store::db::OptiDBImpl;
 use tracing::debug;
 
 use crate::physical_plan::planner::planner::QueryPlanner;
@@ -36,32 +45,43 @@ use crate::Result;
 
 pub struct ProviderImpl {
     metadata: Arc<MetadataProvider>,
-    input: LogicalPlan,
+    db: Arc<OptiDBImpl>,
+    table_source: Arc<DefaultTableSource>,
 }
 
 impl ProviderImpl {
     pub fn try_new_from_provider(
         metadata: Arc<MetadataProvider>,
+        db: Arc<OptiDBImpl>,
         table_provider: Arc<dyn TableProvider>,
     ) -> Result<Self> {
         let table_source = Arc::new(DefaultTableSource::new(table_provider));
-        let input =
-            datafusion_expr::LogicalPlanBuilder::scan("table", table_source, None)?.build()?;
-        Ok(Self { metadata, input })
+        Ok(Self {
+            metadata,
+            db,
+            table_source,
+        })
     }
 
-    pub fn new_from_logical_plan(metadata: Arc<MetadataProvider>, input: LogicalPlan) -> Self {
-        Self { metadata, input }
-    }
+    //    pub fn new_from_logical_plan(metadata: Arc<MetadataProvider>, input: LogicalPlan) -> Self {
+    // Self { metadata, input }
+    // }
 }
 
 #[async_trait]
 impl Provider for ProviderImpl {
     async fn property_values(&self, ctx: Context, req: PropertyValues) -> Result<ArrayRef> {
+        let input = datafusion_expr::LogicalPlanBuilder::scan(
+            "table",
+            self.table_source.clone(),
+            Some(vec![1, 2, 3, 4, 5]),
+        )?
+        .build()?;
+
         let plan = property_values::LogicalPlanBuilder::build(
             ctx,
             self.metadata.clone(),
-            self.input.clone(),
+            input,
             req.clone(),
         )
         .await?;
@@ -75,10 +95,28 @@ impl Provider for ProviderImpl {
 
     async fn event_segmentation(&self, ctx: Context, es: EventSegmentation) -> Result<DataTable> {
         let cur_time = Utc::now();
+        let schema = self.db.schema1("events")?;
+        let fields = es_fields(&ctx, &es, self.metadata.clone())?;
+
+        let projection = fields
+            .iter()
+            .enumerate()
+            .map(|(idx, field)| {
+                let idx = schema.index_of(field)?;
+                Ok(idx)
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        let input = datafusion_expr::LogicalPlanBuilder::scan(
+            "table",
+            self.table_source.clone(),
+            Some(projection),
+        )?
+        .build()?;
         let plan = event_segmentation::logical_plan_builder::LogicalPlanBuilder::build(
             ctx,
             self.metadata.clone(),
-            self.input.clone(),
+            input,
             es.clone(),
         )?;
 
@@ -126,7 +164,8 @@ async fn execute_plan(plan: &LogicalPlan) -> Result<RecordBatch> {
             .with_target_partitions(12),
         runtime,
     )
-    .with_query_planner(Arc::new(QueryPlanner {}));
+    .with_query_planner(Arc::new(QueryPlanner {}))
+    .with_optimizer_rules(vec![]);
     let exec_ctx = SessionContext::with_state(state.clone());
     debug!("logical plan: {:?}", plan);
     let physical_plan = state.create_physical_plan(plan).await?;
@@ -139,4 +178,95 @@ async fn execute_plan(plan: &LogicalPlan) -> Result<RecordBatch> {
     let rows_count = batches.iter().fold(0, |acc, x| acc + x.num_rows());
     let res = concat_batches(&schema, &batches, rows_count)?;
     Ok(res)
+}
+
+fn col_name(ctx: &Context, prop: &PropertyRef, md: &Arc<MetadataProvider>) -> Result<String> {
+    let name = match prop {
+        PropertyRef::System(v) => md
+            .system_properties
+            .get_by_name(ctx.organization_id, ctx.project_id, v)?
+            .column_name(),
+        PropertyRef::User(v) => md
+            .user_properties
+            .get_by_name(ctx.organization_id, ctx.project_id, v)?
+            .column_name(),
+        PropertyRef::Event(v) => md
+            .event_properties
+            .get_by_name(ctx.organization_id, ctx.project_id, v)?
+            .column_name(),
+        _ => unimplemented!(),
+    };
+
+    Ok(name)
+}
+fn es_fields(
+    ctx: &Context,
+    req: &EventSegmentation,
+    md: Arc<MetadataProvider>,
+) -> Result<Vec<String>> {
+    let mut fields = Vec::new();
+    fields.push(COLUMN_PROJECT_ID.to_string());
+    fields.push(COLUMN_USER_ID.to_string());
+    fields.push(COLUMN_CREATED_AT.to_string());
+    fields.push(COLUMN_EVENT.to_string());
+
+    for event in &req.events {
+        if let Some(filters) = &event.filters {
+            for filter in filters {
+                match filter {
+                    EventFilter::Property { property, .. } => {
+                        fields.push(col_name(ctx, &property, &md)?)
+                    }
+                }
+            }
+        }
+
+        for query in &event.queries {
+            match &query.agg {
+                Query::CountEvents => {}
+                Query::CountUniqueGroups => {}
+                Query::DailyActiveGroups => {}
+                Query::WeeklyActiveGroups => {}
+                Query::MonthlyActiveGroups => {}
+                Query::CountPerGroup { .. } => {}
+                Query::AggregatePropertyPerGroup { property, .. } => {
+                    fields.push(col_name(ctx, property, &md)?)
+                }
+                Query::AggregateProperty { property, .. } => {
+                    fields.push(col_name(ctx, property, &md)?)
+                }
+                Query::QueryFormula { .. } => {}
+            }
+        }
+
+        if let Some(breakdowns) = &event.breakdowns {
+            for breakdown in breakdowns {
+                match breakdown {
+                    Breakdown::Property(property) => fields.push(col_name(ctx, property, &md)?),
+                }
+            }
+        }
+    }
+
+    if let Some(filters) = &req.filters {
+        for filter in filters {
+            match filter {
+                EventFilter::Property { property, .. } => {
+                    fields.push(col_name(ctx, &property, &md)?)
+                }
+            }
+        }
+    }
+
+    if let Some(breakdowns) = &req.breakdowns {
+        for breakdown in breakdowns {
+            match breakdown {
+                Breakdown::Property(property) => fields.push(col_name(ctx, property, &md)?),
+            }
+        }
+    }
+
+    fields.dedup();
+
+    Ok(fields)
 }

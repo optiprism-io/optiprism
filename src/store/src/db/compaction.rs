@@ -323,7 +323,10 @@ fn compact(
                 ));
                 let rdrs = tomerge
                     .iter()
-                    .map(|p| File::open(p))
+                    .map(|p| {
+                        println!("%%# {p:?}");
+                        File::open(p)
+                    })
                     .collect::<std::result::Result<Vec<File>, std::io::Error>>()
                     .unwrap();
                 let max_part_size_bytes = opts.merge_max_l1_part_size_bytes

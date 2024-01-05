@@ -435,6 +435,7 @@ pub async fn gen(args: &Test, proj_id: u64) -> Result<(), anyhow::Error> {
 
     let query_provider = Arc::new(ProviderImpl::try_new_from_provider(
         md.clone(),
+        db.clone(),
         data_provider,
     )?);
 
