@@ -24,6 +24,7 @@ use arrow2::io::parquet::read::schema::convert::to_primitive_type;
 use arrow2::io::parquet::read::ParquetError;
 use arrow2::io::parquet::write::array_to_columns;
 use arrow2::io::parquet::write::WriteOptions;
+use metrics::histogram;
 use ordered_float::OrderedFloat;
 use parquet2::compression::CompressionOptions;
 use parquet2::encoding::Encoding;

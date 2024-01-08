@@ -221,7 +221,7 @@ mod tests {
             merge_chunk_size: 1024 * 8 * 8,
         };
         let mut db = OptiDBImpl::open(path, Options {}).unwrap();
-        db.create_table("events", opts).unwrap();
+        db.create_table("events".to_string(), opts).unwrap();
         db.add_field("events", "a", DType::Int64, false).unwrap();
         db.add_field("events", "b", DType::Int64, false).unwrap();
         db.add_field("events", "c", DType::Int64, false).unwrap();

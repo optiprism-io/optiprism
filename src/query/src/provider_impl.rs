@@ -71,10 +71,20 @@ impl ProviderImpl {
 #[async_trait]
 impl Provider for ProviderImpl {
     async fn property_values(&self, ctx: Context, req: PropertyValues) -> Result<ArrayRef> {
+        let fields = prop_val_fields(&ctx, &req, self.metadata.clone())?;
+        let schema = self.db.schema1("events")?;
+        let projection = fields
+            .iter()
+            .enumerate()
+            .map(|(idx, field)| {
+                let idx = schema.index_of(field)?;
+                Ok(idx)
+            })
+            .collect::<Result<Vec<_>>>()?;
         let input = datafusion_expr::LogicalPlanBuilder::scan(
             "table",
             self.table_source.clone(),
-            Some(vec![1, 2, 3, 4, 5]),
+            Some(projection),
         )?
         .build()?;
 
@@ -198,6 +208,21 @@ fn col_name(ctx: &Context, prop: &PropertyRef, md: &Arc<MetadataProvider>) -> Re
     };
 
     Ok(name)
+}
+
+fn prop_val_fields(
+    ctx: &Context,
+    req: &PropertyValues,
+    md: Arc<MetadataProvider>,
+) -> Result<Vec<String>> {
+    let mut fields = Vec::new();
+    fields.push(COLUMN_PROJECT_ID.to_string());
+    fields.push(COLUMN_USER_ID.to_string());
+    fields.push(COLUMN_CREATED_AT.to_string());
+    fields.push(COLUMN_EVENT.to_string());
+    fields.push(col_name(ctx, &req.property, &md)?);
+
+    Ok(fields)
 }
 fn es_fields(
     ctx: &Context,

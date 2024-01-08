@@ -143,7 +143,6 @@ impl DFExtensionPlanner for ExtensionPlanner {
                 })
                 .collect::<Result<Vec<_>>>()
                 .map_err(|err| DataFusionError::Plan(err.to_string()))?;
-            println!("@@@ {:?}", physical_inputs[0]);
             let exec = SegmentedAggregateExec::try_new(
                 physical_inputs[0].clone(),
                 partition_inputs,

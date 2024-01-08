@@ -49,7 +49,6 @@ impl TableProvider for LocalTable {
         _filters: &[Expr],
         _limit: Option<usize>,
     ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
-        println!("pppr {:?}", projection);
         let (schema, fields) = match projection {
             None => {
                 let schema = self.schema().clone();
@@ -78,7 +77,6 @@ impl TableProvider for LocalTable {
                     })
                     .collect::<Vec<_>>();
 
-                println!("pppr {:?}", fields);
                 (schema, fields)
             }
         };

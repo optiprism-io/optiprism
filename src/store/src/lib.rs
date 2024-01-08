@@ -1,5 +1,6 @@
 #![feature(slice_take)]
 #![feature(let_chains)]
+#![feature(allocator_api)]
 
 extern crate core;
 
@@ -16,6 +17,7 @@ use arrow2::datatypes::DataType;
 use chrono::DateTime;
 use chrono::Utc;
 use error::Result;
+use get_size::GetSize;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -23,7 +25,7 @@ use crate::error::StoreError;
 use crate::parquet::merger;
 use crate::Value::Int16;
 
-#[derive(Eq, PartialEq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize, Hash)]
+#[derive(Eq, PartialEq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize, Hash, GetSize)]
 pub enum KeyValue {
     Int8(i8),
     Int16(i16),
@@ -57,8 +59,9 @@ impl NamedValue {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash, GetSize)]
 pub enum Value {
+    Null,
     Int8(Option<i8>),
     Int16(Option<i16>),
     Int32(Option<i32>),

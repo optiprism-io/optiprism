@@ -350,7 +350,7 @@ pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
     info!("initializing platform...");
     let router = init_platform(md.clone(), db.clone(), router)?;
     info!("initializing ingester...");
-    let router = init_ingester(args, &md, &db, router)?;
+    // let router = init_ingester(args, &md, &db, router)?;
 
     let server =
         Server::bind(&args.host).serve(router.into_make_service_with_connect_info::<SocketAddr>());

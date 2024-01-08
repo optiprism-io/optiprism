@@ -3,6 +3,7 @@ use std::time::Duration as STDDuration;
 
 use ::store::db::OptiDBImpl;
 use ::store::db::TableOptions;
+use ::store::error::StoreError;
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::rbac::Role;
@@ -105,8 +106,8 @@ pub fn init_system(
         index_cols: 2,
         l1_max_size_bytes: 1024 * 1024 * 10,
         level_size_multiplier: 10,
-        l0_max_parts: 2,
-        max_log_length_bytes: 1024 * 1024 * 10,
+        l0_max_parts: 4,
+        max_log_length_bytes: 1024 * 1024 * 100,
         merge_array_page_size: 100000,
         merge_data_page_size_limit_bytes: Some(1024 * 1024 * 1000),
         merge_index_cols: 2,
@@ -116,7 +117,13 @@ pub fn init_system(
         merge_chunk_size: 1024 * 8 * 8,
         merge_max_page_size: 1024 * 1024 * 10,
     };
-    db.create_table("events", topts)?;
+    match db.create_table("events".to_string(), topts) {
+        Ok(_) => {}
+        Err(err) => match err {
+            StoreError::AlreadyExists(_) => {}
+            other => return Err(other.into()),
+        },
+    }
 
     create_property(md, 0, 0, CreatePropertyMainRequest {
         name: COLUMN_PROJECT_ID.to_string(),

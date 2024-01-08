@@ -50,6 +50,10 @@ use arrow2::array::MutablePrimitiveArray;
 use arrow2::array::MutableUtf8Array;
 use arrow2::array::PrimitiveArray;
 use arrow2::chunk::Chunk;
+use arrow2::compute::merge_sort::SortOptions;
+use arrow2::compute::sort::lexsort_to_indices;
+use arrow2::compute::sort::SortColumn;
+use arrow2::compute::take;
 use arrow2::datatypes::DataType;
 use arrow2::datatypes::Field;
 use arrow2::datatypes::Schema;
@@ -71,7 +75,9 @@ use crossbeam_skiplist::SkipSet;
 use futures::select;
 use futures::SinkExt;
 use futures::Stream;
+use get_size::GetSize;
 use lazy_static::lazy_static;
+use log::info;
 use metrics::counter;
 use metrics::describe_counter;
 use metrics::describe_histogram;
@@ -128,8 +134,9 @@ fn collect_metrics(tables: Arc<RwLock<Vec<Table>>>) {
             drop(md_mx);
 
             let mem_mx = t.memtable.lock();
+            let sz = mem_mx.partitions.iter().map(|v| v.len()).sum::<usize>();
             histogram!("store.memtable_rows","table"=>t.name.to_string())
-                .record(mem_mx.len().to_f64().unwrap());
+                .record(sz.to_f64().unwrap());
             drop(mem_mx);
 
             gauge!("store.table_fields", "table"=>t.name.to_string())
@@ -161,6 +168,7 @@ macro_rules! memory_col_to_arrow {
             .into_iter()
             .map(|v| match v {
                 Value::$dt(b) => b,
+                Value::Null => None,
                 _ => unreachable!(),
             })
             .collect::<Vec<_>>();
@@ -227,9 +235,198 @@ pub struct Partition {
 }
 
 #[derive(Debug, Clone)]
+struct MemtableColumn {
+    values: Vec<Value>,
+    dt: DType,
+}
+
+impl MemtableColumn {
+    fn new_null(len: usize, dt: DType) -> Self {
+        Self {
+            values: vec![Value::Null; len],
+            dt,
+        }
+    }
+
+    fn clone(&self) -> Self {
+        Self {
+            values: self.values.clone(),
+            dt: self.dt.clone(),
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.values.len()
+    }
+
+    fn to_array(self) -> Box<dyn Array> {
+        match self.dt.try_into().unwrap() {
+            DataType::Boolean => {
+                memory_col_to_arrow!(self.values, Boolean, MutableBooleanArray)
+            }
+            DataType::Int8 => memory_col_to_arrow!(self.values, Int8, MutablePrimitiveArray),
+            DataType::Int16 => memory_col_to_arrow!(self.values, Int16, MutablePrimitiveArray),
+            DataType::Int32 => memory_col_to_arrow!(self.values, Int32, MutablePrimitiveArray),
+            DataType::Int64 => memory_col_to_arrow!(self.values, Int64, MutablePrimitiveArray),
+            DataType::Timestamp(_, _) => {
+                let vals = self
+                    .values
+                    .into_iter()
+                    .map(|v| match v {
+                        Value::Timestamp(b) => b,
+                        Value::Null => None,
+                        _ => unreachable!("{:?}", v),
+                    })
+                    .collect::<Vec<_>>();
+                MutablePrimitiveArray::<i64>::from(vals)
+                    .to(DataType::Timestamp(TimeUnit::Nanosecond, None))
+                    .as_box()
+            }
+            DataType::Utf8 => {
+                let vals = self
+                    .values
+                    .into_iter()
+                    .map(|v| match v {
+                        Value::String(b) => b,
+                        Value::Null => None,
+                        _ => unreachable!("{:?}", v),
+                    })
+                    .collect::<Vec<_>>();
+                MutableUtf8Array::<i32>::from(vals).as_box()
+            }
+            DataType::Decimal(_, _) => {
+                let vals = self
+                    .values
+                    .into_iter()
+                    .map(|v| match v {
+                        Value::Decimal(b) => b,
+                        Value::Null => None,
+                        _ => unreachable!("{:?}", v),
+                    })
+                    .collect::<Vec<_>>();
+                MutablePrimitiveArray::<i128>::from(vals)
+                    .to(DataType::Decimal(
+                        DECIMAL_PRECISION as usize,
+                        DECIMAL_SCALE as usize,
+                    ))
+                    .as_box()
+            }
+            DataType::List(_) => unimplemented!(),
+            _ => unimplemented!(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct MemtablePartition {
+    cols: Vec<MemtableColumn>,
+}
+
+impl MemtablePartition {
+    fn new() -> Self {
+        MemtablePartition { cols: vec![] }
+    }
+    fn len(&self) -> usize {
+        if self.cols.len() == 0 {
+            return 0;
+        }
+        self.cols[0].len()
+    }
+
+    fn chunk(
+        &self,
+        cols: Option<Vec<usize>>,
+        index_cols: usize,
+    ) -> Result<Option<Chunk<Box<dyn Array>>>> {
+        if self.len() == 0 {
+            return Ok(None);
+        }
+
+        let arrs = match cols {
+            None => self
+                .cols
+                .iter()
+                .map(|c| c.clone().to_array())
+                .collect::<Vec<_>>(),
+            Some(cols) => self
+                .cols
+                .iter()
+                .enumerate()
+                .filter(|(idx, _)| cols.contains(idx))
+                .map(|(_, c)| c.clone().to_array())
+                .collect::<Vec<_>>(),
+        };
+
+        let sort_cols = (0..index_cols)
+            .into_iter()
+            .map(|v| SortColumn {
+                values: arrs[v].as_ref(),
+                options: Some(SortOptions {
+                    descending: true,
+                    nulls_first: false,
+                }),
+            })
+            .collect::<Vec<_>>();
+
+        let indices = lexsort_to_indices::<i32>(&sort_cols, None)?;
+
+        let arrs = arrs
+            .iter()
+            .map(|arr| take::take(arr.as_ref(), &indices))
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+
+        let chunk = Chunk::new(arrs);
+        Ok(Some(chunk))
+    }
+
+    fn push_value(&mut self, col: usize, val: Value) {
+        self.cols[col].values.push(val);
+    }
+
+    fn add_column(&mut self, dt: DType) {
+        self.cols.push(MemtableColumn::new_null(self.len(), dt));
+    }
+}
+#[derive(Debug, Clone)]
+struct Memtable {
+    partitions: Vec<MemtablePartition>,
+}
+
+impl Memtable {
+    fn new(partitions: usize) -> Self {
+        Self {
+            partitions: vec![MemtablePartition::new(); partitions],
+        }
+    }
+    fn cols_len(&self) -> usize {
+        self.partitions[0].cols.len()
+    }
+
+    fn add_column(&mut self, dt: DType) {
+        for partition in &mut self.partitions {
+            partition.add_column(dt.clone());
+        }
+    }
+    fn create_empty(&self) -> Self {
+        let partitions = self
+            .partitions
+            .iter()
+            .map(|p| MemtablePartition {
+                cols: p
+                    .cols
+                    .iter()
+                    .map(|c| MemtableColumn::new_null(0, c.dt.clone()))
+                    .collect::<Vec<_>>(),
+            })
+            .collect::<Vec<_>>();
+        Memtable { partitions }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Table {
     name: String,
-    memtable: Arc<Mutex<SkipSet<MemOp>>>,
+    memtable: Arc<Mutex<Memtable>>,
     metadata: Arc<Mutex<Metadata>>,
     vfs: Arc<Vfs>,
     log: Arc<Mutex<BufWriter<File>>>,
@@ -257,6 +454,7 @@ pub enum Op {
 pub enum LogOp {
     Insert(Vec<KeyValue>, Vec<Value>),
     Metadata(Metadata),
+    AddField(Field),
 }
 
 #[derive(Debug)]
@@ -459,7 +657,7 @@ pub struct OptiDBImpl {
     path: PathBuf,
 }
 
-fn _log(op: LogOp, log: &mut File) -> Result<usize> {
+fn log_op(op: LogOp, log: &mut File) -> Result<usize> {
     let data = serialize(&op)?;
 
     let mut a = Vec::with_capacity(1024 * 10);
@@ -476,15 +674,24 @@ fn _log(op: LogOp, log: &mut File) -> Result<usize> {
     Ok(logged_size)
 }
 
-fn recover_op(op: LogOp, memtable: &mut SkipSet<MemOp>, metadata: &mut Metadata) -> Result<()> {
+fn recover_op(op: LogOp, memtable: &mut Memtable, metadata: &mut Metadata) -> Result<()> {
     match op {
         LogOp::Insert(k, v) => {
-            memtable.insert(MemOp {
-                op: Op::Insert(k, v),
-                seq_id: metadata.seq_id,
-            });
+            let phash = siphash(&k);
+            let pid = phash as usize % metadata.opts.partitions;
+            let kv: Vec<Value> = k.iter().map(|k| k.into()).collect::<Vec<_>>();
+            let vv = [kv, v].concat();
+            for (idx, val) in vv.into_iter().enumerate() {
+                memtable.partitions[pid].push_value(idx, val);
+            }
         }
-        LogOp::Metadata(md) => *metadata = md,
+        LogOp::AddField(f) => {
+            metadata.schema.fields.push(f.clone());
+            memtable.add_column(f.data_type.try_into()?);
+        }
+        LogOp::Metadata(md) => {
+            *metadata = md;
+        }
     }
 
     metadata.seq_id += 1;
@@ -494,13 +701,13 @@ fn recover_op(op: LogOp, memtable: &mut SkipSet<MemOp>, metadata: &mut Metadata)
 
 fn log_metadata(log: &mut File, metadata: &mut Metadata) -> Result<()> {
     // !@#trace!("log metadata");
-    _log(LogOp::Metadata(metadata.clone()), log)?;
+    log_op(LogOp::Metadata(metadata.clone()), log)?;
     metadata.seq_id += 1;
 
     Ok(())
 }
 
-fn try_recover_table(path: PathBuf, name: String, opts: Option<TableOptions>) -> Result<Table> {
+fn try_recover_table(path: PathBuf, name: String) -> Result<Table> {
     let start_time = Instant::now();
     // !@#trace!("starting recovery");
     let dir = fs::read_dir(path.clone())?;
@@ -518,103 +725,91 @@ fn try_recover_table(path: PathBuf, name: String, opts: Option<TableOptions>) ->
         };
     }
 
-    // !@#trace!("found {} logs", logs.len());
-
-    let opts = opts.unwrap_or(TableOptions {
-        partitions: 0,
-        index_cols: 0,
-        levels: 0,
-        l0_max_parts: 0,
-        l1_max_size_bytes: 0,
-        level_size_multiplier: 0,
-        max_log_length_bytes: 0,
-        merge_max_l1_part_size_bytes: 0,
-        merge_part_size_multiplier: 0,
-        merge_index_cols: 0,
-        merge_data_page_size_limit_bytes: None,
-        merge_row_group_values_limit: 0,
-        merge_array_size: 0,
-        merge_chunk_size: 0,
-        merge_array_page_size: 0,
-        merge_max_page_size: 1024 * 1024,
-    });
-
-    for pid in 0..opts.partitions {
-        for lid in 0..opts.levels {
-            fs::create_dir_all(path.join(pid.to_string()).join(lid.to_string()))?;
-        }
+    if logs.len() == 0 {
+        return Err(StoreError::Internal("no logs found".to_string()));
     }
 
-    let mut metadata = Metadata {
-        version: 0,
-        seq_id: 0,
-        log_id: 0,
-        table_name: name.clone(),
-        schema: Schema::from(vec![]),
-        stats: Default::default(),
-        partitions: (0..opts.partitions)
-            .into_iter()
-            .map(|pid| Partition {
-                id: pid,
-                levels: vec![Level::new_empty(); opts.levels],
-            })
-            .collect::<Vec<_>>(),
-        opts,
-    };
+    // !@#trace!("found {} logs", logs.len());
 
-    let mut memtable = SkipSet::new();
-    let log = if let Some(log_path) = logs.pop() {
-        // !@#trace!("last log: {:?}", log_path);
-        // todo make a buffered read. Currently something odd happens with reading of the length of the record
-        let mut f = File::open(&log_path)?;
+    let log_path = logs.pop().unwrap();
+    // !@#trace!("last log: {:?}", log_path);
+    // todo make a buffered read. Currently something odd happens with reading the length of the record
+    let mut log = File::open(&log_path)?;
 
-        let mut ops = 0;
-        let mut read_bytes = 0;
+    let mut ops = 0;
+    let mut read_bytes = 0;
+    // get metadata (first record of the log)
 
-        loop {
-            let mut crc_b = [0u8; mem::size_of::<u32>()];
-            read_bytes = f.read(&mut crc_b)?;
-            if read_bytes == 0 {
-                break;
-            }
-            let crc32 = u32::from_le_bytes(crc_b);
-            // !@#trace!("crc32: {}", crc32);
+    let mut crc_b = [0u8; mem::size_of::<u32>()];
+    read_bytes = log.read(&mut crc_b)?;
+    if read_bytes == 0 {
+        return Err(StoreError::Internal("empty log file".to_string()));
+    }
+    let crc32 = u32::from_le_bytes(crc_b);
+    // !@#trace!("crc32: {}", crc32);
 
-            let mut len_b = [0u8; mem::size_of::<u64>()];
-            f.read(&mut len_b)?;
-            let len = u64::from_le_bytes(len_b);
-            // !@#trace!("len: {}", len);
-            let mut data_b = vec![0u8; len as usize];
-            f.read(&mut data_b)?;
-            // todo recover from this case
-            let cur_crc32 = hash_crc32(&data_b);
-            if crc32 != cur_crc32 {
-                return Err(StoreError::Internal(format!(
-                    "corrupted log. crc32 is: {}, need: {}",
-                    cur_crc32, crc32
-                )));
-            }
-            let op = deserialize::<LogOp>(&data_b)?;
-            recover_op(op, &mut memtable, &mut metadata)?;
-
-            metadata.seq_id += 1;
-            ops += 1;
+    let mut len_b = [0u8; mem::size_of::<u64>()];
+    log.read(&mut len_b)?;
+    let len = u64::from_le_bytes(len_b);
+    // !@#trace!("len: {}", len);
+    let mut data_b = vec![0u8; len as usize];
+    log.read(&mut data_b)?;
+    // todo recover from this case
+    let cur_crc32 = hash_crc32(&data_b);
+    if crc32 != cur_crc32 {
+        return Err(StoreError::Internal(format!(
+            "corrupted log. crc32 is: {}, need: {}",
+            cur_crc32, crc32
+        )));
+    }
+    let op = deserialize::<LogOp>(&data_b)?;
+    let mut metadata = match op {
+        LogOp::Metadata(md) => md,
+        _ => {
+            return Err(StoreError::Internal(
+                "first record in log must be metadata".to_string(),
+            ));
         }
-        // !@#trace!("operations recovered: {}", ops);
-        drop(f);
-
-        OpenOptions::new().append(true).open(log_path)?
-    } else {
-        // !@#trace!("creating initial log {}", format!("{:016}.log", 0));
-
-        OpenOptions::new()
-            .create_new(true)
-            .write(true)
-            .read(true)
-            .open(path.join(format!("{:016}.log", 0)))?
     };
 
-    metadata.stats.logged_bytes = log.metadata().unwrap().len();
+    let mut memtable = Memtable::new(metadata.opts.partitions);
+
+    for f in &metadata.schema.fields {
+        memtable.add_column(f.data_type.clone().try_into()?);
+    }
+    loop {
+        let mut crc_b = [0u8; mem::size_of::<u32>()];
+        read_bytes = log.read(&mut crc_b)?;
+        if read_bytes == 0 {
+            break;
+        }
+        let crc32 = u32::from_le_bytes(crc_b);
+        // !@#trace!("crc32: {}", crc32);
+
+        let mut len_b = [0u8; mem::size_of::<u64>()];
+        log.read(&mut len_b)?;
+        let len = u64::from_le_bytes(len_b);
+        // !@#trace!("len: {}", len);
+        let mut data_b = vec![0u8; len as usize];
+        log.read(&mut data_b)?;
+        // todo recover from this case
+        let cur_crc32 = hash_crc32(&data_b);
+        if crc32 != cur_crc32 {
+            return Err(StoreError::Internal(format!(
+                "corrupted log. crc32 is: {}, need: {}",
+                cur_crc32, crc32
+            )));
+        }
+        let op = deserialize::<LogOp>(&data_b)?;
+
+        recover_op(op, &mut memtable, &mut metadata)?;
+
+        metadata.seq_id += 1;
+        ops += 1;
+    }
+    // !@#trace!("operations recovered: {}", ops);
+
+    metadata.stats.logged_bytes = log_path.metadata().unwrap().len();
 
     let log = BufWriter::new(log);
     // if trigger_compact {
@@ -640,10 +835,8 @@ fn recover(path: PathBuf, opts: Options) -> Result<OptiDBImpl> {
         tables.push(try_recover_table(
             f.path(),
             f.file_name().to_os_string().into_string().unwrap(),
-            None,
         )?);
     }
-
     // let trigger_compact = if metadata.partitions[0].parts.len() > 0
     // && metadata.partitions[0].parts.len() > opts.l0_max_parts
     // {
@@ -668,165 +861,41 @@ fn recover(path: PathBuf, opts: Options) -> Result<OptiDBImpl> {
         path,
     })
 }
-
-#[derive(Debug)]
-struct MemtablePartitionChunk {
-    partition_id: usize,
-    chunk: Chunk<Box<dyn Array>>,
-}
-
-#[derive(Debug)]
-struct MemtablePartition {
-    id: usize,
-    cols: Vec<Vec<Value>>,
-}
-
-impl MemtablePartition {
-    pub fn new(id: usize, fields: usize) -> Self {
-        Self {
-            id,
-            cols: vec![Vec::new(); fields],
-        }
-    }
-}
-
-fn memtable_to_partitioned_chunks(
-    metadata: &Metadata,
-    memtable: &SkipSet<MemOp>,
-    partition_id: Option<usize>,
-    fields: Option<Vec<String>>,
-) -> Result<Vec<MemtablePartitionChunk>> {
-    let start_time = Instant::now();
-    let mut partitions: Vec<MemtablePartition> = vec![];
-
-    for op in memtable.iter() {
-        let (keys, vals) = match &op.op {
-            Op::Insert(k, v) => (k, Some(v)),
-            Op::Delete(k) => (k, None),
-        };
-        let phash = siphash(
-            &keys[0..metadata.opts.index_cols]
-                .into_iter()
-                .collect::<Vec<_>>(),
-        );
-        if let Some(pid) = partition_id {
-            if pid != phash as usize % metadata.opts.partitions {
-                continue;
-            }
-        }
-
-        let mut pid: isize = -1;
-        for (pidx, p) in partitions.iter().enumerate() {
-            if p.id == phash as usize % metadata.opts.partitions {
-                pid = pidx as isize;
-                break;
-            }
-        }
-
-        if pid < 0 {
-            partitions.push(MemtablePartition::new(
-                phash as usize % metadata.opts.partitions,
-                metadata.schema.fields.len(),
-            ));
-            pid = partitions.len() as isize - 1;
-        }
-        let pid = pid as usize;
-        let idx_offset = keys.len();
-        for (idx, key) in keys.into_iter().enumerate() {
-            partitions[pid].cols[idx].push(key.into());
-        }
-        if let Some(v) = vals {
-            for (idx, val) in v.into_iter().enumerate() {
-                partitions[pid].cols[idx_offset + idx].push(val.clone());
-            }
-
-            for i in 0..metadata.schema.fields.len() - (metadata.opts.index_cols + v.len()) {
-                partitions[pid].cols[idx_offset + v.len() + i].push(Value::null(
-                    &metadata.schema.fields[idx_offset + v.len() + i].data_type,
-                ));
-            }
-        }
-    }
-    let v = partitions
-        .into_iter()
-        .map(|p| {
-            let arrs = p
-                .cols
-                .into_iter()
-                .enumerate()
-                .map(|(idx, col)| match metadata.schema.fields[idx].data_type {
-                    DataType::Boolean => {
-                        memory_col_to_arrow!(col, Boolean, MutableBooleanArray)
-                    }
-                    DataType::Int8 => memory_col_to_arrow!(col, Int8, MutablePrimitiveArray),
-                    DataType::Int16 => memory_col_to_arrow!(col, Int16, MutablePrimitiveArray),
-                    DataType::Int32 => memory_col_to_arrow!(col, Int32, MutablePrimitiveArray),
-                    DataType::Int64 => memory_col_to_arrow!(col, Int64, MutablePrimitiveArray),
-                    DataType::Timestamp(_, _) => {
-                        let vals = col
-                            .into_iter()
-                            .map(|v| match v {
-                                Value::Timestamp(b) => b,
-                                _ => unreachable!("{:?}", v),
-                            })
-                            .collect::<Vec<_>>();
-                        MutablePrimitiveArray::<i64>::from(vals)
-                            .to(DataType::Timestamp(TimeUnit::Nanosecond, None))
-                            .as_box()
-                    }
-                    DataType::Utf8 => {
-                        let vals = col
-                            .into_iter()
-                            .map(|v| match v {
-                                Value::String(b) => b,
-                                _ => unreachable!("{:?}", v),
-                            })
-                            .collect::<Vec<_>>();
-                        MutableUtf8Array::<i32>::from(vals).as_box()
-                    }
-                    DataType::Decimal(_, _) => {
-                        let vals = col
-                            .into_iter()
-                            .map(|v| match v {
-                                Value::Decimal(b) => b,
-                                _ => unreachable!("{:?}", v),
-                            })
-                            .collect::<Vec<_>>();
-                        MutablePrimitiveArray::<i128>::from(vals)
-                            .to(DataType::Decimal(
-                                DECIMAL_PRECISION as usize,
-                                DECIMAL_SCALE as usize,
-                            ))
-                            .as_box()
-                    }
-                    DataType::List(_) => unimplemented!(),
-                    _ => unimplemented!(),
-                })
-                .collect::<Vec<_>>();
-            (p.id, Chunk::new(arrs))
-        })
-        .collect::<Vec<_>>();
-
-    let chunks = v
-        .into_iter()
-        .map(|(pid, chunk)| MemtablePartitionChunk {
-            partition_id: pid,
-            chunk,
-        })
-        .collect::<Vec<_>>();
-
-    Ok(chunks)
-}
+// #[derive(Debug)]
+// struct MemtablePartitionChunk {
+// partition_id: usize,
+// chunk: Chunk<Box<dyn Array>>,
+// }
+//
+// #[derive(Debug)]
+// struct MemtablePartition {
+// id: usize,
+// cols: Vec<Vec<Value>>,
+// }
+//
+// impl MemtablePartition {
+// pub fn new(id: usize, fields: usize) -> Self {
+// Self {
+// id,
+// cols: vec![Vec::new(); fields],
+// }
+// }
+// }
 
 fn write_level0(
     metadata: &Metadata,
-    memtable: &SkipSet<MemOp>,
+    memtable: &Memtable,
     path: PathBuf,
 ) -> Result<Vec<(usize, Part)>> {
     let mut ret = vec![];
-    let partitioned_chunks = memtable_to_partitioned_chunks(metadata, memtable, None, None)?;
-    for chunk in partitioned_chunks.into_iter() {
-        let (min, max) = chunk_min_max(&chunk.chunk, metadata.opts.index_cols);
+    for (pid, partition) in memtable.partitions.iter().enumerate() {
+        let maybe_chunk = partition.chunk(None, metadata.opts.index_cols)?;
+        if maybe_chunk.is_none() {
+            continue;
+        }
+        let chunk = maybe_chunk.unwrap();
+
+        let (min, max) = chunk_min_max(&chunk, metadata.opts.index_cols);
 
         let popts = parquet::write::WriteOptions {
             write_statistics: true,
@@ -836,7 +905,7 @@ fn write_level0(
             data_pagesize_limit: None,
         };
 
-        let chunk_len = chunk.chunk.len();
+        let chunk_len = chunk.len();
         let encodings = metadata
             .schema
             .fields
@@ -844,7 +913,7 @@ fn write_level0(
             .map(|f| transverse(&f.data_type, |_| parquet::write::Encoding::Plain))
             .collect();
         let row_groups = parquet::write::RowGroupIterator::try_new(
-            vec![Ok(chunk.chunk)].into_iter(),
+            vec![Ok(chunk)].into_iter(),
             &metadata.schema,
             popts,
             encodings,
@@ -853,9 +922,9 @@ fn write_level0(
         let path = part_path(
             &path,
             metadata.table_name.as_str(),
-            chunk.partition_id,
+            pid,
             0,
-            metadata.partitions[chunk.partition_id].levels[0].part_id,
+            metadata.partitions[pid].levels[0].part_id,
         );
         // !@#trace!("creating part file {:?}", p);
         let w = OpenOptions::new().create_new(true).write(true).open(path)?;
@@ -866,8 +935,8 @@ fn write_level0(
             writer.write(group?)?;
         }
         let sz = writer.end(None)?;
-        ret.push((chunk.partition_id, Part {
-            id: metadata.partitions[chunk.partition_id].levels[0].part_id,
+        ret.push((pid, Part {
+            id: metadata.partitions[pid].levels[0].part_id,
             size_bytes: sz,
             values: chunk_len,
             min,
@@ -880,7 +949,7 @@ fn write_level0(
 
 fn flush(
     log: &mut File,
-    memtable: &mut SkipSet<MemOp>,
+    memtable: &mut Memtable,
     metadata: &mut Metadata,
     path: &PathBuf,
 ) -> Result<File> {
@@ -894,7 +963,8 @@ fn flush(
     // write to parquet
     // !@#trace!("writing to parquet");
     // !@#trace!("part id: {}", md.levels[0].part_id);
-    let memtable = mem::take(memtable);
+    let empty_memtable = memtable.create_empty();
+    let memtable = mem::replace(memtable, empty_memtable);
     let parts = write_level0(&metadata, &memtable, path.to_owned())?;
 
     for (pid, part) in parts {
@@ -1045,10 +1115,10 @@ impl OptiDBImpl {
                 continue;
             }
 
-            final_values.push(Value::null(field.data_type()));
+            final_values.push(Value::Null);
         }
         let mut log = tbl.log.lock();
-        let logged = _log(
+        let logged = log_op(
             LogOp::Insert(pk_values.clone(), final_values.clone()),
             log.get_mut(),
         )?;
@@ -1057,14 +1127,16 @@ impl OptiDBImpl {
 
         let mut memtable = tbl.memtable.lock();
 
-        memtable.insert(MemOp {
-            op: Op::Insert(pk_values, final_values),
-            seq_id: metadata.seq_id,
-        });
+        let phash = siphash(&pk_values);
+        let pid = phash as usize % metadata.opts.partitions;
+        for (idx, val) in pk_values.iter().enumerate() {
+            memtable.partitions[pid].push_value(idx, val.into());
+        }
+        for (idx, val) in final_values.into_iter().enumerate() {
+            memtable.partitions[pid].push_value(idx + metadata.opts.index_cols, val);
+        }
 
-        if memtable.len() > 0
-            && metadata.stats.logged_bytes as usize > metadata.opts.max_log_length_bytes
-        {
+        if metadata.stats.logged_bytes as usize > metadata.opts.max_log_length_bytes {
             let l = flush(log.get_mut(), &mut memtable, &mut metadata, &self.path)?;
             *log = BufWriter::new(l);
 
@@ -1150,25 +1222,24 @@ impl OptiDBImpl {
             .unwrap()
             .to_owned();
         let start_time = Instant::now();
-        debug!("ppp");
         let memtable = tbl.memtable.lock();
-        let mem_chunks = memtable_to_partitioned_chunks(
-            &metadata,
-            &memtable,
-            Some(partition_id),
-            Some(fields.clone()),
-        )?;
+
+        let mut fields_idx = vec![];
+        for (idx, f) in metadata.schema.fields.iter().enumerate() {
+            for ff in &fields {
+                if &f.name == ff {
+                    fields_idx.push(idx);
+                }
+            }
+        }
+        let maybe_chunk =
+            memtable.partitions[partition_id].chunk(Some(fields_idx), metadata.opts.index_cols)?;
         drop(memtable);
         histogram!("store.scan_memtable_seconds","table"=>tbl_name.to_string())
             .record(start_time.elapsed());
         let mut rdrs = vec![];
         // todo remove?
-        let mem_chunk = mem_chunks
-            .iter()
-            .find(|c| c.partition_id == partition.id)
-            .map(|c| c.chunk.clone());
 
-        println!("dd3 {:?}", partition.levels);
         for (level_id, level) in partition.levels.into_iter().enumerate() {
             for part in level.parts {
                 let path = part_path(&self.path, tbl_name, partition.id, level_id, part.id);
@@ -1180,7 +1251,7 @@ impl OptiDBImpl {
         counter!("store.scan_parts_total", "table"=>tbl_name.to_string())
             .increment(rdrs.len() as u64);
         let iter = if rdrs.len() == 0 {
-            Box::new(MemChunkIterator::new(mem_chunk))
+            Box::new(MemChunkIterator::new(maybe_chunk))
                 as Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>
         } else {
             let opts = arrow_merger::Options {
@@ -1190,7 +1261,7 @@ impl OptiDBImpl {
                 fields: fields.clone(),
             };
             // todo fix
-            Box::new(MergingIterator::new(rdrs, None, opts)?)
+            Box::new(MergingIterator::new(rdrs, maybe_chunk, opts)?)
                 as Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>
         };
 
@@ -1219,20 +1290,73 @@ impl OptiDBImpl {
             }
         }
 
-        let field = Field::new(field_name.to_string(), dt.try_into()?, is_nullable);
-        metadata.schema.fields.push(field);
+        let field = Field::new(field_name.to_string(), dt.clone().try_into()?, is_nullable);
+        metadata.schema.fields.push(field.clone());
         let mut log = tbl.log.lock();
-        log_metadata(log.get_mut(), &mut metadata)?;
+        log_op(LogOp::AddField(field.clone()), log.get_mut())?;
+
+        let mut memtable = tbl.memtable.lock();
+        if memtable.cols_len() < metadata.schema.fields.len() {
+            let new_cols = metadata.schema.fields.len() - memtable.cols_len();
+            drop(metadata);
+            for _ in 0..new_cols {
+                memtable.add_column(DType::try_from(field.data_type.clone())?);
+            }
+        }
         Ok(())
     }
 
-    pub fn create_table(&self, tbl_name: &str, opts: TableOptions) -> Result<()> {
-        let path = self.path.join("tables").join(tbl_name);
+    pub fn create_table(&self, table_name: String, opts: TableOptions) -> Result<()> {
+        let tbl = self.tables.read();
+        if tbl.iter().find(|t| t.name == table_name).is_some() {
+            return Err(StoreError::AlreadyExists(format!(
+                "Table with name {} already exists",
+                table_name
+            )));
+        }
+        drop(tbl);
+        let path = self.path.join("tables").join(table_name.clone());
         fs::create_dir_all(&path)?;
-        let new_tbl = try_recover_table(path, tbl_name.to_string(), Some(opts))?;
-        let mut tables = self.tables.write();
-        tables.push(new_tbl);
+        for pid in 0..opts.partitions {
+            for lid in 0..opts.levels {
+                fs::create_dir_all(path.join(pid.to_string()).join(lid.to_string()))?;
+            }
+        }
 
+        let mut metadata = Metadata {
+            version: 0,
+            seq_id: 0,
+            log_id: 0,
+            table_name: table_name.clone(),
+            schema: Schema::from(vec![]),
+            stats: Default::default(),
+            partitions: (0..opts.partitions)
+                .into_iter()
+                .map(|pid| Partition {
+                    id: pid,
+                    levels: vec![Level::new_empty(); opts.levels],
+                })
+                .collect::<Vec<_>>(),
+            opts: opts.clone(),
+        };
+
+        let memtable = Memtable::new(opts.partitions.clone());
+        let mut log = OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .read(true)
+            .open(path.join(format!("{:016}.log", 0)))?;
+        log_metadata(&mut log, &mut metadata)?;
+        let tbl = Table {
+            name: table_name.clone(),
+            memtable: Arc::new(Mutex::new(memtable)),
+            metadata: Arc::new(Mutex::new(metadata)),
+            vfs: Arc::new(Vfs::new()),
+            log: Arc::new(Mutex::new(BufWriter::new(log))),
+        };
+
+        let mut tables = self.tables.write();
+        tables.push(tbl);
         Ok(())
     }
 
@@ -1248,17 +1372,16 @@ impl OptiDBImpl {
 impl Drop for OptiDBImpl {
     fn drop(&mut self) {
         let (tx, rx) = mpsc::channel();
-
         if self
             .compactor_outbox
             .send(CompactorMessage::Stop(tx))
             .is_err()
         {
-            error!("failed to shut down compaction worker on database drop");
+            println!("[ERROR] failed to shut down compaction worker on store drop");
             return;
         }
-
         for _ in rx {}
+        println!("[INFO] store successfully stopped");
     }
 }
 
@@ -1276,10 +1399,12 @@ mod tests {
     use arrow2::datatypes::DataType;
     use arrow2::datatypes::Field;
     use arrow2::datatypes::Schema;
+    use bincode::serialize;
     use common::types::DType;
     use futures::executor::block_on;
     use futures::Stream;
     use futures::StreamExt;
+    use get_size::GetSize;
     use rand::rngs::mock::StepRng;
     use rand::thread_rng;
     use rand::Rng;
@@ -1353,7 +1478,7 @@ mod tests {
         // };
 
         let cols = 4;
-        db.create_table("t1", topts).unwrap();
+        db.create_table("t1".to_string(), topts).unwrap();
         for col in 0..cols {
             db.add_field("t1", col.to_string().as_str(), DType::Int64, false)
                 .unwrap();
@@ -1411,7 +1536,7 @@ mod tests {
             max_log_length_bytes: 1024 * 1024 * 100,
             merge_array_page_size: 10000,
             merge_data_page_size_limit_bytes: Some(1024 * 1024),
-            merge_index_cols: 2,
+            merge_index_cols: 1,
             merge_max_l1_part_size_bytes: 1024 * 1024,
             merge_part_size_multiplier: 10,
             merge_row_group_values_limit: 1000,
@@ -1419,21 +1544,20 @@ mod tests {
             merge_max_page_size: 1024 * 1024,
         };
 
-        db.create_table("t1", topts).unwrap();
-        db.add_field("t1", "k1", DType::Int64, false).unwrap();
-        db.add_field("t1", "v1", DType::Int64, false).unwrap();
+        db.create_table("t1".to_string(), topts).unwrap();
+        db.add_field("t1", "f1", DType::Int64, false).unwrap();
 
         db.insert("t1", vec![NamedValue::new(
-            "v1".to_string(),
+            "f1".to_string(),
             Value::Int64(Some(1)),
         )])
         .unwrap();
 
-        db.add_field("t1", "v2", DType::Int64, false).unwrap();
+        db.add_field("t1", "f2", DType::Int64, false).unwrap();
 
         db.insert("t1", vec![
-            NamedValue::new("k1".to_string(), Value::Int64(Some(1))),
-            NamedValue::new("v1".to_string(), Value::Int64(Some(1))),
+            NamedValue::new("f1".to_string(), Value::Int64(Some(2))),
+            NamedValue::new("f2".to_string(), Value::Int64(Some(2))),
         ])
         .unwrap();
 
