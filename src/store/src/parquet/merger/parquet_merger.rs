@@ -847,12 +847,14 @@ where R: Read + Seek
                 self.sorter.push(chunk);
             }
         }
+
         // initialize parquet writer
         let write_opts = WriteOptions {
             write_statistics: true,
             version: Version::V2,
         };
         let mut merged_files: Vec<MergedFile> = Vec::new();
+
         'l1: for part_id in self.id_from.. {
             let w = File::create(&self.to_path.join(format!("{}.parquet", part_id)))?;
             let w = BufWriter::new(w);

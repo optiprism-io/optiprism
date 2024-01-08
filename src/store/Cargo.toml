@@ -9,6 +9,7 @@ authors = ["Optiprism <dev@optiprism.io>"]
 opt-level = 3
 
 [dependencies]
+vfs =  { version = "0.10.0", features = ["embedded-fs"] }
 bumpalo = { version = "3", features = ["allocator_api", "collections"] }
 get-size = { version = "^0.1", features = ["derive"] }
 rand = "0.8.4"
