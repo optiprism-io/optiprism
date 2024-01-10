@@ -4,7 +4,7 @@ use std::sync::Arc;
 use common::types::DType;
 use store::db::OptiDBImpl;
 use store::db::Options;
-use store::db::TableOptions;
+use store::table::Options as TableOptions;
 use uuid::Uuid;
 
 use crate::events;

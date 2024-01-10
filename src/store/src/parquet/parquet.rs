@@ -45,8 +45,8 @@ use parquet2::write::Version;
 
 use crate::error::Result;
 use crate::error::StoreError;
-use crate::parquet::merger::arrow_merger::MemChunkIterator;
-use crate::parquet::merger::IndexChunk;
+use crate::parquet::arrow_merger::MemChunkIterator;
+use crate::parquet::IndexChunk;
 
 #[derive(Eq, PartialEq, PartialOrd, Ord, Debug, Clone)]
 pub enum ParquetValue {

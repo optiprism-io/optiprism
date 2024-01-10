@@ -358,7 +358,7 @@ pub mod test_util {
     use metadata::MetadataProvider;
     use store::db::OptiDBImpl;
     use store::db::Options;
-    use store::db::TableOptions;
+    use store::table::Options as TableOptions;
     use uuid::Uuid;
 
     use crate::error::Result;

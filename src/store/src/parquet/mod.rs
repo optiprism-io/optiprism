@@ -64,11 +64,11 @@ use crate::merge_list_arrays;
 use crate::merge_list_arrays_inner;
 use crate::merge_list_primitive_arrays;
 use crate::merge_primitive_arrays;
-use crate::parquet::merger::parquet::array_to_pages_simple;
-use crate::parquet::merger::parquet::data_page_to_array;
-use crate::parquet::merger::parquet::ColumnPath;
-use crate::parquet::merger::parquet::CompressedPageIterator;
-use crate::parquet::merger::parquet::ParquetValue;
+use crate::parquet::parquet::array_to_pages_simple;
+use crate::parquet::parquet::data_page_to_array;
+use crate::parquet::parquet::ColumnPath;
+use crate::parquet::parquet::CompressedPageIterator;
+use crate::parquet::parquet::ParquetValue;
 use crate::KeyValue;
 use crate::Value;
 
@@ -236,7 +236,7 @@ where
 
 pub struct ThreeColMergeRow<A, B, C>(usize, A, B, C);
 
-impl<A, B, C> Ord for crate::parquet::merger::ThreeColMergeRow<A, B, C>
+impl<A, B, C> Ord for crate::parquet::ThreeColMergeRow<A, B, C>
 where
     A: Ord,
     B: Ord,
@@ -249,7 +249,7 @@ where
     }
 }
 
-impl<A, B, C> PartialOrd for crate::parquet::merger::ThreeColMergeRow<A, B, C>
+impl<A, B, C> PartialOrd for crate::parquet::ThreeColMergeRow<A, B, C>
 where
     A: Ord,
     B: Ord,
@@ -260,7 +260,7 @@ where
     }
 }
 
-impl<A, B, C> PartialEq for crate::parquet::merger::ThreeColMergeRow<A, B, C>
+impl<A, B, C> PartialEq for crate::parquet::ThreeColMergeRow<A, B, C>
 where
     A: Eq,
     B: Eq,
@@ -271,7 +271,7 @@ where
     }
 }
 
-impl<A, B, C> Eq for crate::parquet::merger::ThreeColMergeRow<A, B, C>
+impl<A, B, C> Eq for crate::parquet::ThreeColMergeRow<A, B, C>
 where
     A: Eq,
     B: Eq,

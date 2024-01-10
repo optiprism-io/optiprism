@@ -59,7 +59,7 @@ use scan_dir::ScanDir;
 use service::tracing::TracingCliArgs;
 use store::db::OptiDBImpl;
 use store::db::Options;
-use store::db::TableOptions;
+use store::table::Options as TableOptions;
 use store::NamedValue;
 use store::Value;
 use tokio::select;

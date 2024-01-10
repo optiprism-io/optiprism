@@ -69,16 +69,16 @@ use crate::merge_list_arrays;
 use crate::merge_list_arrays_inner;
 use crate::merge_list_primitive_arrays;
 use crate::merge_primitive_arrays;
-use crate::parquet::merger;
-use crate::parquet::merger::chunk_min_max;
-use crate::parquet::merger::parquet::data_page_to_array;
-use crate::parquet::merger::parquet::ArrowIteratorImpl;
-use crate::parquet::merger::parquet::ColumnPath;
-use crate::parquet::merger::parquet::CompressedPageIterator;
-use crate::parquet::merger::parquet::ParquetValue;
-use crate::parquet::merger::try_merge_arrow_schemas;
-use crate::parquet::merger::OneColMergeRow;
-use crate::parquet::merger::TwoColMergeRow;
+use crate::parquet;
+use crate::parquet::chunk_min_max;
+use crate::parquet::parquet::data_page_to_array;
+use crate::parquet::parquet::ArrowIteratorImpl;
+use crate::parquet::parquet::ColumnPath;
+use crate::parquet::parquet::CompressedPageIterator;
+use crate::parquet::parquet::ParquetValue;
+use crate::parquet::try_merge_arrow_schemas;
+use crate::parquet::OneColMergeRow;
+use crate::parquet::TwoColMergeRow;
 use crate::KeyValue;
 
 // merge chunks with single column partition which is primitive
@@ -529,8 +529,8 @@ impl Iterator for MergingIterator {
 // use parquet2::compression::CompressionOptions;
 // use parquet2::write::Version;
 //
-// use crate::parquet::merger::arrow_merger::MergingIterator;
-// use crate::parquet::merger::arrow_merger::Options;
+// use crate::parquet::arrow_merger::MergingIterator;
+// use crate::parquet::arrow_merger::Options;
 // use crate::test_util::create_parquet_from_chunk;
 // use crate::test_util::parse_markdown_tables;
 //

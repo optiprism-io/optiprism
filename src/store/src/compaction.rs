@@ -19,18 +19,17 @@ use parking_lot::RwLock;
 use tracing::error;
 
 use crate::db::log_metadata;
-use crate::db::part_path;
-use crate::db::FsOp;
-use crate::db::Level;
-use crate::db::Metadata;
-use crate::db::Part;
-use crate::db::Table;
-use crate::db::TableOptions;
-use crate::db::Vfs;
 use crate::error::Result;
 use crate::parquet;
 use crate::parquet::parquet_merger;
 use crate::parquet::parquet_merger::merge;
+use crate::table;
+use crate::table::part_path;
+use crate::table::Level;
+use crate::table::Metadata;
+use crate::table::Part;
+use crate::table::Table;
+use crate::FsOp;
 
 #[derive(Clone, Debug)]
 pub enum CompactorMessage {
@@ -77,36 +76,40 @@ impl Compactor {
     pub fn run(mut self) {
         loop {
             #[cfg(not(test))]
-            match self.inbox.try_recv() {
-                Ok(v) => {
-                    match v {
-                        CompactorMessage::Stop(dropper) => {
-                            drop(dropper);
-                            break;
+            {
+                match self.inbox.try_recv() {
+                    Ok(v) => {
+                        match v {
+                            CompactorMessage::Stop(dropper) => {
+                                drop(dropper);
+                                break;
+                            }
+                            _ => unreachable!(),
                         }
-                        _ => unreachable!(),
+                        // !@#println!("Terminating.");
+                        break;
                     }
-                    // !@#println!("Terminating.");
-                    break;
+                    Err(TryRecvError::Disconnected) => {
+                        break;
+                    }
+                    Err(TryRecvError::Empty) => {}
                 }
-                Err(TryRecvError::Disconnected) => {
-                    break;
-                }
-                Err(TryRecvError::Empty) => {}
             }
             #[cfg(not(test))]
             thread::sleep(time::Duration::from_micros(20)); // todo make configurable
 
             #[cfg(test)]
-            match self.inbox.recv() {
-                Ok(msg) => match msg {
-                    CompactorMessage::Compact => {}
-                    CompactorMessage::Stop(dropper) => {
-                        drop(dropper);
-                        break;
-                    }
-                },
-                Err(err) => panic!("{:?}", err),
+            {
+                match self.inbox.recv() {
+                    Ok(msg) => match msg {
+                        CompactorMessage::Compact => {}
+                        CompactorMessage::Stop(dropper) => {
+                            drop(dropper);
+                            break;
+                        }
+                    },
+                    Err(err) => panic!("{:?}", err),
+                }
             }
             // !@#debug!("compaction started");
             let tables = {
@@ -204,7 +207,7 @@ fn determine_compaction(
     level_id: usize,
     level: &Level,
     next_level: &Level,
-    opts: &TableOptions,
+    opts: &table::Options,
 ) -> Result<Option<Vec<ToCompact>>> {
     // !@#println!("lid {} {}", level_id, level.parts.len());
     let mut to_compact = vec![];
@@ -258,7 +261,7 @@ fn compact(
     levels: Vec<Level>,
     partition_id: usize,
     path: &PathBuf,
-    opts: &TableOptions,
+    opts: &table::Options,
 ) -> Result<Option<CompactResult>> {
     let init_time = Instant::now();
     let mut fs_ops = vec![];

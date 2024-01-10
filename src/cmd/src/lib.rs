@@ -2,8 +2,8 @@ use std::sync::Arc;
 use std::time::Duration as STDDuration;
 
 use ::store::db::OptiDBImpl;
-use ::store::db::TableOptions;
 use ::store::error::StoreError;
+use ::store::table::Options as TableOptions;
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::rbac::Role;
