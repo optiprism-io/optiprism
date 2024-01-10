@@ -28,9 +28,9 @@ use crate::db::Table;
 use crate::db::TableOptions;
 use crate::db::Vfs;
 use crate::error::Result;
-use crate::parquet::merger;
-use crate::parquet::merger::parquet_merger;
-use crate::parquet::merger::parquet_merger::merge;
+use crate::parquet;
+use crate::parquet::parquet_merger;
+use crate::parquet::parquet_merger::merge;
 
 #[derive(Clone, Debug)]
 pub enum CompactorMessage {
