@@ -320,10 +320,7 @@ pub struct MergingIterator {
     // list of index cols (partitions) in parquet file
     index_cols: Vec<ColumnDescriptor>,
     array_size: usize,
-    // final schema of parquet file (merged multiple schemas)
-    parquet_schema: SchemaDescriptor,
-    // final arrow schema
-    arrow_schema: Schema,
+    schema: Schema,
     // list of streams to merge
     streams: Vec<Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>>,
     // sorter for pages chunk from parquet
@@ -338,6 +335,7 @@ impl MergingIterator {
     pub fn new(
         mut readers: Vec<BufReader<File>>,
         mem_chunk: Option<Chunk<Box<dyn Array>>>,
+        schema: Schema,
         opts: Options,
     ) -> Result<Self> {
         let arrow_schemas = readers
@@ -372,11 +370,11 @@ impl MergingIterator {
             arrow_streams.push(Box::new(MemChunkIterator::new(chunk))
                 as Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>);
         }
+
         let mut mr = Self {
             index_cols,
             array_size: opts.array_size,
-            parquet_schema,
-            arrow_schema,
+            schema,
             streams: arrow_streams,
             sorter: BinaryHeap::new(),
             merge_result_buffer: VecDeque::with_capacity(10),
@@ -440,12 +438,28 @@ impl MergingIterator {
             return Ok(None);
         }
 
+        let chunk = add_null_cols_to_chunk(&maybe_chunk.unwrap()?, &self.schema)?;
         Ok(Some(ArrowChunk::new(
-            maybe_chunk.unwrap()?,
+            chunk,
             stream_id,
             self.index_cols.len(),
         )))
     }
+}
+
+fn add_null_cols_to_chunk(
+    chunk: &Chunk<Box<dyn Array>>,
+    schema: &Schema,
+) -> Result<Chunk<Box<dyn Array>>> {
+    let mut cols = chunk.columns().to_vec();
+    let mut null_cols = vec![];
+    for (idx, field) in schema.fields.iter().enumerate() {
+        if idx >= cols.len() {
+            null_cols.push(new_null_array(field.data_type.clone(), chunk.len()).into());
+        }
+    }
+    cols.append(&mut null_cols);
+    Ok(Chunk::new(cols))
 }
 
 impl Iterator for MergingIterator {
@@ -491,15 +505,14 @@ impl Iterator for MergingIterator {
                 .ok()?;
             // todo split arrays
             self.merge_result_buffer = VecDeque::from(res);
+
+            self.next()
         } else {
             // queue contains only one chunk, so we can just push it to result
             let chunk = merge_queue.pop().unwrap();
 
-            return Some(Ok(chunk.chunk));
+            Some(Ok(chunk.chunk))
         }
-
-        let chunk = self.merge_result_buffer.pop_front().map(|v| Ok(v));
-        chunk
     }
 }
 // #[cfg(test)]

@@ -1,39 +1,60 @@
 use std::fs::File;
-use std::time::SystemTime;
 
-use arrow2::error::Error;
-use arrow2::io::parquet::read;
+use arrow2::array::Int32Array;
+use arrow2::chunk::Chunk;
+use arrow2::compute::arithmetics;
+use arrow2::datatypes::DataType;
+use arrow2::datatypes::Field;
+use arrow2::datatypes::Schema;
+use arrow2::io::parquet::write::CompressionOptions;
+use arrow2::io::parquet::write::Encoding;
+use arrow2::io::parquet::write::FileWriter;
+use arrow2::io::parquet::write::RowGroupIterator;
+use arrow2::io::parquet::write::Version;
+use arrow2::io::parquet::write::WriteOptions;
 
-fn main() -> Result<(), Error> {
-    // say we have a file
-    let mut reader = File::open(
-        "/opt/homebrew/Caskroom/clickhouse/user_files/store/tables/events/0/4/3.parquet",
-    )?;
+fn main() {
+    // declare arrays
+    let a = Int32Array::from(&[Some(1), None, Some(3)]);
+    let b = Int32Array::from(&[Some(2), None, Some(6)]);
 
-    // we can read its metadata:
-    let metadata = read::read_metadata(&mut reader)?;
+    // compute (probably the fastest implementation of a nullable op you can find out there)
+    let c = arithmetics::basic::mul_scalar(&a, &2);
+    assert_eq!(c, b);
 
-    // and infer a [`Schema`] from the `metadata`.
-    let schema = read::infer_schema(&metadata)?;
+    // declare a schema with fields
+    let schema = Schema::from(vec![
+        Field::new("c1", DataType::Int32, true),
+        Field::new("c2", DataType::Int32, true),
+    ]);
 
-    // we can filter the columns we need (here we select all)
-    let schema = schema.filter(|idx, _field| if idx == 1 { true } else { false });
+    // declare chunk
+    let chunk = Chunk::new(vec![a.arced(), b.arced()]);
 
-    // we can then read the row groups into chunks
-    let chunks = read::FileReader::new(
-        reader,
-        metadata.row_groups,
-        schema,
-        Some(1024 * 1024),
-        None,
-        None,
-    );
+    // write to parquet (probably the fastest implementation of writing to parquet out there)
 
-    let start = SystemTime::now();
-    for maybe_chunk in chunks {
-        let chunk = maybe_chunk?;
-        assert!(!chunk.is_empty());
+    let options = WriteOptions {
+        write_statistics: true,
+        compression: CompressionOptions::Snappy,
+        version: Version::V1,
+        data_pagesize_limit: None,
+    };
+
+    let row_groups =
+        RowGroupIterator::try_new(vec![Ok(chunk)].into_iter(), &schema, options, vec![
+            vec![Encoding::Plain],
+            vec![Encoding::Plain],
+        ])
+        .unwrap();
+
+    // anything implementing `std::io::Write` works
+    let mut file = File::create("/tmp/test.parquet").unwrap();
+
+    let mut writer = FileWriter::try_new(file, schema, options).unwrap();
+
+    // Write the file.
+    for group in row_groups {
+        writer.write(group.unwrap()).unwrap();
     }
-    println!("took: {:?}", start.elapsed().unwrap());
-    Ok(())
+    let _ = writer.end(None).unwrap();
 }

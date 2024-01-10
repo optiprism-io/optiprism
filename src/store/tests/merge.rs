@@ -91,16 +91,16 @@ fn roundtrip(tc: TestCase) -> anyhow::Result<()> {
     };
 
     let start = Instant::now();
-    fs::remove_dir_all("tests/merge_roundtrip");
-    fs::create_dir_all("tests/merge_roundtrip");
-    merge(readers, "tests/merge_roundtrip".into(), 1, "t", 0, opts).unwrap();
+    fs::remove_dir_all("test_data/merge_roundtrip");
+    fs::create_dir_all("test_data/merge_roundtrip");
+    merge(readers, "test_data/merge_roundtrip".into(), 1, "t", 0, opts).unwrap();
     println!("merge {:?}", start.elapsed());
 
-    let mut pfile = File::open("tests/merge_roundtrip/1.parquet").unwrap();
+    let mut pfile = File::open("test_data/merge_roundtrip/1.parquet").unwrap();
     let metadata = read::read_metadata(&mut pfile).unwrap();
     let schema = read::infer_schema(&metadata).unwrap();
     let chunks = read::FileReader::new(
-        File::open("tests/merge_roundtrip/1.parquet").unwrap(),
+        File::open("test_data/merge_roundtrip/1.parquet").unwrap(),
         metadata.row_groups,
         schema,
         Some(1024 * 1024),
@@ -125,8 +125,8 @@ enum ProfileStep {
 fn stream_parquet_path(stream_id: usize, case_id: usize) -> PathBuf {
     // let mut path = temp_dir();
     // path.push(format!("optiprism/tests/merge"));
-    let mut path = PathBuf::from(format!("tests/merge/{case_id}/"));
-    // path.push(format!("tests/merge/{case_id}/"));
+    let mut path = PathBuf::from(format!("test_data/merge/{case_id}/"));
+    // path.push(format!("test_data/merge/{case_id}/"));
     create_dir_all(path.clone()).unwrap();
     path.push(format!("{stream_id}.parquet"));
 
@@ -189,8 +189,8 @@ fn profile(tc: TestCase, case_id: usize, step: ProfileStep) {
             };
 
             let start = Instant::now();
-            fs::remove_dir_all("tests/merge_profile");
-            fs::create_dir_all("tests/merge_profile");
+            fs::remove_dir_all("test_data/merge_profile");
+            fs::create_dir_all("test_data/merge_profile");
             merge(readers, "/tmp/merge_profile".into(), 1, "t", 0, opts).unwrap();
         }
     }
@@ -566,11 +566,11 @@ fn test_different_row_group_sizes() -> anyhow::Result<()> {
     };
 
     let start = Instant::now();
-    fs::remove_dir_all("tests/merge_different_row_group_sizes").unwrap();
-    fs::create_dir_all("tests/merge_different_row_group_sizes").unwrap();
+    fs::remove_dir_all("test_data/merge_different_row_group_sizes").unwrap();
+    fs::create_dir_all("test_data/merge_different_row_group_sizes").unwrap();
     merge(
         readers,
-        "tests/merge_different_row_group_sizes".into(),
+        "test_data/merge_different_row_group_sizes".into(),
         1,
         "t",
         0,
@@ -578,7 +578,7 @@ fn test_different_row_group_sizes() -> anyhow::Result<()> {
     )
     .unwrap();
 
-    let mut pfile = File::open("tests/merge_different_row_group_sizes/1.parquet").unwrap();
+    let mut pfile = File::open("test_data/merge_different_row_group_sizes/1.parquet").unwrap();
     let final_chunk = read_parquet_as_one_chunk(&mut pfile);
 
     trace!(
@@ -659,17 +659,17 @@ fn test_merge_with_missing_columns() -> anyhow::Result<()> {
     };
 
     let start = Instant::now();
-    fs::remove_dir_all("tests/merge_with_missing_columns");
-    fs::create_dir_all("tests/merge_with_missing_columns");
+    fs::remove_dir_all("test_data/merge_with_missing_columns");
+    fs::create_dir_all("test_data/merge_with_missing_columns");
     merge(
         readers,
-        "tests/merge_with_missing_columns".into(),
+        "test_data/merge_with_missing_columns".into(),
         1,
         "t",
         0,
         opts,
     )?;
-    let mut pfile = File::open("tests/merge_with_missing_columns/1.parquet").unwrap();
+    let mut pfile = File::open("test_data/merge_with_missing_columns/1.parquet").unwrap();
     let final_chunk = read_parquet_as_one_chunk(&mut pfile);
 
     let exp = vec![
@@ -740,8 +740,8 @@ fn test_pick_with_null_columns() -> anyhow::Result<()> {
         })
         .collect::<Vec<_>>();
 
-    fs::remove_dir_all("tests/merge_pick_with_null_columns");
-    fs::create_dir_all("tests/merge_pick_with_null_columns");
+    fs::remove_dir_all("test_data/merge_pick_with_null_columns");
+    fs::create_dir_all("test_data/merge_pick_with_null_columns");
     let opts = Options {
         index_cols: 1,
         data_page_size_limit_bytes: None,
@@ -753,14 +753,14 @@ fn test_pick_with_null_columns() -> anyhow::Result<()> {
     };
     merge(
         readers,
-        "tests/merge_pick_with_null_columns".into(),
+        "test_data/merge_pick_with_null_columns".into(),
         1,
         "t",
         0,
         opts,
     )?;
 
-    let mut pfile = File::open("tests/merge_pick_with_null_columns/1.parquet").unwrap();
+    let mut pfile = File::open("test_data/merge_pick_with_null_columns/1.parquet").unwrap();
     let final_chunk = read_parquet_as_one_chunk(&mut pfile);
 
     let exp = Chunk::new(vec![

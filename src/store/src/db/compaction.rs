@@ -3,6 +3,7 @@ use std::fs::File;
 use std::io::BufWriter;
 use std::path::PathBuf;
 use std::sync::mpsc::Receiver;
+use std::sync::mpsc::RecvError;
 use std::sync::mpsc::Sender;
 use std::sync::mpsc::TryRecvError;
 use std::sync::Arc;
@@ -75,6 +76,7 @@ impl Compactor {
     }
     pub fn run(mut self) {
         loop {
+            #[cfg(not(test))]
             match self.inbox.try_recv() {
                 Ok(v) => {
                     match v {
@@ -92,10 +94,20 @@ impl Compactor {
                 }
                 Err(TryRecvError::Empty) => {}
             }
+            #[cfg(not(test))]
             thread::sleep(time::Duration::from_micros(20)); // todo make configurable
-            // match self.inbox.recv() {
-            // Ok(msg) => match msg {
-            //     CompactorMessage::Compact => {
+
+            #[cfg(test)]
+            match self.inbox.recv() {
+                Ok(msg) => match msg {
+                    CompactorMessage::Compact => {}
+                    CompactorMessage::Stop(dropper) => {
+                        drop(dropper);
+                        break;
+                    }
+                },
+                Err(err) => panic!("{:?}", err),
+            }
             // !@#debug!("compaction started");
             let tables = {
                 let tbls = self.tables.read();

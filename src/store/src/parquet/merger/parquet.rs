@@ -381,7 +381,6 @@ impl ArrowIteratorImpl {
         let metadata = io::parquet::read::read_metadata(&mut rdr)?;
         let schema = io::parquet::read::infer_schema(&metadata)?;
         let schema = schema.filter(|_, f| fields.contains(&f.name));
-        println!("{:?}", schema);
         let frdr = io::parquet::read::FileReader::new(
             rdr,
             metadata.row_groups,

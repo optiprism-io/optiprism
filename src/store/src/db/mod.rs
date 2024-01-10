@@ -362,7 +362,7 @@ impl MemtablePartition {
             .map(|v| SortColumn {
                 values: arrs[v].as_ref(),
                 options: Some(SortOptions {
-                    descending: true,
+                    descending: false,
                     nulls_first: false,
                 }),
             })
@@ -444,74 +444,12 @@ pub struct Metadata {
     opts: TableOptions,
 }
 
-#[derive(Debug, Serialize, Deserialize, Hash)]
-pub enum Op {
-    Insert(Vec<KeyValue>, Vec<Value>),
-    Delete(Vec<KeyValue>),
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 pub enum LogOp {
     Insert(Vec<KeyValue>, Vec<Value>),
     Metadata(Metadata),
     AddField(Field),
 }
-
-#[derive(Debug)]
-struct MemOp {
-    op: Op,
-    seq_id: u64,
-}
-
-impl PartialOrd for MemOp {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl PartialEq for MemOp {
-    fn eq(&self, other: &Self) -> bool {
-        let left_k = match &self.op {
-            Op::Insert(k, _) => k.to_owned(),
-            Op::Delete(k) => k.to_owned(),
-        };
-
-        let right_k = match &other.op {
-            Op::Insert(k, _) => k.to_owned(),
-            Op::Delete(k) => k.to_owned(),
-        };
-
-        if left_k == right_k {
-            self.seq_id == other.seq_id
-        } else {
-            false
-        }
-    }
-}
-
-impl Ord for MemOp {
-    fn cmp(&self, other: &Self) -> Ordering {
-        let left_k = match &self.op {
-            Op::Insert(k, _) => k.to_owned(),
-            Op::Delete(k) => k.to_owned(),
-        };
-
-        let right_k = match &other.op {
-            Op::Insert(k, _) => k.to_owned(),
-            Op::Delete(k) => k.to_owned(),
-        };
-
-        match left_k.partial_cmp(&right_k) {
-            None => unreachable!("keys must be comparable"),
-            Some(ord) => match ord {
-                Ordering::Equal => self.seq_id.cmp(&other.seq_id),
-                _ => ord,
-            },
-        }
-    }
-}
-
-impl Eq for MemOp {}
 
 fn hash_crc32(v: &[u8]) -> u32 {
     let mut hasher = crc32fast::Hasher::new();
@@ -734,8 +672,7 @@ fn try_recover_table(path: PathBuf, name: String) -> Result<Table> {
     let log_path = logs.pop().unwrap();
     // !@#trace!("last log: {:?}", log_path);
     // todo make a buffered read. Currently something odd happens with reading the length of the record
-    let mut log = File::open(&log_path)?;
-
+    let mut log = OpenOptions::new().read(true).write(true).open(&log_path)?;
     let mut ops = 0;
     let mut read_bytes = 0;
     // get metadata (first record of the log)
@@ -894,7 +831,6 @@ fn write_level0(
             continue;
         }
         let chunk = maybe_chunk.unwrap();
-
         let (min, max) = chunk_min_max(&chunk, metadata.opts.index_cols);
 
         let popts = parquet::write::WriteOptions {
@@ -954,6 +890,7 @@ fn flush(
     path: &PathBuf,
 ) -> Result<File> {
     let start_time = Instant::now();
+
     // in case when it is flushed by another thread
     log.flush()?;
     log.sync_all()?;
@@ -966,7 +903,6 @@ fn flush(
     let empty_memtable = memtable.create_empty();
     let memtable = mem::replace(memtable, empty_memtable);
     let parts = write_level0(&metadata, &memtable, path.to_owned())?;
-
     for (pid, part) in parts {
         metadata.partitions[pid].levels[0].parts.push(part.clone());
         // increment table id
@@ -994,7 +930,7 @@ fn flush(
         )))?;
 
     // write metadata to log as first record
-    log_metadata(&mut log, metadata)?;
+    log_metadata(&mut log, metadata);
 
     trace!(
         "removing previous log file {:?}",
@@ -1008,6 +944,7 @@ fn flush(
 
     histogram!("store.flush_time_seconds").record(start_time.elapsed());
     counter!("store.flushes_total").increment(1);
+
     Ok(log)
 }
 
@@ -1212,9 +1149,9 @@ impl OptiDBImpl {
         drop(tables);
         // locking compactor file operations (deleting/moving) to prevent parts deletion during scanning
         let _vfs = tbl.vfs.lock.lock();
-        let _md = tbl.metadata.lock();
-        let metadata = _md.clone();
-        drop(_md);
+        let md = tbl.metadata.lock();
+        let metadata = md.clone();
+        drop(md);
         let partition = metadata
             .partitions
             .iter()
@@ -1234,7 +1171,6 @@ impl OptiDBImpl {
         }
         let maybe_chunk =
             memtable.partitions[partition_id].chunk(Some(fields_idx), metadata.opts.index_cols)?;
-        drop(memtable);
         histogram!("store.scan_memtable_seconds","table"=>tbl_name.to_string())
             .record(start_time.elapsed());
         let mut rdrs = vec![];
@@ -1243,7 +1179,6 @@ impl OptiDBImpl {
         for (level_id, level) in partition.levels.into_iter().enumerate() {
             for part in level.parts {
                 let path = part_path(&self.path, tbl_name, partition.id, level_id, part.id);
-                println!("%%@# path: {:?}", path);
                 let rdr = BufReader::new(File::open(path)?);
                 rdrs.push(rdr);
             }
@@ -1261,8 +1196,12 @@ impl OptiDBImpl {
                 fields: fields.clone(),
             };
             // todo fix
-            Box::new(MergingIterator::new(rdrs, maybe_chunk, opts)?)
-                as Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>
+            Box::new(MergingIterator::new(
+                rdrs,
+                maybe_chunk,
+                metadata.schema.clone(),
+                opts,
+            )?) as Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>
         };
 
         counter!("store.scans_total", "table"=>tbl_name.to_string()).increment(1);
@@ -1420,7 +1359,6 @@ mod tests {
 
     use crate::db::print_partitions;
     use crate::db::Level;
-    use crate::db::MemOp;
     use crate::db::Op;
     use crate::db::OptiDBImpl;
     use crate::db::Options;
