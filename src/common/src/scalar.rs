@@ -1,9 +1,6 @@
 use std::sync::Arc;
 
-use arrow::array::ArrayRef;
 use arrow_schema::DataType;
-use arrow_schema::Field;
-use arrow_schema::Fields;
 use datafusion_common::ScalarValue;
 use serde::Deserialize;
 use serde::Deserializer;

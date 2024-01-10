@@ -48,7 +48,7 @@ fn main() {
         .unwrap();
 
     // anything implementing `std::io::Write` works
-    let mut file = File::create("/tmp/test.parquet").unwrap();
+    let file = File::create("/tmp/test.parquet").unwrap();
 
     let mut writer = FileWriter::try_new(file, schema, options).unwrap();
 

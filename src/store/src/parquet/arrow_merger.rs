@@ -1,82 +1,28 @@
 use std::cmp::min;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
-use std::collections::HashMap;
 use std::collections::VecDeque;
-use std::fs;
 use std::fs::File;
 use std::io::BufReader;
-use std::io::Read;
-use std::io::Seek;
-use std::io::Write;
-use std::os::unix::fs::MetadataExt;
-use std::path::Path;
-use std::path::PathBuf;
 
 use arrow2::array::growable::make_growable;
 use arrow2::array::new_null_array;
 use arrow2::array::Array;
-use arrow2::array::BinaryArray;
-use arrow2::array::BooleanArray;
-use arrow2::array::Float32Array;
-use arrow2::array::Float64Array;
-use arrow2::array::Int128Array;
-use arrow2::array::Int16Array;
-use arrow2::array::Int32Array;
-use arrow2::array::Int64Array;
-use arrow2::array::Int8Array;
-use arrow2::array::ListArray;
-use arrow2::array::MutableArray;
-use arrow2::array::MutableBinaryArray;
-use arrow2::array::MutableBooleanArray;
-use arrow2::array::MutableListArray;
-use arrow2::array::MutablePrimitiveArray;
-use arrow2::array::MutableUtf8Array;
 use arrow2::array::PrimitiveArray;
-use arrow2::array::TryPush;
-use arrow2::array::UInt16Array;
-use arrow2::array::UInt32Array;
-use arrow2::array::UInt64Array;
-use arrow2::array::UInt8Array;
-use arrow2::array::Utf8Array;
-use arrow2::bitmap::Bitmap;
 use arrow2::chunk::Chunk;
-use arrow2::compute::merge_sort::merge_sort;
-use arrow2::compute::merge_sort::merge_sort_slices;
 use arrow2::datatypes::DataType;
-use arrow2::datatypes::Field;
-use arrow2::datatypes::PhysicalType as ArrowPhysicalType;
-use arrow2::datatypes::PrimitiveType as ArrowPrimitiveType;
 use arrow2::datatypes::Schema;
 use arrow2::io::parquet::read::infer_schema;
-use arrow2::io::parquet::write::add_arrow_schema;
 use arrow2::io::parquet::write::to_parquet_schema;
-use arrow2::offset::OffsetsBuffer;
 use arrow2::types::NativeType;
 use metrics::counter;
 use parquet2::metadata::ColumnDescriptor;
-use parquet2::metadata::SchemaDescriptor;
-use parquet2::page::CompressedPage;
-use parquet2::write::FileSeqWriter;
-use parquet2::write::Version;
-use parquet2::write::WriteOptions;
 
 use crate::error::Result;
 use crate::error::StoreError;
-use crate::merge_arrays;
-use crate::merge_arrays_inner;
-use crate::merge_list_arrays;
-use crate::merge_list_arrays_inner;
-use crate::merge_list_primitive_arrays;
-use crate::merge_primitive_arrays;
-use crate::parquet;
 use crate::parquet::chunk_min_max;
-use crate::parquet::parquet::data_page_to_array;
-use crate::parquet::parquet::ArrowIteratorImpl;
-use crate::parquet::parquet::ColumnPath;
-use crate::parquet::parquet::CompressedPageIterator;
-use crate::parquet::parquet::ParquetValue;
 use crate::parquet::try_merge_arrow_schemas;
+use crate::parquet::ArrowIteratorImpl;
 use crate::parquet::OneColMergeRow;
 use crate::parquet::TwoColMergeRow;
 use crate::KeyValue;
@@ -86,7 +32,7 @@ use crate::KeyValue;
 pub fn merge_one_primitive<T: NativeType + Ord>(
     chunks: Vec<&[Box<dyn Array>]>,
 ) -> Result<Vec<usize>> {
-    let mut arrs = chunks
+    let arrs = chunks
         .iter()
         .enumerate()
         .map(|(idx, row)| {
@@ -104,7 +50,7 @@ pub fn merge_one_primitive<T: NativeType + Ord>(
     let mut out = Vec::with_capacity(len);
     let mut sort = BinaryHeap::<OneColMergeRow<T>>::with_capacity(len);
     for (stream, a) in arrs {
-        for (a) in a.into_iter() {
+        for a in a.into_iter() {
             sort.push(OneColMergeRow(stream, *a));
         }
     }
@@ -119,7 +65,7 @@ pub fn merge_one_primitive<T: NativeType + Ord>(
 pub fn merge_two_primitives<T1: NativeType + Ord, T2: NativeType + Ord>(
     chunks: Vec<&[Box<dyn Array>]>,
 ) -> Result<Vec<usize>> {
-    let mut arrs = chunks
+    let arrs = chunks
         .iter()
         .enumerate()
         .map(|(idx, row)| {
@@ -214,7 +160,7 @@ pub fn check_intersection(chunks: &[ArrowChunk], other: Option<&ArrowChunk>) -> 
 }
 
 #[derive(Debug, Clone)]
-struct ArrowChunk {
+pub struct ArrowChunk {
     pub stream: usize,
     chunk: Chunk<Box<dyn Array>>,
     min_values: Vec<KeyValue>,
@@ -276,16 +222,6 @@ impl ArrowChunk {
     pub fn max_values(&self) -> Vec<KeyValue> {
         self.max_values.clone()
     }
-
-    // Get length of arrow chunk
-    pub fn len(&self) -> usize {
-        self.chunk.columns()[0].len()
-    }
-
-    // Check if chunk is empty
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
 }
 
 // this is a temporary array used to merge data pages avoiding downcasting
@@ -311,10 +247,11 @@ impl Iterator for MemChunkIterator {
     type Item = Result<Chunk<Box<dyn Array>>>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let chunk = self.chunk.take().map(|v| Ok(v));
-        chunk
+        self.chunk.take().map(Ok)
     }
 }
+
+type SendableChunk = Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>;
 
 pub struct MergingIterator {
     // list of index cols (partitions) in parquet file
@@ -322,7 +259,7 @@ pub struct MergingIterator {
     array_size: usize,
     schema: Schema,
     // list of streams to merge
-    streams: Vec<Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>>,
+    streams: Vec<SendableChunk>,
     // sorter for pages chunk from parquet
     sorter: BinaryHeap<ArrowChunk>,
     // pages chunk merge queue
@@ -354,20 +291,13 @@ impl MergingIterator {
         let mut arrow_streams = readers
             .into_iter()
             .map(|v| {
-                Box::new(
-                    ArrowIteratorImpl::new(
-                        v,
-                        opts.fields.clone(),
-                        arrow_schema.clone(),
-                        opts.chunk_size,
-                    )
-                    .unwrap(),
-                ) as Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>
+                Box::new(ArrowIteratorImpl::new(v, opts.fields.clone(), opts.chunk_size).unwrap())
+                    as Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>
             })
             .collect::<Vec<_>>();
 
-        if let (chunk) = mem_chunk {
-            arrow_streams.push(Box::new(MemChunkIterator::new(chunk))
+        if mem_chunk.is_some() {
+            arrow_streams.push(Box::new(MemChunkIterator::new(mem_chunk))
                 as Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>);
         }
 
@@ -387,10 +317,7 @@ impl MergingIterator {
         Ok(mr)
     }
 
-    fn merge_queue(
-        &self,
-        queue: &Vec<&Chunk<Box<dyn Array>>>,
-    ) -> Result<Vec<Chunk<Box<dyn Array>>>> {
+    fn merge_queue(&self, queue: &[&Chunk<Box<dyn Array>>]) -> Result<Vec<Chunk<Box<dyn Array>>>> {
         counter!("store.scan_merges_total").increment(1);
         let arrs = queue
             .iter()
@@ -400,9 +327,8 @@ impl MergingIterator {
 
         let cols_len = queue[0].columns().len();
         let mut arrs = (0..cols_len)
-            .into_iter()
             .map(|col_id| {
-                let mut arrs = queue
+                let arrs = queue
                     .iter()
                     .map(|chunk| chunk.columns()[col_id].as_ref())
                     .collect::<Vec<_>>();
@@ -420,7 +346,7 @@ impl MergingIterator {
         let mut out = vec![];
 
         let mut len = arrs[0].len();
-        for i in (0..reorder.len()).into_iter().step_by(self.array_size) {
+        for i in (0..reorder.len()).step_by(self.array_size) {
             let arrs = arrs
                 .iter_mut()
                 .map(|arr| arr.sliced(i, min(self.array_size, len)))
@@ -455,7 +381,7 @@ fn add_null_cols_to_chunk(
     let mut null_cols = vec![];
     for (idx, field) in schema.fields.iter().enumerate() {
         if idx >= cols.len() {
-            null_cols.push(new_null_array(field.data_type.clone(), chunk.len()).into());
+            null_cols.push(new_null_array(field.data_type.clone(), chunk.len()));
         }
     }
     cols.append(&mut null_cols);

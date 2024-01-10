@@ -1,5 +1,6 @@
 use std::fs::File;
 use std::io::BufWriter;
+use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -55,7 +56,7 @@ impl Options {
         }
     }
 }
-
+#[allow(dead_code)]
 fn print_partitions(partitions: &[Partition]) {
     for (pid, p) in partitions.iter().enumerate() {
         println!("+-- {}", pid);
@@ -78,12 +79,6 @@ pub struct Part {
     pub(crate) values: usize,
     pub(crate) min: Vec<KeyValue>,
     pub(crate) max: Vec<KeyValue>,
-}
-
-impl Part {
-    fn path(path: &PathBuf, partition_id: usize, level: usize, id: usize) -> PathBuf {
-        PathBuf::from(path.join(format!("parts/{}/{}/{}.parquet", partition_id, level, id)))
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq, PartialOrd, Ord)]
@@ -139,7 +134,7 @@ pub(crate) struct Metadata {
 }
 
 pub(crate) fn part_path(
-    path: &PathBuf,
+    path: &Path,
     table_name: &str,
     partition_id: usize,
     level_id: usize,
@@ -148,12 +143,5 @@ pub(crate) fn part_path(
     path.join(format!(
         "tables/{}/{}/{}/{}.parquet",
         table_name, partition_id, level_id, part_id
-    ))
-}
-
-fn level_path(path: &PathBuf, table_name: &str, partition_id: usize, level_id: usize) -> PathBuf {
-    path.join(format!(
-        "tables/{}/{}/{}",
-        table_name, partition_id, level_id
     ))
 }

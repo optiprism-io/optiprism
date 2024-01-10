@@ -1,32 +1,30 @@
 use std::cmp;
 use std::fs::File;
-use std::io::BufWriter;
+use std::path::Path;
 use std::path::PathBuf;
 use std::sync::mpsc::Receiver;
-use std::sync::mpsc::RecvError;
 use std::sync::mpsc::Sender;
+#[cfg(not(test))]
 use std::sync::mpsc::TryRecvError;
 use std::sync::Arc;
-use std::sync::Mutex;
+#[cfg(not(test))]
 use std::thread;
-use std::time;
+#[cfg(not(test))]
+use std::time::Duration;
 use std::time::Instant;
 
 use log::trace;
 use metrics::counter;
 use metrics::histogram;
 use parking_lot::RwLock;
-use tracing::error;
 
 use crate::db::log_metadata;
 use crate::error::Result;
-use crate::parquet;
 use crate::parquet::parquet_merger;
 use crate::parquet::parquet_merger::merge;
 use crate::table;
 use crate::table::part_path;
 use crate::table::Level;
-use crate::table::Metadata;
 use crate::table::Part;
 use crate::table::Table;
 use crate::FsOp;
@@ -73,22 +71,18 @@ impl Compactor {
             inbox,
         }
     }
-    pub fn run(mut self) {
+    pub fn run(self) {
         loop {
             #[cfg(not(test))]
             {
                 match self.inbox.try_recv() {
-                    Ok(v) => {
-                        match v {
-                            CompactorMessage::Stop(dropper) => {
-                                drop(dropper);
-                                break;
-                            }
-                            _ => unreachable!(),
+                    Ok(v) => match v {
+                        CompactorMessage::Stop(dropper) => {
+                            drop(dropper);
+                            break;
                         }
-                        // !@#println!("Terminating.");
-                        break;
-                    }
+                        _ => unreachable!(),
+                    },
                     Err(TryRecvError::Disconnected) => {
                         break;
                     }
@@ -96,7 +90,7 @@ impl Compactor {
                 }
             }
             #[cfg(not(test))]
-            thread::sleep(time::Duration::from_micros(20)); // todo make configurable
+            thread::sleep(Duration::from_micros(20)); // todo make configurable
 
             #[cfg(test)]
             {
@@ -125,7 +119,7 @@ impl Compactor {
                 // !@#println!("md lvlb {}", levels[0].part_id);
                 // print_levels(&levels);
                 for (pid, partition) in metadata.partitions.iter().enumerate() {
-                    let start = Instant::now();
+                    let _start = Instant::now();
                     match compact(
                         table.name.as_str(),
                         partition.levels.clone(),
@@ -182,8 +176,6 @@ impl Compactor {
                         },
                         Err(err) => {
                             panic!("compaction error: {:?}", err);
-
-                            continue;
                         }
                     }
                 }
@@ -217,7 +209,7 @@ fn determine_compaction(
         for part in level_parts {
             to_compact.push(ToCompact::new(0, part.id));
         }
-    } else if level_id > 0 && level_parts.len() > 0 {
+    } else if level_id > 0 && !level_parts.is_empty() {
         let mut size = 0;
         for part in level_parts {
             size += part.size_bytes;
@@ -260,17 +252,16 @@ fn compact(
     tbl_name: &str,
     levels: Vec<Level>,
     partition_id: usize,
-    path: &PathBuf,
+    path: &Path,
     opts: &table::Options,
 ) -> Result<Option<CompactResult>> {
     let init_time = Instant::now();
     let mut fs_ops = vec![];
-    let mut l0_rem: Vec<(usize)> = Vec::new();
+    let mut l0_rem: Vec<usize> = Vec::new();
     let mut tmp_levels = levels.clone();
     let mut compacted = false;
     for level_id in 0..tmp_levels.len() - 2 {
-        let mut v = None;
-        v = determine_compaction(
+        let v = determine_compaction(
             level_id,
             &tmp_levels[level_id],
             &tmp_levels[level_id + 1],
@@ -303,8 +294,8 @@ fn compact(
                     part.id = tmp_levels[level_id + 1].part_id + 1;
 
                     let from =
-                        part_path(&path, tbl_name, partition_id, level_id, to_compact[0].part);
-                    let to = part_path(&path, tbl_name, partition_id, level_id + 1, part.id);
+                        part_path(path, tbl_name, partition_id, level_id, to_compact[0].part);
+                    let to = part_path(path, tbl_name, partition_id, level_id + 1, part.id);
                     fs_ops.push(FsOp::Rename(from, to));
 
                     tmp_levels[level_id + 1].parts.push(part.clone());
@@ -319,7 +310,7 @@ fn compact(
                     if tc.level == 0 {
                         l0_rem.push(tc.part);
                     }
-                    tomerge.push(part_path(&path, tbl_name, partition_id, tc.level, tc.part));
+                    tomerge.push(part_path(path, tbl_name, partition_id, tc.level, tc.part));
                     tmp_levels[tc.level].parts = tmp_levels[tc.level]
                         .clone()
                         .parts

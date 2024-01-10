@@ -2,15 +2,12 @@ use std::mem;
 use std::sync::Arc;
 
 use arrow::ffi::from_ffi;
-use arrow::ipc::RecordBatch;
-use arrow2::chunk::Chunk;
 use arrow2::datatypes::DataType;
 use arrow2::datatypes::Field;
 use arrow2::datatypes::IntervalUnit;
 use arrow2::datatypes::Schema;
 use arrow2::datatypes::TimeUnit;
 use arrow_array::make_array;
-use arrow_array::Array;
 use arrow_array::ArrayRef;
 
 use crate::error::Result;

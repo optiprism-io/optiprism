@@ -1,4 +1,3 @@
-use std::error;
 use std::result;
 
 use datafusion_common::DataFusionError;

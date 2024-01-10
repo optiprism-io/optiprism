@@ -5,7 +5,6 @@ use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
 
-use arrow::util::pretty::print_batches;
 use arrow2::array::Array;
 use arrow2::array::BinaryArray;
 use arrow2::array::BooleanArray;
@@ -1096,15 +1095,15 @@ pub fn parse_markdown_tables(data: &str) -> anyhow::Result<Vec<RecordBatch>> {
     let h2 = iter.next().unwrap();
 
     let mut result = vec![];
-    let mut table = vec![br, h1.clone(), h2.clone()];
-    while let Some(line) = iter.next() {
+    let mut table = vec![br, h1, h2];
+    for line in iter {
         let cols = line.split('|').skip(1).collect::<Vec<_>>();
         if cols[0].trim() == "" {
             result.push(parse_markdown_table_v1(table.join("\n").as_str())?);
             table.clear();
             table.push(br);
-            table.push(h1.clone());
-            table.push(h2.clone());
+            table.push(h1);
+            table.push(h2);
         } else {
             table.push(line);
         }
@@ -1348,7 +1347,7 @@ pub fn unmerge_chunk(
                 // try to take values enough to split between all the out chunks
                 let to_take = values_per_row_group * out_count;
                 let end = std::cmp::min(idx + to_take, chunk.len());
-
+                #[allow(clippy::needless_range_loop)]
                 for stream_id in 0..out_count {
                     // calculate indexes for each out. Example: slice 1..10, 3 outs. We'll take [1, 4, 7, 10], [2, 5, 8], [3, 6, 9]
                     let take_idx = (0..end - idx)
@@ -1453,7 +1452,7 @@ pub fn create_parquet_from_chunk<W: Write>(
     chunk: Chunk<Box<dyn Array>>,
     fields: Vec<Field>,
     w: W,
-    data_pagesize_limit: Option<usize>,
+    _data_pagesize_limit: Option<usize>,
     values_per_row_group: usize,
 ) -> anyhow::Result<()> {
     let schema = Schema::from(fields);
@@ -1552,8 +1551,6 @@ pub fn create_parquet_file_from_chunk(
 #[cfg(test)]
 mod tests {
     use arrow::util::pretty::print_batches;
-
-    use crate::test_util::parse_markdown_table_v1;
 
     #[test]
     fn test_pare_markdown_table_v1() {

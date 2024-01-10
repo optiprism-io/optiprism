@@ -55,7 +55,7 @@ impl Column {
         self.values.len()
     }
 
-    fn to_array(self) -> Box<dyn Array> {
+    fn into_array(self) -> Box<dyn Array> {
         match self.dt.try_into().unwrap() {
             DataType::Boolean => {
                 memory_col_to_arrow!(self.values, Boolean, MutableBooleanArray)
@@ -123,7 +123,7 @@ impl Partition {
         Partition { cols: vec![] }
     }
     pub(crate) fn len(&self) -> usize {
-        if self.cols.len() == 0 {
+        if self.cols.is_empty() {
             return 0;
         }
         self.cols[0].len()
@@ -142,19 +142,18 @@ impl Partition {
             None => self
                 .cols
                 .iter()
-                .map(|c| c.clone().to_array())
+                .map(|c| c.clone().into_array())
                 .collect::<Vec<_>>(),
             Some(cols) => self
                 .cols
                 .iter()
                 .enumerate()
                 .filter(|(idx, _)| cols.contains(idx))
-                .map(|(_, c)| c.clone().to_array())
+                .map(|(_, c)| c.clone().into_array())
                 .collect::<Vec<_>>(),
         };
 
         let sort_cols = (0..index_cols)
-            .into_iter()
             .map(|v| SortColumn {
                 values: arrs[v].as_ref(),
                 options: Some(SortOptions {

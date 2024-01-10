@@ -2,7 +2,6 @@ use arrow::datatypes;
 use arrow2::datatypes::DataType as DataType2;
 use arrow_schema::DataType;
 use arrow_schema::TimeUnit;
-use datafusion::parquet::data_type;
 use lazy_static::lazy_static;
 use serde::Deserialize;
 use serde::Deserializer;

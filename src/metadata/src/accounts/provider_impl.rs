@@ -1,7 +1,5 @@
 use std::sync::Arc;
-use std::sync::RwLock;
 
-use async_trait::async_trait;
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::Utc;
@@ -13,7 +11,6 @@ use crate::accounts::Account;
 use crate::accounts::CreateAccountRequest;
 use crate::accounts::Provider;
 use crate::accounts::UpdateAccountRequest;
-use crate::error;
 use crate::error::MetadataError;
 use crate::index::check_insert_constraints;
 use crate::index::check_update_constraints;

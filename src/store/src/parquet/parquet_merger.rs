@@ -4,13 +4,10 @@ use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::fs;
 use std::fs::File;
-use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::Read;
 use std::io::Seek;
-use std::io::Write;
 use std::os::unix::fs::MetadataExt;
-use std::path::Path;
 use std::path::PathBuf;
 
 use arrow2::array::new_null_array;
@@ -38,8 +35,6 @@ use arrow2::array::UInt32Array;
 use arrow2::array::UInt64Array;
 use arrow2::array::UInt8Array;
 use arrow2::array::Utf8Array;
-use arrow2::bitmap::Bitmap;
-use arrow2::chunk::Chunk;
 use arrow2::datatypes::DataType;
 use arrow2::datatypes::Field;
 use arrow2::datatypes::PhysicalType as ArrowPhysicalType;
@@ -50,9 +45,7 @@ use arrow2::io::parquet::write::add_arrow_schema;
 use arrow2::io::parquet::write::array_to_columns;
 use arrow2::io::parquet::write::to_parquet_schema;
 use arrow2::io::parquet::write::WriteOptions as ArrowWriteOptions;
-use arrow2::offset::OffsetsBuffer;
 use arrow2::types::NativeType;
-use metrics::gauge;
 use metrics::histogram;
 use num_traits::ToPrimitive;
 use parquet2::compression::CompressionOptions;
@@ -72,20 +65,19 @@ use crate::merge_list_arrays;
 use crate::merge_list_arrays_inner;
 use crate::merge_list_primitive_arrays;
 use crate::merge_primitive_arrays;
-use crate::parquet::parquet::array_to_pages_simple;
-use crate::parquet::parquet::data_page_to_array;
-use crate::parquet::parquet::get_page_min_max_values;
-use crate::parquet::parquet::pages_to_arrays;
-use crate::parquet::parquet::ColumnPath;
-use crate::parquet::parquet::CompressedPageIterator;
-use crate::parquet::parquet::ParquetValue;
+use crate::parquet::array_to_pages_simple;
+use crate::parquet::data_page_to_array;
+use crate::parquet::get_page_min_max_values;
+use crate::parquet::pages_to_arrays;
 use crate::parquet::try_merge_arrow_schemas;
+use crate::parquet::ColumnPath;
+use crate::parquet::CompressedPageIterator;
 use crate::parquet::IndexChunk;
 use crate::parquet::OneColMergeRow;
+use crate::parquet::ParquetValue;
 use crate::parquet::ThreeColMergeRow;
 use crate::parquet::TmpArray;
 use crate::parquet::TwoColMergeRow;
-use crate::KeyValue;
 
 #[derive(Debug)]
 // Arrow chunk before being merged
@@ -307,6 +299,11 @@ impl PagesIndexChunk {
             })
             .sum()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     pub fn to_arrow_chunk(
         self,
         buf: &mut Vec<u8>,
@@ -424,28 +421,28 @@ pub fn merge_one_primitive<T: NativeType + Ord>(
         order.push(chunks[row_idx].stream);
         if let Some(v) = arr_iters[row_idx].next() {
             let mr = OneColMergeRow(row_idx, *v);
+            #[allow(clippy::drain_collect)]
             sort.push(mr);
         }
 
         // limit output by array size
         if out_col.len() >= array_size {
-            let out = vec![PrimitiveArray::<T>::from_vec(out_col.drain(..).collect()).boxed()];
-            let arr_order = order.drain(..).collect();
+            let out = vec![PrimitiveArray::<T>::from_vec(std::mem::take(&mut out_col)).boxed()];
+            let arr_order = std::mem::take(&mut order);
+            #[allow(clippy::drain_collect)]
             res.push(MergedArrowChunk::new(out, arr_order));
         }
     }
 
     // drain the rest
     if !out_col.is_empty() {
-        let out = vec![PrimitiveArray::<T>::from_vec(out_col.drain(..).collect()).boxed()];
-        let arr_order = order.drain(..).collect();
+        let out = vec![PrimitiveArray::<T>::from_vec(std::mem::take(&mut out_col)).boxed()];
+        let arr_order = std::mem::take(&mut order);
         res.push(MergedArrowChunk::new(out, arr_order));
     }
 
     Ok(res)
 }
-
-type Slice = (usize, usize, usize);
 
 // merge chunks with two column partition that are primitives
 
@@ -490,25 +487,26 @@ pub fn merge_two_primitives<T1: NativeType + Ord, T2: NativeType + Ord>(
         if let Some(v1) = arr_iters[row_idx].0.next() {
             let v2 = arr_iters[row_idx].1.next().unwrap();
             let mr = TwoColMergeRow(row_idx, *v1, *v2);
+            #[allow(clippy::drain_collect)]
             sort.push(mr);
         }
 
         if out_col1.len() >= array_size {
             let out = vec![
-                PrimitiveArray::<T1>::from_vec(out_col1.drain(..).collect()).boxed(),
-                PrimitiveArray::<T2>::from_vec(out_col2.drain(..).collect()).boxed(),
+                PrimitiveArray::<T1>::from_vec(std::mem::take(&mut out_col1)).boxed(),
+                PrimitiveArray::<T2>::from_vec(std::mem::take(&mut out_col2)).boxed(),
             ];
-            let arr_order = order.drain(..).collect();
+            let arr_order = std::mem::take(&mut order);
             res.push(MergedArrowChunk::new(out, arr_order));
         }
     }
 
     if !out_col1.is_empty() {
         let out = vec![
-            PrimitiveArray::<T1>::from_vec(out_col1.drain(..).collect()).boxed(),
-            PrimitiveArray::<T2>::from_vec(out_col2.drain(..).collect()).boxed(),
+            PrimitiveArray::<T1>::from_vec(std::mem::take(&mut out_col1)).boxed(),
+            PrimitiveArray::<T2>::from_vec(std::mem::take(&mut out_col2)).boxed(),
         ];
-        let arr_order = order.drain(..).collect();
+        let arr_order = std::mem::take(&mut order);
         res.push(MergedArrowChunk::new(out, arr_order));
     }
 
@@ -575,22 +573,22 @@ pub fn merge_three_primitives<T1: NativeType + Ord, T2: NativeType + Ord, T3: Na
 
         if out_col1.len() >= array_size {
             let out = vec![
-                PrimitiveArray::<T1>::from_vec(out_col1.drain(..).collect()).boxed(),
-                PrimitiveArray::<T2>::from_vec(out_col2.drain(..).collect()).boxed(),
-                PrimitiveArray::<T3>::from_vec(out_col3.drain(..).collect()).boxed(),
+                PrimitiveArray::<T1>::from_vec(std::mem::take(&mut out_col1)).boxed(),
+                PrimitiveArray::<T2>::from_vec(std::mem::take(&mut out_col2)).boxed(),
+                PrimitiveArray::<T3>::from_vec(std::mem::take(&mut out_col3)).boxed(),
             ];
-            let arr_order = order.drain(..).collect();
+            let arr_order = std::mem::take(&mut order);
             res.push(MergedArrowChunk::new(out, arr_order));
         }
     }
 
     if !out_col1.is_empty() {
         let out = vec![
-            PrimitiveArray::<T1>::from_vec(out_col1.drain(..).collect()).boxed(),
-            PrimitiveArray::<T2>::from_vec(out_col2.drain(..).collect()).boxed(),
-            PrimitiveArray::<T3>::from_vec(out_col3.drain(..).collect()).boxed(),
+            PrimitiveArray::<T1>::from_vec(std::mem::take(&mut out_col1)).boxed(),
+            PrimitiveArray::<T2>::from_vec(std::mem::take(&mut out_col2)).boxed(),
+            PrimitiveArray::<T3>::from_vec(std::mem::take(&mut out_col3)).boxed(),
         ];
-        let arr_order = order.drain(..).collect();
+        let arr_order = std::mem::take(&mut order);
         res.push(MergedArrowChunk::new(out, arr_order));
     }
 
@@ -740,13 +738,6 @@ pub enum MergeReorder {
     Merge(Vec<usize>, Vec<usize>),
 }
 
-pub struct FileMergeOptions {
-    index_cols: usize,
-    data_page_size_limit: Option<usize>,
-    row_group_values_limit: usize,
-    array_page_size: usize,
-}
-
 #[derive(Debug, Clone)]
 pub struct MergedFile {
     pub size_bytes: u64,
@@ -804,7 +795,7 @@ pub fn merge<R: Read + Seek>(
         max_part_file_size_bytes: opts.max_part_size_bytes,
     };
 
-    Ok(mr.merge(tbl_name, level_id)?)
+    mr.merge(tbl_name, level_id)
 }
 
 impl<R> Merger<R>
@@ -868,7 +859,7 @@ where R: Read + Seek
             let mut first = true;
             let mut some = false;
             // Request merge of index column
-            'l2: while let Some(chunks) = self.next_index_chunk()? {
+            while let Some(chunks) = self.next_index_chunk()? {
                 some = true;
                 // get descriptors of index/partition columns
 
@@ -948,7 +939,7 @@ where R: Read + Seek
                                 histogram!("store.merger.uncompressed_data_page_size_bytes","table"=>tbl_name.to_string(),"level"=>level_id.to_string()).record(dp.uncompressed_size().to_f64().unwrap());
                                 histogram!("store.merger.compressed_data_page_size_bytes","table"=>tbl_name.to_string(),"level"=>level_id.to_string()).record(dp.compressed_size().to_f64().unwrap());
                             }
-                            seq_writer.write_page(&page)?;
+                            seq_writer.write_page(page)?;
                         }
                     }
 
@@ -987,7 +978,7 @@ where R: Read + Seek
                 seq_writer.end(key_value_metadata)?;
 
                 let mf = MergedFile {
-                    size_bytes: File::open(&self.to_path.join(format!("{}.parquet", part_id)))?
+                    size_bytes: File::open(self.to_path.join(format!("{}.parquet", part_id)))?
                         .metadata()
                         .unwrap()
                         .size(),
@@ -999,7 +990,7 @@ where R: Read + Seek
                 merged_files.push(mf);
             } else {
                 // delete empty file. We can do this safely because we write to temp file and then rename it
-                fs::remove_file(&self.to_path.join(format!("{}.parquet", part_id)))?;
+                fs::remove_file(self.to_path.join(format!("{}.parquet", part_id)))?;
             }
             break;
         }

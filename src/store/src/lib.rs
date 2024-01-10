@@ -15,15 +15,11 @@ pub mod parquet;
 pub mod table;
 pub mod test_util;
 
-use std::cmp::Ordering;
 use std::fmt::Debug;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
-use arrow2::datatypes::DataType;
-use chrono::DateTime;
-use chrono::Utc;
 use error::Result;
 use get_size::GetSize;
 use parking_lot::Mutex;
@@ -31,7 +27,6 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::error::StoreError;
-use crate::Value::Int16;
 
 #[derive(Eq, PartialEq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize, Hash, GetSize)]
 pub enum KeyValue {
@@ -43,13 +38,13 @@ pub enum KeyValue {
     Timestamp(i64),
 }
 
-impl TryFrom<&parquet::parquet::ParquetValue> for KeyValue {
+impl TryFrom<&parquet::ParquetValue> for KeyValue {
     type Error = StoreError;
 
-    fn try_from(value: &parquet::parquet::ParquetValue) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: &parquet::ParquetValue) -> std::result::Result<Self, Self::Error> {
         Ok(match value {
-            parquet::parquet::ParquetValue::Int32(v) => KeyValue::Int32(*v),
-            parquet::parquet::ParquetValue::Int64(v) => KeyValue::Int64(*v),
+            parquet::ParquetValue::Int32(v) => KeyValue::Int32(*v),
+            parquet::ParquetValue::Int64(v) => KeyValue::Int64(*v),
             _ => unimplemented!(),
         })
     }
@@ -86,33 +81,6 @@ pub enum Value {
     ListTimestamp(Option<Vec<Option<i64>>>),
     ListDecimal(Option<Vec<Option<i128>>>),
     ListString(Option<Vec<Option<String>>>),
-}
-
-impl Value {
-    fn null(dt: &DataType) -> Value {
-        match dt {
-            DataType::Boolean => Value::Boolean(None),
-            DataType::Int8 => Value::Int8(None),
-            DataType::Int16 => Int16(None),
-            DataType::Int32 => Value::Int32(None),
-            DataType::Int64 => Value::Int64(None),
-            DataType::Timestamp(_, _) => Value::Timestamp(None),
-            DataType::Utf8 => Value::String(None),
-            DataType::Decimal(_, _) => Value::Decimal(None),
-            DataType::List(f) => match f.data_type() {
-                DataType::Boolean => Value::ListBoolean(None),
-                DataType::Int8 => Value::ListInt8(None),
-                DataType::Int16 => Value::ListInt16(None),
-                DataType::Int32 => Value::ListInt32(None),
-                DataType::Int64 => Value::ListInt64(None),
-                DataType::Timestamp(_, _) => Value::ListTimestamp(None),
-                DataType::Utf8 => Value::ListString(None),
-                DataType::Decimal(_, _) => Value::ListDecimal(None),
-                _ => unimplemented!(),
-            },
-            _ => unimplemented!(),
-        }
-    }
 }
 
 impl From<&KeyValue> for Value {

@@ -15,7 +15,6 @@ use arrow2::datatypes::TimeUnit;
 use arrow2::io::parquet::read;
 use arrow2::io::print;
 use store::parquet::parquet_merger::merge;
-use store::parquet::parquet_merger::Merger;
 use store::parquet::parquet_merger::Options;
 use store::test_util::concat_chunks;
 use store::test_util::create_parquet_from_chunk;
@@ -26,8 +25,6 @@ use store::test_util::unmerge_chunk;
 use store::test_util::PrimaryIndexType;
 use tracing::trace;
 use tracing_test::traced_test;
-use vfs::MemoryFS;
-use vfs::VfsPath;
 
 #[derive(Clone)]
 struct TestCase {
@@ -91,8 +88,8 @@ fn roundtrip(tc: TestCase) -> anyhow::Result<()> {
     };
 
     let start = Instant::now();
-    fs::remove_dir_all("test_data/merge_roundtrip");
-    fs::create_dir_all("test_data/merge_roundtrip");
+    fs::remove_dir_all("test_data/merge_roundtrip").unwrap();
+    fs::create_dir_all("test_data/merge_roundtrip").unwrap();
     merge(readers, "test_data/merge_roundtrip".into(), 1, "t", 0, opts).unwrap();
     println!("merge {:?}", start.elapsed());
 
@@ -116,12 +113,13 @@ fn roundtrip(tc: TestCase) -> anyhow::Result<()> {
 
     Ok(())
 }
-
+#[allow(dead_code)]
 enum ProfileStep {
     Generate,
     Merge,
 }
 
+#[allow(dead_code)]
 fn stream_parquet_path(stream_id: usize, case_id: usize) -> PathBuf {
     // let mut path = temp_dir();
     // path.push(format!("optiprism/tests/merge"));
@@ -132,7 +130,7 @@ fn stream_parquet_path(stream_id: usize, case_id: usize) -> PathBuf {
 
     path
 }
-
+#[allow(dead_code)]
 fn profile(tc: TestCase, case_id: usize, step: ProfileStep) {
     let start = Instant::now();
     match step {
@@ -188,9 +186,8 @@ fn profile(tc: TestCase, case_id: usize, step: ProfileStep) {
                 max_part_size_bytes: None,
             };
 
-            let start = Instant::now();
-            fs::remove_dir_all("test_data/merge_profile");
-            fs::create_dir_all("test_data/merge_profile");
+            fs::remove_dir_all("test_data/merge_profile").unwrap();
+            fs::create_dir_all("test_data/merge_profile").unwrap();
             merge(readers, "/tmp/merge_profile".into(), 1, "t", 0, opts).unwrap();
         }
     }
@@ -412,6 +409,7 @@ fn test_merge() -> anyhow::Result<()> {
 
 // #[test]
 // todo Move to benches
+#[allow(dead_code)]
 fn test_profile_merge() {
     let data_fields = vec![
         Field::new("f1", DataType::Boolean, true),
@@ -565,7 +563,6 @@ fn test_different_row_group_sizes() -> anyhow::Result<()> {
         max_part_size_bytes: None,
     };
 
-    let start = Instant::now();
     fs::remove_dir_all("test_data/merge_different_row_group_sizes").unwrap();
     fs::create_dir_all("test_data/merge_different_row_group_sizes").unwrap();
     merge(
@@ -658,9 +655,8 @@ fn test_merge_with_missing_columns() -> anyhow::Result<()> {
         max_part_size_bytes: None,
     };
 
-    let start = Instant::now();
-    fs::remove_dir_all("test_data/merge_with_missing_columns");
-    fs::create_dir_all("test_data/merge_with_missing_columns");
+    fs::remove_dir_all("test_data/merge_with_missing_columns").unwrap();
+    fs::create_dir_all("test_data/merge_with_missing_columns").unwrap();
     merge(
         readers,
         "test_data/merge_with_missing_columns".into(),
@@ -727,7 +723,6 @@ fn test_pick_with_null_columns() -> anyhow::Result<()> {
         vec![Field::new("f1", DataType::Int64, false)],
     ];
 
-    let _names = vec!["f1", "f2"];
     let readers = cols
         .into_iter()
         .zip(fields.iter())
@@ -740,8 +735,8 @@ fn test_pick_with_null_columns() -> anyhow::Result<()> {
         })
         .collect::<Vec<_>>();
 
-    fs::remove_dir_all("test_data/merge_pick_with_null_columns");
-    fs::create_dir_all("test_data/merge_pick_with_null_columns");
+    fs::remove_dir_all("test_data/merge_pick_with_null_columns").unwrap();
+    fs::create_dir_all("test_data/merge_pick_with_null_columns").unwrap();
     let opts = Options {
         index_cols: 1,
         data_page_size_limit_bytes: None,

@@ -1,108 +1,47 @@
-use std::cmp;
-use std::cmp::Ordering;
 use std::collections::BinaryHeap;
-use std::collections::HashMap;
-use std::collections::VecDeque;
 use std::ffi::OsStr;
 use std::fs;
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::hash::Hash;
 use std::hash::Hasher;
-use std::io;
 use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::Read;
-use std::io::Seek;
 use std::io::Write;
 use std::mem;
-use std::os::unix::fs::MetadataExt;
-use std::path::Path;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::mpsc;
-use std::sync::mpsc::Receiver;
-use std::sync::mpsc::RecvError;
 use std::sync::mpsc::Sender;
-use std::sync::mpsc::TryRecvError;
 use std::sync::Arc;
-use std::sync::MutexGuard;
-use std::sync::OnceLock;
 use std::task::Context;
 use std::task::Poll;
 use std::thread;
-use std::time;
 use std::time::Duration;
 use std::time::Instant;
 
-use arrow::compute::concat;
-use arrow::ipc::Time;
-use arrow2::array::clone;
 use arrow2::array::Array;
-use arrow2::array::Int32Array;
-use arrow2::array::Int64Array;
-use arrow2::array::MutableArray;
-use arrow2::array::MutableBinaryArray;
-use arrow2::array::MutableBooleanArray;
-use arrow2::array::MutablePrimitiveArray;
-use arrow2::array::MutableUtf8Array;
-use arrow2::array::PrimitiveArray;
 use arrow2::chunk::Chunk;
-use arrow2::compute::merge_sort::SortOptions;
-use arrow2::compute::sort::lexsort_to_indices;
-use arrow2::compute::sort::SortColumn;
-use arrow2::compute::take;
 use arrow2::datatypes::DataType;
 use arrow2::datatypes::Field;
 use arrow2::datatypes::Schema;
-use arrow2::datatypes::SchemaRef;
-use arrow2::datatypes::TimeUnit;
 use arrow2::io::parquet;
-use arrow2::io::parquet::read;
-use arrow2::io::parquet::read::FileReader;
 use arrow2::io::parquet::write::transverse;
-use arrow2::io::print;
-use arrow_buffer::ToByteSlice;
 use bincode::deserialize;
 use bincode::serialize;
-use chrono::format::Item;
 use common::types::DType;
-use common::DECIMAL_PRECISION;
-use common::DECIMAL_SCALE;
-use crossbeam_skiplist::SkipSet;
-use futures::select;
-use futures::SinkExt;
 use futures::Stream;
-use get_size::GetSize;
-use lazy_static::lazy_static;
-use log::info;
 use metrics::counter;
-use metrics::describe_counter;
-use metrics::describe_histogram;
 use metrics::gauge;
 use metrics::histogram;
-use metrics::Counter;
-use metrics::Gauge;
-use metrics::Histogram;
-use metrics::Unit;
 use num_traits::ToPrimitive;
 use parking_lot::Mutex;
 use parking_lot::RwLock;
-use parquet2::metadata::FileMetaData;
-use rand::rngs::mock::StepRng;
-use rand::Rng;
-use rocksdb::Transaction;
-use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
-use shuffle::irs::Irs;
-use shuffle::shuffler::Shuffler;
 use siphasher::sip::SipHasher13;
-use tracing::debug;
-use tracing::error;
-use tracing::instrument;
 use tracing::trace;
-use tracing_subscriber::fmt::time::FormatTime;
 
 use crate::arrow_conversion::schema2_to_schema1;
 use crate::compaction::Compactor;
@@ -148,7 +87,7 @@ fn collect_metrics(tables: Arc<RwLock<Vec<Table>>>) {
             gauge!("store.table_fields", "table"=>t.name.to_string())
                 .set(md.schema.fields.len().to_f64().unwrap());
             gauge!("store.sequence","table"=>t.name.to_string()).set(md.seq_id.to_f64().unwrap());
-            for (pid, partition) in md.partitions.iter().enumerate() {
+            for partition in md.partitions.iter() {
                 for (lvlid, lvl) in partition.levels.iter().enumerate() {
                     let sz = lvl.parts.iter().map(|v| v.size_bytes).sum::<u64>();
                     let values = lvl.parts.iter().map(|v| v.values).sum::<usize>();
@@ -169,7 +108,7 @@ fn collect_metrics(tables: Arc<RwLock<Vec<Table>>>) {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum LogOp {
+pub(crate) enum LogOp {
     Insert(Vec<KeyValue>, Vec<Value>),
     Metadata(Metadata),
     AddField(Field),
@@ -269,7 +208,7 @@ fn try_recover_table(path: PathBuf, name: String) -> Result<Table> {
         };
     }
 
-    if logs.len() == 0 {
+    if logs.is_empty() {
         return Err(StoreError::Internal("no logs found".to_string()));
     }
 
@@ -279,12 +218,10 @@ fn try_recover_table(path: PathBuf, name: String) -> Result<Table> {
     // !@#trace!("last log: {:?}", log_path);
     // todo make a buffered read. Currently something odd happens with reading the length of the record
     let mut log = OpenOptions::new().read(true).write(true).open(&log_path)?;
-    let mut ops = 0;
-    let mut read_bytes = 0;
     // get metadata (first record of the log)
 
     let mut crc_b = [0u8; mem::size_of::<u32>()];
-    read_bytes = log.read(&mut crc_b)?;
+    let read_bytes = log.read(&mut crc_b)?;
     if read_bytes == 0 {
         return Err(StoreError::Internal("empty log file".to_string()));
     }
@@ -292,11 +229,11 @@ fn try_recover_table(path: PathBuf, name: String) -> Result<Table> {
     // !@#trace!("crc32: {}", crc32);
 
     let mut len_b = [0u8; mem::size_of::<u64>()];
-    log.read(&mut len_b)?;
+    _ = log.read(&mut len_b)?;
     let len = u64::from_le_bytes(len_b);
     // !@#trace!("len: {}", len);
     let mut data_b = vec![0u8; len as usize];
-    log.read(&mut data_b)?;
+    _ = log.read(&mut data_b)?;
     // todo recover from this case
     let cur_crc32 = hash_crc32(&data_b);
     if crc32 != cur_crc32 {
@@ -322,7 +259,7 @@ fn try_recover_table(path: PathBuf, name: String) -> Result<Table> {
     }
     loop {
         let mut crc_b = [0u8; mem::size_of::<u32>()];
-        read_bytes = log.read(&mut crc_b)?;
+        let read_bytes = log.read(&mut crc_b)?;
         if read_bytes == 0 {
             break;
         }
@@ -330,11 +267,11 @@ fn try_recover_table(path: PathBuf, name: String) -> Result<Table> {
         // !@#trace!("crc32: {}", crc32);
 
         let mut len_b = [0u8; mem::size_of::<u64>()];
-        log.read(&mut len_b)?;
+        _ = log.read(&mut len_b)?;
         let len = u64::from_le_bytes(len_b);
         // !@#trace!("len: {}", len);
         let mut data_b = vec![0u8; len as usize];
-        log.read(&mut data_b)?;
+        _ = log.read(&mut data_b)?;
         // todo recover from this case
         let cur_crc32 = hash_crc32(&data_b);
         if crc32 != cur_crc32 {
@@ -348,7 +285,6 @@ fn try_recover_table(path: PathBuf, name: String) -> Result<Table> {
         recover_op(op, &mut memtable, &mut metadata)?;
 
         metadata.seq_id += 1;
-        ops += 1;
     }
     // !@#trace!("operations recovered: {}", ops);
 
@@ -505,7 +441,7 @@ fn flush(
     // !@#trace!("part id: {}", md.levels[0].part_id);
     let empty_memtable = memtable.create_empty();
     let memtable = mem::replace(memtable, empty_memtable);
-    let parts = write_level0(&metadata, &memtable, path.to_owned())?;
+    let parts = write_level0(metadata, &memtable, path.to_owned())?;
     for (pid, part) in parts {
         metadata.partitions[pid].levels[0].parts.push(part.clone());
         // increment table id
@@ -533,7 +469,7 @@ fn flush(
         )))?;
 
     // write metadata to log as first record
-    log_metadata(&mut log, metadata);
+    log_metadata(&mut log, metadata)?;
 
     trace!(
         "removing previous log file {:?}",
@@ -573,7 +509,7 @@ impl ScanStream {
 impl Stream for ScanStream {
     type Item = Result<Chunk<Box<dyn Array>>>;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+    fn poll_next(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         match self.iter.next() {
             None => {
                 histogram!("store.scan_time_seconds","table"=>self.table_name.to_string())
@@ -635,13 +571,7 @@ impl OptiDBImpl {
             .collect::<Vec<_>>();
         let mut final_values: Vec<Value> = vec![];
 
-        for (field_idx, field) in metadata
-            .schema
-            .fields
-            .iter()
-            .skip(metadata.opts.index_cols)
-            .enumerate()
-        {
+        for field in metadata.schema.fields.iter().skip(metadata.opts.index_cols) {
             let mut found = false;
             for v in values.iter() {
                 if field.name == v.name {
@@ -700,7 +630,7 @@ impl OptiDBImpl {
     }
 
     pub fn flush(&self) -> Result<()> {
-        let mut tbls = self.tables.read();
+        let tbls = self.tables.read();
         for tbl in tbls.iter() {
             let mut log = tbl.log.lock();
             let mut memtable = tbl.memtable.lock();
@@ -714,7 +644,7 @@ impl OptiDBImpl {
     pub fn schema(&self, tbl_name: &str) -> Result<Schema> {
         let tables = self.tables.read();
         let tbl = tables.iter().find(|t| t.name == tbl_name);
-        let mut tbl = match tbl {
+        let tbl = match tbl {
             None => return Err(StoreError::Internal("table not found".to_string())),
             Some(tbl) => tbl,
         };
@@ -728,11 +658,11 @@ impl OptiDBImpl {
         Ok(schema2_to_schema1(schema))
     }
 
-    pub fn get(&self, opts: ReadOptions, key: Vec<KeyValue>) -> Result<Vec<(String, Value)>> {
+    pub fn get(&self, _opts: ReadOptions, _key: Vec<KeyValue>) -> Result<Vec<(String, Value)>> {
         unimplemented!()
     }
 
-    pub fn delete(&self, opts: WriteOptions, key: Vec<KeyValue>) -> Result<()> {
+    pub fn delete(&self, _opts: WriteOptions, _key: Vec<KeyValue>) -> Result<()> {
         unimplemented!()
     }
 
@@ -744,7 +674,7 @@ impl OptiDBImpl {
     ) -> Result<ScanStream> {
         let tables = self.tables.read();
         let tbl = tables.iter().find(|t| t.name == tbl_name);
-        let mut tbl = match tbl {
+        let tbl = match tbl {
             None => return Err(StoreError::Internal("table not found".to_string())),
             Some(tbl) => tbl.to_owned(),
         };
@@ -788,7 +718,7 @@ impl OptiDBImpl {
         }
         counter!("store.scan_parts_total", "table"=>tbl_name.to_string())
             .increment(rdrs.len() as u64);
-        let iter = if rdrs.len() == 0 {
+        let iter = if rdrs.is_empty() {
             Box::new(MemChunkIterator::new(maybe_chunk))
                 as Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>
         } else {
@@ -850,7 +780,7 @@ impl OptiDBImpl {
 
     pub fn create_table(&self, table_name: String, opts: table::Options) -> Result<()> {
         let tbl = self.tables.read();
-        if tbl.iter().find(|t| t.name == table_name).is_some() {
+        if tbl.iter().any(|t| t.name == table_name) {
             return Err(StoreError::AlreadyExists(format!(
                 "Table with name {} already exists",
                 table_name
@@ -873,7 +803,6 @@ impl OptiDBImpl {
             schema: Schema::from(vec![]),
             stats: Default::default(),
             partitions: (0..opts.partitions)
-                .into_iter()
                 .map(|pid| Partition {
                     id: pid,
                     levels: vec![Level::new_empty(); opts.levels],
@@ -882,7 +811,7 @@ impl OptiDBImpl {
             opts: opts.clone(),
         };
 
-        let memtable = Memtable::new(opts.partitions.clone());
+        let memtable = Memtable::new(opts.partitions);
         let mut log = OpenOptions::new()
             .create_new(true)
             .write(true)
@@ -929,61 +858,43 @@ impl Drop for OptiDBImpl {
 
 #[cfg(test)]
 mod tests {
-    use std::env::temp_dir;
+
     use std::fs;
-    use std::io;
-    use std::io::Write;
     use std::path::PathBuf;
     use std::pin::Pin;
-    use std::sync::Arc;
     use std::thread;
     use std::time::Duration;
 
     use arrow2::array::Array;
     use arrow2::array::PrimitiveArray;
     use arrow2::chunk::Chunk;
-    use arrow2::datatypes::DataType;
-    use arrow2::datatypes::Field;
-    use arrow2::datatypes::Schema;
-    use bincode::serialize;
     use common::types::DType;
-    use futures::executor::block_on;
     use futures::Stream;
     use futures::StreamExt;
-    use get_size::GetSize;
     use rand::rngs::mock::StepRng;
-    use rand::thread_rng;
-    use rand::Rng;
     use shuffle::fy::FisherYates;
-    use shuffle::irs::Irs;
     use shuffle::shuffler::Shuffler;
-    use tracing::info;
-    use tracing::log;
-    use tracing::log::debug;
-    use tracing::trace;
-    use tracing_subscriber::util::SubscriberInitExt;
     use tracing_test::traced_test;
 
     use crate::db;
-    use crate::db::Level;
     use crate::db::OptiDBImpl;
     use crate::db::Options;
-    use crate::db::Part;
     use crate::table;
-    use crate::KeyValue;
     use crate::NamedValue;
     use crate::Value;
+
+    type SendableRecordBatchStream =
+        Pin<Box<dyn Stream<Item = crate::error::Result<Chunk<Box<dyn Array>>>> + Send>>;
 
     #[traced_test]
     #[test]
     fn gen() {
-        // let path = temp_dir().join("db");
         let path = PathBuf::from("/opt/homebrew/Caskroom/clickhouse/user_files");
         fs::remove_dir_all(&path).unwrap();
         fs::create_dir_all(&path).unwrap();
 
         let opts = Options {};
-        let mut db = OptiDBImpl::open(path, opts).unwrap();
+        let db = OptiDBImpl::open(path, opts).unwrap();
         let topts = table::Options {
             levels: 7,
             merge_array_size: 1000,
@@ -1003,24 +914,6 @@ mod tests {
             merge_chunk_size: 1024 * 8 * 8,
         };
 
-        // let topts = TableOptions {
-        // levels: 7,
-        // merge_array_size: 10000,
-        // partitions: 2,
-        // index_cols: 2,
-        // l1_max_size_bytes: 1024 * 1024,
-        // level_size_multiplier: 10,
-        // l0_max_parts: 4,
-        // max_log_length_bytes: 1024 * 1024,
-        // merge_array_page_size: 10000,
-        // merge_data_page_size_limit_bytes: Some(1024 * 1024),
-        // merge_index_cols: 2,
-        // merge_max_l1_part_size_bytes: 1024 * 1024,
-        // merge_part_size_multiplier: 10,
-        // merge_row_group_values_limit: 1000,
-        // read_chunk_size: 10,
-        // };
-
         let cols = 4;
         db.create_table("t1".to_string(), topts).unwrap();
         for col in 0..cols {
@@ -1037,28 +930,14 @@ mod tests {
         for _ in 0..2 {
             for i in input.clone() {
                 let vals = (0..cols)
-                    .map(|v| NamedValue::new(v.to_string(), Value::Int64(Some(i as i64))))
+                    .map(|v| NamedValue::new(v.to_string(), Value::Int64(Some(i))))
                     .collect::<Vec<_>>();
                 db.insert("t1", vals).unwrap();
             }
         }
-        // let names = (0..cols).map(|v| v.to_string()).collect::<Vec<_>>();
-        // let streams = db.scan_partition("t1", 2, names).unwrap();
-        // for stream in streams {
-        // let b = block_on(stream.collect::<Vec<_>>())
-        // .into_iter()
-        // .map(|v| v.unwrap())
-        // .collect::<Vec<_>>();
-        //
-        // for bb in b {
-        //     println!("{: ?}", bb);
-        // }
-        // }
 
         db.flush().unwrap();
         thread::sleep(Duration::from_millis(20));
-        // print_partitions(db.tables.read()[0].metadata.lock().partitions.as_ref());
-        // db.compact();
     }
 
     #[test]
@@ -1068,7 +947,7 @@ mod tests {
         fs::create_dir_all(&path).unwrap();
 
         let opts = Options {};
-        let mut db = OptiDBImpl::open(path, opts).unwrap();
+        let db = OptiDBImpl::open(path, opts).unwrap();
         let topts = table::Options {
             levels: 7,
             merge_array_size: 10000,
@@ -1116,7 +995,7 @@ mod tests {
         fs::create_dir_all(&path).unwrap();
 
         let opts = db::Options {};
-        let mut db = OptiDBImpl::open(path.clone(), opts).unwrap();
+        let db = OptiDBImpl::open(path.clone(), opts).unwrap();
         let topts = table::Options {
             levels: 7,
             merge_array_size: 10000,
@@ -1157,9 +1036,7 @@ mod tests {
             .scan_partition("t1", 0, vec!["f1".to_string(), "f2".to_string()])
             .unwrap();
 
-        let mut stream: Pin<
-            Box<dyn Stream<Item = crate::error::Result<Chunk<Box<dyn Array>>>> + Send>,
-        > = Box::pin(stream);
+        let mut stream: SendableRecordBatchStream = Box::pin(stream);
         let b = stream.next().await;
 
         assert_eq!(
@@ -1173,9 +1050,7 @@ mod tests {
         // scan one column
         let stream = db.scan_partition("t1", 0, vec!["f1".to_string()]).unwrap();
 
-        let mut stream: Pin<
-            Box<dyn Stream<Item = crate::error::Result<Chunk<Box<dyn Array>>>> + Send>,
-        > = Box::pin(stream);
+        let mut stream: SendableRecordBatchStream = Box::pin(stream);
         let b = stream.next().await;
 
         assert_eq!(
@@ -1197,9 +1072,7 @@ mod tests {
             .scan_partition("t1", 0, vec!["f1".to_string(), "f2".to_string()])
             .unwrap();
 
-        let mut stream: Pin<
-            Box<dyn Stream<Item = crate::error::Result<Chunk<Box<dyn Array>>>> + Send>,
-        > = Box::pin(stream);
+        let mut stream: SendableRecordBatchStream = Box::pin(stream);
         let b = stream.next().await;
 
         assert_eq!(
@@ -1218,16 +1091,14 @@ mod tests {
 
         // reopen db
         let opts = db::Options {};
-        let mut db = OptiDBImpl::open(path.clone(), opts).unwrap();
+        let db = OptiDBImpl::open(path.clone(), opts).unwrap();
 
         // scan two columns
         let stream = db
             .scan_partition("t1", 0, vec!["f1".to_string(), "f2".to_string()])
             .unwrap();
 
-        let mut stream: Pin<
-            Box<dyn Stream<Item = crate::error::Result<Chunk<Box<dyn Array>>>> + Send>,
-        > = Box::pin(stream);
+        let mut stream: SendableRecordBatchStream = Box::pin(stream);
         let b = stream.next().await;
 
         assert_eq!(
@@ -1254,9 +1125,7 @@ mod tests {
             .scan_partition("t1", 0, vec!["f1".to_string(), "f2".to_string()])
             .unwrap();
 
-        let mut stream: Pin<
-            Box<dyn Stream<Item = crate::error::Result<Chunk<Box<dyn Array>>>> + Send>,
-        > = Box::pin(stream);
+        let mut stream: SendableRecordBatchStream = Box::pin(stream);
         let b = stream.next().await;
 
         assert_eq!(
@@ -1297,9 +1166,7 @@ mod tests {
             ])
             .unwrap();
 
-        let mut stream: Pin<
-            Box<dyn Stream<Item = crate::error::Result<Chunk<Box<dyn Array>>>> + Send>,
-        > = Box::pin(stream);
+        let mut stream: SendableRecordBatchStream = Box::pin(stream);
         let b = stream.next().await;
 
         assert_eq!(
@@ -1348,9 +1215,7 @@ mod tests {
             ])
             .unwrap();
 
-        let mut stream: Pin<
-            Box<dyn Stream<Item = crate::error::Result<Chunk<Box<dyn Array>>>> + Send>,
-        > = Box::pin(stream);
+        let mut stream: SendableRecordBatchStream = Box::pin(stream);
         let b = stream.next().await;
 
         assert_eq!(
@@ -1388,9 +1253,7 @@ mod tests {
             ])
             .unwrap();
 
-        let mut stream: Pin<
-            Box<dyn Stream<Item = crate::error::Result<Chunk<Box<dyn Array>>>> + Send>,
-        > = Box::pin(stream);
+        let mut stream: SendableRecordBatchStream = Box::pin(stream);
         let b = stream.next().await;
 
         assert_eq!(
