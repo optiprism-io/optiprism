@@ -3,12 +3,9 @@ use std::fmt::Formatter;
 use std::hash::Hash;
 use std::hash::Hasher;
 use std::sync::Arc;
-use std::sync::RwLock;
 
-use async_trait::async_trait;
 use byteorder::ByteOrder;
 use byteorder::LittleEndian;
-use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 
 use crate::dictionaries::Provider;
@@ -54,7 +51,7 @@ impl ProviderImpl {
 
 impl Debug for ProviderImpl {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        self.fmt(f)
+        write!(f, "dictionaries")
     }
 }
 

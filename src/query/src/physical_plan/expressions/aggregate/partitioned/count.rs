@@ -434,7 +434,7 @@ impl PartitionedAggregateExpr for PartitionedCount<i128> {
             let group_col = groups.row_converter.convert_rows(rows)?;
             let res_col = res_col_b.finish();
             let res_col = Arc::new(res_col) as ArrayRef;
-            Ok(vec![group_col, vec![res_col]].concat())
+            Ok([group_col, vec![res_col]].concat())
         } else {
             let mut res_col_b = Decimal128Builder::with_capacity(1)
                 .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?;

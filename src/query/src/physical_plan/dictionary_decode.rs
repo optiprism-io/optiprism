@@ -1,7 +1,7 @@
 use std::any::Any;
 use std::fmt;
 use std::fmt::Debug;
-use std::fmt::Formatter;
+
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Context;
@@ -14,10 +14,10 @@ use arrow::array::Int32Array;
 use arrow::array::Int64Array;
 use arrow::array::Int8Array;
 use arrow::array::StringBuilder;
-use arrow::array::UInt16Array;
-use arrow::array::UInt32Array;
-use arrow::array::UInt64Array;
-use arrow::array::UInt8Array;
+
+
+
+
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
 use arrow::datatypes::FieldRef;
@@ -25,7 +25,7 @@ use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
 use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
-use arrow::util::pretty::print_batches;
+
 use axum::async_trait;
 use datafusion::execution::context::TaskContext;
 use datafusion::physical_plan::expressions::Column;
@@ -41,7 +41,7 @@ use datafusion::physical_plan::RecordBatchStream;
 use datafusion::physical_plan::SendableRecordBatchStream;
 use datafusion::physical_plan::Statistics;
 use datafusion_common::Result as DFResult;
-use futures::executor::block_on;
+
 use futures::Stream;
 use futures::StreamExt;
 use metadata::dictionaries::provider_impl::SingleDictionaryProvider;

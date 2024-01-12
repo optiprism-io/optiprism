@@ -1,7 +1,5 @@
 use std::sync::Arc;
-use std::sync::RwLock;
 
-use async_trait::async_trait;
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::Utc;
@@ -13,7 +11,6 @@ use crate::dashboards::CreateDashboardRequest;
 use crate::dashboards::Dashboard;
 use crate::dashboards::Provider;
 use crate::dashboards::UpdateDashboardRequest;
-use crate::error;
 use crate::error::MetadataError;
 use crate::index::next_seq;
 use crate::metadata::ListResponse;
@@ -85,7 +82,7 @@ impl Provider for ProviderImpl {
                 org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
                 dashboard.id,
             ),
-            &data,
+            data,
         )?;
 
         tx.commit()?;
@@ -139,7 +136,7 @@ impl Provider for ProviderImpl {
                 org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
                 dashboard.id,
             ),
-            &data,
+            data,
         )?;
         tx.commit()?;
         Ok(dashboard)

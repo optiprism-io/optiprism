@@ -10,7 +10,9 @@ pub fn check_insert_constraints(
 ) -> Result<()> {
     for key in keys.iter().flatten() {
         if (tx.get(key)?).is_some() {
-            return Err(MetadataError::AlreadyExists(String::from_utf8(key.to_owned())?).into());
+            return Err(MetadataError::AlreadyExists(String::from_utf8(
+                key.to_owned(),
+            )?));
         }
     }
     Ok(())
@@ -35,9 +37,9 @@ pub fn check_update_constraints(
     for (key, prev_key) in keys.iter().zip(prev_keys) {
         if let Some(key_v) = key {
             if key != prev_key && (tx.get(key_v)?).is_some() {
-                return Err(
-                    MetadataError::AlreadyExists(String::from_utf8(key_v.to_owned())?).into(),
-                );
+                return Err(MetadataError::AlreadyExists(String::from_utf8(
+                    key_v.to_owned(),
+                )?));
             }
         }
     }
@@ -76,7 +78,9 @@ pub fn delete_index(tx: &Transaction<TransactionDB>, keys: &[Option<Vec<u8>>]) -
 pub fn get_index<K>(tx: &Transaction<TransactionDB>, key: K) -> Result<Vec<u8>>
 where K: AsRef<[u8]> {
     match tx.get(key.as_ref())? {
-        None => Err(MetadataError::NotFound(String::from_utf8(key.as_ref().to_owned())?).into()),
+        None => Err(MetadataError::NotFound(String::from_utf8(
+            key.as_ref().to_owned(),
+        )?)),
         Some(v) => Ok(v),
     }
 }

@@ -27,11 +27,13 @@ fn assert(l: &CustomEvent, r: &CustomEvent) {
 }
 
 #[tokio::test]
-async fn test_custom_events() -> anyhow::Result<()> {
-    let (base_url, md, pp) = run_http_service(false).await?;
+async fn test_custom_events() {
+    let (base_url, md, pp) = run_http_service(false).await.unwrap();
     let events_url = format!("{base_url}/organizations/1/projects/1/schema/custom-events");
     let cl = Client::new();
-    let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts).await?;
+    let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts)
+        .await
+        .unwrap();
 
     let event1 = md
         .events
@@ -46,7 +48,7 @@ async fn test_custom_events() -> anyhow::Result<()> {
             properties: None,
             custom_properties: None,
         })
-        .await?;
+        .unwrap();
 
     let event2 = md
         .events
@@ -61,7 +63,7 @@ async fn test_custom_events() -> anyhow::Result<()> {
             properties: None,
             custom_properties: None,
         })
-        .await?;
+        .unwrap();
 
     let mut custom_event1 = CustomEvent {
         id: 1,
@@ -86,10 +88,11 @@ async fn test_custom_events() -> anyhow::Result<()> {
     // list without events should be empty
     {
         let resp = cl
-            .get(format!("{events_url}"))
+            .get(&events_url)
             .headers(admin_headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
 
         assert_response_status_eq!(resp, StatusCode::OK);
         assert_response_json_eq!(resp, EMPTY_LIST.to_string());
@@ -101,7 +104,8 @@ async fn test_custom_events() -> anyhow::Result<()> {
             .get(format!("{events_url}/1"))
             .headers(admin_headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
 
         assert_response_status_eq!(resp, StatusCode::NOT_FOUND);
     }
@@ -112,7 +116,8 @@ async fn test_custom_events() -> anyhow::Result<()> {
             .delete(format!("{events_url}/1"))
             .headers(admin_headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
 
         assert_response_status_eq!(resp, StatusCode::NOT_FOUND);
     }
@@ -130,12 +135,13 @@ async fn test_custom_events() -> anyhow::Result<()> {
 
         let resp = cl
             .post(&events_url)
-            .body(serde_json::to_string(&req)?)
+            .body(serde_json::to_string(&req).unwrap())
             .headers(admin_headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
         assert_response_status_eq!(resp, StatusCode::CREATED);
-        let resp: CustomEvent = serde_json::from_str(resp.text().await?.as_str())?;
+        let resp: CustomEvent = serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
         assert(&resp, &custom_event1)
     }
 
@@ -166,12 +172,13 @@ async fn test_custom_events() -> anyhow::Result<()> {
 
         let resp = cl
             .put(format!("{events_url}/1"))
-            .body(serde_json::to_string(&req)?)
+            .body(serde_json::to_string(&req).unwrap())
             .headers(admin_headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
         assert_response_status_eq!(resp, StatusCode::OK);
-        let e: CustomEvent = serde_json::from_str(resp.text().await?.as_str())?;
+        let e: CustomEvent = serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
 
         assert(&e, &custom_event1);
     }
@@ -182,9 +189,10 @@ async fn test_custom_events() -> anyhow::Result<()> {
             .get(format!("{events_url}/1"))
             .headers(admin_headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
         assert_response_status_eq!(resp, StatusCode::OK);
-        let e: CustomEvent = serde_json::from_str(resp.text().await?.as_str())?;
+        let e: CustomEvent = serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
         assert(&e, &custom_event1);
     }
     // list events should return list with one event
@@ -193,9 +201,11 @@ async fn test_custom_events() -> anyhow::Result<()> {
             .get(&events_url)
             .headers(admin_headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
         assert_response_status_eq!(resp, StatusCode::OK);
-        let resp: ListResponse<CustomEvent> = serde_json::from_str(resp.text().await?.as_str())?;
+        let resp: ListResponse<CustomEvent> =
+            serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
         assert_eq!(resp.data.len(), 1);
         assert(&resp.data[0], &custom_event1);
     }
@@ -206,15 +216,16 @@ async fn test_custom_events() -> anyhow::Result<()> {
             .delete(format!("{events_url}/1"))
             .headers(admin_headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
         assert_response_status_eq!(resp, StatusCode::OK);
 
         let resp = cl
             .delete(format!("{events_url}/1"))
             .headers(admin_headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
         assert_response_status_eq!(resp, StatusCode::NOT_FOUND);
     }
-    Ok(())
 }

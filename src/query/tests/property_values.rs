@@ -1,21 +1,12 @@
-use std::env::temp_dir;
-use std::sync::Arc;
-
-use store::db::OptiDBImpl;
-use store::db::Options;
-use store::db::TableOptions;
-use uuid::Uuid;
-
 #[cfg(test)]
 mod tests {
-    use std::env::temp_dir;
+
     use std::sync::Arc;
 
     use arrow::util::pretty::print_batches;
     use common::query::EventRef;
     use common::query::PropValueOperation;
     use common::query::PropertyRef;
-    use common::types::TABLE_EVENTS;
     use common::DECIMAL_PRECISION;
     use common::DECIMAL_SCALE;
     use datafusion::execution::context::SessionState;
@@ -26,17 +17,13 @@ mod tests {
     use datafusion_common::ScalarValue;
     use metadata::test_util::init_db;
     use query::error::Result;
-    use query::physical_plan::planner::planner::QueryPlanner;
+    use query::physical_plan::planner::QueryPlanner;
     use query::queries::property_values::Filter;
     use query::queries::property_values::LogicalPlanBuilder;
     use query::queries::property_values::PropertyValues;
     use query::test_util::create_entities;
     use query::test_util::events_provider;
     use query::Context;
-    use store::db::OptiDBImpl;
-    use store::db::Options;
-    use store::db::TableOptions;
-    use uuid::Uuid;
 
     #[tokio::test]
     async fn test_bool() -> Result<()> {
@@ -68,10 +55,11 @@ mod tests {
         println!("{:?}", plan);
         let runtime = Arc::new(RuntimeEnv::default());
         let config = SessionConfig::new().with_target_partitions(1);
+        #[allow(deprecated)]
         let session_state = SessionState::with_config_rt(config, runtime)
             .with_query_planner(Arc::new(QueryPlanner {}))
             .with_optimizer_rules(vec![]);
-
+        #[allow(deprecated)]
         let exec_ctx = SessionContext::with_state(session_state.clone());
         let physical_plan = session_state.create_physical_plan(&plan).await?;
 
@@ -115,10 +103,11 @@ mod tests {
         println!("{:?}", plan);
         let runtime = Arc::new(RuntimeEnv::default());
         let config = SessionConfig::new().with_target_partitions(1);
+        #[allow(deprecated)]
         let session_state = SessionState::with_config_rt(config, runtime)
             .with_query_planner(Arc::new(QueryPlanner {}))
             .with_optimizer_rules(vec![]);
-
+        #[allow(deprecated)]
         let exec_ctx = SessionContext::with_state(session_state.clone());
         let physical_plan = session_state.create_physical_plan(&plan).await?;
 
@@ -158,10 +147,11 @@ mod tests {
         println!("{:?}", plan);
         let runtime = Arc::new(RuntimeEnv::default());
         let config = SessionConfig::new().with_target_partitions(1);
+        #[allow(deprecated)]
         let session_state = SessionState::with_config_rt(config, runtime)
             .with_query_planner(Arc::new(QueryPlanner {}))
             .with_optimizer_rules(vec![]);
-
+        #[allow(deprecated)]
         let exec_ctx = SessionContext::with_state(session_state.clone());
         let physical_plan = session_state.create_physical_plan(&plan).await?;
 
@@ -200,10 +190,11 @@ mod tests {
         println!("{:?}", plan);
         let runtime = Arc::new(RuntimeEnv::default());
         let config = SessionConfig::new().with_target_partitions(1);
+        #[allow(deprecated)]
         let session_state = SessionState::with_config_rt(config, runtime)
             .with_query_planner(Arc::new(QueryPlanner {}))
             .with_optimizer_rules(vec![]);
-
+        #[allow(deprecated)]
         let exec_ctx = SessionContext::with_state(session_state.clone());
         let physical_plan = session_state.create_physical_plan(&plan).await?;
 

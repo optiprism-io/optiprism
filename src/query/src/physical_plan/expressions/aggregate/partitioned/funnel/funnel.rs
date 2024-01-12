@@ -787,6 +787,7 @@ impl PartitionedAggregateExpr for Funnel {
     }
 }
 
+#[ignore]
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;

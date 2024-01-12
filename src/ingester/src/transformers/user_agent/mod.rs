@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use common::types;
-use futures::executor::block_on;
 use metadata::properties;
 use uaparser::Parser;
 use uaparser::UserAgentParser;
@@ -10,7 +9,6 @@ use crate::Context;
 use crate::PropValue;
 use crate::PropertyAndValue;
 use crate::RequestContext;
-use crate::Track;
 
 pub mod identify;
 pub mod track;
@@ -123,16 +121,16 @@ pub fn resolve_properties(
         let mut s = String::new();
         s.push_str(client.os.family.as_ref());
         if let Some(major) = &client.os.major {
-            s.push_str(" ");
+            s.push(' ');
             s.push_str(major.to_string().as_ref());
             if let Some(minor) = &client.os.minor {
-                s.push_str(".");
+                s.push('.');
                 s.push_str(minor.to_string().as_ref());
                 if let Some(patch) = &client.os.patch {
-                    s.push_str(".");
+                    s.push('.');
                     s.push_str(patch.to_string().as_ref());
                     if let Some(pm) = &client.os.patch_minor {
-                        s.push_str(".");
+                        s.push('.');
                         s.push_str(pm.to_string().as_ref());
                     }
                 }

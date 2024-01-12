@@ -1,4 +1,4 @@
-use std::sync::Arc;
+
 
 use axum::extract::Extension;
 use axum::extract::Path;
@@ -7,7 +7,7 @@ use axum::Router;
 use common::http::Json;
 
 use crate::http::Properties;
-use crate::properties;
+
 use crate::properties::Property;
 use crate::properties::UpdatePropertyRequest;
 use crate::Context;

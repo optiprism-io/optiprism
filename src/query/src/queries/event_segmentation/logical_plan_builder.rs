@@ -11,6 +11,9 @@ use common::query::time_columns;
 use common::query::EventFilter;
 use common::query::PropValueOperation;
 use common::query::PropertyRef;
+use common::types::COLUMN_CREATED_AT;
+use common::types::COLUMN_EVENT;
+use common::types::COLUMN_USER_ID;
 use datafusion_common::Column;
 use datafusion_expr::col;
 use datafusion_expr::expr;
@@ -24,18 +27,14 @@ use datafusion_expr::ExprSchemable;
 use datafusion_expr::Extension;
 use datafusion_expr::Filter;
 use datafusion_expr::LogicalPlan;
-use datafusion_expr::Projection;
 use datafusion_expr::ScalarFunctionDefinition;
 use datafusion_expr::Sort;
-use futures::executor;
 use metadata::dictionaries::provider_impl::SingleDictionaryProvider;
 use metadata::MetadataProvider;
 use tracing::debug;
 
 use crate::context::Format;
-use crate::error::QueryError;
 use crate::error::Result;
-use crate::event_fields;
 use crate::expr::event_expression;
 use crate::expr::property_col;
 use crate::expr::property_expression;
@@ -154,7 +153,7 @@ impl LogicalPlanBuilder {
                 let node = SegmentNode::try_new(
                     input.clone(),
                     or.unwrap(),
-                    Column::from_qualified_name(event_fields::USER_ID),
+                    Column::from_qualified_name(COLUMN_USER_ID),
                 )?;
                 let input = LogicalPlan::Extension(Extension {
                     node: Arc::new(node),
@@ -217,7 +216,7 @@ impl LogicalPlanBuilder {
 
                 SegmentExpr::Count {
                     filter,
-                    ts_col: Column::from_qualified_name(event_fields::CREATED_AT),
+                    ts_col: Column::from_qualified_name(COLUMN_CREATED_AT),
                     time_range: time.into(),
                     op: segment::Operator::GtEq,
                     right: 1,
@@ -242,7 +241,7 @@ impl LogicalPlanBuilder {
                         time,
                     } => SegmentExpr::Count {
                         filter: event_expr,
-                        ts_col: Column::from_qualified_name(event_fields::CREATED_AT),
+                        ts_col: Column::from_qualified_name(COLUMN_CREATED_AT),
                         time_range: time.into(),
                         op: operation.into(),
                         right: *value,
@@ -259,7 +258,7 @@ impl LogicalPlanBuilder {
                         filter: event_expr,
                         predicate: property_col(&self.ctx, &self.metadata, property)?
                             .try_into_col()?,
-                        ts_col: Column::from_qualified_name(event_fields::CREATED_AT),
+                        ts_col: Column::from_qualified_name(COLUMN_CREATED_AT),
                         time_range: time.into(),
                         agg: aggregate.into(),
                         op: operation.into(),
@@ -286,7 +285,7 @@ impl LogicalPlanBuilder {
             EventFilter::Property {
                 property,
                 operation,
-                value,
+                value: _,
             } => match operation {
                 PropValueOperation::Like
                 | PropValueOperation::NotLike
@@ -465,7 +464,7 @@ impl LogicalPlanBuilder {
                 LogicalPlan::Extension(Extension {
                     node: Arc::new(PivotNode::try_new(
                         input,
-                        Column::from_name(event_fields::CREATED_AT),
+                        Column::from_name(COLUMN_CREATED_AT),
                         Column::from_name(COL_VALUE),
                         result_cols,
                     )?),
@@ -506,12 +505,7 @@ impl LogicalPlanBuilder {
         // time expression
 
         // todo add project_id filtering
-        let mut expr = time_expression(
-            event_fields::CREATED_AT,
-            input.schema(),
-            &self.es.time,
-            cur_time,
-        )?;
+        let mut expr = time_expression(COLUMN_CREATED_AT, input.schema(), &self.es.time, cur_time)?;
 
         // event expression
         expr = and(
@@ -541,7 +535,7 @@ impl LogicalPlanBuilder {
     ) -> Result<(LogicalPlan, Vec<Expr>)> {
         let mut group_expr: Vec<Expr> = vec![];
 
-        let ts_col = Expr::Column(Column::from_qualified_name(event_fields::CREATED_AT));
+        let ts_col = Expr::Column(Column::from_qualified_name(COLUMN_CREATED_AT));
         let expr_fn = ScalarFunction {
             func_def: ScalarFunctionDefinition::BuiltIn(BuiltinScalarFunction::DateTrunc),
             args: vec![lit(self.es.interval_unit.as_str()), ts_col],
@@ -550,12 +544,12 @@ impl LogicalPlanBuilder {
 
         // group_expr.push(Expr::Alias(
         // Box::new(lit(event.event.name())),
-        // event_fields::EVENT.to_string(),
+        // COLUMN_EVENT.to_string(),
         // ));
         group_expr.push(Expr::Alias(Alias {
             expr: Box::new(time_expr),
             relation: None,
-            name: event_fields::CREATED_AT.to_string(),
+            name: COLUMN_CREATED_AT.to_string(),
         }));
 
         // event groups
@@ -588,8 +582,8 @@ impl LogicalPlanBuilder {
                 Query::CountEvents => AggregateExpr::Count {
                     filter: None,
                     groups: Some(group_expr.clone()),
-                    predicate: col(event_fields::EVENT).try_into_col()?,
-                    partition_col: col(event_fields::USER_ID).try_into_col()?,
+                    predicate: col(COLUMN_EVENT).try_into_col()?,
+                    partition_col: col(COLUMN_USER_ID).try_into_col()?,
                     distinct: false,
                 },
                 Query::CountUniqueGroups | Query::DailyActiveGroups => {
@@ -597,7 +591,7 @@ impl LogicalPlanBuilder {
                         filter: None,
                         outer_fn: partitioned_aggregate::AggregateFunction::Count,
                         groups: Some(group_expr.clone()),
-                        partition_col: col(event_fields::USER_ID).try_into_col()?,
+                        partition_col: col(COLUMN_USER_ID).try_into_col()?,
                         distinct: true,
                     }
                 }
@@ -607,7 +601,7 @@ impl LogicalPlanBuilder {
                     filter: None,
                     outer_fn: aggregate.into(),
                     groups: Some(group_expr.clone()),
-                    partition_col: col(event_fields::USER_ID).try_into_col()?,
+                    partition_col: col(COLUMN_USER_ID).try_into_col()?,
                     distinct: false,
                 },
                 Query::AggregatePropertyPerGroup {
@@ -620,7 +614,7 @@ impl LogicalPlanBuilder {
                     outer_fn: aggregate.into(),
                     predicate: property_col(&self.ctx, &self.metadata, property)?.try_into_col()?,
                     groups: Some(group_expr.clone()),
-                    partition_col: col(event_fields::USER_ID).try_into_col()?,
+                    partition_col: col(COLUMN_USER_ID).try_into_col()?,
                 },
                 Query::AggregateProperty {
                     property,
@@ -628,7 +622,7 @@ impl LogicalPlanBuilder {
                 } => AggregateExpr::Aggregate {
                     filter: None,
                     groups: Some(group_expr.clone()),
-                    partition_col: col(event_fields::USER_ID).try_into_col()?,
+                    partition_col: col(COLUMN_USER_ID).try_into_col()?,
                     predicate: property_col(&self.ctx, &self.metadata, property)?.try_into_col()?,
                     agg: aggregate.into(),
                 },
@@ -643,7 +637,7 @@ impl LogicalPlanBuilder {
         let agg_node = PartitionedAggregateNode::try_new(
             input,
             segment_inputs,
-            Column::from_qualified_name(event_fields::USER_ID),
+            Column::from_qualified_name(COLUMN_USER_ID),
             aggr_expr,
         )?;
 

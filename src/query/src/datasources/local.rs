@@ -1,12 +1,12 @@
 use std::any::Any;
 use std::sync::Arc;
 
-use arrow::datatypes::Fields;
-use arrow::datatypes::Schema;
+
+
 use arrow::datatypes::SchemaRef;
 use async_trait::async_trait;
 use datafusion::datasource::TableProvider;
-use datafusion::error::DataFusionError;
+
 use datafusion::execution::context::SessionState;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion_expr::Expr;

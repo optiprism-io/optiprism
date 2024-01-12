@@ -862,25 +862,25 @@ pub fn create_list_binary_array<
 /// * `fields` - The fields of the table
 ///
 /// # Example
-///     let data = r#"
-/// ```markdown
-/// | a | b     | c    | d     | e     |
-/// |---|-------|------|-------|-------|
-/// | 1 | true  | test | 1,2,3 | a,b,c |
-/// | 2 |       |      | 1,2   | b     |
-/// | 3 | false | lala |       |       |
-/// ```
-///     "#;
-///     let fields = vec![
-///         Field::new("a", DataType::Int64, true),
-///         Field::new("b", DataType::Boolean, true),
-///         Field::new("c", DataType::Utf8, true),
-///         Field::new("d", DataType::List(Box::new(Field::new("1", DataType::Int32, true))), true),
-///         Field::new("e", DataType::List(Box::new(Field::new("1", DataType::Utf8, true))), true),
-///     ];
-///
-///     let parsed = parse_markdown_table(data.to_string(), &fields)?;
-///     println!("{:#?}", parsed);
+/// //     let data = r#"
+/// // ```markdown
+/// // | a | b     | c    | d     | e     |
+/// // |---|-------|------|-------|-------|
+/// // | 1 | true  | test | 1,2,3 | a,b,c |
+/// // | 2 |       |      | 1,2   | b     |
+/// // | 3 | false | lala |       |       |
+/// // ```
+/// //    "#;
+/// //    let fields = vec![
+/// //        Field::new("a", DataType::Int64, true),
+/// //        Field::new("b", DataType::Boolean, true),
+/// //        Field::new("c", DataType::Utf8, true),
+/// //        Field::new("d", DataType::List(Box::new(Field::new("1", DataType::Int32, true))), true),
+/// //        Field::new("e", DataType::List(Box::new(Field::new("1", DataType::Utf8, true))), true),
+/// //    ];
+/// //
+/// //    let parsed = parse_markdown_table(data.to_string(), &fields)?;
+/// //    println!("{:#?}", parsed);
 ///
 ///    // Output:
 ///    // [

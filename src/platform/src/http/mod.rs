@@ -10,39 +10,13 @@ pub mod properties;
 pub mod queries;
 pub mod reports;
 
-use std::collections::BTreeMap;
-use std::error::Error;
-use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use axum::async_trait;
-use axum::body::HttpBody;
-use axum::extract::rejection::JsonRejection;
-use axum::http;
-use axum::http::HeaderMap;
-use axum::http::HeaderValue;
-use axum::http::Request;
 use axum::middleware;
-use axum::middleware::Next;
 use axum::Extension;
 use axum::Router;
-use axum::Server;
-use axum_core::body;
-use axum_core::extract::FromRequest;
-use axum_core::response::IntoResponse;
-use axum_core::response::Response;
-use axum_core::BoxError;
-use bytes::Bytes;
-use hyper::Body;
-use lazy_static::lazy_static;
 use metadata::MetadataProvider;
-use regex::Regex;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-use serde_json::Value;
-use tokio::select;
-use tokio::signal::unix::SignalKind;
 use tower_cookies::CookieManagerLayer;
 use tower_http::cors::Any;
 use tower_http::cors::CorsLayer;
@@ -52,14 +26,9 @@ use tower_http::trace::TraceLayer;
 use tracing::info;
 
 use crate::context::print_request_response;
-use crate::PlatformError;
 use crate::PlatformProvider;
-use crate::Result;
 
-pub struct Service {
-    router: Router,
-    addr: SocketAddr,
-}
+pub struct Service {}
 
 #[derive(Clone)]
 pub struct Properties {

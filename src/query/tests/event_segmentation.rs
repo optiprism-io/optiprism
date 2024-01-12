@@ -23,6 +23,7 @@ mod tests {
     use common::query::PropertyRef;
     use common::query::QueryTime;
     use common::query::TimeIntervalUnit;
+    use common::types::COLUMN_USER_ID;
     use datafusion::execution::context::SessionState;
     use datafusion::execution::runtime_env::RuntimeEnv;
     use datafusion::physical_plan::collect;
@@ -33,8 +34,7 @@ mod tests {
     use metadata::custom_events::CreateCustomEventRequest;
     use metadata::test_util::init_db;
     use query::error::Result;
-    use query::event_fields;
-    use query::physical_plan::planner::planner::QueryPlanner;
+    use query::physical_plan::planner::QueryPlanner;
     use query::queries::event_segmentation::logical_plan_builder::LogicalPlanBuilder;
     use query::test_util::create_entities;
     use query::test_util::events_provider;
@@ -53,7 +53,7 @@ mod tests {
                 from: to.sub(Duration::days(10)),
                 to,
             },
-            group: event_fields::USER_ID.to_string(),
+            group: COLUMN_USER_ID.to_string(),
             interval_unit: TimeIntervalUnit::Second,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
@@ -205,7 +205,7 @@ mod tests {
                 last: 20,
                 unit: TimeIntervalUnit::Day,
             },
-            group: event_fields::USER_ID.to_string(),
+            group: COLUMN_USER_ID.to_string(),
             interval_unit: TimeIntervalUnit::Day,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
@@ -299,10 +299,11 @@ mod tests {
 
         let runtime = Arc::new(RuntimeEnv::default());
         let config = SessionConfig::new().with_target_partitions(1);
+        #[allow(deprecated)]
         let session_state = SessionState::with_config_rt(config, runtime)
             .with_query_planner(Arc::new(QueryPlanner {}))
             .with_optimizer_rules(vec![]);
-
+        #[allow(deprecated)]
         let exec_ctx = SessionContext::with_state(session_state.clone());
         let physical_plan = session_state.create_physical_plan(&plan).await?;
         // println!("physical plan: {:#?}", physical_plan);
@@ -367,7 +368,7 @@ mod tests {
                 last: 30,
                 unit: TimeIntervalUnit::Day,
             },
-            group: event_fields::USER_ID.to_string(),
+            group: COLUMN_USER_ID.to_string(),
             interval_unit: TimeIntervalUnit::Week,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
@@ -406,10 +407,11 @@ mod tests {
 
         let runtime = Arc::new(RuntimeEnv::default());
         let config = SessionConfig::new().with_target_partitions(1);
+        #[allow(deprecated)]
         let session_state = SessionState::with_config_rt(config, runtime)
             .with_query_planner(Arc::new(QueryPlanner {}))
             .with_optimizer_rules(vec![]);
-
+        #[allow(deprecated)]
         let exec_ctx = SessionContext::with_state(session_state.clone());
         let physical_plan = session_state.create_physical_plan(&plan).await?;
 

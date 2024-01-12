@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::time::Duration as STDDuration;
+
 
 use ::store::db::OptiDBImpl;
 use ::store::error::StoreError;
@@ -26,7 +26,7 @@ use common::types::EVENT_PROPERTY_PAGE_SEARCH;
 use common::types::EVENT_PROPERTY_PAGE_TITLE;
 use common::types::EVENT_PROPERTY_PAGE_URL;
 use common::types::EVENT_SCREEN;
-use common::types::TABLE_EVENTS;
+
 use common::types::USER_PROPERTY_CITY;
 use common::types::USER_PROPERTY_CLIENT_FAMILY;
 use common::types::USER_PROPERTY_CLIENT_VERSION_MAJOR;
@@ -55,7 +55,7 @@ use metrics::describe_counter;
 use metrics::describe_histogram;
 use metrics::Unit;
 use metrics_exporter_prometheus::PrometheusBuilder;
-use metrics_util::MetricKindMask;
+
 use platform::auth::password::make_password_hash;
 use tracing::info;
 
@@ -238,14 +238,14 @@ fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<(
         teams: None,
     }) {
         Ok(acc) => acc,
-        Err(err) => md.accounts.get_by_email("admin@email.com")?,
+        Err(_err) => md.accounts.get_by_email("admin@email.com")?,
     };
     let org = match md.organizations.create(CreateOrganizationRequest {
         created_by: admin.id,
         name: "Test Organization".to_string(),
     }) {
         Ok(org) => org,
-        Err(err) => md.organizations.get_by_id(1)?,
+        Err(_err) => md.organizations.get_by_id(1)?,
     };
 
     let proj = match md.projects.create(org.id, CreateProjectRequest {
@@ -253,7 +253,7 @@ fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<(
         name: "Test Project".to_string(),
     }) {
         Ok(proj) => proj,
-        Err(err) => md.projects.get_by_id(1, 1)?,
+        Err(_err) => md.projects.get_by_id(1, 1)?,
     };
 
     info!("token: {}", proj.token);
@@ -269,7 +269,7 @@ fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<(
         teams: None,
     }) {
         Ok(acc) => acc,
-        Err(err) => md.accounts.get_by_email("user@test.com")?,
+        Err(_err) => md.accounts.get_by_email("user@test.com")?,
     };
 
     Ok((org.id, proj.id))

@@ -18,16 +18,18 @@ use crate::http::tests::run_http_service;
 use crate::http::tests::EMPTY_LIST;
 
 #[tokio::test]
-async fn test_auth() -> anyhow::Result<()> {
-    let (base_addr, md, pp) = run_http_service(false).await?;
+async fn test_auth() {
+    let (base_addr, md, pp) = run_http_service(false).await.unwrap();
     let auth_addr = format!("{base_addr}/auth");
     let cl = Client::new();
-    let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts).await?;
+    let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts)
+        .await
+        .unwrap();
 
     let mut headers = HeaderMap::new();
     headers.insert(
         http::header::CONTENT_TYPE,
-        HeaderValue::from_str("application/json")?,
+        HeaderValue::from_str("application/json").unwrap(),
     );
 
     let user_tokens: TokensResponse = {
@@ -42,10 +44,11 @@ async fn test_auth() -> anyhow::Result<()> {
 
         let resp = cl
             .post(format!("{auth_addr}/signup"))
-            .body(serde_json::to_string(&req)?)
+            .body(serde_json::to_string(&req).unwrap())
             .headers(admin_headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
 
         assert_response_status_eq!(resp, StatusCode::CREATED);
 
@@ -61,9 +64,9 @@ async fn test_auth() -> anyhow::Result<()> {
                 projects: OptionalProperty::Some(Some(vec![(1, ProjectRole::Reader)])),
                 teams: OptionalProperty::None,
             })
-            .await?;
+            .unwrap();
 
-        resp.json().await?
+        resp.json().await.unwrap()
     };
 
     {
@@ -73,7 +76,8 @@ async fn test_auth() -> anyhow::Result<()> {
             ))
             .headers(headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
 
         assert_response_status_eq!(resp, StatusCode::UNAUTHORIZED);
     }
@@ -83,7 +87,7 @@ async fn test_auth() -> anyhow::Result<()> {
         let mut jwt_headers = headers.clone();
         jwt_headers.insert(
             http::header::AUTHORIZATION,
-            HeaderValue::from_str(format!("Bearer {}", user_tokens.access_token).as_str())?,
+            HeaderValue::from_str(format!("Bearer {}", user_tokens.access_token).as_str()).unwrap(),
         );
 
         let resp = cl
@@ -92,7 +96,8 @@ async fn test_auth() -> anyhow::Result<()> {
             ))
             .headers(jwt_headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
 
         assert_response_status_eq!(resp, StatusCode::OK);
         assert_response_json_eq!(resp, EMPTY_LIST);
@@ -105,20 +110,23 @@ async fn test_auth() -> anyhow::Result<()> {
 
         let resp = cl
             .post(format!("{auth_addr}/refresh-token"))
-            .body(serde_json::to_string(&req)?)
+            .body(serde_json::to_string(&req).unwrap())
             .headers(headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
 
         assert_response_status_eq!(resp, StatusCode::OK);
-        let new_user_tokens: TokensResponse = serde_json::from_str(resp.text().await?.as_str())?;
+        let new_user_tokens: TokensResponse =
+            serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
 
         // todo: check for tokens revocation here
 
         let mut new_jwt_headers = headers.clone();
         new_jwt_headers.insert(
             http::header::AUTHORIZATION,
-            HeaderValue::from_str(format!("Bearer {}", new_user_tokens.access_token).as_str())?,
+            HeaderValue::from_str(format!("Bearer {}", new_user_tokens.access_token).as_str())
+                .unwrap(),
         );
 
         new_jwt_headers
@@ -132,11 +140,10 @@ async fn test_auth() -> anyhow::Result<()> {
             ))
             .headers(new_jwt_headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
 
         assert_response_status_eq!(resp, StatusCode::OK);
         assert_response_json_eq!(resp, EMPTY_LIST.to_string());
     }
-
-    Ok(())
 }

@@ -200,7 +200,6 @@ impl TryInto<DictionaryType> for properties::DictionaryType {
             properties::DictionaryType::Int16 => DictionaryType::Int16,
             properties::DictionaryType::Int32 => DictionaryType::Int32,
             properties::DictionaryType::Int64 => DictionaryType::Int64,
-            _ => return Err(PlatformError::EntityMap(format!("{:?}", self))),
         })
     }
 }
@@ -248,7 +247,7 @@ impl TryInto<metadata::properties::Property> for Property {
             display_name: self.display_name,
             order: self.order,
             typ: self.typ.into(),
-            data_type: self.data_type.into(),
+            data_type: self.data_type,
             status: self.status.into(),
             is_system: self.is_system,
             nullable: self.nullable,
@@ -275,7 +274,7 @@ impl TryInto<Property> for metadata::properties::Property {
             name: self.name,
             description: self.description,
             display_name: self.display_name,
-            data_type: self.data_type.into(),
+            data_type: self.data_type,
             status: self.status.into(),
             is_system: self.is_system,
             nullable: self.nullable,

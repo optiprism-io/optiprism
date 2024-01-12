@@ -1,10 +1,7 @@
 use std::any::Any;
 use std::fmt::Formatter;
-use std::fs::File;
-use std::mem;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::sync::Mutex;
 use std::task::Context;
 use std::task::Poll;
 
@@ -25,16 +22,10 @@ use datafusion_common::Result as DFResult;
 use datafusion_common::Statistics;
 use futures::Stream;
 use futures::StreamExt;
-use futures::TryStream;
 use store::arrow_conversion::arrow2_to_arrow1;
 use store::db::OptiDBImpl;
-use store::db::ScanStream;
-use store::error::StoreError;
 use tracing::debug;
-use tracing::info;
-use tracing::trace;
 
-use crate::error::QueryError;
 use crate::error::Result;
 
 #[derive(Debug)]
@@ -62,8 +53,10 @@ impl LocalExec {
     }
 }
 
+type SendableChunkStream =
+    Pin<Box<dyn Stream<Item = store::error::Result<Chunk<Box<dyn Array>>>> + Send>>;
 struct PartitionStream {
-    local_stream: Pin<Box<dyn Stream<Item = store::error::Result<Chunk<Box<dyn Array>>>> + Send>>,
+    local_stream: SendableChunkStream,
     schema: SchemaRef,
 }
 
@@ -77,15 +70,15 @@ impl Stream for PartitionStream {
     type Item = DFResult<RecordBatch>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let v = match self.local_stream.poll_next_unpin(cx) {
+        match self.local_stream.poll_next_unpin(cx) {
             Poll::Ready(Some(Ok(chunk))) => {
                 let arrs = chunk
                     .into_arrays()
                     .into_iter()
-                    .map(|arr| arrow2_to_arrow1::convert(arr))
+                    .map(arrow2_to_arrow1::convert)
                     .collect::<store::error::Result<Vec<_>>>()
                     .map_err(|e| DataFusionError::Execution(e.to_string()))?;
-                let vv = RecordBatch::try_new(self.schema.clone(), arrs.clone());
+                let _vv = RecordBatch::try_new(self.schema.clone(), arrs.clone());
                 Poll::Ready(Some(Ok(RecordBatch::try_new(self.schema.clone(), arrs)?)))
             }
             Poll::Ready(Some(Err(e))) => {
@@ -93,14 +86,12 @@ impl Stream for PartitionStream {
             }
             Poll::Pending => Poll::Pending,
             Poll::Ready(None) => Poll::Ready(None),
-        };
-
-        v
+        }
     }
 }
 
 impl DisplayAs for LocalExec {
-    fn fmt_as(&self, t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "LocalExec")
     }
 }
@@ -174,8 +165,6 @@ mod tests {
     use std::sync::Arc;
 
     use arrow::util::pretty::print_batches;
-    use arrow2::datatypes::DataType;
-    use arrow2::datatypes::Field;
     use common::types::DType;
     use datafusion::datasource::DefaultTableSource;
     use datafusion::datasource::TableProvider;
@@ -188,14 +177,13 @@ mod tests {
     use store::arrow_conversion::schema2_to_schema1;
     use store::db::OptiDBImpl;
     use store::db::Options;
-    use store::db::TableOptions;
-    use store::KeyValue;
+    use store::table::Options as TableOptions;
     use store::NamedValue;
     use store::Value;
     use tracing::debug;
 
     use crate::datasources::local::LocalTable;
-    use crate::physical_plan::planner::planner::QueryPlanner;
+    use crate::physical_plan::planner::QueryPlanner;
 
     #[tokio::test]
     async fn test() {
@@ -219,14 +207,15 @@ mod tests {
             levels: 7,
             merge_part_size_multiplier: 0,
             merge_chunk_size: 1024 * 8 * 8,
+            merge_max_page_size: 1000,
         };
-        let mut db = OptiDBImpl::open(path, Options {}).unwrap();
+        let db = OptiDBImpl::open(path, Options {}).unwrap();
         db.create_table("events".to_string(), opts).unwrap();
         db.add_field("events", "a", DType::Int64, false).unwrap();
         db.add_field("events", "b", DType::Int64, false).unwrap();
         db.add_field("events", "c", DType::Int64, false).unwrap();
 
-        let a = NamedValue::new("a".to_string(), Value::Int64(None));
+        let _a = NamedValue::new("a".to_string(), Value::Int64(None));
         for i in 0..1000 {
             db.insert("events", vec![
                 NamedValue::new("a".to_string(), Value::Int64(Some(i))),
@@ -236,7 +225,7 @@ mod tests {
             .unwrap();
         }
 
-        let schema = schema2_to_schema1(db.schema("events").unwrap());
+        let _schema = schema2_to_schema1(db.schema("events").unwrap());
         let prov = LocalTable::try_new(Arc::new(db), "events".to_string()).unwrap();
         let table_source = Arc::new(DefaultTableSource::new(
             Arc::new(prov) as Arc<dyn TableProvider>
@@ -247,10 +236,12 @@ mod tests {
             .unwrap();
 
         let runtime = Arc::new(RuntimeEnv::default());
+        #[allow(deprecated)]
         let state =
             SessionState::with_config_rt(SessionConfig::new().with_target_partitions(12), runtime)
                 .with_query_planner(Arc::new(QueryPlanner {}))
                 .with_optimizer_rules(vec![]);
+        #[allow(deprecated)]
         let exec_ctx = SessionContext::with_state(state.clone());
         let physical_plan = state.create_physical_plan(&input).await.unwrap();
         let displayable_plan = displayable(physical_plan.as_ref());

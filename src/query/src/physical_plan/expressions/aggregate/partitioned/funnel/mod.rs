@@ -16,7 +16,7 @@ use datafusion_expr::Operator;
 
 use crate::error::Result;
 use crate::StaticArray;
-
+#[allow(clippy::module_inception)]
 pub mod funnel;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -106,6 +106,9 @@ pub struct Batch {
 impl Batch {
     pub fn len(&self) -> usize {
         self.batch.num_rows()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.batch.num_rows() == 0
     }
 }
 

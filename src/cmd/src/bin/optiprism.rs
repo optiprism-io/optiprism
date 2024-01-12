@@ -1,64 +1,8 @@
-use std::collections::BinaryHeap;
-use std::env::temp_dir;
-use std::ffi::OsStr;
-use std::fmt::Write;
-use std::fs;
-use std::fs::File;
-use std::net::SocketAddr;
-use std::path::Path;
-use std::path::PathBuf;
-use std::sync::Arc;
-
-use arrow::array::ArrayRef;
-use arrow::array::Int16Array;
-use arrow::array::Int32Array;
-use arrow::array::Int64Array;
-use arrow::array::Int8Array;
-use arrow::array::StringBuilder;
-use arrow::array::UInt16Array;
-use arrow::array::UInt32Array;
-use arrow::array::UInt64Array;
-use arrow::array::UInt8Array;
-use arrow::datatypes::DataType;
-use arrow::datatypes::Field;
-use arrow::datatypes::Schema;
-use arrow::datatypes::SchemaRef;
-use arrow::record_batch::RecordBatch;
-use bytesize::ByteSize;
-use chrono::Duration;
-use chrono::Utc;
 use clap::Parser;
 use clap::Subcommand;
 use cmd::store::Shop;
 use cmd::test::Test;
-use common::rbac::OrganizationRole;
-use common::rbac::ProjectRole;
-use common::rbac::Role;
-use datafusion::datasource::MemTable;
-use datafusion::datasource::TableProvider;
-use datafusion::parquet::arrow::ArrowWriter;
-use datafusion::parquet::basic::Compression;
-use datafusion::parquet::file::properties::WriterProperties;
-use dateparser::DateTimeUtc;
-use futures::executor::block_on;
-use indicatif::ProgressBar;
-use indicatif::ProgressState;
-use indicatif::ProgressStyle;
-use metadata::accounts::CreateAccountRequest;
-use metadata::organizations::CreateOrganizationRequest;
-use metadata::projects::CreateProjectRequest;
-use metadata::properties::DictionaryType;
-use metadata::properties::Type;
-use metadata::MetadataProvider;
-use platform::auth;
-use platform::auth::password::make_password_hash;
-use query::datasources::local::LocalTable;
-use query::ProviderImpl;
-use scan_dir::ScanDir;
 use service::tracing::TracingCliArgs;
-use tracing::debug;
-use tracing::info;
-use uuid::Uuid;
 
 extern crate parse_duration;
 
@@ -90,7 +34,7 @@ async fn main() -> Result<()> {
     args.tracing.init()?;
 
     if args.command.is_none() {
-        return Err(Error::BadRequest("no command specified".to_string()).into());
+        return Err(Error::BadRequest("no command specified".to_string()));
     }
 
     match &args.command {

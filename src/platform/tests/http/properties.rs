@@ -2,10 +2,8 @@ use chrono::Utc;
 use common::types::DType;
 use common::types::OptionalProperty;
 use metadata::metadata::ListResponse;
-use metadata::properties;
 use metadata::properties::CreatePropertyRequest;
-use platform::datatype::DictionaryType;
-use platform::properties::DataType;
+use platform::properties::DictionaryType;
 use platform::properties::Property;
 use platform::properties::Status;
 use platform::properties::Type;
@@ -32,11 +30,13 @@ fn assert(l: &Property, r: &Property) {
 }
 
 #[tokio::test]
-async fn test_event_properties() -> anyhow::Result<()> {
-    let (base_url, md, pp) = run_http_service(false).await?;
+async fn test_event_properties() {
+    let (base_url, md, pp) = run_http_service(false).await.unwrap();
     let prop_url = format!("{base_url}/organizations/1/projects/1/schema/event-properties");
     let cl = Client::new();
-    let headers = create_admin_acc_and_login(&pp.auth, &md.accounts).await?;
+    let headers = create_admin_acc_and_login(&pp.auth, &md.accounts)
+        .await
+        .unwrap();
 
     let mut prop1 = Property {
         id: 1,
@@ -55,14 +55,19 @@ async fn test_event_properties() -> anyhow::Result<()> {
         nullable: true,
         is_array: true,
         is_dictionary: true,
-        dictionary_type: Some(DictionaryType::UInt8),
+        dictionary_type: Some(DictionaryType::Int8),
         is_system: false,
         typ: Type::Event,
+        order: 0,
     };
 
     // list without props should be empty
     {
-        cl.get(&prop_url).headers(headers.clone()).send().await?;
+        cl.get(&prop_url)
+            .headers(headers.clone())
+            .send()
+            .await
+            .unwrap();
     }
 
     // get of unexisting event prop 1 should return 404 not found error
@@ -71,7 +76,8 @@ async fn test_event_properties() -> anyhow::Result<()> {
             .get(format!("{prop_url}/1"))
             .headers(headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
         assert_response_status_eq!(resp, StatusCode::NOT_FOUND);
     }
 
@@ -81,7 +87,8 @@ async fn test_event_properties() -> anyhow::Result<()> {
             .delete(format!("{prop_url}/1"))
             .headers(headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
         assert_response_status_eq!(resp, StatusCode::NOT_FOUND);
     }
 
@@ -94,7 +101,7 @@ async fn test_event_properties() -> anyhow::Result<()> {
             description: prop1.description.clone(),
             display_name: prop1.display_name.clone(),
             typ: prop1.typ.clone().into(),
-            data_type: properties::DataType::String,
+            data_type: DType::String,
             status: prop1.status.clone().into(),
             nullable: prop1.nullable,
             is_array: prop1.is_array,
@@ -103,11 +110,12 @@ async fn test_event_properties() -> anyhow::Result<()> {
                 .dictionary_type
                 .clone()
                 .map(|v| v.try_into())
-                .transpose()?,
+                .transpose()
+                .unwrap(),
             is_system: false,
         };
 
-        let resp = md.event_properties.create(1, 1, req).await?;
+        let resp = md.event_properties.create(1, 1, req).unwrap();
         assert_eq!(resp.id, 1);
     }
 
@@ -127,13 +135,14 @@ async fn test_event_properties() -> anyhow::Result<()> {
 
         let resp = cl
             .put(format!("{prop_url}/1"))
-            .body(serde_json::to_string(&req)?)
+            .body(serde_json::to_string(&req).unwrap())
             .headers(headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
         let status = resp.status();
         assert_eq!(status, StatusCode::OK);
-        let p: Property = serde_json::from_str(resp.text().await?.as_str())?;
+        let p: Property = serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
         assert(&p, &prop1)
     }
 
@@ -143,17 +152,24 @@ async fn test_event_properties() -> anyhow::Result<()> {
             .get(format!("{prop_url}/1"))
             .headers(headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
         let status = resp.status();
         assert_eq!(status, StatusCode::OK);
-        let p: Property = serde_json::from_str(resp.text().await?.as_str())?;
+        let p: Property = serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
         assert(&p, &prop1)
     }
     // list events should return list with one event
     {
-        let resp = cl.get(&prop_url).headers(headers.clone()).send().await?;
+        let resp = cl
+            .get(&prop_url)
+            .headers(headers.clone())
+            .send()
+            .await
+            .unwrap();
         assert_response_status_eq!(resp, StatusCode::OK);
-        let resp: ListResponse<Property> = serde_json::from_str(resp.text().await?.as_str())?;
+        let resp: ListResponse<Property> =
+            serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
         assert_eq!(resp.data.len(), 1);
         assert(&resp.data[0], &prop1);
     }
@@ -164,15 +180,16 @@ async fn test_event_properties() -> anyhow::Result<()> {
             .delete(format!("{prop_url}/1"))
             .headers(headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
         assert_response_status_eq!(resp, StatusCode::OK);
 
         let resp = cl
             .delete(format!("{prop_url}/1"))
             .headers(headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
         assert_response_status_eq!(resp, StatusCode::NOT_FOUND);
     }
-    Ok(())
 }

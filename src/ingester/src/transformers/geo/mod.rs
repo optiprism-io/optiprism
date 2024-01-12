@@ -4,7 +4,7 @@ pub mod track;
 use std::sync::Arc;
 
 use common::types;
-use futures::executor::block_on;
+
 use maxminddb;
 use maxminddb::geoip2;
 use metadata::properties;

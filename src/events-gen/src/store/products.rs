@@ -3,7 +3,6 @@ use std::io;
 use std::sync::Arc;
 
 use common::DECIMAL_SCALE;
-use futures::executor::block_on;
 use metadata::dictionaries;
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
@@ -51,8 +50,7 @@ impl Product {
         self.discount_price.unwrap_or(self.price)
     }
     pub fn path(&self) -> String {
-        let name = self.name_str.replace(" ", "-").to_lowercase();
-        name
+        self.name_str.replace(' ', "-").to_lowercase()
     }
 }
 

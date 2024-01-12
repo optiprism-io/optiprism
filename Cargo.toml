@@ -16,6 +16,5 @@ members = [
     "src/store",
     "src/ingester",
     "src/test_util",
-    "src/ttest",
     "src/cmd",
 ]

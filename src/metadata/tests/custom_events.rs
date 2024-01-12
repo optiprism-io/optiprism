@@ -14,7 +14,6 @@ use metadata::error::MetadataError;
 use metadata::error::Result;
 use metadata::events;
 use metadata::events::CreateEventRequest;
-use metadata::store::Store;
 use uuid::Uuid;
 
 fn get_providers(max_events_level: usize) -> (Arc<dyn events::Provider>, Arc<dyn Provider>) {

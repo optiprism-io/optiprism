@@ -314,7 +314,7 @@ impl PartitionedAggregateNode {
         let mut agg_result_fields: Vec<DFField> = Vec::new();
         let input_schema = input.schema();
 
-        for (_agg_idx, (agg, name)) in agg_expr.iter().enumerate() {
+        for (agg, name) in agg_expr.iter() {
             for group_expr in agg.group_exprs() {
                 group_cols.insert(group_expr.display_name()?, ());
             }
@@ -337,8 +337,8 @@ impl PartitionedAggregateNode {
             .filter(|f| group_cols.contains_key(f.name()))
             .cloned()
             .collect::<Vec<_>>();
-        let group_fields = vec![vec![segment_field], group_fields].concat();
-        let fields: Vec<DFField> = vec![group_fields, agg_result_fields].concat();
+        let group_fields = [vec![segment_field], group_fields].concat();
+        let fields: Vec<DFField> = [group_fields, agg_result_fields].concat();
         let schema = DFSchema::new_with_metadata(fields, Default::default())?;
         let ret = Self {
             input,

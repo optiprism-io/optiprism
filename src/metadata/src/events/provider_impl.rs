@@ -1,7 +1,7 @@
 use std::sync::Arc;
-use std::sync::RwLock;
 
-use async_trait::async_trait;
+
+
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::Utc;
@@ -9,7 +9,7 @@ use common::types::OptionalProperty;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 
-use crate::error;
+
 use crate::error::MetadataError;
 use crate::events::CreateEventRequest;
 use crate::events::Event;

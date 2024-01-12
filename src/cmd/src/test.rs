@@ -8,22 +8,13 @@ use arrow::array::ArrayBuilder;
 use arrow::array::ArrayRef;
 use arrow::array::BooleanBuilder;
 use arrow::array::Decimal128Builder;
-use arrow::array::Float32Builder;
-use arrow::array::Float64Builder;
 use arrow::array::Int16Builder;
 use arrow::array::Int32Builder;
 use arrow::array::Int64Builder;
 use arrow::array::Int8Builder;
-use arrow::array::LargeStringBuilder;
 use arrow::array::StringBuilder;
 use arrow::array::TimestampNanosecondBuilder;
-use arrow::array::TimestampSecondBuilder;
-use arrow::array::UInt16Builder;
-use arrow::array::UInt32Builder;
-use arrow::array::UInt64Builder;
-use arrow::array::UInt8Builder;
 use arrow::datatypes::SchemaRef;
-use arrow::datatypes::TimeUnit;
 use arrow::record_batch::RecordBatch;
 use axum::Router;
 use chrono::Duration;
@@ -32,46 +23,31 @@ use chrono::NaiveDateTime;
 use chrono::Utc;
 use clap::Parser;
 use common::types::DType;
-use common::types::COLUMN_CREATED_AT;
-use common::types::COLUMN_EVENT;
-use common::types::COLUMN_PROJECT_ID;
-use common::types::COLUMN_USER_ID;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 use datafusion::datasource::TableProvider;
 use hyper::Server;
-use metadata::error::MetadataError;
 use metadata::properties::DictionaryType;
 use metadata::properties::Type;
 use metadata::test_util::create_event;
 use metadata::test_util::create_property;
 use metadata::test_util::CreatePropertyMainRequest;
 use metadata::MetadataProvider;
-use metrics::counter;
-use metrics::describe_counter;
-use metrics::gauge;
-use metrics_exporter_prometheus::PrometheusBuilder;
-use metrics_util::MetricKindMask;
 use platform::auth;
 use query::datasources::local::LocalTable;
 use query::ProviderImpl;
 use scan_dir::ScanDir;
-use service::tracing::TracingCliArgs;
 use store::db::OptiDBImpl;
 use store::db::Options;
-use store::table::Options as TableOptions;
 use store::NamedValue;
 use store::Value;
 use tokio::select;
 use tokio::signal::unix::SignalKind;
-use tracing::debug;
 use tracing::info;
 
-use crate::error::Error;
 use crate::init_metrics;
 use crate::init_project;
 use crate::init_system;
-use crate::test;
 
 #[derive(Parser, Clone)]
 pub struct Test {
@@ -183,7 +159,7 @@ pub fn gen_mem(
                 builders[partition].b_user_id.append_value(user as i64);
                 builders[partition]
                     .b_created_at
-                    .append_value(event_time.timestamp_nanos());
+                    .append_value(event_time.timestamp_nanos_opt().unwrap());
                 builders[partition].b_event.append_value(1);
                 builders[partition].b_i8.append_value(event as i8);
                 builders[partition].b_i16.append_value(event as i16);
@@ -230,7 +206,7 @@ pub fn gen_mem(
     Ok(res)
 }
 
-pub async fn gen(args: &Test, proj_id: u64) -> Result<(), anyhow::Error> {
+pub async fn gen(args: &Test, _proj_id: u64) -> Result<(), anyhow::Error> {
     fs::remove_dir_all(&args.path).unwrap();
     let rocks = Arc::new(metadata::rocksdb::new(args.path.join("md"))?);
     let db = Arc::new(OptiDBImpl::open(args.path.join("store"), Options {})?);
@@ -241,13 +217,13 @@ pub async fn gen(args: &Test, proj_id: u64) -> Result<(), anyhow::Error> {
     init_system(&md, &db, args.partitions.unwrap_or_else(num_cpus::get))?;
 
     info!("creating org structure and admin account...");
-    let (org_id, proj_id) = crate::init_test_org_structure(&md)?;
+    let (_org_id, proj_id) = crate::init_test_org_structure(&md)?;
 
     info!("project initialization...");
     init_project(1, proj_id, &md)?;
 
     info!("starting sample data generation...");
-    let partitions = args.partitions.unwrap_or_else(num_cpus::get);
+    let _partitions = args.partitions.unwrap_or_else(num_cpus::get);
 
     let props = [
         ("i_8", DType::Int8),
@@ -293,9 +269,9 @@ pub async fn gen(args: &Test, proj_id: u64) -> Result<(), anyhow::Error> {
         .unwrap()
         .duration_trunc(Duration::days(1))?;
 
-    let users = 1000;
-    let days = 100;
-    let events = 200;
+    let users = 10;
+    let days = 50;
+    let events = 20;
     let mut vals: Vec<NamedValue> = vec![];
     let mut i = 0;
     for user in 0..users {
@@ -314,7 +290,7 @@ pub async fn gen(args: &Test, proj_id: u64) -> Result<(), anyhow::Error> {
                 ));
                 vals.push(NamedValue::new(
                     "created_at".to_string(),
-                    Value::Timestamp(Some(event_time.timestamp_nanos())),
+                    Value::Timestamp(Some(event_time.timestamp_nanos_opt().unwrap())),
                 ));
                 vals.push(NamedValue::new(
                     "event".to_string(),
@@ -420,7 +396,7 @@ pub async fn gen(args: &Test, proj_id: u64) -> Result<(), anyhow::Error> {
 
     let all_parquet_files: Vec<_> = ScanDir::files()
         .walk(args.path.join("store/tables/events"), |iter| {
-            iter.filter(|&(_, ref name)| name.ends_with(".parquet"))
+            iter.filter(|(_, name)| name.ends_with(".parquet"))
                 .map(|(ref entry, _)| entry.path())
                 .collect()
         })

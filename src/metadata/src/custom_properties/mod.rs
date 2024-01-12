@@ -1,6 +1,6 @@
 pub mod provider_impl;
 
-use async_trait::async_trait;
+
 use chrono::DateTime;
 use chrono::Utc;
 pub use provider_impl::ProviderImpl;

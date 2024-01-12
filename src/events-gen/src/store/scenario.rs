@@ -6,8 +6,6 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration as StdDuration;
 
-use arrow::datatypes::SchemaRef;
-use arrow::record_batch::RecordBatch;
 use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
@@ -22,7 +20,6 @@ use tracing::info;
 use crate::error::Result;
 use crate::generator::Generator;
 use crate::store::actions::Action;
-use crate::store::batch_builder::RecordBatchBuilder;
 use crate::store::coefficients::make_coefficients;
 use crate::store::events::Event;
 use crate::store::intention::select_intention;
@@ -434,22 +431,17 @@ impl Scenario {
                 rec.page_title = "my orders".to_string();
             }
         }
-        match state.selected_product {
-            Some(product) => {
-                rec.product_name = Some(product.name as i16);
-                rec.product_category = Some(product.category as i16);
-                rec.product_subcategory = product.subcategory.map(|v| v as i16);
-                rec.product_brand = product.brand.map(|v| v as i16);
-                rec.product_price = Some(product.price.mantissa());
 
-                match product.discount_price {
-                    Some(price) => {
-                        rec.product_discount_price = Some(price.mantissa());
-                    }
-                    _ => {}
-                }
+        if let Some(product) = state.selected_product {
+            rec.product_name = Some(product.name as i16);
+            rec.product_category = Some(product.category as i16);
+            rec.product_subcategory = product.subcategory.map(|v| v as i16);
+            rec.product_brand = product.brand.map(|v| v as i16);
+            rec.product_price = Some(product.price.mantissa());
+
+            if let Some(price) = product.discount_price {
+                rec.product_discount_price = Some(price.mantissa());
             }
-            _ => {}
         }
 
         if !state.spent_total.is_zero() {
@@ -463,7 +455,7 @@ impl Scenario {
         let mut cart_amount: Option<Decimal> = None;
         if !state.cart.is_empty() {
             rec.cart_items_number = Some(state.cart.len() as i8);
-            let mut cart_amount_: Decimal = state
+            let cart_amount_: Decimal = state
                 .cart
                 .iter()
                 .map(|p| p.discount_price.unwrap_or(p.price))
@@ -473,11 +465,8 @@ impl Scenario {
             cart_amount = Some(cart_amount_);
         }
 
-        match event {
-            Event::OrderCompleted => {
-                rec.revenue = Some(cart_amount.unwrap().mantissa());
-            }
-            _ => {}
+        if event == Event::OrderCompleted {
+            rec.revenue = Some(cart_amount.unwrap().mantissa());
         }
 
         rec.country = profile.geo.country.map(|v| v as i16);

@@ -8,17 +8,17 @@ use datafusion_common::Column;
 use datafusion_common::DFSchema;
 use datafusion_common::ScalarValue;
 use datafusion_expr::col;
-use datafusion_expr::expr;
+
 use datafusion_expr::utils::exprlist_to_fields;
 use datafusion_expr::Aggregate;
-use datafusion_expr::Expr;
+
 use datafusion_expr::Extension;
 use datafusion_expr::Filter as PlanFilter;
-use datafusion_expr::Limit;
+
 use datafusion_expr::LogicalPlan;
-use datafusion_expr::Sort;
+
 use metadata::dictionaries::provider_impl::SingleDictionaryProvider;
-use metadata::properties;
+
 use metadata::MetadataProvider;
 
 use crate::error::Result;

@@ -1,14 +1,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use chrono::Utc;
 use common::types::DType;
 use common::types::DICT_USERS;
-use common::types::TABLE_EVENTS;
-use common::types::TABLE_USERS;
-use common::DECIMAL_PRECISION;
-use common::DECIMAL_SCALE;
-use futures::executor::block_on;
 use metadata::dictionaries;
 use metadata::events;
 use metadata::events::CreateEventRequest;
@@ -18,7 +12,6 @@ use metadata::properties::CreatePropertyRequest;
 use metadata::properties::DictionaryType;
 use metadata::properties::Status;
 use store::db::OptiDBImpl;
-use store::error::StoreError;
 
 use crate::error::IngesterError;
 use crate::error::Result;
@@ -34,10 +27,10 @@ use crate::Transformer;
 fn resolve_property(
     ctx: &RequestContext,
     properties: &Arc<dyn properties::Provider>,
-    db: &Arc<OptiDBImpl>,
+    _db: &Arc<OptiDBImpl>,
     typ: properties::Type,
     name: String,
-    val: &PropValue,
+    val: PropValue,
 ) -> Result<PropertyAndValue> {
     let data_type = match val {
         PropValue::Date(_) => DType::Int64,
@@ -72,7 +65,7 @@ fn resolve_property(
 
     Ok(PropertyAndValue {
         property: prop,
-        value: val.to_owned().into(),
+        value: val.clone(),
     })
 }
 
@@ -85,7 +78,7 @@ fn resolve_properties(
 ) -> Result<Vec<PropertyAndValue>> {
     let resolved_props = props
         .iter()
-        .map(|(k, v)| resolve_property(&ctx, properties, db, typ.clone(), k.to_owned(), v))
+        .map(|(k, v)| resolve_property(ctx, properties, db, typ.clone(), k.to_owned(), v.clone()))
         .collect::<Result<Vec<PropertyAndValue>>>()?;
     Ok(resolved_props)
 }
@@ -101,6 +94,7 @@ pub struct Executor<T> {
     dicts: Arc<dyn dictionaries::Provider>,
 }
 
+#[allow(clippy::too_many_arguments)]
 impl Executor<Track> {
     pub fn new(
         transformers: Vec<Arc<dyn Transformer<Track>>>,
@@ -213,7 +207,7 @@ impl Executor<Track> {
         Ok(())
     }
 }
-
+#[allow(clippy::too_many_arguments)]
 impl Executor<Identify> {
     pub fn new(
         transformers: Vec<Arc<dyn Transformer<Identify>>>,
@@ -239,7 +233,7 @@ impl Executor<Identify> {
     }
 
     pub fn execute(&mut self, ctx: &RequestContext, mut req: Identify) -> Result<()> {
-        let mut ctx = ctx.to_owned();
+        let ctx = ctx.to_owned();
         let project = self.projects.get_by_token(ctx.token.as_str())?;
         let mut ctx = ctx.to_owned();
         ctx.organization_id = Some(project.organization_id);

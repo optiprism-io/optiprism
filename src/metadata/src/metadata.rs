@@ -34,7 +34,7 @@ pub struct MetadataProvider {
 }
 
 impl MetadataProvider {
-    pub fn try_new(db: Arc<TransactionDB>, optiDb: Arc<OptiDBImpl>) -> Result<Self> {
+    pub fn try_new(db: Arc<TransactionDB>, opti_db: Arc<OptiDBImpl>) -> Result<Self> {
         let events = Arc::new(events::ProviderImpl::new(db.clone()));
         Ok(MetadataProvider {
             dashboards: Arc::new(dashboards::ProviderImpl::new(db.clone())),
@@ -43,15 +43,15 @@ impl MetadataProvider {
             custom_events: Arc::new(custom_events::ProviderImpl::new(db.clone(), events)),
             event_properties: Arc::new(properties::ProviderImpl::new_event(
                 db.clone(),
-                optiDb.clone(),
+                opti_db.clone(),
             )),
             user_properties: Arc::new(properties::ProviderImpl::new_user(
                 db.clone(),
-                optiDb.clone(),
+                opti_db.clone(),
             )),
             system_properties: Arc::new(properties::ProviderImpl::new_system(
                 db.clone(),
-                optiDb.clone(),
+                opti_db.clone(),
             )),
             custom_properties: Arc::new(custom_properties::ProviderImpl::new(db.clone())),
             organizations: Arc::new(organizations::ProviderImpl::new(db.clone())),

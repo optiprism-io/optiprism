@@ -7,7 +7,7 @@ use common::types::USER_PROPERTY_DEVICE_MODEL;
 use common::types::USER_PROPERTY_OS;
 use common::types::USER_PROPERTY_OS_FAMILY;
 use common::types::USER_PROPERTY_OS_VERSION_MAJOR;
-use futures::executor::block_on;
+
 use metadata::dictionaries;
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;

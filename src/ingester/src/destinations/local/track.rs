@@ -1,17 +1,13 @@
 use std::sync::Arc;
 
-use chrono::Utc;
 use common::types::DType;
 use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_EVENT_ID;
 use common::types::COLUMN_PROJECT_ID;
 use common::types::COLUMN_USER_ID;
-use futures::executor::block_on;
 use metadata::dictionaries;
-use metadata::properties;
 use metadata::properties::DictionaryType;
-use metadata::properties::Type;
 use rust_decimal::prelude::ToPrimitive;
 use store::db::OptiDBImpl;
 use store::NamedValue;
@@ -28,23 +24,11 @@ use crate::Track;
 pub struct Local {
     db: Arc<OptiDBImpl>,
     dict: Arc<dyn dictionaries::Provider>,
-    event_properties: Arc<dyn properties::Provider>,
-    user_properties: Arc<dyn properties::Provider>,
 }
 
 impl Local {
-    pub fn new(
-        db: Arc<OptiDBImpl>,
-        dict: Arc<dyn dictionaries::Provider>,
-        event_properties: Arc<dyn properties::Provider>,
-        user_properties: Arc<dyn properties::Provider>,
-    ) -> Self {
-        Self {
-            db,
-            dict,
-            event_properties,
-            user_properties,
-        }
+    pub fn new(db: Arc<OptiDBImpl>, dict: Arc<dyn dictionaries::Provider>) -> Self {
+        Self { db, dict }
     }
 }
 
@@ -95,50 +79,50 @@ fn property_to_value(
 
 impl Destination<Track> for Local {
     fn send(&self, ctx: &RequestContext, req: Track) -> Result<()> {
-        let mut values = Vec::new();
-
-        values.push(NamedValue::new(
-            COLUMN_PROJECT_ID.to_string(),
-            Value::Int64(Some(ctx.project_id.unwrap() as i64)),
-        ));
-        values.push(NamedValue::new(
-            COLUMN_USER_ID.to_string(),
-            Value::Int64(Some(req.resolved_user_id.unwrap())),
-        ));
-        values.push(NamedValue::new(
-            COLUMN_CREATED_AT.to_string(),
-            Value::Timestamp(Some(req.timestamp.timestamp())),
-        ));
-        values.push(NamedValue::new(
-            COLUMN_EVENT_ID.to_string(),
-            Value::Int64(Some(req.resolved_event.as_ref().unwrap().record_id as i64)),
-        ));
         let event_id = req.resolved_event.as_ref().unwrap().event.id;
 
-        values.push(NamedValue::new(
-            COLUMN_EVENT.to_string(),
-            Value::Int64(Some(event_id as i64)),
-        ));
+        let mut values = vec![
+            NamedValue::new(
+                COLUMN_PROJECT_ID.to_string(),
+                Value::Int64(Some(ctx.project_id.unwrap() as i64)),
+            ),
+            NamedValue::new(
+                COLUMN_USER_ID.to_string(),
+                Value::Int64(Some(req.resolved_user_id.unwrap())),
+            ),
+            NamedValue::new(
+                COLUMN_CREATED_AT.to_string(),
+                Value::Timestamp(Some(req.timestamp.timestamp())),
+            ),
+            NamedValue::new(
+                COLUMN_EVENT_ID.to_string(),
+                Value::Int64(Some(req.resolved_event.as_ref().unwrap().record_id as i64)),
+            ),
+            NamedValue::new(
+                COLUMN_EVENT.to_string(),
+                Value::Int64(Some(event_id as i64)),
+            ),
+        ];
 
         let event_props = req
             .resolved_properties
             .as_ref()
-            .map(|v| v.clone())
-            .unwrap_or_else(|| vec![]);
+            .cloned()
+            .unwrap_or_else(Vec::new);
 
         for prop in &event_props {
-            let value = property_to_value(ctx, &prop, &self.dict)?;
+            let value = property_to_value(ctx, prop, &self.dict)?;
             values.push(NamedValue::new(prop.property.column_name(), value));
         }
 
         let user_props = req
             .resolved_properties
             .as_ref()
-            .map(|v| v.clone())
-            .unwrap_or_else(|| vec![]);
+            .cloned()
+            .unwrap_or_else(Vec::new);
 
         for prop in &user_props {
-            let value = property_to_value(ctx, &prop, &self.dict)?;
+            let value = property_to_value(ctx, prop, &self.dict)?;
             values.push(NamedValue::new(prop.property.column_name(), value));
         }
         self.db.insert("events", values)?;

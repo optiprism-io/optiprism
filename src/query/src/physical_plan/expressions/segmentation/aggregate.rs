@@ -164,7 +164,7 @@ where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Displa
     _time_window: i64,
     out_batch_size: usize,
 }
-
+#[allow(clippy::too_many_arguments)]
 impl<T, OT, Op> Aggregate<T, OT, Op>
 where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
 {
@@ -392,7 +392,7 @@ mod tests {
 
     // TODO fix
     // #[test]
-    fn test_decimal() {
+    fn _test_decimal() {
         let data = r#"
 | user_id(i64) | ts(ts) | event(utf8) | v(decimal) |
 |--------------|--------|-------------|--------|

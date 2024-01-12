@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use async_trait::async_trait;
+
 use rocksdb::TransactionDB;
 
 use crate::custom_properties::CustomProperty;

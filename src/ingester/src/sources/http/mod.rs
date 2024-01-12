@@ -1,19 +1,15 @@
 use std::collections::HashMap;
 use std::net::IpAddr;
-use std::net::Ipv4Addr;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::sync::Mutex;
 
 use axum::extract::ConnectInfo;
 use axum::extract::Path;
-use axum::extract::State;
 use axum::http::StatusCode;
 use axum::routing;
 use axum::Extension;
-use axum::Json;
 use axum::Router;
-use axum::Server;
 use axum_macros::debug_handler;
 use chrono::DateTime;
 use chrono::Utc;
@@ -22,15 +18,11 @@ use common::types::EVENT_PAGE;
 use common::types::EVENT_SCREEN;
 use rust_decimal::Decimal;
 use serde::Deserialize;
-use tokio::select;
-use tokio::signal::unix::SignalKind;
 use tower_http::cors::Any;
 use tower_http::cors::CorsLayer;
-use tracing::info;
 
 use crate::error::Result;
 use crate::executor::Executor;
-use crate::Destination;
 use crate::RequestContext;
 
 pub mod service;
@@ -225,7 +217,7 @@ impl App {
                 url: page.url.clone(),
             }),
             user_agent: req.context.user_agent.clone(),
-            ip: req.context.ip.clone(),
+            ip: req.context.ip,
         };
 
         let raw_properties = req.properties.map(|v| {
@@ -242,8 +234,8 @@ impl App {
             user_id: req.user_id.clone(),
             anonymous_id: req.anonymous_id.clone(),
             resolved_user_id: None,
-            sent_at: req.sent_at.unwrap_or_else(|| Utc::now()),
-            timestamp: req.timestamp.unwrap_or_else(|| Utc::now()),
+            sent_at: req.sent_at.unwrap_or_else(Utc::now),
+            timestamp: req.timestamp.unwrap_or_else(Utc::now),
             context,
             event: req.event.clone().unwrap(),
             resolved_event: None,
@@ -271,7 +263,7 @@ impl App {
         self.track(ctx, req)
     }
 
-    pub fn identify(&self, ctx: &RequestContext, mut req: IdentifyRequest) -> Result<()> {
+    pub fn identify(&self, ctx: &RequestContext, req: IdentifyRequest) -> Result<()> {
         let context = crate::Context {
             library: req.context.library.map(|lib| crate::Library {
                 name: lib.name.clone(),
@@ -285,7 +277,7 @@ impl App {
                 url: page.url.clone(),
             }),
             user_agent: req.context.user_agent.clone(),
-            ip: req.context.ip.clone(),
+            ip: req.context.ip,
         };
 
         let raw_user_properties = req.user_properties.map(|v| {
@@ -296,7 +288,7 @@ impl App {
         let track = crate::Identify {
             user_id: req.user_id.clone(),
             resolved_user_id: None,
-            sent_at: req.sent_at.clone(),
+            sent_at: req.sent_at,
             context,
             event: req.event.clone().unwrap(),
             user_properties: raw_user_properties,
@@ -314,23 +306,21 @@ pub fn attach_routes(
 ) -> Router {
     let app = App {
         track: Arc::new(Mutex::new(track_exec)),
-        identify: Arc::new(Mutex::new((identify_exec))),
+        identify: Arc::new(Mutex::new(identify_exec)),
     };
     let cors = CorsLayer::new()
         .allow_methods(Any)
         .allow_origin(Any)
         .allow_headers(Any);
 
-    let router = router
+    router
         .route("/v1/ingest/:token/track", routing::post(track))
         .route("/v1/ingest/:token/click", routing::post(click))
         .route("/v1/ingest/:token/page", routing::post(page))
         .route("/v1/ingest/:token/screen", routing::post(screen))
         .route("/v1/ingest/:token/identify", routing::post(identify))
         .layer(cors)
-        .layer(Extension(app));
-
-    router
+        .layer(Extension(app))
 }
 
 #[cfg(test)]
@@ -372,8 +362,6 @@ mod tests {
 }
     "#;
 
-        let res: TrackRequest = serde_json::from_str(PAYLOAD).unwrap();
-
-        println!("{:?}", res);
+        let _: TrackRequest = serde_json::from_str(PAYLOAD).unwrap();
     }
 }

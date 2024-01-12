@@ -1,7 +1,6 @@
 use std::any::Any;
 use std::fmt;
 use std::fmt::Debug;
-use std::fmt::Formatter;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Context;
@@ -54,7 +53,7 @@ impl PartitionExec {
         let mut schema = (*input.schema()).clone();
         let _a = schema.fields();
 
-        schema.fields = vec![vec![Arc::new(field)], schema.fields.to_vec()]
+        schema.fields = [vec![Arc::new(field)], schema.fields.to_vec()]
             .concat()
             .into();
         Ok(Self {
@@ -172,7 +171,7 @@ impl Stream for PartitionStream {
 
                 let result = RecordBatch::try_new(
                     self.schema.clone(),
-                    vec![
+                    [
                         vec![Arc::new(hash_arr) as ArrayRef],
                         batch.columns().to_owned(),
                     ]
@@ -198,7 +197,6 @@ mod tests {
     use datafusion::physical_plan::memory::MemoryExec;
     use datafusion::physical_plan::ExecutionPlan;
     use datafusion::prelude::SessionContext;
-    pub use datafusion_common::Result;
     use store::test_util::parse_markdown_tables;
 
     use crate::physical_plan::partition::PartitionExec;

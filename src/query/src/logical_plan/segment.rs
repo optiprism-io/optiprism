@@ -7,6 +7,7 @@ use std::sync::Arc;
 use common::query;
 use common::query::event_segmentation::QueryAggregate;
 use common::query::event_segmentation::SegmentTime;
+use common::query::PropValueOperation;
 use datafusion_common::Column;
 use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;
@@ -27,8 +28,8 @@ pub enum AggregateFunction {
     Count,
 }
 
-impl Into<AggregateFunction> for &QueryAggregate {
-    fn into(self) -> AggregateFunction {
+impl From<&QueryAggregate> for AggregateFunction {
+    fn from(_value: &QueryAggregate) -> Self {
         todo!()
     }
 }
@@ -42,8 +43,8 @@ pub enum Operator {
     GtEq,
 }
 
-impl Into<Operator> for &query::PropValueOperation {
-    fn into(self) -> Operator {
+impl From<&query::PropValueOperation> for Operator {
+    fn from(_value: &PropValueOperation) -> Self {
         todo!()
     }
 }
@@ -55,12 +56,11 @@ pub enum TimeRange {
     None,
 }
 
-impl Into<TimeRange> for &SegmentTime {
-    fn into(self) -> TimeRange {
+impl From<&SegmentTime> for TimeRange {
+    fn from(_value: &SegmentTime) -> Self {
         todo!()
     }
 }
-
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum SegmentExpr {
     And(Box<SegmentExpr>, Box<SegmentExpr>),

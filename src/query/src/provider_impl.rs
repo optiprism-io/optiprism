@@ -4,7 +4,6 @@ use std::time::Instant;
 use arrow::array::ArrayRef;
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
-use arrow::util::pretty::print_batches;
 use async_trait::async_trait;
 use chrono::Utc;
 use common::query::event_segmentation::Breakdown;
@@ -23,7 +22,6 @@ use datafusion::execution::runtime_env::RuntimeEnv;
 use datafusion::physical_plan::coalesce_batches::concat_batches;
 use datafusion::physical_plan::collect;
 use datafusion::physical_plan::display::DisplayableExecutionPlan;
-use datafusion::physical_plan::displayable;
 use datafusion::prelude::SessionConfig;
 use datafusion::prelude::SessionContext;
 use datafusion_expr::LogicalPlan;
@@ -31,7 +29,7 @@ use metadata::MetadataProvider;
 use store::db::OptiDBImpl;
 use tracing::debug;
 
-use crate::physical_plan::planner::planner::QueryPlanner;
+use crate::physical_plan::planner::QueryPlanner;
 use crate::queries::event_segmentation;
 use crate::queries::event_segmentation::logical_plan_builder::COL_AGG_NAME;
 use crate::queries::property_values;
@@ -76,7 +74,7 @@ impl Provider for ProviderImpl {
         let projection = fields
             .iter()
             .enumerate()
-            .map(|(idx, field)| {
+            .map(|(_idx, field)| {
                 let idx = schema.index_of(field)?;
                 Ok(idx)
             })
@@ -111,7 +109,7 @@ impl Provider for ProviderImpl {
         let projection = fields
             .iter()
             .enumerate()
-            .map(|(idx, field)| {
+            .map(|(_idx, field)| {
                 let idx = schema.index_of(field)?;
                 Ok(idx)
             })
@@ -168,6 +166,7 @@ impl Provider for ProviderImpl {
 async fn execute_plan(plan: &LogicalPlan) -> Result<RecordBatch> {
     let start = Instant::now();
     let runtime = Arc::new(RuntimeEnv::default());
+    #[allow(deprecated)]
     let state = SessionState::with_config_rt(
         SessionConfig::new()
             .with_collect_statistics(true)
@@ -176,6 +175,7 @@ async fn execute_plan(plan: &LogicalPlan) -> Result<RecordBatch> {
     )
     .with_query_planner(Arc::new(QueryPlanner {}))
     .with_optimizer_rules(vec![]);
+    #[allow(deprecated)]
     let exec_ctx = SessionContext::with_state(state.clone());
     debug!("logical plan: {:?}", plan);
     let physical_plan = state.create_physical_plan(plan).await?;
@@ -215,12 +215,13 @@ fn prop_val_fields(
     req: &PropertyValues,
     md: Arc<MetadataProvider>,
 ) -> Result<Vec<String>> {
-    let mut fields = Vec::new();
-    fields.push(COLUMN_PROJECT_ID.to_string());
-    fields.push(COLUMN_USER_ID.to_string());
-    fields.push(COLUMN_CREATED_AT.to_string());
-    fields.push(COLUMN_EVENT.to_string());
-    fields.push(col_name(ctx, &req.property, &md)?);
+    let fields = vec![
+        COLUMN_PROJECT_ID.to_string(),
+        COLUMN_USER_ID.to_string(),
+        COLUMN_CREATED_AT.to_string(),
+        COLUMN_EVENT.to_string(),
+        col_name(ctx, &req.property, &md)?,
+    ];
 
     Ok(fields)
 }
@@ -229,18 +230,19 @@ fn es_fields(
     req: &EventSegmentation,
     md: Arc<MetadataProvider>,
 ) -> Result<Vec<String>> {
-    let mut fields = Vec::new();
-    fields.push(COLUMN_PROJECT_ID.to_string());
-    fields.push(COLUMN_USER_ID.to_string());
-    fields.push(COLUMN_CREATED_AT.to_string());
-    fields.push(COLUMN_EVENT.to_string());
+    let mut fields = vec![
+        COLUMN_PROJECT_ID.to_string(),
+        COLUMN_USER_ID.to_string(),
+        COLUMN_CREATED_AT.to_string(),
+        COLUMN_EVENT.to_string(),
+    ];
 
     for event in &req.events {
         if let Some(filters) = &event.filters {
             for filter in filters {
                 match filter {
                     EventFilter::Property { property, .. } => {
-                        fields.push(col_name(ctx, &property, &md)?)
+                        fields.push(col_name(ctx, property, &md)?)
                     }
                 }
             }
@@ -277,7 +279,7 @@ fn es_fields(
         for filter in filters {
             match filter {
                 EventFilter::Property { property, .. } => {
-                    fields.push(col_name(ctx, &property, &md)?)
+                    fields.push(col_name(ctx, property, &md)?)
                 }
             }
         }

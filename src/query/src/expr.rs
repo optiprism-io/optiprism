@@ -8,6 +8,7 @@ use common::query::EventRef;
 use common::query::PropValueOperation;
 use common::query::PropertyRef;
 use common::query::QueryTime;
+use common::types::COLUMN_EVENT;
 use datafusion_common::Column;
 use datafusion_common::ExprSchema;
 use datafusion_common::ScalarValue;
@@ -19,13 +20,11 @@ use datafusion_expr::or;
 use datafusion_expr::Expr;
 use datafusion_expr::ExprSchemable;
 use datafusion_expr::Operator;
-use futures::executor;
 use metadata::dictionaries;
 use metadata::properties::DictionaryType;
 use metadata::MetadataProvider;
 
 use crate::error::QueryError;
-use crate::event_fields;
 use crate::logical_plan::expr::lit_timestamp;
 use crate::logical_plan::expr::multi_and;
 use crate::logical_plan::expr::multi_or;
@@ -67,13 +66,13 @@ pub fn event_expression(
                 .events
                 .get_by_name(ctx.organization_id, ctx.project_id, name)?;
             binary_expr(
-                col(event_fields::EVENT),
+                col(COLUMN_EVENT),
                 Operator::Eq,
                 lit(ScalarValue::from(e.id as u16)),
             )
         }
         EventRef::Regular(id) => binary_expr(
-            col(event_fields::EVENT),
+            col(COLUMN_EVENT),
             Operator::Eq,
             lit(ScalarValue::from(*id as u16)),
         ),
@@ -167,11 +166,6 @@ pub fn encode_property_dict_values(
                     DictionaryType::Int16 => ScalarValue::Int16(Some(key as i16)),
                     DictionaryType::Int32 => ScalarValue::Int32(Some(key as i32)),
                     DictionaryType::Int64 => ScalarValue::Int64(Some(key as i64)),
-                    _ => {
-                        return Err(QueryError::Plan(format!(
-                            "unsupported dictionary type \"{dict_type:?}\""
-                        )));
-                    }
                 };
 
                 ret.push(scalar_value);
@@ -179,6 +173,7 @@ pub fn encode_property_dict_values(
                 ret.push(ScalarValue::try_from(DataType::from(dict_type.to_owned()))?);
             }
         } else {
+            #[allow(deprecated)]
             return Err(QueryError::Plan(format!(
                 "value type should be Utf8, but \"{:?}\" was given",
                 value.get_datatype()
@@ -386,6 +381,5 @@ pub fn named_property_expression(
         PropValueOperation::False => Ok(prop_col.is_false()),
         PropValueOperation::Empty => Ok(prop_col.is_null()),
         PropValueOperation::Exists => Ok(prop_col.is_not_null()),
-        _ => unimplemented!(),
     }
 }

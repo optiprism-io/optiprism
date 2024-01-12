@@ -8,7 +8,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread;
 
-use arrow::record_batch::RecordBatch;
 use axum::Router;
 use axum::Server;
 use chrono::DateTime;
@@ -16,29 +15,15 @@ use chrono::Duration;
 use chrono::NaiveDateTime;
 use chrono::Utc;
 use clap::Parser;
-use common::rbac::OrganizationRole;
-use common::rbac::ProjectRole;
-use common::rbac::Role;
-use common::types::DType;
-use common::types::COLUMN_PROJECT_ID;
 use common::types::EVENT_PROPERTY_PAGE_PATH;
 use common::types::EVENT_PROPERTY_PAGE_TITLE;
 use common::types::EVENT_PROPERTY_PAGE_URL;
 use common::types::USER_PROPERTY_CITY;
-use common::types::USER_PROPERTY_CLIENT_FAMILY;
-use common::types::USER_PROPERTY_CLIENT_VERSION_MAJOR;
-use common::types::USER_PROPERTY_CLIENT_VERSION_MINOR;
-use common::types::USER_PROPERTY_CLIENT_VERSION_PATCH;
 use common::types::USER_PROPERTY_COUNTRY;
-use common::types::USER_PROPERTY_DEVICE_BRAND;
-use common::types::USER_PROPERTY_DEVICE_FAMILY;
 use common::types::USER_PROPERTY_DEVICE_MODEL;
 use common::types::USER_PROPERTY_OS;
 use common::types::USER_PROPERTY_OS_FAMILY;
 use common::types::USER_PROPERTY_OS_VERSION_MAJOR;
-use common::types::USER_PROPERTY_OS_VERSION_MINOR;
-use common::types::USER_PROPERTY_OS_VERSION_PATCH;
-use common::types::USER_PROPERTY_OS_VERSION_PATCH_MINOR;
 use crossbeam_channel::bounded;
 use datafusion::datasource::TableProvider;
 use dateparser::DateTimeUtc;
@@ -52,7 +37,6 @@ use events_gen::store::scenario;
 use events_gen::store::scenario::EventRecord;
 use events_gen::store::scenario::Scenario;
 use events_gen::store::schema::create_properties;
-use futures::executor::block_on;
 use ingester::error::IngesterError;
 use ingester::executor::Executor;
 use ingester::transformers::geo;
@@ -61,24 +45,13 @@ use ingester::Destination;
 use ingester::Identify;
 use ingester::Track;
 use ingester::Transformer;
-use metadata::accounts::CreateAccountRequest;
-use metadata::organizations::CreateOrganizationRequest;
-use metadata::projects::CreateProjectRequest;
-use metadata::properties;
-use metadata::properties::CreatePropertyRequest;
-use metadata::properties::DictionaryType;
-use metadata::properties::Status;
-use metadata::properties::Type;
 use metadata::MetadataProvider;
 use platform::auth;
-use platform::auth::password::make_password_hash;
 use query::datasources::local::LocalTable;
 use query::ProviderImpl;
 use rand::thread_rng;
-use scan_dir::ScanDir;
 use store::db::OptiDBImpl;
 use store::db::Options;
-use store::table::Options as TableOptions;
 use store::NamedValue;
 use store::Value;
 use tokio::select;
@@ -184,12 +157,8 @@ fn init_ingester(
     track_transformers.push(Arc::new(geo) as Arc<dyn Transformer<Track>>);
 
     let mut track_destinations = Vec::new();
-    let track_local_dst = ingester::destinations::local::track::Local::new(
-        db.clone(),
-        md.dictionaries.clone(),
-        md.event_properties.clone(),
-        md.user_properties.clone(),
-    );
+    let track_local_dst =
+        ingester::destinations::local::track::Local::new(db.clone(), md.dictionaries.clone());
     track_destinations.push(Arc::new(track_local_dst) as Arc<dyn Destination<Track>>);
     let track_exec = Executor::<Track>::new(
         track_transformers.clone(),
@@ -235,7 +204,7 @@ fn init_ingester(
     ))
 }
 
-pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
+pub async fn start(args: &Shop, _proj_id: u64) -> Result<()> {
     debug!("db path: {:?}", args.path);
 
     if args.generate {
@@ -250,7 +219,9 @@ pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
     init_system(&md, &db, args.partitions.unwrap_or_else(num_cpus::get))?;
     if let Some(ui_path) = &args.ui_path {
         if !ui_path.try_exists()? {
-            return Err(Error::FileNotFound(format!("ui path {ui_path:?} doesn't exist")).into());
+            return Err(Error::FileNotFound(format!(
+                "ui path {ui_path:?} doesn't exist"
+            )));
         }
         debug!("ui path: {:?}", ui_path);
     }
@@ -259,8 +230,7 @@ pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
         return Err(Error::FileNotFound(format!(
             "demo data path {:?} doesn't exist",
             args.demo_data_path
-        ))
-        .into());
+        )));
     }
 
     let to_date = match &args.to_date {
@@ -297,7 +267,7 @@ pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
         info!("expecting total unique users: {total_users}");
         info!("starting sample data generation...");
 
-        let db_clone = db.clone();
+        let _db_clone = db.clone();
         let md_clone = md.clone();
         let db_clone = db.clone();
         let args_clone = args.clone();
@@ -346,11 +316,11 @@ pub async fn start(args: &Shop, proj_id: u64) -> Result<()> {
         future_gen(md.clone(), db.clone(), store_cfg)?;
     }
 
-    let mut router = Router::new();
+    let router = Router::new();
     info!("initializing platform...");
     let router = init_platform(md.clone(), db.clone(), router)?;
     info!("initializing ingester...");
-    // let router = init_ingester(args, &md, &db, router)?;
+    let router = init_ingester(args, &md, &db, router)?;
 
     let server =
         Server::bind(&args.host).serve(router.into_make_service_with_connect_info::<SocketAddr>());
@@ -411,7 +381,7 @@ where R: io::Read {
     // move init to thread because thread_rng is not movable
     // todo parallelize?
     thread::spawn(move || {
-        let mut rng = thread_rng();
+        let rng = thread_rng();
         info!("creating generator...");
         let gen_cfg = generator::Config {
             rng: rng.clone(),
@@ -493,7 +463,7 @@ where R: io::Read {
 
     // todo parallelize?
     thread::spawn(move || {
-        let mut rng = thread_rng();
+        let rng = thread_rng();
         let gen_cfg = generator::Config {
             rng: rng.clone(),
             profiles,
@@ -531,19 +501,17 @@ where R: io::Read {
         out.insert(event.created_at, event);
     }
     thread::spawn(move || {
-        let mut idx = 0;
         loop {
             match out.pop_first() {
                 None => break,
                 Some((ts, event)) => {
                     let cur = Utc::now().timestamp();
                     let ts = ts / 1000000000;
-                    let d = NaiveDateTime::from_timestamp_opt(ts, 0).unwrap();
+                    let _d = NaiveDateTime::from_timestamp_opt(ts, 0).unwrap();
                     if ts > cur {
                         thread::sleep(std::time::Duration::from_secs((ts - cur) as u64));
                     }
                     write_event(cfg.org_id, cfg.project_id, &db, &md, event, 0).unwrap();
-                    idx += 1;
                 }
             }
         }
@@ -559,169 +527,157 @@ fn write_event(
     event: EventRecord,
     idx: i64,
 ) -> Result<()> {
-    let mut vals = vec![];
-    vals.push(NamedValue::new(
-        "project_id".to_string(),
-        Value::Int64(Some(proj_id as i64)),
-    ));
-    vals.push(NamedValue::new(
-        "user_id".to_string(),
-        Value::Int64(Some(event.user_id)),
-    ));
-    vals.push(NamedValue::new(
-        "created_at".to_string(),
-        Value::Timestamp(Some(event.created_at)),
-    ));
-    vals.push(NamedValue::new(
-        "event_id".to_string(),
-        Value::Int64(Some(idx)),
-    ));
-    vals.push(NamedValue::new(
-        "event".to_string(),
-        Value::Int64(Some(event.event)),
-    ));
-    vals.push(NamedValue::new(
-        md.event_properties
-            .get_by_name(org_id, proj_id, EVENT_PROPERTY_PAGE_PATH)
-            .unwrap()
-            .column_name(),
-        Value::String(Some(event.page_path)),
-    ));
-    vals.push(NamedValue::new(
-        md.event_properties
-            .get_by_name(org_id, proj_id, EVENT_PROPERTY_PAGE_TITLE)
-            .unwrap()
-            .column_name(),
-        Value::String(Some(event.page_title)),
-    ));
-    vals.push(NamedValue::new(
-        md.event_properties
-            .get_by_name(org_id, proj_id, EVENT_PROPERTY_PAGE_URL)
-            .unwrap()
-            .column_name(),
-        Value::String(Some(event.page_url)),
-    ));
-    vals.push(NamedValue::new(
-        md.event_properties
-            .get_by_name(org_id, proj_id, "Product Name")
-            .unwrap()
-            .column_name(),
-        Value::Int16(event.product_name),
-    ));
-    vals.push(NamedValue::new(
-        md.event_properties
-            .get_by_name(org_id, proj_id, "Product Category")
-            .unwrap()
-            .column_name(),
-        Value::Int16(event.product_category),
-    ));
-    vals.push(NamedValue::new(
-        md.event_properties
-            .get_by_name(org_id, proj_id, "Product Subcategory")
-            .unwrap()
-            .column_name(),
-        Value::Int16(event.product_subcategory),
-    ));
-    vals.push(NamedValue::new(
-        md.event_properties
-            .get_by_name(org_id, proj_id, "Product Brand")
-            .unwrap()
-            .column_name(),
-        Value::Int16(event.product_brand),
-    ));
-    vals.push(NamedValue::new(
-        md.event_properties
-            .get_by_name(org_id, proj_id, "Product Price")
-            .unwrap()
-            .column_name(),
-        Value::Decimal(event.product_price),
-    ));
-    vals.push(NamedValue::new(
-        md.event_properties
-            .get_by_name(org_id, proj_id, "Product Discount Price")
-            .unwrap()
-            .column_name(),
-        Value::Decimal(event.product_discount_price),
-    ));
-    vals.push(NamedValue::new(
-        md.event_properties
-            .get_by_name(org_id, proj_id, "Revenue")
-            .unwrap()
-            .column_name(),
-        Value::Decimal(event.revenue),
-    ));
-    vals.push(NamedValue::new(
-        md.user_properties
-            .get_by_name(org_id, proj_id, "Spent Total")
-            .unwrap()
-            .column_name(),
-        Value::Decimal(event.spent_total),
-    ));
-    vals.push(NamedValue::new(
-        md.user_properties
-            .get_by_name(org_id, proj_id, "Products Bought")
-            .unwrap()
-            .column_name(),
-        Value::Int8(event.products_bought),
-    ));
-    vals.push(NamedValue::new(
-        md.user_properties
-            .get_by_name(org_id, proj_id, "Cart Items Number")
-            .unwrap()
-            .column_name(),
-        Value::Int8(event.cart_items_number),
-    ));
-    vals.push(NamedValue::new(
-        md.user_properties
-            .get_by_name(org_id, proj_id, "Cart Amount")
-            .unwrap()
-            .column_name(),
-        Value::Decimal(event.cart_amount),
-    ));
-    vals.push(NamedValue::new(
-        md.user_properties
-            .get_by_name(org_id, proj_id, USER_PROPERTY_COUNTRY)
-            .unwrap()
-            .column_name(),
-        Value::Int64(event.country.map(|v| v as i64)),
-    ));
-    vals.push(NamedValue::new(
-        md.user_properties
-            .get_by_name(org_id, proj_id, USER_PROPERTY_CITY)
-            .unwrap()
-            .column_name(),
-        Value::Int64(event.city.map(|v| v as i64)),
-    ));
-    vals.push(NamedValue::new(
-        md.user_properties
-            .get_by_name(org_id, proj_id, USER_PROPERTY_DEVICE_MODEL)
-            .unwrap()
-            .column_name(),
-        Value::Int64(event.device.map(|v| v as i64)),
-    ));
-    // todo remove in favour of Os Family?
-    vals.push(NamedValue::new(
-        md.user_properties
-            .get_by_name(org_id, proj_id, USER_PROPERTY_OS_FAMILY)
-            .unwrap()
-            .column_name(),
-        Value::Int64(event.device_category.map(|v| v as i64)),
-    ));
-    vals.push(NamedValue::new(
-        md.user_properties
-            .get_by_name(org_id, proj_id, USER_PROPERTY_OS)
-            .unwrap()
-            .column_name(),
-        Value::Int64(event.os.map(|v| v as i64)),
-    ));
-    vals.push(NamedValue::new(
-        md.user_properties
-            .get_by_name(org_id, proj_id, USER_PROPERTY_OS_VERSION_MAJOR)
-            .unwrap()
-            .column_name(),
-        Value::Int64(event.os_version.map(|v| v as i64)),
-    ));
+    let vals = vec![
+        NamedValue::new("project_id".to_string(), Value::Int64(Some(proj_id as i64))),
+        NamedValue::new("user_id".to_string(), Value::Int64(Some(event.user_id))),
+        NamedValue::new(
+            "created_at".to_string(),
+            Value::Timestamp(Some(event.created_at)),
+        ),
+        NamedValue::new("event_id".to_string(), Value::Int64(Some(idx))),
+        NamedValue::new("event".to_string(), Value::Int64(Some(event.event))),
+        NamedValue::new(
+            md.event_properties
+                .get_by_name(org_id, proj_id, EVENT_PROPERTY_PAGE_PATH)
+                .unwrap()
+                .column_name(),
+            Value::String(Some(event.page_path)),
+        ),
+        NamedValue::new(
+            md.event_properties
+                .get_by_name(org_id, proj_id, EVENT_PROPERTY_PAGE_TITLE)
+                .unwrap()
+                .column_name(),
+            Value::String(Some(event.page_title)),
+        ),
+        NamedValue::new(
+            md.event_properties
+                .get_by_name(org_id, proj_id, EVENT_PROPERTY_PAGE_URL)
+                .unwrap()
+                .column_name(),
+            Value::String(Some(event.page_url)),
+        ),
+        NamedValue::new(
+            md.event_properties
+                .get_by_name(org_id, proj_id, "Product Name")
+                .unwrap()
+                .column_name(),
+            Value::Int16(event.product_name),
+        ),
+        NamedValue::new(
+            md.event_properties
+                .get_by_name(org_id, proj_id, "Product Category")
+                .unwrap()
+                .column_name(),
+            Value::Int16(event.product_category),
+        ),
+        NamedValue::new(
+            md.event_properties
+                .get_by_name(org_id, proj_id, "Product Subcategory")
+                .unwrap()
+                .column_name(),
+            Value::Int16(event.product_subcategory),
+        ),
+        NamedValue::new(
+            md.event_properties
+                .get_by_name(org_id, proj_id, "Product Brand")
+                .unwrap()
+                .column_name(),
+            Value::Int16(event.product_brand),
+        ),
+        NamedValue::new(
+            md.event_properties
+                .get_by_name(org_id, proj_id, "Product Price")
+                .unwrap()
+                .column_name(),
+            Value::Decimal(event.product_price),
+        ),
+        NamedValue::new(
+            md.event_properties
+                .get_by_name(org_id, proj_id, "Product Discount Price")
+                .unwrap()
+                .column_name(),
+            Value::Decimal(event.product_discount_price),
+        ),
+        NamedValue::new(
+            md.event_properties
+                .get_by_name(org_id, proj_id, "Revenue")
+                .unwrap()
+                .column_name(),
+            Value::Decimal(event.revenue),
+        ),
+        NamedValue::new(
+            md.user_properties
+                .get_by_name(org_id, proj_id, "Spent Total")
+                .unwrap()
+                .column_name(),
+            Value::Decimal(event.spent_total),
+        ),
+        NamedValue::new(
+            md.user_properties
+                .get_by_name(org_id, proj_id, "Products Bought")
+                .unwrap()
+                .column_name(),
+            Value::Int8(event.products_bought),
+        ),
+        NamedValue::new(
+            md.user_properties
+                .get_by_name(org_id, proj_id, "Cart Items Number")
+                .unwrap()
+                .column_name(),
+            Value::Int8(event.cart_items_number),
+        ),
+        NamedValue::new(
+            md.user_properties
+                .get_by_name(org_id, proj_id, "Cart Amount")
+                .unwrap()
+                .column_name(),
+            Value::Decimal(event.cart_amount),
+        ),
+        NamedValue::new(
+            md.user_properties
+                .get_by_name(org_id, proj_id, USER_PROPERTY_COUNTRY)
+                .unwrap()
+                .column_name(),
+            Value::Int64(event.country.map(|v| v as i64)),
+        ),
+        NamedValue::new(
+            md.user_properties
+                .get_by_name(org_id, proj_id, USER_PROPERTY_CITY)
+                .unwrap()
+                .column_name(),
+            Value::Int64(event.city.map(|v| v as i64)),
+        ),
+        NamedValue::new(
+            md.user_properties
+                .get_by_name(org_id, proj_id, USER_PROPERTY_DEVICE_MODEL)
+                .unwrap()
+                .column_name(),
+            Value::Int64(event.device.map(|v| v as i64)),
+        ),
+        NamedValue::new(
+            md.user_properties
+                .get_by_name(org_id, proj_id, USER_PROPERTY_OS_FAMILY)
+                .unwrap()
+                .column_name(),
+            Value::Int64(event.device_category.map(|v| v as i64)),
+        ),
+        NamedValue::new(
+            md.user_properties
+                .get_by_name(org_id, proj_id, USER_PROPERTY_OS)
+                .unwrap()
+                .column_name(),
+            Value::Int64(event.os.map(|v| v as i64)),
+        ),
+        NamedValue::new(
+            md.user_properties
+                .get_by_name(org_id, proj_id, USER_PROPERTY_OS_VERSION_MAJOR)
+                .unwrap()
+                .column_name(),
+            Value::Int64(event.os_version.map(|v| v as i64)),
+        ),
+    ];
     db.insert("events", vals)?;
 
-    return Ok(());
+    Ok(())
 }

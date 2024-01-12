@@ -1,19 +1,19 @@
 use std::collections::BTreeMap;
 use std::fmt::Debug;
-use std::fmt::Display;
-use std::fmt::Formatter;
+
+
 use std::result;
 
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::response::Response;
-use axum::Json;
+
 use common::error::CommonError;
 use common::http::ApiError;
 use metadata::error::MetadataError;
 use query::error::QueryError;
-use serde::Serialize;
-use serde::Serializer;
+
+
 use thiserror::Error;
 use tracing::debug;
 

@@ -1216,7 +1216,7 @@ impl TryInto<EventSegmentation> for common::query::event_segmentation::EventSegm
 mod tests {
     use chrono::DateTime;
     use chrono::Utc;
-    use query::event_fields;
+    use common::types::COLUMN_USER_ID;
     use serde_json::json;
 
     use crate::error::Result;
@@ -1247,7 +1247,7 @@ mod tests {
             .with_timezone(&Utc);
         let es = EventSegmentation {
             time: QueryTime::Between { from, to },
-            group: event_fields::USER_ID.to_string(),
+            group: COLUMN_USER_ID.to_string(),
             interval_unit: TimeIntervalUnit::Minute,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,

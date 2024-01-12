@@ -2,7 +2,6 @@ use std::num::NonZeroUsize;
 use std::sync::Arc;
 use std::sync::RwLock;
 
-use async_trait::async_trait;
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::Utc;
@@ -14,7 +13,6 @@ use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use store::db::OptiDBImpl;
 
-use crate::error;
 use crate::error::MetadataError;
 use crate::index::check_insert_constraints;
 use crate::index::check_update_constraints;
@@ -89,55 +87,55 @@ fn index_display_name_key(
 
 pub struct ProviderImpl {
     db: Arc<TransactionDB>,
-    optiDb: Arc<OptiDBImpl>,
+    opti_db: Arc<OptiDBImpl>,
     id_cache: RwLock<LruCache<(u64, u64, u64), Property>>,
     name_cache: RwLock<LruCache<(u64, u64, String), Property>>,
     typ: Type,
 }
 
 impl ProviderImpl {
-    pub fn new_user(db: Arc<TransactionDB>, optiDb: Arc<OptiDBImpl>) -> Self {
-        let mut id_cache = RwLock::new(LruCache::new(
+    pub fn new_user(db: Arc<TransactionDB>, opti_db: Arc<OptiDBImpl>) -> Self {
+        let id_cache = RwLock::new(LruCache::new(
             NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
         ));
-        let mut name_cache = RwLock::new(LruCache::new(
+        let name_cache = RwLock::new(LruCache::new(
             NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
         ));
         ProviderImpl {
             db,
-            optiDb,
+            opti_db,
             id_cache,
             name_cache,
             typ: Type::User,
         }
     }
 
-    pub fn new_event(db: Arc<TransactionDB>, optiDb: Arc<OptiDBImpl>) -> Self {
-        let mut id_cache = RwLock::new(LruCache::new(
+    pub fn new_event(db: Arc<TransactionDB>, opti_db: Arc<OptiDBImpl>) -> Self {
+        let id_cache = RwLock::new(LruCache::new(
             NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
         ));
-        let mut name_cache = RwLock::new(LruCache::new(
+        let name_cache = RwLock::new(LruCache::new(
             NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
         ));
         ProviderImpl {
             db,
             id_cache,
             name_cache,
-            optiDb,
+            opti_db,
             typ: Type::Event,
         }
     }
 
-    pub fn new_system(db: Arc<TransactionDB>, optiDb: Arc<OptiDBImpl>) -> Self {
-        let mut id_cache = RwLock::new(LruCache::new(
+    pub fn new_system(db: Arc<TransactionDB>, opti_db: Arc<OptiDBImpl>) -> Self {
+        let id_cache = RwLock::new(LruCache::new(
             NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
         ));
-        let mut name_cache = RwLock::new(LruCache::new(
+        let name_cache = RwLock::new(LruCache::new(
             NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
         ));
         ProviderImpl {
             db,
-            optiDb,
+            opti_db,
             id_cache,
             name_cache,
             typ: Type::System,
@@ -165,7 +163,7 @@ impl ProviderImpl {
             IDX_NAME,
             name,
         );
-        let data = get_index(&tx, idx_key)?;
+        let data = get_index(tx, idx_key)?;
 
         Ok(deserialize(&data)?)
     }
@@ -212,17 +210,17 @@ impl ProviderImpl {
             req.display_name.clone(),
         );
 
-        check_insert_constraints(&tx, idx_keys.as_ref())?;
+        check_insert_constraints(tx, idx_keys.as_ref())?;
 
         let id = next_seq(
-            &tx,
+            tx,
             make_id_seq_key(
                 org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
             ),
         )?;
 
         let order = next_zero_seq(
-            &tx,
+            tx,
             make_id_seq_key(
                 org_proj_ns(
                     organization_id,
@@ -272,7 +270,7 @@ impl ProviderImpl {
         let data = serialize(&prop)?;
         tx.put(idx_key, &data)?;
 
-        insert_index(&tx, idx_keys.as_ref(), &data)?;
+        insert_index(tx, idx_keys.as_ref(), &data)?;
 
         let dt = if let Some(dt) = &req.dictionary_type {
             match dt {
@@ -284,7 +282,7 @@ impl ProviderImpl {
         } else {
             req.data_type.clone()
         };
-        self.optiDb
+        self.opti_db
             .add_field(TABLE_EVENTS, prop.column_name().as_str(), dt, req.nullable)?;
         Ok(prop)
     }

@@ -66,12 +66,6 @@ pub mod physical_plan;
 pub mod provider_impl;
 pub mod queries;
 
-pub mod event_fields {
-    pub const EVENT: &str = "event";
-    pub const CREATED_AT: &str = "created_at";
-    pub const USER_ID: &str = "user_id";
-}
-
 pub const DEFAULT_BATCH_SIZE: usize = 4096;
 
 macro_rules! static_array_enum {
@@ -329,7 +323,7 @@ impl DataTable {
 }
 
 pub mod test_util {
-    use std::env::temp_dir;
+
     use std::path::PathBuf;
     use std::sync::Arc;
 
@@ -338,6 +332,10 @@ pub mod test_util {
     use arrow::datatypes::Schema;
     use arrow::datatypes::TimeUnit;
     use common::types::DType;
+    use common::types::COLUMN_CREATED_AT;
+    use common::types::COLUMN_EVENT;
+    use common::types::COLUMN_PROJECT_ID;
+    use common::types::COLUMN_USER_ID;
     use common::DECIMAL_PRECISION;
     use common::DECIMAL_SCALE;
     use datafusion::datasource::listing::ListingTable;
@@ -357,19 +355,16 @@ pub mod test_util {
     use metadata::properties::Type;
     use metadata::MetadataProvider;
     use store::db::OptiDBImpl;
-    use store::db::Options;
-    use store::table::Options as TableOptions;
-    use uuid::Uuid;
 
     use crate::error::Result;
-    use crate::event_fields;
 
     pub async fn events_provider(
         db: Arc<OptiDBImpl>,
-        org_id: u64,
-        proj_id: u64,
+        _org_id: u64,
+        _proj_id: u64,
     ) -> Result<LogicalPlan> {
         let schema = Schema::new(vec![
+            Field::new("project_id", DataType::Int64, false),
             Field::new("user_id", DataType::Int64, false),
             Field::new(
                 "created_at",
@@ -415,7 +410,7 @@ pub mod test_util {
 
     pub fn create_property(
         md: &Arc<MetadataProvider>,
-        db: &Arc<OptiDBImpl>,
+        _db: &Arc<OptiDBImpl>,
         org_id: u64,
         proj_id: u64,
         req: CreatePropertyRequest,
@@ -437,12 +432,13 @@ pub mod test_util {
         org_id: u64,
         proj_id: u64,
     ) -> Result<()> {
-        db.add_field("events", event_fields::USER_ID, DType::Int64, false)?;
-        db.add_field("events", event_fields::CREATED_AT, DType::Int64, false)?;
-        db.add_field("events", event_fields::EVENT, DType::Int64, false)?;
+        db.add_field("events", COLUMN_PROJECT_ID, DType::Int64, false)?;
+        db.add_field("events", COLUMN_USER_ID, DType::Int64, false)?;
+        db.add_field("events", COLUMN_CREATED_AT, DType::Timestamp, false)?;
+        db.add_field("events", COLUMN_EVENT, DType::Int64, false)?;
         // create user props
 
-        let country_prop = create_property(&md, &db, org_id, proj_id, CreatePropertyRequest {
+        let country_prop = create_property(&md, db, org_id, proj_id, CreatePropertyRequest {
             created_by: 0,
             tags: None,
             name: "Country".to_string(),
@@ -471,7 +467,7 @@ pub mod test_util {
             "german",
         )?;
 
-        create_property(&md, &db, org_id, proj_id, CreatePropertyRequest {
+        create_property(&md, db, org_id, proj_id, CreatePropertyRequest {
             created_by: 0,
             tags: None,
             name: "Device".to_string(),
@@ -487,7 +483,7 @@ pub mod test_util {
             is_system: false,
         })?;
 
-        create_property(&md, &db, org_id, proj_id, CreatePropertyRequest {
+        create_property(&md, db, org_id, proj_id, CreatePropertyRequest {
             created_by: 0,
             tags: None,
             name: "Is Premium".to_string(),
@@ -531,7 +527,7 @@ pub mod test_util {
             })?;
 
         // create event props
-        create_property(&md, &db, org_id, proj_id, CreatePropertyRequest {
+        create_property(&md, db, org_id, proj_id, CreatePropertyRequest {
             created_by: 0,
             tags: None,
             name: "Product Name".to_string(),
@@ -547,7 +543,7 @@ pub mod test_util {
             is_system: false,
         })?;
 
-        create_property(&md, &db, org_id, proj_id, CreatePropertyRequest {
+        create_property(&md, db, org_id, proj_id, CreatePropertyRequest {
             created_by: 0,
             tags: None,
             name: "Revenue".to_string(),

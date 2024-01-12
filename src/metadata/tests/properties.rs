@@ -1,25 +1,15 @@
-use std::env::temp_dir;
-use std::sync::Arc;
-
 use common::types::DType;
 use common::types::OptionalProperty;
 use metadata::error::Result;
 use metadata::properties::CreatePropertyRequest;
-use metadata::properties::Provider;
-use metadata::properties::ProviderImpl;
 use metadata::properties::Status;
 use metadata::properties::Type;
 use metadata::properties::UpdatePropertyRequest;
 use metadata::test_util::init_db;
-use rocksdb::TransactionDB;
-use store::db::OptiDBImpl;
-use store::db::Options;
-use store::db::TableOptions;
-use uuid::Uuid;
 
 #[test]
 fn test_properties() -> Result<()> {
-    let (md, opti_db) = init_db()?;
+    let (md, _opti_db) = init_db()?;
 
     // try to get, delete, update unexisting event prop
     assert!(md.event_properties.get_by_id(1, 1, 1).is_err());
@@ -99,7 +89,7 @@ fn test_properties() -> Result<()> {
     assert_eq!(md.event_properties.get_by_name(1, 1, "prop2")?.id, 2);
     let mut update_prop1 = update_prop_req.clone();
     update_prop1.name.insert("prop2".to_string());
-    let a = md.event_properties.update(1, 1, 1, update_prop1.clone());
+    let _a = md.event_properties.update(1, 1, 1, update_prop1.clone());
     assert_eq!(
         md.event_properties
             .update(1, 1, 1, update_prop1.clone())?
