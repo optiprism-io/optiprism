@@ -1,17 +1,7 @@
 use std::sync::Arc;
 
-
-
 use common::types::DType;
-
-
-
-
-
-
-
 use enum_iterator::all;
-
 use metadata::properties::DictionaryType;
 use metadata::properties::Type;
 use metadata::test_util::create_event;

@@ -787,6 +787,7 @@ impl PartitionedAggregateExpr for Funnel {
     }
 }
 
+#[allow(unused_attributes)]
 #[ignore]
 #[cfg(test)]
 mod tests {

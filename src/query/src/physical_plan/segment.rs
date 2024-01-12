@@ -1,7 +1,6 @@
 use std::any::Any;
 use std::fmt;
 use std::fmt::Debug;
-
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Context;
@@ -247,7 +246,6 @@ mod tests {
     use datafusion::physical_plan::memory::MemoryExec;
     use datafusion::physical_plan::ExecutionPlan;
     use datafusion::prelude::SessionContext;
-    
     use datafusion_common::ScalarValue;
     use datafusion_expr::Operator;
     use store::test_util::parse_markdown_tables;

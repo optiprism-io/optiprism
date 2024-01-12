@@ -1,14 +1,10 @@
 pub mod provider_impl;
 
 use arrow::datatypes;
-
 use chrono::DateTime;
 use chrono::Utc;
 use common::types::DType;
 use common::types::OptionalProperty;
-
-
-
 use convert_case::Case;
 use convert_case::Casing;
 pub use provider_impl::ProviderImpl;

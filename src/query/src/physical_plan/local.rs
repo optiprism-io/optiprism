@@ -139,7 +139,6 @@ impl ExecutionPlan for LocalExec {
         partition: usize,
         _cx: Arc<TaskContext>,
     ) -> datafusion_common::Result<SendableRecordBatchStream> {
-        debug!("pp {partition}");
         let stream = self
             .db
             .scan_partition(self.tbl_name.as_str(), partition, self.fields.clone())

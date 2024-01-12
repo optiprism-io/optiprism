@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-
 use rocksdb::TransactionDB;
 
 use crate::custom_properties::CustomProperty;

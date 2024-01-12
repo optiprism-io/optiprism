@@ -116,8 +116,6 @@ impl Compactor {
                     let md = table.metadata.lock();
                     md.clone()
                 };
-                // !@#println!("md lvlb {}", levels[0].part_id);
-                // print_levels(&levels);
                 for (pid, partition) in metadata.partitions.iter().enumerate() {
                     let _start = Instant::now();
                     match compact(
@@ -131,9 +129,6 @@ impl Compactor {
                             None => continue,
                             Some(res) => {
                                 let mut metadata = table.metadata.lock();
-                                // !@#println!("md lvl");
-                                // print_levels(&md.levels);
-                                // print_levels(&md.levels);
                                 for rem in &res.l0_remove {
                                     metadata.partitions[pid].levels[0].parts =
                                         metadata.partitions[pid].levels[0]
@@ -143,9 +138,6 @@ impl Compactor {
                                             .filter(|p| p.id != *rem)
                                             .collect::<Vec<_>>();
                                 }
-                                // !@#println!("res rem: {:?}", res.l0_remove);
-                                // !@#println!("res levels");
-                                // print_levels(&res.levels);
                                 for (idx, l) in res.levels.iter().enumerate().skip(1) {
                                     metadata.partitions[pid].levels[idx] = l.clone();
                                 }
@@ -153,8 +145,6 @@ impl Compactor {
                                 log_metadata(log.get_mut(), &mut metadata).unwrap();
                                 drop(metadata);
                                 // drop because next fs operation is with locking
-                                // !@#println!("md lvl after");
-                                // print_levels(&md.levels);
                                 for op in res.fs_ops {
                                     match op {
                                         FsOp::Rename(from, to) => {
@@ -168,10 +158,6 @@ impl Compactor {
                                         }
                                     }
                                 }
-                                // !@#println!("After");
-                                // let mut md = self.metadata.lock().unwrap();
-                                // // !@#println!("post md");
-                                // print_levels(&md.levels);
                             }
                         },
                         Err(err) => {
@@ -180,7 +166,6 @@ impl Compactor {
                     }
                 }
             }
-            // !@#debug!("compaction finished in {:?}", duration);
         }
         //     CompactorMessage::Stop(dropper) => {
         //         drop(dropper);
@@ -201,7 +186,6 @@ fn determine_compaction(
     next_level: &Level,
     opts: &table::Options,
 ) -> Result<Option<Vec<ToCompact>>> {
-    // !@#println!("lid {} {}", level_id, level.parts.len());
     let mut to_compact = vec![];
 
     let level_parts = &level.parts;
@@ -215,10 +199,6 @@ fn determine_compaction(
             size += part.size_bytes;
             let level_threshold =
                 opts.l1_max_size_bytes * opts.level_size_multiplier.pow(level_id as u32 - 1);
-            // println!(
-            //     "threshold {} level {level_id} size {}",
-            //     level_threshold, size
-            // );
             if size > level_threshold as u64 {
                 to_compact.push(ToCompact::new(level_id, part.id));
             }
@@ -279,10 +259,7 @@ fn compact(
                 let start_time = Instant::now();
 
                 compacted = true;
-                // println!("to compact {:?}", to_compact);
                 if to_compact.len() == 1 {
-                    // println!("rename");
-
                     let idx = tmp_levels[level_id]
                         .parts
                         .iter()
@@ -300,12 +277,9 @@ fn compact(
 
                     tmp_levels[level_id + 1].parts.push(part.clone());
                     tmp_levels[level_id + 1].part_id += 1;
-                    // !@#println!("done");
                     continue;
                 }
-                // println!("llee {}", to_compact.len());
                 let mut tomerge = vec![];
-                // println!("tmplevels {:#?}", tmp_levels);
                 for tc in &to_compact {
                     if tc.level == 0 {
                         l0_rem.push(tc.part);
@@ -319,7 +293,6 @@ fn compact(
                         .collect::<Vec<_>>();
                 }
 
-                // println!("inpaths {:?}", tomerge);
                 let out_part_id = tmp_levels[level_id + 1].part_id + 1;
                 let out_path = path.join(format!(
                     "tables/{}/{}/{}",
@@ -329,10 +302,7 @@ fn compact(
                 ));
                 let rdrs = tomerge
                     .iter()
-                    .map(|p| {
-                        println!("%%# {p:?}");
-                        File::open(p)
-                    })
+                    .map(File::open)
                     .collect::<std::result::Result<Vec<File>, std::io::Error>>()
                     .unwrap();
                 let max_part_size_bytes = opts.merge_max_l1_part_size_bytes
@@ -348,7 +318,6 @@ fn compact(
                 };
                 let merge_result =
                     merge(rdrs, out_path, out_part_id, tbl_name, level_id, merger_opts)?;
-                // !@#println!("merge result {:#?}", merge_result);
                 for f in merge_result {
                     let final_part = {
                         Part {
@@ -378,7 +347,6 @@ fn compact(
                         .collect::<Vec<_>>()
                         .as_mut(),
                 );
-                // !@#println!("after compaction");
                 histogram!("store.level_compaction_time_seconds","table"=>tbl_name.to_string(),"level"=>level_id.to_string()).record(start_time.elapsed());
             }
         }
@@ -387,7 +355,6 @@ fn compact(
     histogram!("store.compaction_time_seconds","table"=>tbl_name.to_string())
         .record(init_time.elapsed());
 
-    // !@#println!("return lvl");
     Ok(Some(CompactResult {
         l0_remove: l0_rem,
         levels: tmp_levels,

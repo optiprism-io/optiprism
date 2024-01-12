@@ -120,8 +120,6 @@ impl Scenario {
                 }
                 let _ups = users_per_sec_clone.swap(0, Ordering::SeqCst);
                 let _eps = events_per_sec_clone.swap(0, Ordering::SeqCst);
-                // println!("users per second: {ups}");
-                // println!("events per second: {eps}");
             }
         });
 
@@ -255,7 +253,6 @@ impl Scenario {
                                 .find(|p| p.category == product.category && p.id != product.id);
 
                             if found.is_none() {
-                                // println!("no related product");
                                 action = Action::EndSession;
                                 continue;
                             }

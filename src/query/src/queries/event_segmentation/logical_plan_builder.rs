@@ -122,7 +122,6 @@ impl LogicalPlanBuilder {
         input: LogicalPlan,
         es: EventSegmentation,
     ) -> Result<LogicalPlan> {
-        debug!("{:?}", es);
         let events = es.events.clone();
         let builder = LogicalPlanBuilder {
             ctx: ctx.clone(),

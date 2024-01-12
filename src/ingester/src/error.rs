@@ -1,21 +1,12 @@
-
-
-
-
 use std::result;
 
 use axum::response::IntoResponse;
 use axum::response::Response;
 use common::http::ApiError;
-
-
 use maxminddb::MaxMindDBError;
 use metadata::error::MetadataError;
-
-
 use store::error::StoreError;
 use thiserror::Error;
-
 
 pub type Result<T> = result::Result<T, IngesterError>;
 

@@ -1,15 +1,11 @@
 use std::env::temp_dir;
 use std::sync::Arc;
 
-
 use metadata::dashboards::CreateDashboardRequest;
 use metadata::dashboards::Provider;
 use metadata::dashboards::ProviderImpl;
 use metadata::dashboards::UpdateDashboardRequest;
 use metadata::error::Result;
-
-
-
 use uuid::Uuid;
 
 #[test]

@@ -27,7 +27,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_event_segmentation() {
-        println!("1");
         let (base_url, md, pp) = run_http_service(true).await.unwrap();
         let cl = Client::new();
         let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts)

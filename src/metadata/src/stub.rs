@@ -1,4 +1,3 @@
-
 use chrono::DateTime;
 use chrono::NaiveDateTime;
 use chrono::Utc;
@@ -17,7 +16,6 @@ use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::rbac::Role;
 use common::types::DType;
-
 use datafusion_common::ScalarValue;
 use lazy_static::lazy_static;
 
@@ -53,7 +51,6 @@ use crate::projects::Project;
 use crate::projects::UpdateProjectRequest;
 use crate::properties;
 use crate::properties::CreatePropertyRequest;
-
 use crate::properties::Property;
 use crate::properties::UpdatePropertyRequest;
 use crate::reports;

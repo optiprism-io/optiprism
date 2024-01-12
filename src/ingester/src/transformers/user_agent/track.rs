@@ -1,20 +1,10 @@
-
-
 use std::sync::Arc;
 
-
-
-
 use metadata::properties;
-
 use uaparser::UserAgentParser;
-
 
 use crate::error::Result;
 use crate::transformers::user_agent::resolve_properties;
-
-
-
 use crate::RequestContext;
 use crate::Track;
 use crate::Transformer;

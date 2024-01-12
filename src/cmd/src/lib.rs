@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-
 use ::store::db::OptiDBImpl;
 use ::store::error::StoreError;
 use ::store::table::Options as TableOptions;
@@ -26,7 +25,6 @@ use common::types::EVENT_PROPERTY_PAGE_SEARCH;
 use common::types::EVENT_PROPERTY_PAGE_TITLE;
 use common::types::EVENT_PROPERTY_PAGE_URL;
 use common::types::EVENT_SCREEN;
-
 use common::types::USER_PROPERTY_CITY;
 use common::types::USER_PROPERTY_CLIENT_FAMILY;
 use common::types::USER_PROPERTY_CLIENT_VERSION_MAJOR;
@@ -55,7 +53,6 @@ use metrics::describe_counter;
 use metrics::describe_histogram;
 use metrics::Unit;
 use metrics_exporter_prometheus::PrometheusBuilder;
-
 use platform::auth::password::make_password_hash;
 use tracing::info;
 

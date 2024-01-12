@@ -518,7 +518,6 @@ impl Stream for ScanStream {
             }
             Some(chunk) => {
                 let chunk = chunk?;
-                println!("COLS LLLEEEN {}", chunk.arrays().len());
                 Poll::Ready(Some(Ok(chunk)))
             }
         }
@@ -676,7 +675,6 @@ impl OptiDBImpl {
         partition_id: usize,
         fields: Vec<String>,
     ) -> Result<ScanStream> {
-        println!("E@ {:?}", fields);
         let tables = self.tables.read();
         let tbl = tables.iter().find(|t| t.name == tbl_name);
         let tbl = match tbl {

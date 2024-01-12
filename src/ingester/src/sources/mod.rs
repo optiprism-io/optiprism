@@ -1,6 +1,5 @@
 use serde::Deserialize;
 
-
 pub mod http;
 
 #[derive(Clone, Deserialize, Debug)]

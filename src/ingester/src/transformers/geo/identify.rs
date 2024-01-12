@@ -1,22 +1,11 @@
-
-
 use std::sync::Arc;
 
-
-
-
 use metadata::properties;
-
-
-
 
 use crate::error::Result;
 use crate::transformers::geo::resolve_properties;
 use crate::Identify;
-
-
 use crate::RequestContext;
-
 use crate::Transformer;
 
 pub struct Geo {

@@ -1,14 +1,11 @@
 use std::sync::Arc;
 
-
-
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::Utc;
 use common::types::OptionalProperty;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
-
 
 use crate::error::MetadataError;
 use crate::events::CreateEventRequest;

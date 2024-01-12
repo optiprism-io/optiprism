@@ -306,7 +306,6 @@ mod tests {
         #[allow(deprecated)]
         let exec_ctx = SessionContext::with_state(session_state.clone());
         let physical_plan = session_state.create_physical_plan(&plan).await?;
-        // println!("physical plan: {:#?}", physical_plan);
         let result = collect(physical_plan, exec_ctx.task_ctx()).await?;
         print_batches(&result)?;
 

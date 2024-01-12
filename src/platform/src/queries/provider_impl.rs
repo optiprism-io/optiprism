@@ -67,7 +67,7 @@ impl Provider for ProviderImpl {
         let mut data = self.query.event_segmentation(ctx, lreq).await?;
 
         // do empty response so it will be [] instead of [[],[],[],...]
-        if data.columns.len() > 0 && data.columns[0].data.len() == 0 {
+        if !data.columns.is_empty() && data.columns[0].data.is_empty() {
             data.columns = vec![];
         }
         let resp = match query.format {

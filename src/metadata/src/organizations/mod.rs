@@ -1,6 +1,5 @@
 pub mod provider_impl;
 
-
 use chrono::DateTime;
 use chrono::Utc;
 use common::types::OptionalProperty;
