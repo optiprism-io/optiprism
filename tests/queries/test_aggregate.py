@@ -13,7 +13,7 @@ def test_types():
             print("Test Aggregate Property {0}({1})".format(agg, field))
             typ = field.replace("_", "")
             t1 = main.return_type(typ, agg)
-            if t1 == "f64" or t1 == "i128" or t1 == "u128":
+            if t1 == "f64" or t1 == "i128" or t1 == "decimal":
                 op = optiprism.aggregate_property_query(agg, field)
                 ch = clickhouse.aggregate_property_query(agg, field)
 

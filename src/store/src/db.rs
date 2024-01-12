@@ -517,8 +517,9 @@ impl Stream for ScanStream {
                 Poll::Ready(None)
             }
             Some(chunk) => {
-                println!("{:?}", chunk);
-                Poll::Ready(Some(chunk))
+                let chunk = chunk?;
+                println!("COLS LLLEEEN {}", chunk.arrays().len());
+                Poll::Ready(Some(Ok(chunk)))
             }
         }
     }
@@ -699,10 +700,12 @@ impl OptiDBImpl {
         let memtable = tbl.memtable.lock();
 
         let mut fields_idx = vec![];
+        let mut schema_fields = vec![];
         for (idx, f) in metadata.schema.fields.iter().enumerate() {
             for ff in &fields {
                 if &f.name == ff {
                     fields_idx.push(idx);
+                    schema_fields.push(f.to_owned());
                 }
             }
         }
@@ -736,7 +739,7 @@ impl OptiDBImpl {
             Box::new(MergingIterator::new(
                 rdrs,
                 maybe_chunk,
-                metadata.schema.clone(),
+                Schema::from(schema_fields),
                 opts,
             )?) as Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>
         };
@@ -1215,6 +1218,30 @@ mod tests {
                 .boxed(),
                 PrimitiveArray::<i64>::from(vec![None, Some(1), Some(2), None, Some(4), Some(5)])
                     .boxed(),
+                PrimitiveArray::<i64>::from(vec![None, Some(1), None, None, None, Some(5)]).boxed(),
+            ]),
+            b.unwrap().unwrap()
+        );
+
+        // scan only 1 and 3 cols
+        let stream = db
+            .scan_partition("t1", 0, vec!["f1".to_string(), "f3".to_string()])
+            .unwrap();
+
+        let mut stream: SendableRecordBatchStream = Box::pin(stream);
+        let b = stream.next().await;
+
+        assert_eq!(
+            Chunk::new(vec![
+                PrimitiveArray::<i64>::from(vec![
+                    Some(1),
+                    Some(1),
+                    Some(2),
+                    Some(3),
+                    Some(4),
+                    Some(5)
+                ])
+                .boxed(),
                 PrimitiveArray::<i64>::from(vec![None, Some(1), None, None, None, Some(5)]).boxed(),
             ]),
             b.unwrap().unwrap()

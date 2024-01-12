@@ -71,7 +71,7 @@ def aggregate_property_query(agg, field: str, prop_type="system",
         headers={"Content-Type": "application/json",
                  "Authorization": "Bearer " + token})
 
-    if len(resp.json()[0]) == 0:
+    if len(resp.json()) == 0:
         return []
 
     ts = resp.json()[1]
@@ -142,7 +142,7 @@ def partitioned_aggregate_property_query(agg, outer_agg, typ: str, prop_type="sy
         headers={"Content-Type": "application/json",
                  "Authorization": "Bearer " + token})
 
-    if len(resp.json()[0]) == 0:
+    if len(resp.json()) == 0:
         return []
 
     ts = resp.json()[1]
@@ -209,6 +209,8 @@ def simple_query(query: str, time_last=2, unit="day",
         headers={"Content-Type": "application/json",
                  "Authorization": "Bearer " + token})
 
+    if len(resp.json()) == 0:
+        return []
     ts = resp.json()[1]
     if breakdowns is not None:
         group = resp.json()[2]

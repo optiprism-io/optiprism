@@ -78,7 +78,7 @@ def partitioned_aggregate_property_query(agg, outer_agg, field, group=None, inte
     print(q)
     resp = requests.get(ch_addr,
                         params={"query": q})
-    if not resp.json():
+    if len(resp.json())==0:
         return []
     ts = list(map(lambda x: x * 1000000000, resp.json()[0]))
 
