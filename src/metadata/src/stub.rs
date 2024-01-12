@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::NaiveDateTime;
 use chrono::Utc;
@@ -16,7 +15,7 @@ use common::query::TimeIntervalUnit;
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::rbac::Role;
-use datafusion::arrow::datatypes::DataType;
+use common::types::DType;
 use datafusion_common::ScalarValue;
 use lazy_static::lazy_static;
 
@@ -35,12 +34,6 @@ use crate::dashboards::CreateDashboardRequest;
 use crate::dashboards::Dashboard;
 use crate::dashboards::Panel;
 use crate::dashboards::UpdateDashboardRequest;
-use crate::database;
-use crate::database::Column;
-use crate::database::CreateTableRequest;
-use crate::database::Table;
-use crate::database::TableRef;
-use crate::database::UpdateTableRequest;
 use crate::dictionaries;
 use crate::events;
 use crate::events::CreateEventRequest;
@@ -58,7 +51,6 @@ use crate::projects::Project;
 use crate::projects::UpdateProjectRequest;
 use crate::properties;
 use crate::properties::CreatePropertyRequest;
-use crate::properties::DictionaryType;
 use crate::properties::Property;
 use crate::properties::UpdatePropertyRequest;
 use crate::reports;
@@ -434,7 +426,7 @@ impl events::Provider for Events {
         Ok(Events::event())
     }
 
-    fn generate_record_id(&self, organization_id: u64, project_id: u64) -> Result<u64> {
+    fn generate_record_id(&self, _organization_id: u64, _project_id: u64) -> Result<u64> {
         unreachable!()
     }
 }
@@ -454,14 +446,15 @@ impl Properties {
             name: "name".to_string(),
             description: Some("description".to_string()),
             display_name: Some("display_name".to_string()),
+            order: 0,
             typ: properties::Type::Event,
-            data_type: properties::DataType::UInt16,
+            data_type: DType::Int8,
             status: properties::Status::Enabled,
             is_system: true,
             nullable: true,
             is_array: true,
             is_dictionary: true,
-            dictionary_type: Some(properties::DictionaryType::UInt8),
+            dictionary_type: Some(properties::DictionaryType::Int8),
         }
     }
 }
@@ -551,76 +544,6 @@ impl custom_properties::Provider for CustomProperties {
     }
 }
 
-pub struct Database {}
-
-impl database::Provider for Database {
-    fn create_table(&self, req: CreateTableRequest) -> Result<Table> {
-        Ok(Table {
-            id: 1,
-            typ: TableRef::Events(1, 1),
-            columns: vec![Column::new(
-                "col".to_string(),
-                DataType::UInt8,
-                true,
-                Some(DictionaryType::UInt64),
-            )],
-        })
-    }
-
-    fn get_table_by_id(&self, id: u64) -> Result<Table> {
-        Ok(Table {
-            id: 1,
-            typ: TableRef::Events(1, 1),
-            columns: vec![Column::new(
-                "col".to_string(),
-                DataType::UInt8,
-                true,
-                Some(DictionaryType::UInt64),
-            )],
-        })
-    }
-
-    fn get_table(&self, typ: TableRef) -> Result<Table> {
-        Ok(Table {
-            id: 1,
-            typ: TableRef::Events(1, 1),
-            columns: vec![Column::new(
-                "col".to_string(),
-                DataType::UInt8,
-                true,
-                Some(DictionaryType::UInt64),
-            )],
-        })
-    }
-
-    fn list(&self) -> Result<ListResponse<Table>> {
-        Ok(ListResponse {
-            data: vec![Table {
-                id: 1,
-                typ: TableRef::Events(1, 1),
-                columns: vec![Column::new(
-                    "col".to_string(),
-                    DataType::UInt8,
-                    true,
-                    Some(DictionaryType::UInt64),
-                )],
-            }],
-            meta: ResponseMetadata { next: None },
-        })
-    }
-
-    fn add_column(&self, _table_type: TableRef, _col: Column) -> Result<()> {
-        Ok(())
-    }
-
-    fn update_table(&self, table_id: u64, req: UpdateTableRequest) -> Result<Table> {
-        todo!()
-    }
-
-    fn delete_table(&self, id: u64) -> Result<Table> {
-        todo!()
-    }
-}
 #[derive(Debug)]
 pub struct Dictionaries {}
 
@@ -722,7 +645,7 @@ impl projects::Provider for Projects {
         Ok(Projects::project())
     }
 
-    fn get_by_token(&self, token: &str) -> Result<Project> {
+    fn get_by_token(&self, _token: &str) -> Result<Project> {
         Ok(Projects::project())
     }
 

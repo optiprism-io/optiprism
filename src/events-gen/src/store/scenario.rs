@@ -6,13 +6,12 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration as StdDuration;
 
-use arrow::datatypes::SchemaRef;
-use arrow::record_batch::RecordBatch;
 use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
 use common::DECIMAL_SCALE;
 use crossbeam_channel::tick;
+use crossbeam_channel::Sender;
 use rand::prelude::*;
 use rand::rngs::ThreadRng;
 use rust_decimal::Decimal;
@@ -21,14 +20,45 @@ use tracing::info;
 use crate::error::Result;
 use crate::generator::Generator;
 use crate::store::actions::Action;
-use crate::store::batch_builder::RecordBatchBuilder;
 use crate::store::coefficients::make_coefficients;
 use crate::store::events::Event;
 use crate::store::intention::select_intention;
 use crate::store::intention::Intention;
 use crate::store::products::Product;
 use crate::store::products::ProductProvider;
+use crate::store::profiles::Profile;
 use crate::store::transitions::make_transitions;
+
+#[derive(Debug, Clone)]
+pub struct EventRecord {
+    pub user_id: i64,
+    pub created_at: i64,
+    pub event: i64,
+    pub page_path: String,
+    pub page_search: String,
+    pub page_title: String,
+    pub page_url: String,
+    pub a_name: String,
+    pub a_href: String,
+    pub product_name: Option<i16>,
+    pub product_category: Option<i16>,
+    pub product_subcategory: Option<i16>,
+    pub product_brand: Option<i16>,
+    pub product_price: Option<i128>,
+    pub product_discount_price: Option<i128>,
+    pub spent_total: Option<i128>,
+    pub products_bought: Option<i8>,
+    pub cart_items_number: Option<i8>,
+    pub cart_amount: Option<i128>,
+    pub revenue: Option<i128>,
+    pub country: Option<i16>,
+    pub city: Option<i16>,
+    pub device: Option<i16>,
+    pub device_category: Option<i16>,
+    pub os: Option<i16>,
+    pub os_version: Option<i16>,
+}
+
 pub struct State<'a> {
     pub session_id: usize,
     pub event_id: usize,
@@ -46,23 +76,19 @@ pub struct State<'a> {
 pub struct Config {
     pub rng: ThreadRng,
     pub gen: Generator,
-    pub schema: SchemaRef,
     pub events_map: HashMap<Event, u64>,
     pub products: ProductProvider,
     pub to: DateTime<Utc>,
-    pub batch_size: usize,
-    pub partitions: usize,
+    pub out: Sender<Option<EventRecord>>,
 }
 
 pub struct Scenario {
     pub rng: ThreadRng,
     pub gen: Generator,
-    pub schema: SchemaRef,
     pub events_map: HashMap<Event, u64>,
     pub products: ProductProvider,
     pub to: DateTime<Utc>,
-    pub batch_size: usize,
-    pub partitions: usize,
+    pub out: Sender<Option<EventRecord>>,
 }
 
 impl Scenario {
@@ -70,26 +96,14 @@ impl Scenario {
         Self {
             rng: cfg.rng,
             gen: cfg.gen,
-            schema: cfg.schema,
             events_map: cfg.events_map,
             products: cfg.products,
             to: cfg.to,
-            batch_size: cfg.batch_size,
-            partitions: cfg.partitions,
+            out: cfg.out,
         }
     }
 
-    pub fn run(&mut self) -> Result<Vec<Vec<RecordBatch>>> {
-        let mut result: Vec<Vec<RecordBatch>> =
-            vec![Vec::with_capacity(self.batch_size); self.partitions];
-        let mut batch_builders: Vec<RecordBatchBuilder> = Vec::with_capacity(self.partitions);
-        for _ in 0..self.partitions {
-            batch_builders.push(RecordBatchBuilder::new(
-                self.batch_size,
-                self.schema.clone(),
-            ));
-        }
-
+    pub fn run(&mut self) -> Result<()> {
         let events_per_sec = Arc::new(AtomicUsize::new(0));
         let events_per_sec_clone = events_per_sec.clone();
         let users_per_sec = Arc::new(AtomicUsize::new(0));
@@ -106,20 +120,14 @@ impl Scenario {
                 }
                 let _ups = users_per_sec_clone.swap(0, Ordering::SeqCst);
                 let _eps = events_per_sec_clone.swap(0, Ordering::SeqCst);
-                // println!("users per second: {ups}");
-                // println!("events per second: {eps}");
             }
         });
 
         let mut user_id: i64 = 0;
         let mut overall_events: usize = 0;
-        let mut partition_id: usize;
         while let Some(sample) = self.gen.next_sample() {
             users_per_sec.fetch_add(1, Ordering::SeqCst);
             user_id += 1;
-            partition_id = user_id as usize % self.partitions;
-            let batch_builder = &mut batch_builders[partition_id];
-            let partition_result = &mut result[partition_id];
 
             let mut state = State {
                 session_id: 0,
@@ -245,7 +253,6 @@ impl Scenario {
                                 .find(|p| p.category == product.category && p.id != product.id);
 
                             if found.is_none() {
-                                // println!("no related product");
                                 action = Action::EndSession;
                                 continue;
                             }
@@ -276,15 +283,7 @@ impl Scenario {
 
                     if let Some(event) = prev_action.unwrap().to_event() {
                         overall_events += 1;
-                        batch_builder.write_event(
-                            event,
-                            *self.events_map.get(&event).unwrap(),
-                            &state,
-                            &sample.profile,
-                        )?;
-                        if batch_builder.len() >= self.batch_size {
-                            partition_result.push(batch_builder.build_record_batch()?);
-                        }
+                        self.write_event(event, &state, &sample.profile);
                     }
 
                     #[allow(clippy::single_match)]
@@ -315,17 +314,166 @@ impl Scenario {
 
         info!("total events: {overall_events}");
 
-        // flush the rest
-        for (idx, builder) in batch_builders.iter_mut().enumerate() {
-            if builder.len() > 0 {
-                result[idx].push(builder.build_record_batch()?);
+        self.out.send(None).unwrap();
+
+        Ok(())
+    }
+
+    fn write_event(&self, event: Event, state: &State, profile: &Profile) {
+        let event_id = *self.events_map.get(&event).unwrap();
+        let mut rec = EventRecord {
+            user_id: state.user_id,
+            created_at: state.cur_timestamp * 10i64.pow(9),
+            event: event_id as i64,
+            page_path: "".to_string(),
+            page_search: "".to_string(),
+            page_title: "".to_string(),
+            page_url: "".to_string(),
+            a_name: "".to_string(),
+            a_href: "".to_string(),
+            product_name: None,
+            product_category: None,
+            product_subcategory: None,
+            product_brand: None,
+            product_price: None,
+            product_discount_price: None,
+            spent_total: None,
+            products_bought: None,
+            cart_items_number: None,
+            cart_amount: None,
+            revenue: None,
+            country: None,
+            city: None,
+            device: None,
+            device_category: None,
+            os: None,
+            os_version: None,
+        };
+        match event {
+            Event::UserRegistered => {
+                rec.page_path = "register".to_string();
+                rec.page_title = "user registration".to_string();
+            }
+            Event::UserLoggedIn => {
+                rec.page_path = "login".to_string();
+                rec.page_title = "user login".to_string();
+            }
+            Event::SubscribedForNewsletter => {
+                rec.page_path = "subscribe".to_string();
+                rec.page_title = "newsletter subscription".to_string();
+            }
+            Event::IndexPageViewed => {
+                rec.page_path = "index".to_string();
+                rec.page_title = "index page".to_string();
+            }
+            Event::DealsViewed => {
+                rec.page_path = "deals".to_string();
+                rec.page_title = "deals".to_string();
+            }
+            Event::ProductSearched => {
+                rec.page_path = "search".to_string();
+                rec.page_title = "search product".to_string();
+                if let Some(query) = &state.search_query {
+                    rec.page_search = query.to_owned();
+                }
+            }
+            Event::NotFound => {
+                rec.page_path = "not-found".to_string();
+                rec.page_title = "404 not found".to_string();
+            }
+            Event::ProductViewed => {
+                rec.page_path = state.selected_product.unwrap().path();
+                rec.page_title = state.selected_product.unwrap().name_str.clone();
+            }
+            Event::ProductAddedToCart => {
+                rec.page_path = state.selected_product.unwrap().path();
+                rec.page_title = state.selected_product.unwrap().name_str.clone();
+            }
+            Event::BuyNowProduct => {
+                rec.page_path = state.selected_product.unwrap().path();
+                rec.page_title = state.selected_product.unwrap().name_str.clone();
+            }
+            Event::ProductRated => {
+                rec.page_path = state.selected_product.unwrap().path();
+                rec.page_title = state.selected_product.unwrap().name_str.clone();
+            }
+            Event::CartViewed => {
+                rec.page_path = "cart".to_string();
+                rec.page_title = "cart".to_string();
+            }
+            Event::CouponApplied => {
+                rec.page_path = "coupons".to_string();
+                rec.page_title = "coupons".to_string();
+            }
+            Event::CustomerInformationEntered => {
+                rec.page_path = "checkout".to_string();
+                rec.page_title = "checkout".to_string();
+            }
+            Event::ShippingMethodEntered => {
+                rec.page_path = "checkout".to_string();
+                rec.page_title = "checkout".to_string();
+            }
+            Event::PaymentMethodEntered => {
+                rec.page_path = "checkout".to_string();
+                rec.page_title = "checkout".to_string();
+            }
+            Event::OrderVerified => {}
+            Event::OrderCompleted => {
+                rec.page_path = "order-completed".to_string();
+                rec.page_title = "orders".to_string();
+            }
+            Event::ProductRefunded => {}
+            Event::OrdersViewed => {
+                rec.page_path = "orders".to_string();
+                rec.page_title = "my orders".to_string();
             }
         }
 
-        // remove unused partitions
-        result = result.iter().cloned().filter(|v| !v.is_empty()).collect();
+        if let Some(product) = state.selected_product {
+            rec.product_name = Some(product.name as i16);
+            rec.product_category = Some(product.category as i16);
+            rec.product_subcategory = product.subcategory.map(|v| v as i16);
+            rec.product_brand = product.brand.map(|v| v as i16);
+            rec.product_price = Some(product.price.mantissa());
 
-        Ok(result)
+            if let Some(price) = product.discount_price {
+                rec.product_discount_price = Some(price.mantissa());
+            }
+        }
+
+        if !state.spent_total.is_zero() {
+            rec.spent_total = Some(state.spent_total.mantissa());
+        }
+
+        if !state.products_bought.is_empty() {
+            rec.products_bought = Some(state.products_bought.len() as i8);
+        }
+
+        let mut cart_amount: Option<Decimal> = None;
+        if !state.cart.is_empty() {
+            rec.cart_items_number = Some(state.cart.len() as i8);
+            let cart_amount_: Decimal = state
+                .cart
+                .iter()
+                .map(|p| p.discount_price.unwrap_or(p.price))
+                .sum();
+
+            rec.cart_amount = Some(cart_amount_.mantissa());
+            cart_amount = Some(cart_amount_);
+        }
+
+        if event == Event::OrderCompleted {
+            rec.revenue = Some(cart_amount.unwrap().mantissa());
+        }
+
+        rec.country = profile.geo.country.map(|v| v as i16);
+        rec.city = profile.geo.city.map(|v| v as i16);
+        rec.device = profile.device.device.map(|v| v as i16);
+        rec.device_category = profile.device.device_category.map(|v| v as i16);
+        rec.os = profile.device.os.map(|v| v as i16);
+        rec.os_version = profile.device.os_version.map(|v| v as i16);
+
+        self.out.send(Some(rec)).unwrap();
     }
 }
 

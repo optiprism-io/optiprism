@@ -78,7 +78,8 @@ impl TryInto<common::query::event_segmentation::SegmentTime> for SegmentTime {
 #[serde(rename_all = "camelCase")]
 pub enum ChartType {
     Line,
-    Bar,
+    Column,
+    Pie,
 }
 
 impl TryInto<common::query::event_segmentation::ChartType> for ChartType {
@@ -89,7 +90,8 @@ impl TryInto<common::query::event_segmentation::ChartType> for ChartType {
     ) -> std::result::Result<common::query::event_segmentation::ChartType, Self::Error> {
         Ok(match self {
             ChartType::Line => common::query::event_segmentation::ChartType::Line,
-            ChartType::Bar => common::query::event_segmentation::ChartType::Bar,
+            ChartType::Column => common::query::event_segmentation::ChartType::Column,
+            ChartType::Pie => common::query::event_segmentation::ChartType::Pie,
         })
     }
 }
@@ -100,7 +102,8 @@ impl TryInto<ChartType> for common::query::event_segmentation::ChartType {
     fn try_into(self) -> std::result::Result<ChartType, Self::Error> {
         Ok(match self {
             common::query::event_segmentation::ChartType::Line => ChartType::Line,
-            common::query::event_segmentation::ChartType::Bar => ChartType::Bar,
+            common::query::event_segmentation::ChartType::Column => ChartType::Column,
+            common::query::event_segmentation::ChartType::Pie => ChartType::Pie,
         })
     }
 }
@@ -1213,7 +1216,7 @@ impl TryInto<EventSegmentation> for common::query::event_segmentation::EventSegm
 mod tests {
     use chrono::DateTime;
     use chrono::Utc;
-    use query::event_fields;
+    use common::types::COLUMN_USER_ID;
     use serde_json::json;
 
     use crate::error::Result;
@@ -1244,7 +1247,7 @@ mod tests {
             .with_timezone(&Utc);
         let es = EventSegmentation {
             time: QueryTime::Between { from, to },
-            group: event_fields::USER_ID.to_string(),
+            group: COLUMN_USER_ID.to_string(),
             interval_unit: TimeIntervalUnit::Minute,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,

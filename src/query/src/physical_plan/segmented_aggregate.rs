@@ -37,10 +37,10 @@ use datafusion::physical_plan::aggregates::PhysicalGroupBy;
 use datafusion::physical_plan::common::collect;
 use datafusion::physical_plan::expressions::PhysicalSortExpr;
 use datafusion::physical_plan::memory::MemoryExec;
-use datafusion::physical_plan::metrics::BaselineMetrics;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
 use datafusion::physical_plan::metrics::MetricsSet;
 use datafusion::physical_plan::AggregateExpr as DFAggregateExpr;
+use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::physical_plan::Partitioning;
@@ -53,6 +53,8 @@ use datafusion_common::ScalarValue;
 use futures::executor::block_on;
 use futures::Stream;
 use futures::StreamExt;
+use metrics::histogram;
+use tokio::time::Instant;
 
 use crate::error::QueryError;
 use crate::physical_plan::expressions::aggregate;
@@ -73,7 +75,7 @@ macro_rules! combine_results {
             _ => unimplemented!(),
         };
         // make aggregate expression. Here predicate is an result from initial expression
-        let mut agg = aggregate::aggregate::Aggregate::<$ty, $ty>::try_new(
+        let mut agg = aggregate::Aggregate::<$ty, $ty>::try_new(
             None,
             Some($groups.clone()),
             Column::new_with_schema("segment", &$self.schema)?,
@@ -105,7 +107,7 @@ macro_rules! combine_results {
                     Ok(col_idx) => Ok(batch.column(col_idx).clone()),
                     Err(_) => {
                         let v = ScalarValue::try_from(field.data_type())?;
-                        Ok(v.to_array_of_size(batch.column(0).len()))
+                        Ok(v.to_array_of_size(batch.column(0).len())?)
                     }
                 },
             )
@@ -114,12 +116,14 @@ macro_rules! combine_results {
         $res_batches.push(result);
     }};
 }
+
+type NamedAggExpr = (Arc<Mutex<Box<dyn PartitionedAggregateExpr>>>, String);
 #[derive(Debug)]
 pub struct SegmentedAggregateExec {
     input: Arc<dyn ExecutionPlan>,
     partition_inputs: Option<Vec<Arc<dyn ExecutionPlan>>>,
     partition_col: Column,
-    agg_expr: Vec<(Arc<Mutex<Box<dyn PartitionedAggregateExpr>>>, String)>,
+    agg_expr: Vec<NamedAggExpr>,
     schema: SchemaRef,
     agg_schemas: Vec<SchemaRef>,
     metrics: ExecutionPlanMetricsSet,
@@ -131,7 +135,7 @@ impl SegmentedAggregateExec {
         input: Arc<dyn ExecutionPlan>,
         partition_inputs: Option<Vec<Arc<dyn ExecutionPlan>>>,
         partition_col: Column,
-        agg_expr: Vec<(Arc<Mutex<Box<dyn PartitionedAggregateExpr>>>, String)>,
+        agg_expr: Vec<NamedAggExpr>,
     ) -> Result<Self> {
         let input_schema = input.schema();
         let mut agg_schemas: Vec<SchemaRef> = Vec::new();
@@ -168,8 +172,8 @@ impl SegmentedAggregateExec {
             .filter(|f| group_cols.contains_key(f.name()))
             .cloned()
             .collect::<Vec<_>>();
-        let group_fields = vec![vec![segment_field], group_fields].concat();
-        let fields: Vec<FieldRef> = vec![group_fields.clone(), agg_result_fields].concat();
+        let group_fields = [vec![segment_field], group_fields].concat();
+        let fields: Vec<FieldRef> = [group_fields.clone(), agg_result_fields].concat();
 
         let schema = Schema::new(fields);
         Ok(Self {
@@ -189,12 +193,11 @@ impl SegmentedAggregateExec {
 struct RunnerOptions {
     partitions: Option<Arc<Vec<HashMap<i64, (), RandomState>>>>,
     // Segments<Aggs<>>
-    agg_expr: Vec<Vec<Arc<Mutex<Box<dyn PartitionedAggregateExpr>>>>>,
+    agg_expr: Vec<Vec<AggExpr>>,
     // single partition input
     input: Arc<dyn ExecutionPlan>,
     schema: SchemaRef,
     agg_schemas: Vec<SchemaRef>,
-    baseline_metrics: BaselineMetrics,
 }
 
 // make a hashmap of all partition keys in segment
@@ -209,7 +212,7 @@ async fn collect_segment(
             Some(Ok(batch)) => {
                 let vals = partition_col
                     .evaluate(&batch)?
-                    .into_array(batch.num_rows())
+                    .into_array(batch.num_rows())?
                     .as_any()
                     .downcast_ref::<Int64Array>()
                     .unwrap()
@@ -230,13 +233,14 @@ async fn collect_segment(
     Ok(exist)
 }
 
+type AggExpr = Arc<Mutex<Box<dyn PartitionedAggregateExpr>>>;
+
 struct Runner {
     partitions: Option<Arc<Vec<HashMap<i64, (), RandomState>>>>,
-    agg_expr: Vec<Vec<Arc<Mutex<Box<dyn PartitionedAggregateExpr>>>>>,
+    agg_expr: Vec<Vec<AggExpr>>,
     input: SendableRecordBatchStream,
     schema: SchemaRef,
     agg_schemas: Vec<SchemaRef>,
-    baseline_metrics: BaselineMetrics,
 }
 
 impl Runner {
@@ -253,13 +257,13 @@ impl Runner {
             input: opts.input.execute(partition, ctx)?,
             schema: opts.schema.clone(),
             agg_schemas: opts.agg_schemas.clone(),
-            baseline_metrics: opts.baseline_metrics.clone(),
         };
 
         Ok(res)
     }
 
     fn run(&mut self, tx: Sender<RecordBatch>) -> Result<()> {
+        let start_time = Instant::now();
         let segments_count = if let Some(streams) = &self.partitions {
             streams.len()
         } else {
@@ -289,7 +293,6 @@ impl Runner {
                 }
             };
         }
-
         let mut batches: Vec<RecordBatch> = Vec::with_capacity(10); // todo why 10?
         for segment in 0..segments_count {
             for (agg_idx, aggrm) in self.agg_expr[segment].iter().enumerate() {
@@ -298,11 +301,11 @@ impl Runner {
                     .finalize()
                     .map_err(QueryError::into_datafusion_execution_error)?;
                 let seg_col =
-                    ScalarValue::Int64(Some(segment as i64)).to_array_of_size(agg_cols[0].len());
-                let cols = vec![vec![seg_col], agg_cols].concat();
+                    ScalarValue::Int64(Some(segment as i64)).to_array_of_size(agg_cols[0].len())?;
+                let cols = [vec![seg_col], agg_cols].concat();
                 let schema = self.agg_schemas[agg_idx].clone();
                 let schema = Arc::new(Schema::new(
-                    vec![
+                    [
                         vec![Arc::new(Field::new("segment", DataType::Int64, false))],
                         schema.fields().to_vec(),
                     ]
@@ -318,7 +321,7 @@ impl Runner {
                             Ok(col_idx) => Ok(batch.column(col_idx).clone()),
                             Err(_) => {
                                 let v = ScalarValue::try_from(field.data_type())?;
-                                Ok(v.to_array_of_size(batch.column(0).len()))
+                                Ok(v.to_array_of_size(batch.column(0).len())?)
                             }
                         },
                     )
@@ -331,7 +334,10 @@ impl Runner {
         let batch = concat_batches(&self.schema, batches.iter().collect::<Vec<_>>())?;
 
         tx.send(batch)
-            .map_err(|err| QueryError::Internal(err.to_string()))
+            .map_err(|err| QueryError::Internal(err.to_string()))?;
+
+        histogram!("query.segmented_aggregate_run_seconds").record(start_time.elapsed());
+        Ok(())
     }
 }
 
@@ -339,6 +345,12 @@ fn run(runners: Vec<Runner>, tx: Sender<RecordBatch>) {
     for mut runner in runners.into_iter() {
         let tx = tx.clone();
         spawn(move || runner.run(tx).unwrap());
+    }
+}
+
+impl DisplayAs for SegmentedAggregateExec {
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "SegmentedAggregateExec")
     }
 }
 
@@ -431,18 +443,16 @@ impl ExecutionPlan for SegmentedAggregateExec {
                     schema: self.schema.clone(),
                     agg_schemas: self.agg_schemas.clone(),
                     agg_expr: agg_expr.clone(),
-                    baseline_metrics: BaselineMetrics::new(&self.metrics, partition),
                 };
                 Runner::new(opts, partition, context.clone())
             })
             .collect::<DFResult<Vec<_>>>()?;
-        let (tx, rx) = bounded(5);
+        let (tx, rx) = bounded(5); // todo why 5?
         // let (tx, rx) = mpsc::channel();
         run(runners, tx);
-
         let mut completed = partition_count;
         let mut batches: Vec<RecordBatch> = Vec::with_capacity(partition_count);
-        while let batch = rx.recv().unwrap() {
+        while let Ok(batch) = rx.recv() {
             batches.push(batch);
             completed -= 1;
             if completed == 0 {
@@ -660,12 +670,8 @@ impl ExecutionPlan for SegmentedAggregateExec {
         Some(self.metrics.clone_inner())
     }
 
-    fn fmt_as(&self, _t: DisplayFormatType, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "SegmentedAggregateExec")
-    }
-
-    fn statistics(&self) -> Statistics {
-        Statistics::default()
+    fn statistics(&self) -> DFResult<Statistics> {
+        Ok(Statistics::new_unknown(self.schema.as_ref()))
     }
 }
 
@@ -719,7 +725,6 @@ mod tests {
     use datafusion::physical_plan::memory::MemoryExec;
     use datafusion::physical_plan::ExecutionPlan;
     use datafusion::prelude::SessionContext;
-    pub use datafusion_common::Result;
     use datafusion_common::ScalarValue;
     use datafusion_expr::Operator;
     use store::test_util::parse_markdown_tables;

@@ -14,6 +14,7 @@ use crate::query::PropertyRef;
 use crate::query::QueryTime;
 use crate::query::TimeIntervalUnit;
 use crate::scalar::ScalarValueRef;
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum SegmentTime {
     Between {
@@ -46,7 +47,8 @@ impl SegmentTime {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum ChartType {
     Line,
-    Bar,
+    Column,
+    Pie,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]

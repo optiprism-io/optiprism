@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use bincode::deserialize;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
@@ -47,7 +45,7 @@ pub fn make_id_seq_key(ns: &[u8]) -> Vec<u8> {
     [ns, b"/id_seq"].concat()
 }
 
-pub fn list<'a, T>(tx: &Transaction<TransactionDB>, ns: &[u8]) -> Result<ListResponse<T>>
+pub fn list<T>(tx: &Transaction<TransactionDB>, ns: &[u8]) -> Result<ListResponse<T>>
 where T: DeserializeOwned {
     let prefix = make_data_key(ns);
 

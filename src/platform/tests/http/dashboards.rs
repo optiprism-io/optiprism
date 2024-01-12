@@ -24,11 +24,13 @@ fn assert(l: &Dashboard, r: &Dashboard) {
 }
 
 #[tokio::test]
-async fn test_dashboards() -> anyhow::Result<()> {
-    let (base_url, md, pp) = run_http_service(false).await?;
+async fn test_dashboards() {
+    let (base_url, md, pp) = run_http_service(false).await.unwrap();
     let dash_url = format!("{base_url}/organizations/1/projects/1/dashboards");
     let cl = Client::new();
-    let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts).await?;
+    let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts)
+        .await
+        .unwrap();
 
     let mut dash = Dashboard {
         id: 0,
@@ -53,10 +55,11 @@ async fn test_dashboards() -> anyhow::Result<()> {
     // list without dashboards should be empty
     {
         let resp = cl
-            .get(format!("{dash_url}"))
+            .get(&dash_url)
             .headers(admin_headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
 
         assert_response_status_eq!(resp, StatusCode::OK);
         assert_response_json_eq!(resp, EMPTY_LIST.to_string());
@@ -68,7 +71,8 @@ async fn test_dashboards() -> anyhow::Result<()> {
             .get(format!("{dash_url}/1"))
             .headers(admin_headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
 
         assert_response_status_eq!(resp, StatusCode::NOT_FOUND);
     }
@@ -79,7 +83,8 @@ async fn test_dashboards() -> anyhow::Result<()> {
             .delete(format!("{dash_url}/1"))
             .headers(admin_headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
 
         assert_response_status_eq!(resp, StatusCode::NOT_FOUND);
     }
@@ -95,12 +100,13 @@ async fn test_dashboards() -> anyhow::Result<()> {
 
         let resp = cl
             .post(&dash_url)
-            .body(serde_json::to_string(&req)?)
+            .body(serde_json::to_string(&req).unwrap())
             .headers(admin_headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
         assert_response_status_eq!(resp, StatusCode::CREATED);
-        let resp: Dashboard = serde_json::from_str(resp.text().await?.as_str())?;
+        let resp: Dashboard = serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
         assert(&resp, &dash)
     }
 
@@ -126,12 +132,13 @@ async fn test_dashboards() -> anyhow::Result<()> {
 
         let resp = cl
             .put(format!("{dash_url}/1"))
-            .body(serde_json::to_string(&req)?)
+            .body(serde_json::to_string(&req).unwrap())
             .headers(admin_headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
         assert_response_status_eq!(resp, StatusCode::OK);
-        let d: Dashboard = serde_json::from_str(resp.text().await?.as_str())?;
+        let d: Dashboard = serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
 
         assert(&d, &dash);
     }
@@ -142,9 +149,10 @@ async fn test_dashboards() -> anyhow::Result<()> {
             .get(format!("{dash_url}/1"))
             .headers(admin_headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
         assert_response_status_eq!(resp, StatusCode::OK);
-        let d: Dashboard = serde_json::from_str(resp.text().await?.as_str())?;
+        let d: Dashboard = serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
         assert(&d, &dash);
     }
     // list dashboards should return list with one dashboard
@@ -153,9 +161,11 @@ async fn test_dashboards() -> anyhow::Result<()> {
             .get(&dash_url)
             .headers(admin_headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
         assert_response_status_eq!(resp, StatusCode::OK);
-        let resp: ListResponse<Dashboard> = serde_json::from_str(resp.text().await?.as_str())?;
+        let resp: ListResponse<Dashboard> =
+            serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
         assert_eq!(resp.data.len(), 1);
         assert(&resp.data[0], &dash);
     }
@@ -166,15 +176,16 @@ async fn test_dashboards() -> anyhow::Result<()> {
             .delete(format!("{dash_url}/1"))
             .headers(admin_headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
         assert_response_status_eq!(resp, StatusCode::OK);
 
         let resp = cl
             .delete(format!("{dash_url}/1"))
             .headers(admin_headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
         assert_response_status_eq!(resp, StatusCode::NOT_FOUND);
     }
-    Ok(())
 }

@@ -9,10 +9,15 @@ use common::query::event_segmentation::Query;
 use common::query::event_segmentation::SegmentCondition;
 use common::query::time_columns;
 use common::query::EventFilter;
+use common::query::PropValueOperation;
 use common::query::PropertyRef;
+use common::types::COLUMN_CREATED_AT;
+use common::types::COLUMN_EVENT;
+use common::types::COLUMN_USER_ID;
 use datafusion_common::Column;
 use datafusion_expr::col;
 use datafusion_expr::expr;
+use datafusion_expr::expr::Alias;
 use datafusion_expr::expr::ScalarFunction;
 use datafusion_expr::expr_fn::and;
 use datafusion_expr::lit;
@@ -22,15 +27,14 @@ use datafusion_expr::ExprSchemable;
 use datafusion_expr::Extension;
 use datafusion_expr::Filter;
 use datafusion_expr::LogicalPlan;
+use datafusion_expr::ScalarFunctionDefinition;
 use datafusion_expr::Sort;
-use futures::executor;
 use metadata::dictionaries::provider_impl::SingleDictionaryProvider;
 use metadata::MetadataProvider;
 use tracing::debug;
 
 use crate::context::Format;
 use crate::error::Result;
-use crate::event_fields;
 use crate::expr::event_expression;
 use crate::expr::property_col;
 use crate::expr::property_expression;
@@ -69,6 +73,9 @@ macro_rules! breakdowns_to_dicts {
                     $cols_hash.insert(prop.to_owned(), ());
 
                     match prop {
+                        PropertyRef::System(name) => {
+                            dictionary_prop_to_col!($self, system_properties, name, $decode_cols)
+                        }
                         PropertyRef::User(name) => {
                             dictionary_prop_to_col!($self, user_properties, name, $decode_cols)
                         }
@@ -115,7 +122,6 @@ impl LogicalPlanBuilder {
         input: LogicalPlan,
         es: EventSegmentation,
     ) -> Result<LogicalPlan> {
-        debug!("{:?}", es);
         let events = es.events.clone();
         let builder = LogicalPlanBuilder {
             ctx: ctx.clone(),
@@ -146,7 +152,7 @@ impl LogicalPlanBuilder {
                 let node = SegmentNode::try_new(
                     input.clone(),
                     or.unwrap(),
-                    Column::from_qualified_name(event_fields::USER_ID),
+                    Column::from_qualified_name(COLUMN_USER_ID),
                 )?;
                 let input = LogicalPlan::Extension(Extension {
                     node: Arc::new(node),
@@ -160,8 +166,11 @@ impl LogicalPlanBuilder {
             None
         };
 
+        let mut cols_hash: HashMap<PropertyRef, ()> = HashMap::new();
+
+        let mut input = builder.decode_filter_dictionaries(input, &mut cols_hash)?;
         // build main query
-        let mut input = match events.len() {
+        input = match events.len() {
             1 => builder.build_event_logical_plan(input.clone(), 0, segment_inputs)?,
             _ => {
                 let mut inputs: Vec<LogicalPlan> = vec![];
@@ -182,8 +191,7 @@ impl LogicalPlanBuilder {
             }
         };
 
-        input = builder.decode_dictionaries(input)?;
-
+        input = builder.decode_breakdowns_dictionaries(input, &mut cols_hash)?;
         Ok(input)
     }
 
@@ -207,7 +215,7 @@ impl LogicalPlanBuilder {
 
                 SegmentExpr::Count {
                     filter,
-                    ts_col: Column::from_qualified_name(event_fields::CREATED_AT),
+                    ts_col: Column::from_qualified_name(COLUMN_CREATED_AT),
                     time_range: time.into(),
                     op: segment::Operator::GtEq,
                     right: 1,
@@ -232,7 +240,7 @@ impl LogicalPlanBuilder {
                         time,
                     } => SegmentExpr::Count {
                         filter: event_expr,
-                        ts_col: Column::from_qualified_name(event_fields::CREATED_AT),
+                        ts_col: Column::from_qualified_name(COLUMN_CREATED_AT),
                         time_range: time.into(),
                         op: operation.into(),
                         right: *value,
@@ -249,7 +257,7 @@ impl LogicalPlanBuilder {
                         filter: event_expr,
                         predicate: property_col(&self.ctx, &self.metadata, property)?
                             .try_into_col()?,
-                        ts_col: Column::from_qualified_name(event_fields::CREATED_AT),
+                        ts_col: Column::from_qualified_name(COLUMN_CREATED_AT),
                         time_range: time.into(),
                         agg: aggregate.into(),
                         op: operation.into(),
@@ -266,10 +274,107 @@ impl LogicalPlanBuilder {
         Ok(expr)
     }
 
-    fn decode_dictionaries(&self, input: LogicalPlan) -> Result<LogicalPlan> {
-        let mut cols_hash: HashMap<PropertyRef, ()> = HashMap::new();
+    fn decode_filter_single_dictionary(
+        &self,
+        cols_hash: &mut HashMap<PropertyRef, ()>,
+        decode_cols: &mut Vec<(Column, Arc<SingleDictionaryProvider>)>,
+        filter: &EventFilter,
+    ) -> Result<()> {
+        match filter {
+            EventFilter::Property {
+                property,
+                operation,
+                value: _,
+            } => match operation {
+                PropValueOperation::Like
+                | PropValueOperation::NotLike
+                | PropValueOperation::Regex
+                | PropValueOperation::NotRegex => {
+                    let prop = match property {
+                        PropertyRef::System(prop_ref) => {
+                            self.metadata.system_properties.get_by_name(
+                                self.ctx.organization_id,
+                                self.ctx.project_id,
+                                prop_ref.as_str(),
+                            )?
+                        }
+                        PropertyRef::User(prop_ref) => self.metadata.user_properties.get_by_name(
+                            self.ctx.organization_id,
+                            self.ctx.project_id,
+                            prop_ref.as_str(),
+                        )?,
+                        PropertyRef::Event(prop_ref) => {
+                            self.metadata.event_properties.get_by_name(
+                                self.ctx.organization_id,
+                                self.ctx.project_id,
+                                prop_ref.as_str(),
+                            )?
+                        }
+                        PropertyRef::Custom(_) => unreachable!(),
+                    };
+
+                    if !prop.is_dictionary {
+                        return Ok(());
+                    }
+
+                    let col_name = prop.column_name();
+                    let dict = SingleDictionaryProvider::new(
+                        self.ctx.organization_id,
+                        self.ctx.project_id,
+                        col_name.clone(),
+                        self.metadata.dictionaries.clone(),
+                    );
+                    let col = Column::from_name(col_name);
+
+                    decode_cols.push((col, Arc::new(dict)));
+
+                    if cols_hash.contains_key(property) {
+                        return Ok(());
+                    }
+                    cols_hash.insert(property.to_owned(), ());
+                }
+                _ => {}
+            },
+        }
+
+        Ok(())
+    }
+    fn decode_filter_dictionaries(
+        &self,
+        input: LogicalPlan,
+        cols_hash: &mut HashMap<PropertyRef, ()>,
+    ) -> Result<LogicalPlan> {
         let mut decode_cols: Vec<(Column, Arc<SingleDictionaryProvider>)> = Vec::new();
 
+        for event in &self.es.events {
+            if let Some(filters) = &event.filters {
+                for filter in filters {
+                    self.decode_filter_single_dictionary(cols_hash, &mut decode_cols, filter)?;
+                }
+            }
+        }
+
+        if let Some(filters) = &self.es.filters {
+            for filter in filters {
+                self.decode_filter_single_dictionary(cols_hash, &mut decode_cols, filter)?;
+            }
+        }
+
+        if decode_cols.is_empty() {
+            return Ok(input);
+        }
+
+        Ok(LogicalPlan::Extension(Extension {
+            node: Arc::new(DictionaryDecodeNode::try_new(input, decode_cols.clone())?),
+        }))
+    }
+
+    fn decode_breakdowns_dictionaries(
+        &self,
+        input: LogicalPlan,
+        cols_hash: &mut HashMap<PropertyRef, ()>,
+    ) -> Result<LogicalPlan> {
+        let mut decode_cols: Vec<(Column, Arc<SingleDictionaryProvider>)> = Vec::new();
         for event in &self.es.events {
             if let Some(breakdowns) = &event.breakdowns {
                 breakdowns_to_dicts!(self, breakdowns, cols_hash, decode_cols);
@@ -285,7 +390,7 @@ impl LogicalPlanBuilder {
         }
 
         Ok(LogicalPlan::Extension(Extension {
-            node: Arc::new(DictionaryDecodeNode::try_new(input, decode_cols)?),
+            node: Arc::new(DictionaryDecodeNode::try_new(input, decode_cols.clone())?),
         }))
     }
 
@@ -358,13 +463,16 @@ impl LogicalPlanBuilder {
                 LogicalPlan::Extension(Extension {
                     node: Arc::new(PivotNode::try_new(
                         input,
-                        Column::from_name(event_fields::CREATED_AT),
+                        Column::from_name(COLUMN_CREATED_AT),
                         Column::from_name(COL_VALUE),
                         result_cols,
                     )?),
                 })
             };
         }
+
+        // let exprx = input.expressions();
+        // let input = LogicalPlan::Projection(Projection::try_new(exprx, Arc::new(input))?);
         Ok(input)
     }
 
@@ -394,12 +502,9 @@ impl LogicalPlanBuilder {
         // };
         // let cur_time = self.cur_time.duration_trunc(trunc).unwrap();
         // time expression
-        let mut expr = time_expression(
-            event_fields::CREATED_AT,
-            input.schema(),
-            &self.es.time,
-            cur_time,
-        )?;
+
+        // todo add project_id filtering
+        let mut expr = time_expression(COLUMN_CREATED_AT, input.schema(), &self.es.time, cur_time)?;
 
         // event expression
         expr = and(
@@ -429,21 +534,22 @@ impl LogicalPlanBuilder {
     ) -> Result<(LogicalPlan, Vec<Expr>)> {
         let mut group_expr: Vec<Expr> = vec![];
 
-        let ts_col = Expr::Column(Column::from_qualified_name(event_fields::CREATED_AT));
+        let ts_col = Expr::Column(Column::from_qualified_name(COLUMN_CREATED_AT));
         let expr_fn = ScalarFunction {
-            fun: BuiltinScalarFunction::DateTrunc,
+            func_def: ScalarFunctionDefinition::BuiltIn(BuiltinScalarFunction::DateTrunc),
             args: vec![lit(self.es.interval_unit.as_str()), ts_col],
         };
         let time_expr = Expr::ScalarFunction(expr_fn);
 
         // group_expr.push(Expr::Alias(
         // Box::new(lit(event.event.name())),
-        // event_fields::EVENT.to_string(),
+        // COLUMN_EVENT.to_string(),
         // ));
-        group_expr.push(Expr::Alias(
-            Box::new(time_expr),
-            event_fields::CREATED_AT.to_string(),
-        ));
+        group_expr.push(Expr::Alias(Alias {
+            expr: Box::new(time_expr),
+            relation: None,
+            name: COLUMN_CREATED_AT.to_string(),
+        }));
 
         // event groups
         if let Some(breakdowns) = &event.breakdowns {
@@ -475,8 +581,8 @@ impl LogicalPlanBuilder {
                 Query::CountEvents => AggregateExpr::Count {
                     filter: None,
                     groups: Some(group_expr.clone()),
-                    predicate: col(event_fields::EVENT).try_into_col()?,
-                    partition_col: col(event_fields::USER_ID).try_into_col()?,
+                    predicate: col(COLUMN_EVENT).try_into_col()?,
+                    partition_col: col(COLUMN_USER_ID).try_into_col()?,
                     distinct: false,
                 },
                 Query::CountUniqueGroups | Query::DailyActiveGroups => {
@@ -484,7 +590,7 @@ impl LogicalPlanBuilder {
                         filter: None,
                         outer_fn: partitioned_aggregate::AggregateFunction::Count,
                         groups: Some(group_expr.clone()),
-                        partition_col: col(event_fields::USER_ID).try_into_col()?,
+                        partition_col: col(COLUMN_USER_ID).try_into_col()?,
                         distinct: true,
                     }
                 }
@@ -494,7 +600,7 @@ impl LogicalPlanBuilder {
                     filter: None,
                     outer_fn: aggregate.into(),
                     groups: Some(group_expr.clone()),
-                    partition_col: col(event_fields::USER_ID).try_into_col()?,
+                    partition_col: col(COLUMN_USER_ID).try_into_col()?,
                     distinct: false,
                 },
                 Query::AggregatePropertyPerGroup {
@@ -507,7 +613,7 @@ impl LogicalPlanBuilder {
                     outer_fn: aggregate.into(),
                     predicate: property_col(&self.ctx, &self.metadata, property)?.try_into_col()?,
                     groups: Some(group_expr.clone()),
-                    partition_col: col(event_fields::USER_ID).try_into_col()?,
+                    partition_col: col(COLUMN_USER_ID).try_into_col()?,
                 },
                 Query::AggregateProperty {
                     property,
@@ -515,7 +621,7 @@ impl LogicalPlanBuilder {
                 } => AggregateExpr::Aggregate {
                     filter: None,
                     groups: Some(group_expr.clone()),
-                    partition_col: col(event_fields::USER_ID).try_into_col()?,
+                    partition_col: col(COLUMN_USER_ID).try_into_col()?,
                     predicate: property_col(&self.ctx, &self.metadata, property)?.try_into_col()?,
                     agg: aggregate.into(),
                 },
@@ -530,7 +636,7 @@ impl LogicalPlanBuilder {
         let agg_node = PartitionedAggregateNode::try_new(
             input,
             segment_inputs,
-            Column::from_qualified_name(event_fields::USER_ID),
+            Column::from_qualified_name(COLUMN_USER_ID),
             aggr_expr,
         )?;
 
@@ -576,7 +682,9 @@ impl LogicalPlanBuilder {
     fn breakdown_expr(&self, breakdown: &Breakdown) -> Result<Expr> {
         match breakdown {
             Breakdown::Property(prop_ref) => match prop_ref {
-                PropertyRef::User(_prop_name) | PropertyRef::Event(_prop_name) => {
+                PropertyRef::System(_prop_name)
+                | PropertyRef::User(_prop_name)
+                | PropertyRef::Event(_prop_name) => {
                     let prop_col = property_col(&self.ctx, &self.metadata, prop_ref)?;
                     Ok(prop_col)
                 }

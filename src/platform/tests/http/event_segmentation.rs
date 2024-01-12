@@ -26,15 +26,19 @@ mod tests {
     use crate::http::tests::run_http_service;
 
     #[tokio::test]
-    async fn test_event_segmentation() -> anyhow::Result<()> {
-        let (base_url, md, pp) = run_http_service(true).await?;
+    async fn test_event_segmentation() {
+        let (base_url, md, pp) = run_http_service(true).await.unwrap();
         let cl = Client::new();
-        let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts).await?;
+        let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts)
+            .await
+            .unwrap();
 
-        let from =
-            DateTime::parse_from_rfc3339("2021-09-08T13:42:00.000000+00:00")?.with_timezone(&Utc);
-        let to =
-            DateTime::parse_from_rfc3339("2021-09-08T13:48:00.000000+00:00")?.with_timezone(&Utc);
+        let from = DateTime::parse_from_rfc3339("2021-09-08T13:42:00.000000+00:00")
+            .unwrap()
+            .with_timezone(&Utc);
+        let to = DateTime::parse_from_rfc3339("2021-09-08T13:48:00.000000+00:00")
+            .unwrap()
+            .with_timezone(&Utc);
 
         let es = EventSegmentation {
             time: QueryTime::Between { from, to },
@@ -103,15 +107,14 @@ mod tests {
             .post(format!(
                 "{base_url}/organizations/1/projects/1/queries/event-segmentation"
             ))
-            .body(serde_json::to_string(&es)?)
+            .body(serde_json::to_string(&es).unwrap())
             .headers(admin_headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
 
         assert_response_status_eq!(resp, StatusCode::OK);
-        let txt = resp.text().await?;
+        let txt = resp.text().await.unwrap();
         debug!("{}", &txt);
-
-        Ok(())
     }
 }

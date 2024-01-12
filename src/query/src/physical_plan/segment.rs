@@ -23,6 +23,7 @@ use datafusion::physical_plan::expressions::PhysicalSortExpr;
 use datafusion::physical_plan::metrics::BaselineMetrics;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
 use datafusion::physical_plan::metrics::MetricsSet;
+use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::physical_plan::Partitioning;
@@ -64,6 +65,12 @@ impl SegmentExec {
             partition_col,
             out_buffer_size,
         })
+    }
+}
+
+impl DisplayAs for SegmentExec {
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "PartitionExec")
     }
 }
 
@@ -128,12 +135,8 @@ impl ExecutionPlan for SegmentExec {
         Some(self.metrics.clone_inner())
     }
 
-    fn fmt_as(&self, _t: DisplayFormatType, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "PartitionExec")
-    }
-
-    fn statistics(&self) -> Statistics {
-        Statistics::default()
+    fn statistics(&self) -> DFResult<Statistics> {
+        Ok(Statistics::new_unknown(self.schema.as_ref()))
     }
 }
 
@@ -171,7 +174,7 @@ impl Stream for SegmentStream {
                     let partition = self
                         .partition_col
                         .evaluate(&batch)?
-                        .into_array(batch.num_rows())
+                        .into_array(batch.num_rows())?
                         .as_any()
                         .downcast_ref::<Int64Array>()
                         .unwrap()
@@ -243,7 +246,6 @@ mod tests {
     use datafusion::physical_plan::memory::MemoryExec;
     use datafusion::physical_plan::ExecutionPlan;
     use datafusion::prelude::SessionContext;
-    pub use datafusion_common::Result;
     use datafusion_common::ScalarValue;
     use datafusion_expr::Operator;
     use store::test_util::parse_markdown_tables;

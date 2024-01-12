@@ -8,7 +8,6 @@ use metadata::events::Provider;
 use metadata::events::ProviderImpl;
 use metadata::events::Status;
 use metadata::events::UpdateEventRequest;
-use metadata::store::Store;
 use uuid::Uuid;
 #[test]
 fn test_events() -> Result<()> {

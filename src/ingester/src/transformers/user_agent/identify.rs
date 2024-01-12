@@ -1,22 +1,12 @@
-use std::fs;
-use std::io;
 use std::sync::Arc;
 
-use common::types;
-use futures::executor::block_on;
-use metadata::events;
 use metadata::properties;
-use uaparser::Parser;
 use uaparser::UserAgentParser;
 
-use crate::error::IngesterError;
 use crate::error::Result;
 use crate::transformers::user_agent::resolve_properties;
 use crate::Identify;
-use crate::PropValue;
-use crate::Property;
 use crate::RequestContext;
-use crate::Track;
 use crate::Transformer;
 
 pub struct UserAgent {

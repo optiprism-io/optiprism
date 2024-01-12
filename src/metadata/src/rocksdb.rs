@@ -4,16 +4,8 @@ use rocksdb::ColumnFamilyDescriptor;
 use rocksdb::Options;
 use rocksdb::TransactionDB;
 use rocksdb::TransactionDBOptions;
-use rocksdb::WriteBatch;
-use rocksdb::DB;
 
 use crate::Result;
-
-type KVBytes = (Box<[u8]>, Box<[u8]>);
-
-pub struct Store {
-    db: TransactionDB,
-}
 
 enum ColumnFamily {
     General,

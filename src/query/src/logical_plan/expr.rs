@@ -42,10 +42,14 @@ pub fn lit_timestamp(data_type: DataType, date_time: &DateTime<Utc>) -> Result<E
         DataType::Timestamp(arrow::datatypes::TimeUnit::Millisecond, tz) => {
             ScalarValue::TimestampMillisecond(Some(date_time.timestamp_millis()), tz)
         }
-        DataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, tz) => {
+        DataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, tz) =>
+        {
+            #[allow(deprecated)]
             ScalarValue::TimestampMicrosecond(Some(date_time.timestamp_nanos() / 1000), tz)
         }
-        DataType::Timestamp(arrow::datatypes::TimeUnit::Nanosecond, tz) => {
+        DataType::Timestamp(arrow::datatypes::TimeUnit::Nanosecond, tz) =>
+        {
+            #[allow(deprecated)]
             ScalarValue::TimestampNanosecond(Some(date_time.timestamp_nanos()), tz)
         }
         _ => {

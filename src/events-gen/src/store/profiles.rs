@@ -1,7 +1,12 @@
 use std::io;
 use std::sync::Arc;
 
-use futures::executor::block_on;
+use common::types::USER_PROPERTY_CITY;
+use common::types::USER_PROPERTY_COUNTRY;
+use common::types::USER_PROPERTY_DEVICE_MODEL;
+use common::types::USER_PROPERTY_OS;
+use common::types::USER_PROPERTY_OS_FAMILY;
+use common::types::USER_PROPERTY_OS_VERSION_MAJOR;
 use metadata::dictionaries;
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
@@ -61,6 +66,7 @@ impl ProfileProvider {
         org_id: u64,
         proj_id: u64,
         dicts: &Arc<dyn dictionaries::Provider>,
+        properties: &Arc<dyn metadata::properties::Provider>,
         geo_rdr: R,
         device_rdr: R,
     ) -> Result<Self> {
@@ -76,12 +82,32 @@ impl ProfileProvider {
                     country: rec
                         .country
                         .map(|v| {
-                            dicts.get_key_or_create(org_id, proj_id, "user_country", v.as_str())
+                            dicts.get_key_or_create(
+                                org_id,
+                                proj_id,
+                                properties
+                                    .get_by_name(org_id, proj_id, USER_PROPERTY_COUNTRY)
+                                    .unwrap()
+                                    .column_name()
+                                    .as_str(),
+                                v.as_str(),
+                            )
                         })
                         .transpose()?,
                     city: rec
                         .city
-                        .map(|v| dicts.get_key_or_create(org_id, proj_id, "user_city", v.as_str()))
+                        .map(|v| {
+                            dicts.get_key_or_create(
+                                org_id,
+                                proj_id,
+                                properties
+                                    .get_by_name(org_id, proj_id, USER_PROPERTY_CITY)
+                                    .unwrap()
+                                    .column_name()
+                                    .as_str(),
+                                v.as_str(),
+                            )
+                        })
                         .transpose()?,
                 };
                 result.push(geo);
@@ -105,7 +131,16 @@ impl ProfileProvider {
                     device: rec
                         .device
                         .map(|v| {
-                            dicts.get_key_or_create(org_id, proj_id, "user_device", v.as_str())
+                            dicts.get_key_or_create(
+                                org_id,
+                                proj_id,
+                                properties
+                                    .get_by_name(org_id, proj_id, USER_PROPERTY_DEVICE_MODEL)
+                                    .unwrap()
+                                    .column_name()
+                                    .as_str(),
+                                v.as_str(),
+                            )
                         })
                         .transpose()?,
                     device_category: rec
@@ -114,19 +149,43 @@ impl ProfileProvider {
                             dicts.get_key_or_create(
                                 org_id,
                                 proj_id,
-                                "user_device_category",
+                                properties
+                                    .get_by_name(org_id, proj_id, USER_PROPERTY_OS_FAMILY)
+                                    .unwrap()
+                                    .column_name()
+                                    .as_str(),
                                 v.as_str(),
                             )
                         })
                         .transpose()?,
                     os: rec
                         .os
-                        .map(|v| dicts.get_key_or_create(org_id, proj_id, "user_os", v.as_str()))
+                        .map(|v| {
+                            dicts.get_key_or_create(
+                                org_id,
+                                proj_id,
+                                properties
+                                    .get_by_name(org_id, proj_id, USER_PROPERTY_OS)
+                                    .unwrap()
+                                    .column_name()
+                                    .as_str(),
+                                v.as_str(),
+                            )
+                        })
                         .transpose()?,
                     os_version: rec
                         .os_version
                         .map(|v| {
-                            dicts.get_key_or_create(org_id, proj_id, "user_os_version", v.as_str())
+                            dicts.get_key_or_create(
+                                org_id,
+                                proj_id,
+                                properties
+                                    .get_by_name(org_id, proj_id, USER_PROPERTY_OS_VERSION_MAJOR)
+                                    .unwrap()
+                                    .column_name()
+                                    .as_str(),
+                                v.as_str(),
+                            )
                         })
                         .transpose()?,
                 };

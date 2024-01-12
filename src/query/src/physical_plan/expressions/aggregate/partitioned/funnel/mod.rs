@@ -16,7 +16,7 @@ use datafusion_expr::Operator;
 
 use crate::error::Result;
 use crate::StaticArray;
-
+#[allow(clippy::module_inception)]
 pub mod funnel;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -107,6 +107,9 @@ impl Batch {
     pub fn len(&self) -> usize {
         self.batch.num_rows()
     }
+    pub fn is_empty(&self) -> bool {
+        self.batch.num_rows() == 0
+    }
 }
 
 // calculate expressions
@@ -124,7 +127,7 @@ fn evaluate_batch(
         // evaluate expr to bool result
         let arr = expr
             .evaluate(&batch)?
-            .into_array(0)
+            .into_array(0)?
             .as_any()
             .downcast_ref::<BooleanArray>()
             .unwrap()
@@ -140,7 +143,7 @@ fn evaluate_batch(
             let arr = expr
                 .expr
                 .evaluate(&batch)?
-                .into_array(0)
+                .into_array(0)?
                 .as_any()
                 .downcast_ref::<BooleanArray>()
                 .unwrap()
@@ -165,7 +168,7 @@ fn evaluate_batch(
     let mut constants_out: Option<Vec<_>> = None;
     if let Some(cc) = constants {
         for c in cc.iter() {
-            let arr = c.evaluate(&batch)?.into_array(0);
+            let arr = c.evaluate(&batch)?.into_array(0)?;
             let arr = StaticArray::from(arr);
             if let Some(c) = &mut constants_out {
                 c.push(arr)
@@ -178,7 +181,7 @@ fn evaluate_batch(
     // Optiprism uses millisecond precision
     let ts = ts_col
         .evaluate(&batch)?
-        .into_array(0)
+        .into_array(0)?
         .as_any()
         .downcast_ref::<TimestampMillisecondArray>()
         .unwrap()
@@ -186,7 +189,7 @@ fn evaluate_batch(
 
     let parr = partition_col
         .evaluate(&batch)?
-        .into_array(batch.num_rows())
+        .into_array(batch.num_rows())?
         .as_any()
         .downcast_ref::<Int64Array>()
         .unwrap()

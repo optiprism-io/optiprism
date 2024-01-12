@@ -13,15 +13,15 @@ def test_types():
             print("Test Aggregate Property {0}({1})".format(agg, field))
             typ = field.replace("_", "")
             t1 = main.return_type(typ, agg)
-            if t1 == "f64" or t1 == "i128" or t1 == "u128":
-                ch = clickhouse.aggregate_property_query(agg, field)
+            if t1 == "f64" or t1 == "i128" or t1 == "decimal":
                 op = optiprism.aggregate_property_query(agg, field)
+                ch = clickhouse.aggregate_property_query(agg, field)
 
                 for idx, v in enumerate(ch[1]):
                     assert math.isclose(op[1][idx], v, rel_tol=0.000001)
             else:
-                ch = clickhouse.aggregate_property_query(agg, field, period=10)
                 op = optiprism.aggregate_property_query(agg, field, period=10)
+                ch = clickhouse.aggregate_property_query(agg, field, period=10)
                 print(ch)
                 print(op)
                 assert ch == op
@@ -46,14 +46,14 @@ def test_grouped():
     group = "group"
     print(optiprism.token)
 
-    ch = clickhouse.aggregate_property_query(agg, group, group=group)
     op = optiprism.aggregate_property_query(agg, group, breakdowns=[group])
+    ch = clickhouse.aggregate_property_query(agg, group, group=group)
     assert ch == op
 
 
 def test_all_aggregates():
     for field in main.fields:
-        ch = clickhouse.all_aggregates_query(field)
         op = optiprism.all_aggregates_query(field)
+        ch = clickhouse.all_aggregates_query(field)
 
         assert ch == op

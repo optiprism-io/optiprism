@@ -1,5 +1,6 @@
 #![feature(trace_macros)]
 
+use std::fs;
 use std::fs::create_dir_all;
 use std::fs::File;
 use std::io::Cursor;
@@ -13,7 +14,8 @@ use arrow2::datatypes::Field;
 use arrow2::datatypes::TimeUnit;
 use arrow2::io::parquet::read;
 use arrow2::io::print;
-use store::parquet::merger::ParquetMerger;
+use store::parquet::parquet_merger::merge;
+use store::parquet::parquet_merger::Options;
 use store::test_util::concat_chunks;
 use store::test_util::create_parquet_from_chunk;
 use store::test_util::create_parquet_from_chunks;
@@ -75,23 +77,27 @@ fn roundtrip(tc: TestCase) -> anyhow::Result<()> {
         })
         .collect::<Vec<_>>();
 
-    let mut out = Cursor::new(vec![]);
-    let mut merger = ParquetMerger::try_new(
-        readers,
-        &mut out,
-        idx_cols_len,
-        tc.out_data_page_size_limit,
-        tc.out_row_group_values_limit,
-        tc.out_arrow_page_size,
-    )?;
+    let opts = Options {
+        index_cols: idx_cols_len,
+        data_page_size_limit_bytes: tc.out_data_page_size_limit,
+        row_group_values_limit: tc.out_row_group_values_limit,
+        array_page_size: tc.out_arrow_page_size,
+        out_part_id: 0,
+        merge_max_page_size: 1024 * 1024,
+        max_part_size_bytes: None,
+    };
+
     let start = Instant::now();
-    merger.merge()?;
+    fs::remove_dir_all("/tmp/merge_roundtrip").ok();
+    fs::create_dir_all("/tmp/merge_roundtrip").unwrap();
+    merge(readers, "/tmp/merge_roundtrip".into(), 1, "t", 0, opts).unwrap();
     println!("merge {:?}", start.elapsed());
 
-    let metadata = read::read_metadata(&mut out)?;
-    let schema = read::infer_schema(&metadata)?;
+    let mut pfile = File::open("/tmp/merge_roundtrip/1.parquet").unwrap();
+    let metadata = read::read_metadata(&mut pfile).unwrap();
+    let schema = read::infer_schema(&metadata).unwrap();
     let chunks = read::FileReader::new(
-        out,
+        File::open("/tmp/merge_roundtrip/1.parquet").unwrap(),
         metadata.row_groups,
         schema,
         Some(1024 * 1024),
@@ -107,23 +113,24 @@ fn roundtrip(tc: TestCase) -> anyhow::Result<()> {
 
     Ok(())
 }
-
+#[allow(dead_code)]
 enum ProfileStep {
     Generate,
     Merge,
 }
 
+#[allow(dead_code)]
 fn stream_parquet_path(stream_id: usize, case_id: usize) -> PathBuf {
     // let mut path = temp_dir();
     // path.push(format!("optiprism/tests/merge"));
-    let mut path = PathBuf::from(format!("tests/merge/{case_id}/"));
-    // path.push(format!("tests/merge/{case_id}/"));
+    let mut path = PathBuf::from(format!("/tmp/merge/{case_id}/"));
+    // path.push(format!("/tmp/merge/{case_id}/"));
     create_dir_all(path.clone()).unwrap();
     path.push(format!("{stream_id}.parquet"));
 
     path
 }
-
+#[allow(dead_code)]
 fn profile(tc: TestCase, case_id: usize, step: ProfileStep) {
     let start = Instant::now();
     match step {
@@ -169,17 +176,19 @@ fn profile(tc: TestCase, case_id: usize, step: ProfileStep) {
                 .map(|stream_id| File::open(stream_parquet_path(stream_id, case_id)).unwrap())
                 .collect::<Vec<_>>();
 
-            let mut out = Cursor::new(vec![]);
-            let mut merger = ParquetMerger::try_new(
-                readers,
-                &mut out,
-                idx_cols_len,
-                tc.out_data_page_size_limit,
-                tc.out_row_group_values_limit,
-                tc.out_arrow_page_size,
-            )
-            .unwrap();
-            merger.merge().unwrap();
+            let opts = Options {
+                index_cols: idx_cols_len,
+                data_page_size_limit_bytes: tc.out_data_page_size_limit,
+                row_group_values_limit: tc.out_row_group_values_limit,
+                array_page_size: tc.out_arrow_page_size,
+                out_part_id: 0,
+                merge_max_page_size: 100,
+                max_part_size_bytes: None,
+            };
+
+            fs::remove_dir_all("/tmp/merge_profile").ok();
+            fs::create_dir_all("/tmp/merge_profile").unwrap();
+            merge(readers, "/tmp/merge_profile".into(), 1, "t", 0, opts).unwrap();
         }
     }
     println!("{:?}", start.elapsed());
@@ -237,19 +246,19 @@ fn test_merge() -> anyhow::Result<()> {
     let data_fields = [data_fields, data_list_fields].concat();
 
     let cases = vec![
-        // TestCase {
-        // idx_fields: vec![Field::new("idx1", DataType::Int64, false)],
-        // data_fields: data_fields.clone(),
-        // gen_null_values_periodicity: None,
-        // gen_exclusive_row_groups_periodicity: None,
-        // primary_index_type: PrimaryIndexType::Sequential(100),
-        // gen_out_streams_count: 10,
-        // gen_row_group_size: 5,
-        // gen_data_page_limit: None,
-        // out_data_page_size_limit: Some(10),
-        // out_row_group_values_limit: 2,
-        // out_arrow_page_size: 3,
-        // },
+        TestCase {
+            idx_fields: vec![Field::new("idx1", DataType::Int64, false)],
+            data_fields: data_fields.clone(),
+            gen_null_values_periodicity: None,
+            gen_exclusive_row_groups_periodicity: None,
+            primary_index_type: PrimaryIndexType::Sequential(100),
+            gen_out_streams_count: 10,
+            gen_row_group_size: 5,
+            gen_data_page_limit: None,
+            out_data_page_size_limit: Some(10),
+            out_row_group_values_limit: 2,
+            out_arrow_page_size: 3,
+        },
         // TestCase {
         // idx_fields: vec![Field::new("idx1", DataType::Int64, false)],
         // data_fields: data_fields.clone(),
@@ -400,6 +409,7 @@ fn test_merge() -> anyhow::Result<()> {
 
 // #[test]
 // todo Move to benches
+#[allow(dead_code)]
 fn test_profile_merge() {
     let data_fields = vec![
         Field::new("f1", DataType::Boolean, true),
@@ -543,12 +553,30 @@ fn test_different_row_group_sizes() -> anyhow::Result<()> {
         })
         .collect::<Vec<_>>();
 
-    let mut out = Cursor::new(vec![]);
-    let mut merger = ParquetMerger::try_new(readers, &mut out, 1, None, 100, 100)?;
+    let opts = Options {
+        index_cols: 2,
+        data_page_size_limit_bytes: None,
+        row_group_values_limit: 100,
+        array_page_size: 100,
+        out_part_id: 0,
+        merge_max_page_size: 100,
+        max_part_size_bytes: None,
+    };
 
-    merger.merge()?;
+    fs::remove_dir_all("/tmp/merge_different_row_group_sizes").ok();
+    fs::create_dir_all("/tmp/merge_different_row_group_sizes").unwrap();
+    merge(
+        readers,
+        "/tmp/merge_different_row_group_sizes".into(),
+        1,
+        "t",
+        0,
+        opts,
+    )
+    .unwrap();
 
-    let final_chunk = read_parquet_as_one_chunk(&mut out);
+    let mut pfile = File::open("/tmp/merge_different_row_group_sizes/1.parquet").unwrap();
+    let final_chunk = read_parquet_as_one_chunk(&mut pfile);
 
     trace!(
         "final merged \n{}",
@@ -617,10 +645,28 @@ fn test_merge_with_missing_columns() -> anyhow::Result<()> {
         })
         .collect::<Vec<_>>();
 
-    let mut out = Cursor::new(vec![]);
-    let mut merger = ParquetMerger::try_new(readers, &mut out, 1, None, 100, 100)?;
-    merger.merge()?;
-    let final_chunk = read_parquet_as_one_chunk(&mut out);
+    let opts = Options {
+        index_cols: 1,
+        data_page_size_limit_bytes: None,
+        row_group_values_limit: 100,
+        array_page_size: 100,
+        out_part_id: 0,
+        merge_max_page_size: 100,
+        max_part_size_bytes: None,
+    };
+
+    fs::remove_dir_all("/tmp/merge_with_missing_columns").ok();
+    fs::create_dir_all("/tmp/merge_with_missing_columns").unwrap();
+    merge(
+        readers,
+        "/tmp/merge_with_missing_columns".into(),
+        1,
+        "t",
+        0,
+        opts,
+    )?;
+    let mut pfile = File::open("/tmp/merge_with_missing_columns/1.parquet").unwrap();
+    let final_chunk = read_parquet_as_one_chunk(&mut pfile);
 
     let exp = vec![
         PrimitiveArray::<i64>::from_slice([1, 2, 3, 4, 5, 6, 7, 8, 9]).boxed(),
@@ -677,7 +723,6 @@ fn test_pick_with_null_columns() -> anyhow::Result<()> {
         vec![Field::new("f1", DataType::Int64, false)],
     ];
 
-    let _names = vec!["f1", "f2"];
     let readers = cols
         .into_iter()
         .zip(fields.iter())
@@ -690,10 +735,28 @@ fn test_pick_with_null_columns() -> anyhow::Result<()> {
         })
         .collect::<Vec<_>>();
 
-    let mut out = Cursor::new(vec![]);
-    let mut merger = ParquetMerger::try_new(readers, &mut out, 1, None, 100, 100)?;
-    merger.merge()?;
-    let final_chunk = read_parquet_as_one_chunk(&mut out);
+    fs::remove_dir_all("/tmp/merge_pick_with_null_columns").ok();
+    fs::create_dir_all("/tmp/merge_pick_with_null_columns").unwrap();
+    let opts = Options {
+        index_cols: 1,
+        data_page_size_limit_bytes: None,
+        row_group_values_limit: 100,
+        array_page_size: 100,
+        out_part_id: 0,
+        merge_max_page_size: 100,
+        max_part_size_bytes: None,
+    };
+    merge(
+        readers,
+        "/tmp/merge_pick_with_null_columns".into(),
+        1,
+        "t",
+        0,
+        opts,
+    )?;
+
+    let mut pfile = File::open("/tmp/merge_pick_with_null_columns/1.parquet").unwrap();
+    let final_chunk = read_parquet_as_one_chunk(&mut pfile);
 
     let exp = Chunk::new(vec![
         PrimitiveArray::<i64>::from_slice([1, 2, 3, 4, 5, 6]).boxed(),

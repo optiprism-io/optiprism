@@ -69,7 +69,21 @@ impl Hash for DictionaryDecodeNode {
 
 impl PartialEq for DictionaryDecodeNode {
     fn eq(&self, other: &Self) -> bool {
-        self.dyn_eq(other)
+        let res = self.input == other.input && self.schema == other.schema;
+        if !res {
+            return false;
+        }
+        let cols = self
+            .decode_cols
+            .iter()
+            .map(|v| v.0.clone())
+            .collect::<Vec<_>>();
+        let other_cols = other
+            .decode_cols
+            .iter()
+            .map(|v| v.0.clone())
+            .collect::<Vec<_>>();
+        cols == other_cols
     }
 }
 

@@ -8,11 +8,11 @@ use std::task::Poll;
 
 use arrow::array::Array;
 use arrow::array::ArrayRef;
+use arrow::array::Int16Array;
+use arrow::array::Int32Array;
+use arrow::array::Int64Array;
+use arrow::array::Int8Array;
 use arrow::array::StringBuilder;
-use arrow::array::UInt16Array;
-use arrow::array::UInt32Array;
-use arrow::array::UInt64Array;
-use arrow::array::UInt8Array;
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
 use arrow::datatypes::FieldRef;
@@ -27,6 +27,7 @@ use datafusion::physical_plan::expressions::PhysicalSortExpr;
 use datafusion::physical_plan::metrics::BaselineMetrics;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
 use datafusion::physical_plan::metrics::MetricsSet;
+use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::physical_plan::Partitioning;
@@ -34,7 +35,6 @@ use datafusion::physical_plan::RecordBatchStream;
 use datafusion::physical_plan::SendableRecordBatchStream;
 use datafusion::physical_plan::Statistics;
 use datafusion_common::Result as DFResult;
-use futures::executor::block_on;
 use futures::Stream;
 use futures::StreamExt;
 use metadata::dictionaries::provider_impl::SingleDictionaryProvider;
@@ -78,6 +78,12 @@ impl DictionaryDecodeExec {
             schema,
             metrics: ExecutionPlanMetricsSet::new(),
         }
+    }
+}
+
+impl DisplayAs for DictionaryDecodeExec {
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "DictionaryDecodeExec")
     }
 }
 
@@ -128,16 +134,12 @@ impl ExecutionPlan for DictionaryDecodeExec {
         }))
     }
 
-    fn fmt_as(&self, _t: DisplayFormatType, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "DictionaryDecodeExec")
-    }
-
     fn metrics(&self) -> Option<MetricsSet> {
         Some(self.metrics.clone_inner())
     }
 
-    fn statistics(&self) -> Statistics {
-        Statistics::default()
+    fn statistics(&self) -> DFResult<Statistics> {
+        Ok(Statistics::new_unknown(self.schema.as_ref()))
     }
 }
 
@@ -152,7 +154,6 @@ macro_rules! decode_array {
     ($array_ref:expr,$array_type:ident, $dict:expr) => {{
         let mut result = StringBuilder::with_capacity($array_ref.len(), $array_ref.len());
         let src_arr = $array_ref.as_any().downcast_ref::<$array_type>().unwrap();
-
         for v in src_arr.iter() {
             match v {
                 None => result.append_null(),
@@ -188,11 +189,11 @@ impl DictionaryDecodeStream {
                         match self.decode_cols.iter().find(|(col, _)| idx == col.index()) {
                             None => array_ref.to_owned(),
                             Some((_, dict)) => match array_ref.data_type() {
-                                DataType::UInt8 => decode_array!(array_ref, UInt8Array, dict),
-                                DataType::UInt16 => decode_array!(array_ref, UInt16Array, dict),
-                                DataType::UInt32 => decode_array!(array_ref, UInt32Array, dict),
-                                DataType::UInt64 => decode_array!(array_ref, UInt64Array, dict),
-                                _ => unimplemented!(),
+                                DataType::Int8 => decode_array!(array_ref, Int8Array, dict),
+                                DataType::Int16 => decode_array!(array_ref, Int16Array, dict),
+                                DataType::Int32 => decode_array!(array_ref, Int32Array, dict),
+                                DataType::Int64 => decode_array!(array_ref, Int64Array, dict),
+                                _ => unimplemented!("{:?}", array_ref.data_type()),
                             },
                         }
                     })

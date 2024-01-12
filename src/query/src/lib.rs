@@ -58,18 +58,13 @@ pub use provider_impl::ProviderImpl;
 use crate::queries::property_values::PropertyValues;
 
 pub mod context;
+pub mod datasources;
 pub mod error;
 pub mod expr;
 pub mod logical_plan;
 pub mod physical_plan;
 pub mod provider_impl;
 pub mod queries;
-
-pub mod event_fields {
-    pub const EVENT: &str = "event_event";
-    pub const CREATED_AT: &str = "event_created_at";
-    pub const USER_ID: &str = "event_user_id";
-}
 
 pub const DEFAULT_BATCH_SIZE: usize = 4096;
 
@@ -328,11 +323,19 @@ impl DataTable {
 }
 
 pub mod test_util {
-    use std::env::temp_dir;
+
     use std::path::PathBuf;
     use std::sync::Arc;
 
     use arrow::datatypes::DataType;
+    use arrow::datatypes::Field;
+    use arrow::datatypes::Schema;
+    use arrow::datatypes::TimeUnit;
+    use common::types::DType;
+    use common::types::COLUMN_CREATED_AT;
+    use common::types::COLUMN_EVENT;
+    use common::types::COLUMN_PROJECT_ID;
+    use common::types::COLUMN_USER_ID;
     use common::DECIMAL_PRECISION;
     use common::DECIMAL_SCALE;
     use datafusion::datasource::listing::ListingTable;
@@ -345,44 +348,55 @@ pub mod test_util {
     use datafusion_expr::logical_plan::builder::UNNAMED_TABLE;
     use datafusion_expr::LogicalPlan;
     use datafusion_expr::LogicalPlanBuilder;
-    use metadata::database;
-    use metadata::database::Column;
-    use metadata::database::CreateTableRequest;
-    use metadata::database::Table;
-    use metadata::database::TableRef;
     use metadata::events;
     use metadata::properties;
     use metadata::properties::CreatePropertyRequest;
     use metadata::properties::Property;
     use metadata::properties::Type;
     use metadata::MetadataProvider;
-    use uuid::Uuid;
+    use store::db::OptiDBImpl;
 
     use crate::error::Result;
-    use crate::event_fields;
 
     pub async fn events_provider(
-        db: Arc<dyn database::Provider>,
-        org_id: u64,
-        proj_id: u64,
+        db: Arc<OptiDBImpl>,
+        _org_id: u64,
+        _proj_id: u64,
     ) -> Result<LogicalPlan> {
-        let table = db.get_table(TableRef::Events(org_id, proj_id))?;
-        let schema = table.arrow_schema();
-
-        let options = CsvReadOptions::new();
+        let schema = Schema::new(vec![
+            Field::new("project_id", DataType::Int64, false),
+            Field::new("user_id", DataType::Int64, false),
+            Field::new(
+                "created_at",
+                DataType::Timestamp(TimeUnit::Nanosecond, None),
+                false,
+            ),
+            Field::new("event", DataType::Int64, true),
+            Field::new("user_country", DataType::Int64, true),
+            Field::new("user_device", DataType::Utf8, true),
+            Field::new("user_is_premium", DataType::Boolean, true),
+            Field::new("event_product_name", DataType::Utf8, true),
+            Field::new(
+                "event_revenue",
+                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                true,
+            ),
+        ]);
+        let mut options = CsvReadOptions::new();
+        options.schema = Some(&schema);
         let table_path = ListingTableUrl::parse(
             PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .join("resources/test/events.csv")
                 .to_str()
                 .unwrap(),
         )?;
-        let target_partitions = 1;
+        let target_partitions = 12;
         let session_config = SessionConfig::new().with_target_partitions(target_partitions);
         let listing_options = options.to_listing_options(&session_config);
 
         let config = ListingTableConfig::new(table_path)
             .with_listing_options(listing_options)
-            .with_schema(Arc::new(schema));
+            .with_schema(Arc::new(db.schema1("events")?));
         let provider = ListingTable::try_new(config)?;
         Ok(
             LogicalPlanBuilder::scan(UNNAMED_TABLE, provider_as_source(Arc::new(provider)), None)?
@@ -396,6 +410,7 @@ pub mod test_util {
 
     pub fn create_property(
         md: &Arc<MetadataProvider>,
+        _db: &Arc<OptiDBImpl>,
         org_id: u64,
         proj_id: u64,
         req: CreatePropertyRequest,
@@ -403,75 +418,40 @@ pub mod test_util {
         let prop = match req.typ {
             Type::Event => md.event_properties.create(org_id, proj_id, req)?,
             Type::User => md.user_properties.create(org_id, proj_id, req)?,
+            _ => unimplemented!(),
         };
 
-        md.database.add_column(
-            TableRef::Events(org_id, proj_id),
-            Column::new(
-                prop.column_name(),
-                prop.data_type.clone().into(),
-                prop.nullable,
-                prop.dictionary_type.clone(),
-            ),
-        )?;
+        // db.add_field("events", prop.column_name().as_str(), prop.data_type.clone().into(), prop.nullable)?;
 
         Ok(prop)
     }
 
     pub async fn create_entities(
         md: Arc<MetadataProvider>,
+        db: &Arc<OptiDBImpl>,
         org_id: u64,
         proj_id: u64,
     ) -> Result<()> {
-        md.database.create_table(CreateTableRequest {
-            typ: TableRef::Events(org_id, proj_id),
-            columns: vec![],
-        })?;
-
-        md.database.add_column(
-            TableRef::Events(org_id, proj_id),
-            Column::new(
-                event_fields::USER_ID.to_string(),
-                DataType::Int64,
-                false,
-                None,
-            ),
-        )?;
-        md.database.add_column(
-            TableRef::Events(org_id, proj_id),
-            Column::new(
-                event_fields::CREATED_AT.to_string(),
-                DataType::Timestamp(arrow::datatypes::TimeUnit::Nanosecond, None),
-                false,
-                None,
-            ),
-        )?;
-        md.database.add_column(
-            TableRef::Events(org_id, proj_id),
-            Column::new(
-                event_fields::EVENT.to_string(),
-                DataType::UInt16,
-                false,
-                None,
-            ),
-        )?;
-
+        db.add_field("events", COLUMN_PROJECT_ID, DType::Int64, false)?;
+        db.add_field("events", COLUMN_USER_ID, DType::Int64, false)?;
+        db.add_field("events", COLUMN_CREATED_AT, DType::Timestamp, false)?;
+        db.add_field("events", COLUMN_EVENT, DType::Int64, false)?;
         // create user props
 
-        let country_prop = create_property(&md, org_id, proj_id, CreatePropertyRequest {
+        let country_prop = create_property(&md, db, org_id, proj_id, CreatePropertyRequest {
             created_by: 0,
             tags: None,
             name: "Country".to_string(),
             description: None,
             display_name: None,
             typ: properties::Type::User,
-            data_type: properties::DataType::String,
+            data_type: DType::String,
             status: properties::Status::Enabled,
             is_system: false,
             nullable: false,
             is_array: false,
             is_dictionary: false,
-            dictionary_type: Some(properties::DictionaryType::UInt8),
+            dictionary_type: Some(properties::DictionaryType::Int8),
         })?;
 
         md.dictionaries.get_key_or_create(
@@ -486,14 +466,15 @@ pub mod test_util {
             country_prop.column_name().as_str(),
             "german",
         )?;
-        create_property(&md, org_id, proj_id, CreatePropertyRequest {
+
+        create_property(&md, db, org_id, proj_id, CreatePropertyRequest {
             created_by: 0,
             tags: None,
             name: "Device".to_string(),
             description: None,
             display_name: None,
             typ: properties::Type::User,
-            data_type: properties::DataType::String,
+            data_type: DType::String,
             status: properties::Status::Enabled,
             nullable: true,
             is_array: false,
@@ -502,14 +483,14 @@ pub mod test_util {
             is_system: false,
         })?;
 
-        create_property(&md, org_id, proj_id, CreatePropertyRequest {
+        create_property(&md, db, org_id, proj_id, CreatePropertyRequest {
             created_by: 0,
             tags: None,
             name: "Is Premium".to_string(),
             description: None,
             display_name: None,
             typ: Type::User,
-            data_type: properties::DataType::String,
+            data_type: DType::Boolean,
             status: properties::Status::Enabled,
             is_system: false,
             nullable: false,
@@ -546,14 +527,14 @@ pub mod test_util {
             })?;
 
         // create event props
-        create_property(&md, org_id, proj_id, CreatePropertyRequest {
+        create_property(&md, db, org_id, proj_id, CreatePropertyRequest {
             created_by: 0,
             tags: None,
             name: "Product Name".to_string(),
             description: None,
             display_name: None,
             typ: Type::Event,
-            data_type: properties::DataType::String,
+            data_type: DType::String,
             status: properties::Status::Enabled,
             nullable: false,
             is_array: false,
@@ -562,14 +543,14 @@ pub mod test_util {
             is_system: false,
         })?;
 
-        create_property(&md, org_id, proj_id, CreatePropertyRequest {
+        create_property(&md, db, org_id, proj_id, CreatePropertyRequest {
             created_by: 0,
             tags: None,
             name: "Revenue".to_string(),
             description: None,
             display_name: None,
             typ: Type::Event,
-            data_type: properties::DataType::Decimal,
+            data_type: DType::Decimal,
             status: properties::Status::Enabled,
             nullable: true,
             is_array: false,
@@ -579,13 +560,5 @@ pub mod test_util {
         })?;
 
         Ok(())
-    }
-
-    pub fn create_md() -> Result<Arc<MetadataProvider>> {
-        let mut path = temp_dir();
-        path.push(format!("{}.db", Uuid::new_v4()));
-
-        let store = Arc::new(metadata::rocksdb::new(path)?);
-        Ok(Arc::new(MetadataProvider::try_new(store)?))
     }
 }

@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use arrow::array::Array;
 use axum::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
@@ -63,8 +64,12 @@ impl Provider for ProviderImpl {
             cur_time,
         };
 
-        let data = self.query.event_segmentation(ctx, lreq).await?;
+        let mut data = self.query.event_segmentation(ctx, lreq).await?;
 
+        // do empty response so it will be [] instead of [[],[],[],...]
+        if !data.columns.is_empty() && data.columns[0].data.is_empty() {
+            data.columns = vec![];
+        }
         let resp = match query.format {
             None => QueryResponse::try_new_json(data.columns),
             Some(QueryResponseFormat::Json) => QueryResponse::try_new_json(data.columns),

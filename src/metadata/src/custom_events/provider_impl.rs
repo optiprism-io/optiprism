@@ -1,14 +1,10 @@
 use std::sync::Arc;
-use std::sync::RwLock;
 
-use async_trait::async_trait;
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::Utc;
 use common::query::EventRef;
 use common::types::OptionalProperty;
-use futures::future::BoxFuture;
-use futures::future::FutureExt;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 
@@ -17,7 +13,6 @@ use crate::custom_events::CustomEvent;
 use crate::custom_events::Event;
 use crate::custom_events::Provider;
 use crate::custom_events::UpdateCustomEventRequest;
-use crate::error;
 use crate::error::MetadataError;
 use crate::events;
 use crate::index::check_insert_constraints;

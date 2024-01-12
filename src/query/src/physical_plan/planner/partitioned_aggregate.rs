@@ -24,10 +24,6 @@ use crate::logical_plan::partitioned_aggregate::funnel::StepOrder;
 use crate::logical_plan::partitioned_aggregate::funnel::Touch;
 use crate::logical_plan::partitioned_aggregate::AggregateExpr;
 use crate::logical_plan::partitioned_aggregate::SortField;
-// use crate::logical_plan::_segmentation::AggregateFunction;
-// use crate::logical_plan::_segmentation::SegmentationNode;
-// use crate::logical_plan::_segmentation::TimeRange;
-use crate::physical_plan::expressions::aggregate::aggregate::Aggregate;
 use crate::physical_plan::expressions::aggregate::count::Count;
 // use crate::physical_plan::expressions::aggregate::aggregate;
 // use crate::physical_plan::expressions::aggregate::aggregate::Aggregate;
@@ -36,12 +32,16 @@ use crate::physical_plan::expressions::aggregate::partitioned;
 use crate::physical_plan::expressions::aggregate::partitioned::count::PartitionedCount;
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel;
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Funnel;
+// use crate::logical_plan::_segmentation::AggregateFunction;
+// use crate::logical_plan::_segmentation::SegmentationNode;
+// use crate::logical_plan::_segmentation::TimeRange;
+use crate::physical_plan::expressions::aggregate::Aggregate;
 use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
 // use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel;
 // use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Funnel;
 use crate::physical_plan::expressions::segmentation::aggregate::AggregateFunction;
 use crate::physical_plan::planner::build_filter;
-use crate::physical_plan::planner::planner::col;
+use crate::physical_plan::planner::col;
 
 fn build_groups(
     groups: Option<Vec<(Expr, SortField)>>,
@@ -409,7 +409,6 @@ pub fn build_partitioned_aggregate_expr(
             let filter = build_filter(filter, &dfschema, schema, &execution_props)?;
             let groups = build_groups(groups, &dfschema, schema, &execution_props)?;
             let partition_col = col(partition_col, &dfschema);
-
             let expr = match get_return_type(DataType::Int64, &outer_fn) {
                 DataType::Float64 => {
                     let agg = aggregate::<f64>(&outer_fn);
@@ -425,7 +424,6 @@ pub fn build_partitioned_aggregate_expr(
                 }
                 _ => unreachable!(),
             };
-
             Ok(expr)
         }
         AggregateExpr::PartitionedAggregate {

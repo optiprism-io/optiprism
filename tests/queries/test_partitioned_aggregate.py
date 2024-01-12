@@ -13,7 +13,7 @@ def test_types():
                 typ = field.replace("_", "")
                 t1 = main.return_type(typ, inner_agg)
                 t2 = main.return_type(t1, outer_agg)
-                if t2 == "f64" or t2 == "i128" or t2 == "u128":
+                if t2 == "f64" or t2 == "i128" or t2 == "decimal":
                     ch = clickhouse.partitioned_aggregate_property_query(inner_agg, outer_agg, field)
                     op = optiprism.partitioned_aggregate_property_query(inner_agg, outer_agg, field)
 

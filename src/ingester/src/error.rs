@@ -1,21 +1,12 @@
-use std::collections::BTreeMap;
-use std::error;
-use std::fmt::Display;
-use std::fmt::Formatter;
 use std::result;
 
 use axum::response::IntoResponse;
 use axum::response::Response;
 use common::http::ApiError;
-use common::http::Json;
-use hyper::StatusCode;
 use maxminddb::MaxMindDBError;
 use metadata::error::MetadataError;
-use serde::Serialize;
-use serde::Serializer;
 use store::error::StoreError;
 use thiserror::Error;
-use tracing::debug;
 
 pub type Result<T> = result::Result<T, IngesterError>;
 

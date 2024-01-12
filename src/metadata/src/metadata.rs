@@ -3,12 +3,12 @@ use std::sync::Arc;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
+use store::db::OptiDBImpl;
 
 use crate::accounts;
 use crate::custom_events;
 use crate::custom_properties;
 use crate::dashboards;
-use crate::database;
 use crate::dictionaries;
 use crate::events;
 use crate::organizations;
@@ -25,29 +25,38 @@ pub struct MetadataProvider {
     pub custom_events: Arc<dyn custom_events::Provider>,
     pub event_properties: Arc<dyn properties::Provider>,
     pub user_properties: Arc<dyn properties::Provider>,
+    pub system_properties: Arc<dyn properties::Provider>,
     pub custom_properties: Arc<dyn custom_properties::Provider>,
     pub organizations: Arc<dyn organizations::Provider>,
     pub projects: Arc<dyn projects::Provider>,
     pub accounts: Arc<dyn accounts::Provider>,
-    pub database: Arc<dyn database::Provider>,
     pub dictionaries: Arc<dyn dictionaries::Provider>,
 }
 
 impl MetadataProvider {
-    pub fn try_new(db: Arc<TransactionDB>) -> Result<Self> {
+    pub fn try_new(db: Arc<TransactionDB>, opti_db: Arc<OptiDBImpl>) -> Result<Self> {
         let events = Arc::new(events::ProviderImpl::new(db.clone()));
         Ok(MetadataProvider {
             dashboards: Arc::new(dashboards::ProviderImpl::new(db.clone())),
             reports: Arc::new(reports::ProviderImpl::new(db.clone())),
             events: events.clone(),
             custom_events: Arc::new(custom_events::ProviderImpl::new(db.clone(), events)),
-            event_properties: Arc::new(properties::ProviderImpl::new_event(db.clone())),
-            user_properties: Arc::new(properties::ProviderImpl::new_user(db.clone())),
+            event_properties: Arc::new(properties::ProviderImpl::new_event(
+                db.clone(),
+                opti_db.clone(),
+            )),
+            user_properties: Arc::new(properties::ProviderImpl::new_user(
+                db.clone(),
+                opti_db.clone(),
+            )),
+            system_properties: Arc::new(properties::ProviderImpl::new_system(
+                db.clone(),
+                opti_db.clone(),
+            )),
             custom_properties: Arc::new(custom_properties::ProviderImpl::new(db.clone())),
             organizations: Arc::new(organizations::ProviderImpl::new(db.clone())),
             projects: Arc::new(projects::ProviderImpl::new(db.clone())),
             accounts: Arc::new(accounts::ProviderImpl::new(db.clone())),
-            database: Arc::new(database::ProviderImpl::new(db.clone())),
             dictionaries: Arc::new(dictionaries::ProviderImpl::new(db)),
         })
     }
@@ -60,11 +69,11 @@ impl MetadataProvider {
             custom_events: Arc::new(stub::CustomEvents {}),
             event_properties: Arc::new(stub::Properties {}),
             user_properties: Arc::new(stub::Properties {}),
+            system_properties: Arc::new(stub::Properties {}),
             custom_properties: Arc::new(stub::CustomProperties {}),
             organizations: Arc::new(stub::Organizations {}),
             projects: Arc::new(stub::Projects {}),
             accounts: Arc::new(stub::Accounts {}),
-            database: Arc::new(stub::Database {}),
             dictionaries: Arc::new(stub::Dictionaries {}),
         }
     }

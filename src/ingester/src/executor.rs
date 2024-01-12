@@ -1,20 +1,17 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use chrono::Utc;
+use common::types::DType;
 use common::types::DICT_USERS;
-use common::DECIMAL_PRECISION;
-use common::DECIMAL_SCALE;
-use futures::executor::block_on;
 use metadata::dictionaries;
 use metadata::events;
 use metadata::events::CreateEventRequest;
 use metadata::projects;
 use metadata::properties;
 use metadata::properties::CreatePropertyRequest;
-use metadata::properties::DataType;
 use metadata::properties::DictionaryType;
 use metadata::properties::Status;
+use store::db::OptiDBImpl;
 
 use crate::error::IngesterError;
 use crate::error::Result;
@@ -22,7 +19,7 @@ use crate::Destination;
 use crate::Event;
 use crate::Identify;
 use crate::PropValue;
-use crate::Property;
+use crate::PropertyAndValue;
 use crate::RequestContext;
 use crate::Track;
 use crate::Transformer;
@@ -30,19 +27,20 @@ use crate::Transformer;
 fn resolve_property(
     ctx: &RequestContext,
     properties: &Arc<dyn properties::Provider>,
+    _db: &Arc<OptiDBImpl>,
     typ: properties::Type,
     name: String,
-    val: &PropValue,
-) -> Result<Property> {
+    val: PropValue,
+) -> Result<PropertyAndValue> {
     let data_type = match val {
-        PropValue::Date(_) => DataType::Timestamp,
-        PropValue::String(_) => DataType::String,
-        PropValue::Number(_) => DataType::Decimal,
-        PropValue::Bool(_) => DataType::Boolean,
+        PropValue::Date(_) => DType::Int64,
+        PropValue::String(_) => DType::String,
+        PropValue::Number(_) => DType::Decimal,
+        PropValue::Bool(_) => DType::Boolean,
     };
 
     let (is_dictionary, dictionary_type) = if let PropValue::String(_) = val {
-        (true, Some(DictionaryType::UInt64))
+        (true, Some(DictionaryType::Int64))
     } else {
         (false, None)
     };
@@ -52,7 +50,7 @@ fn resolve_property(
         name: name.clone(),
         description: None,
         display_name: None,
-        typ,
+        typ: typ.clone(),
         data_type,
         status: Status::Enabled,
         is_system: false,
@@ -64,28 +62,31 @@ fn resolve_property(
 
     let prop =
         properties.get_or_create(ctx.organization_id.unwrap(), ctx.project_id.unwrap(), req)?;
-    Ok(Property {
+
+    Ok(PropertyAndValue {
         property: prop,
-        value: val.to_owned().into(),
+        value: val.clone(),
     })
 }
 
 fn resolve_properties(
     ctx: &RequestContext,
     properties: &Arc<dyn properties::Provider>,
+    db: &Arc<OptiDBImpl>,
     typ: properties::Type,
     props: &HashMap<String, PropValue>,
-) -> Result<Vec<Property>> {
+) -> Result<Vec<PropertyAndValue>> {
     let resolved_props = props
         .iter()
-        .map(|(k, v)| resolve_property(&ctx, properties, typ.clone(), k.to_owned(), v))
-        .collect::<Result<Vec<Property>>>()?;
+        .map(|(k, v)| resolve_property(ctx, properties, db, typ.clone(), k.to_owned(), v.clone()))
+        .collect::<Result<Vec<PropertyAndValue>>>()?;
     Ok(resolved_props)
 }
 
 pub struct Executor<T> {
     transformers: Vec<Arc<dyn Transformer<T>>>,
     destinations: Vec<Arc<dyn Destination<T>>>,
+    db: Arc<OptiDBImpl>,
     event_properties: Arc<dyn properties::Provider>,
     user_properties: Arc<dyn properties::Provider>,
     events: Arc<dyn events::Provider>,
@@ -93,10 +94,12 @@ pub struct Executor<T> {
     dicts: Arc<dyn dictionaries::Provider>,
 }
 
+#[allow(clippy::too_many_arguments)]
 impl Executor<Track> {
     pub fn new(
         transformers: Vec<Arc<dyn Transformer<Track>>>,
         destinations: Vec<Arc<dyn Destination<Track>>>,
+        db: Arc<OptiDBImpl>,
         event_properties: Arc<dyn properties::Provider>,
         user_properties: Arc<dyn properties::Provider>,
         events: Arc<dyn events::Provider>,
@@ -106,6 +109,7 @@ impl Executor<Track> {
         Self {
             transformers,
             destinations,
+            db,
             event_properties,
             user_properties,
             events,
@@ -145,6 +149,7 @@ impl Executor<Track> {
             req.resolved_properties = Some(resolve_properties(
                 &ctx,
                 &self.event_properties,
+                &self.db,
                 properties::Type::Event,
                 props,
             )?);
@@ -154,6 +159,7 @@ impl Executor<Track> {
             req.resolved_user_properties = Some(resolve_properties(
                 &ctx,
                 &self.user_properties,
+                &self.db,
                 properties::Type::Event,
                 props,
             )?);
@@ -201,11 +207,12 @@ impl Executor<Track> {
         Ok(())
     }
 }
-
+#[allow(clippy::too_many_arguments)]
 impl Executor<Identify> {
     pub fn new(
         transformers: Vec<Arc<dyn Transformer<Identify>>>,
         destinations: Vec<Arc<dyn Destination<Identify>>>,
+        db: Arc<OptiDBImpl>,
         event_properties: Arc<dyn properties::Provider>,
         user_properties: Arc<dyn properties::Provider>,
         events: Arc<dyn events::Provider>,
@@ -215,6 +222,7 @@ impl Executor<Identify> {
         Self {
             transformers,
             destinations,
+            db,
             event_properties,
             user_properties,
             events,
@@ -225,7 +233,7 @@ impl Executor<Identify> {
     }
 
     pub fn execute(&mut self, ctx: &RequestContext, mut req: Identify) -> Result<()> {
-        let mut ctx = ctx.to_owned();
+        let ctx = ctx.to_owned();
         let project = self.projects.get_by_token(ctx.token.as_str())?;
         let mut ctx = ctx.to_owned();
         ctx.organization_id = Some(project.organization_id);

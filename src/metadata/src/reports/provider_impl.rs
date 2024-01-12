@@ -1,7 +1,5 @@
 use std::sync::Arc;
-use std::sync::RwLock;
 
-use async_trait::async_trait;
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::Utc;
@@ -9,7 +7,6 @@ use common::types::OptionalProperty;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 
-use crate::error;
 use crate::error::MetadataError;
 use crate::index::next_seq;
 use crate::metadata::ListResponse;
@@ -87,7 +84,7 @@ impl Provider for ProviderImpl {
                 org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
                 report.id,
             ),
-            &data,
+            data,
         )?;
         tx.commit()?;
         Ok(report)
@@ -139,7 +136,7 @@ impl Provider for ProviderImpl {
                 org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
                 report.id,
             ),
-            &data,
+            data,
         )?;
         tx.commit()?;
         Ok(report)

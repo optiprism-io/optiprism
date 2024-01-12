@@ -14,10 +14,12 @@ mod tests {
     use crate::http::tests::run_http_service;
 
     #[tokio::test]
-    async fn test_property_values() -> anyhow::Result<()> {
-        let (base_url, md, pp) = run_http_service(true).await?;
+    async fn test_property_values() {
+        let (base_url, md, pp) = run_http_service(true).await.unwrap();
         let cl = Client::new();
-        let headers = create_admin_acc_and_login(&pp.auth, &md.accounts).await?;
+        let headers = create_admin_acc_and_login(&pp.auth, &md.accounts)
+            .await
+            .unwrap();
         let req = ListPropertyValuesRequest {
             property: PropertyRef::Event {
                 property_name: "Product Name".to_string(),
@@ -35,14 +37,13 @@ mod tests {
             .post(format!(
                 "{base_url}/organizations/1/projects/1/property-values"
             ))
-            .body(serde_json::to_string(&req)?)
+            .body(serde_json::to_string(&req).unwrap())
             .headers(headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
 
         assert_response_status_eq!(resp, StatusCode::OK);
-        let _txt = resp.text().await?;
-
-        Ok(())
+        let _txt = resp.text().await.unwrap();
     }
 }

@@ -2,7 +2,6 @@ pub mod provider_impl;
 
 use std::fmt::Debug;
 
-use async_trait::async_trait;
 pub use provider_impl::ProviderImpl;
 
 use crate::Result;

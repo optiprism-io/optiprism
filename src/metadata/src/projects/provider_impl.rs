@@ -1,7 +1,5 @@
 use std::sync::Arc;
-use std::sync::RwLock;
 
-use async_trait::async_trait;
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::Utc;
@@ -12,7 +10,6 @@ use rand::thread_rng;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 
-use crate::error;
 use crate::error::MetadataError;
 use crate::index::check_insert_constraints;
 use crate::index::check_update_constraints;
@@ -35,7 +32,6 @@ use crate::Result;
 
 const NAMESPACE: &[u8] = b"projects";
 const IDX_NAME: &[u8] = b"name";
-const IDX_TOKEN: &[u8] = b"token";
 
 fn index_keys(organization_id: u64, name: &str, token: &str) -> Vec<Option<Vec<u8>>> {
     [

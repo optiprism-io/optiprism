@@ -80,7 +80,7 @@ where Op: ComparisonOp<i64>
         let ts = self
             .ts_col
             .evaluate(batch)?
-            .into_array(batch.num_rows())
+            .into_array(batch.num_rows())?
             .as_any()
             .downcast_ref::<TimestampMillisecondArray>()
             .unwrap()
@@ -88,7 +88,7 @@ where Op: ComparisonOp<i64>
         let filter = self
             .filter
             .evaluate(batch)?
-            .into_array(batch.num_rows())
+            .into_array(batch.num_rows())?
             .as_any()
             .downcast_ref::<BooleanArray>()
             .unwrap()

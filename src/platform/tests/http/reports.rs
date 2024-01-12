@@ -30,11 +30,13 @@ fn assert(l: &Report, r: &Report) {
 }
 
 #[tokio::test]
-async fn test_reports() -> anyhow::Result<()> {
-    let (base_url, md, pp) = run_http_service(false).await?;
+async fn test_reports() {
+    let (base_url, md, pp) = run_http_service(false).await.unwrap();
     let report_url = format!("{base_url}/organizations/1/projects/1/reports");
     let cl = Client::new();
-    let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts).await?;
+    let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts)
+        .await
+        .unwrap();
 
     let mut report = Report {
         id: 0,
@@ -64,10 +66,11 @@ async fn test_reports() -> anyhow::Result<()> {
     // list without reports should be empty
     {
         let resp = cl
-            .get(format!("{report_url}"))
+            .get(&report_url)
             .headers(admin_headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
 
         assert_response_status_eq!(resp, StatusCode::OK);
         assert_response_json_eq!(resp, EMPTY_LIST.to_string());
@@ -79,7 +82,8 @@ async fn test_reports() -> anyhow::Result<()> {
             .get(format!("{report_url}/1"))
             .headers(admin_headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
 
         assert_response_status_eq!(resp, StatusCode::NOT_FOUND);
     }
@@ -90,7 +94,8 @@ async fn test_reports() -> anyhow::Result<()> {
             .delete(format!("{report_url}/1"))
             .headers(admin_headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
 
         assert_response_status_eq!(resp, StatusCode::NOT_FOUND);
     }
@@ -107,12 +112,13 @@ async fn test_reports() -> anyhow::Result<()> {
 
         let resp = cl
             .post(&report_url)
-            .body(serde_json::to_string(&req)?)
+            .body(serde_json::to_string(&req).unwrap())
             .headers(admin_headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
         assert_response_status_eq!(resp, StatusCode::CREATED);
-        let resp: Report = serde_json::from_str(resp.text().await?.as_str())?;
+        let resp: Report = serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
         assert(&resp, &report)
     }
 
@@ -146,12 +152,13 @@ async fn test_reports() -> anyhow::Result<()> {
 
         let resp = cl
             .put(format!("{report_url}/1"))
-            .body(serde_json::to_string(&req)?)
+            .body(serde_json::to_string(&req).unwrap())
             .headers(admin_headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
         assert_response_status_eq!(resp, StatusCode::OK);
-        let r: Report = serde_json::from_str(resp.text().await?.as_str())?;
+        let r: Report = serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
 
         assert(&r, &report);
     }
@@ -162,9 +169,10 @@ async fn test_reports() -> anyhow::Result<()> {
             .get(format!("{report_url}/1"))
             .headers(admin_headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
         assert_response_status_eq!(resp, StatusCode::OK);
-        let r: Report = serde_json::from_str(resp.text().await?.as_str())?;
+        let r: Report = serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
         assert(&r, &report);
     }
     // list reports should return list with one report
@@ -173,9 +181,11 @@ async fn test_reports() -> anyhow::Result<()> {
             .get(&report_url)
             .headers(admin_headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
         assert_response_status_eq!(resp, StatusCode::OK);
-        let resp: ListResponse<Report> = serde_json::from_str(resp.text().await?.as_str())?;
+        let resp: ListResponse<Report> =
+            serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
         assert_eq!(resp.data.len(), 1);
         assert(&resp.data[0], &report);
     }
@@ -186,15 +196,16 @@ async fn test_reports() -> anyhow::Result<()> {
             .delete(format!("{report_url}/1"))
             .headers(admin_headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
         assert_response_status_eq!(resp, StatusCode::OK);
 
         let resp = cl
             .delete(format!("{report_url}/1"))
             .headers(admin_headers.clone())
             .send()
-            .await?;
+            .await
+            .unwrap();
         assert_response_status_eq!(resp, StatusCode::NOT_FOUND);
     }
-    Ok(())
 }

@@ -164,7 +164,7 @@ where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Displa
     _time_window: i64,
     out_batch_size: usize,
 }
-
+#[allow(clippy::too_many_arguments)]
 impl<T, OT, Op> Aggregate<T, OT, Op>
 where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
 {
@@ -212,7 +212,7 @@ macro_rules! agg {
                 let ts = self
                     .ts_col
                     .evaluate(batch)?
-                    .into_array(batch.num_rows())
+                    .into_array(batch.num_rows())?
                     .as_any()
                     .downcast_ref::<TimestampMillisecondArray>()
                     .unwrap()
@@ -221,7 +221,7 @@ macro_rules! agg {
                 let filter = self
                     .filter
                     .evaluate(batch)?
-                    .into_array(batch.num_rows())
+                    .into_array(batch.num_rows())?
                     .as_any()
                     .downcast_ref::<BooleanArray>()
                     .unwrap()
@@ -230,7 +230,7 @@ macro_rules! agg {
                 let predicate = self
                     .predicate
                     .evaluate(batch)?
-                    .into_array(batch.num_rows())
+                    .into_array(batch.num_rows())?
                     .as_any()
                     .downcast_ref::<$array_ty>()
                     .unwrap()
@@ -392,7 +392,7 @@ mod tests {
 
     // TODO fix
     // #[test]
-    fn test_decimal() {
+    fn _test_decimal() {
         let data = r#"
 | user_id(i64) | ts(ts) | event(utf8) | v(decimal) |
 |--------------|--------|-------------|--------|

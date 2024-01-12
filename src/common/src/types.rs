@@ -1,3 +1,6 @@
+use arrow::datatypes;
+use arrow2::datatypes::DataType as DataType2;
+use arrow_schema::DataType;
 use arrow_schema::TimeUnit;
 use lazy_static::lazy_static;
 use serde::Deserialize;
@@ -5,16 +8,33 @@ use serde::Deserializer;
 use serde::Serialize;
 use serde::Serializer;
 
+use crate::error::CommonError;
+
 pub const DECIMAL_PRECISION: u8 = 28;
 pub const DECIMAL_SCALE: i8 = 16;
 pub const DECIMAL_MULTIPLIER: i128 = 10i128.pow(DECIMAL_SCALE as u32);
 pub const TIME_UNIT: TimeUnit = TimeUnit::Nanosecond;
 
+pub const TABLE_EVENTS: &str = "events";
+pub const TABLE_USERS: &str = "users";
+
+pub const COLUMN_PROJECT_ID: &str = "project_id";
 pub const COLUMN_USER_ID: &str = "user_id";
-pub const COLUMN_TIMESTAMP: &str = "ts";
-pub const COLUMN_REAL_TIMESTAMP: &str = "real_ts";
+pub const COLUMN_CREATED_AT: &str = "created_at";
 pub const COLUMN_EVENT_ID: &str = "event_id";
 pub const COLUMN_EVENT: &str = "event";
+
+pub const EVENT_PROPERTY_A_NAME: &str = "A Name";
+pub const EVENT_PROPERTY_A_HREF: &str = "A Href";
+pub const EVENT_PROPERTY_A_ID: &str = "A ID";
+pub const EVENT_PROPERTY_A_CLASS: &str = "A Class";
+pub const EVENT_PROPERTY_A_STYLE: &str = "A Style";
+
+pub const EVENT_PROPERTY_PAGE_PATH: &str = "Page Path";
+pub const EVENT_PROPERTY_PAGE_REFERER: &str = "Page Referer";
+pub const EVENT_PROPERTY_PAGE_SEARCH: &str = "Page Search";
+pub const EVENT_PROPERTY_PAGE_TITLE: &str = "Page Title";
+pub const EVENT_PROPERTY_PAGE_URL: &str = "Page URL";
 
 pub const USER_PROPERTY_CLIENT_FAMILY: &str = "Client Family";
 pub const USER_PROPERTY_CLIENT_VERSION_MINOR: &str = "Client Version Minor";
@@ -23,6 +43,7 @@ pub const USER_PROPERTY_CLIENT_VERSION_PATCH: &str = "Version Patch";
 pub const USER_PROPERTY_DEVICE_FAMILY: &str = "Device Family";
 pub const USER_PROPERTY_DEVICE_BRAND: &str = "Device Brand";
 pub const USER_PROPERTY_DEVICE_MODEL: &str = "Device Model";
+pub const USER_PROPERTY_OS: &str = "OS";
 pub const USER_PROPERTY_OS_FAMILY: &str = "OS Family";
 pub const USER_PROPERTY_OS_VERSION_MAJOR: &str = "OS Version Major";
 pub const USER_PROPERTY_OS_VERSION_MINOR: &str = "OS Version Minor";
@@ -42,6 +63,7 @@ lazy_static! {
         USER_PROPERTY_DEVICE_FAMILY,
         USER_PROPERTY_DEVICE_BRAND,
         USER_PROPERTY_DEVICE_MODEL,
+        USER_PROPERTY_OS,
         USER_PROPERTY_OS_FAMILY,
         USER_PROPERTY_OS_VERSION_MAJOR,
         USER_PROPERTY_OS_VERSION_MINOR,
@@ -54,6 +76,167 @@ lazy_static! {
 pub const EVENT_CLICK: &str = "Click";
 pub const EVENT_PAGE: &str = "Page";
 pub const EVENT_SCREEN: &str = "Screen";
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum DType {
+    String,
+    Int8,
+    Int16,
+    Int32,
+    Int64,
+    Decimal,
+    Boolean,
+    Timestamp,
+    List(Box<DType>),
+}
+
+impl DType {
+    pub fn short_name(&self) -> String {
+        match self {
+            DType::String => "str".to_string(),
+            DType::Int8 => "i8".to_string(),
+            DType::Int16 => "i16".to_string(),
+            DType::Int32 => "i32".to_string(),
+            DType::Int64 => "i64".to_string(),
+            DType::Decimal => "d".to_string(),
+            DType::Boolean => "b".to_string(),
+            DType::Timestamp => "ts".to_string(),
+            DType::List(v) => {
+                let s = match v.as_ref() {
+                    DType::String => "str".to_string(),
+                    DType::Int8 => "i8".to_string(),
+                    DType::Int16 => "i16".to_string(),
+                    DType::Int32 => "i32".to_string(),
+                    DType::Int64 => "i64".to_string(),
+                    DType::Decimal => "d".to_string(),
+                    DType::Boolean => "b".to_string(),
+                    DType::Timestamp => "ts".to_string(),
+                    _ => unimplemented!(),
+                };
+                format!("l_{}", s)
+            }
+        }
+    }
+}
+
+impl TryFrom<DType> for datatypes::DataType {
+    type Error = CommonError;
+    fn try_from(value: DType) -> Result<Self, Self::Error> {
+        Ok(match value {
+            DType::String => datatypes::DataType::Utf8,
+            DType::Int8 => datatypes::DataType::Int8,
+            DType::Int16 => datatypes::DataType::Int16,
+            DType::Int32 => datatypes::DataType::Int32,
+            DType::Int64 => datatypes::DataType::Int64,
+            DType::Decimal => datatypes::DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+            DType::Boolean => datatypes::DataType::Boolean,
+            DType::Timestamp => datatypes::DataType::Timestamp(TIME_UNIT, None),
+            DType::List(dt) => match dt.as_ref() {
+                DType::String => DataType::Utf8,
+                DType::Int8 => DataType::Int8,
+                DType::Int16 => DataType::Int16,
+                DType::Int32 => DataType::Int32,
+                DType::Int64 => DataType::Int64,
+                DType::Decimal => DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                DType::Boolean => DataType::Boolean,
+                DType::Timestamp => DataType::Timestamp(TIME_UNIT, None),
+                _ => return Err(CommonError::General("Unsupported type1".to_string())),
+            },
+        })
+    }
+}
+
+impl TryFrom<DataType> for DType {
+    type Error = CommonError;
+
+    fn try_from(dt: DataType) -> Result<Self, Self::Error> {
+        Ok(match dt {
+            DataType::Boolean => DType::Boolean,
+            DataType::Int8 => DType::Int8,
+            DataType::Int16 => DType::Int16,
+            DataType::Int32 => DType::Int32,
+            DataType::Int64 => DType::Int64,
+            DataType::Utf8 => DType::String,
+            DataType::Decimal128(_, _) => DType::Decimal,
+            DataType::List(f) => match f.data_type() {
+                DataType::Boolean => DType::Boolean,
+                DataType::Int8 => DType::Int8,
+                DataType::Int16 => DType::Int16,
+                DataType::Int32 => DType::Int32,
+                DataType::Int64 => DType::Int64,
+                DataType::Utf8 => DType::String,
+                DataType::Decimal128(_, _) => DType::Decimal,
+                _ => return Err(CommonError::General("Unsupported type2".to_string())),
+            },
+            _ => return Err(CommonError::General(format!("Unsupported type {:?}", dt))),
+        })
+    }
+}
+
+impl TryFrom<DType> for DataType2 {
+    type Error = CommonError;
+    fn try_from(value: DType) -> Result<Self, Self::Error> {
+        Ok(match value {
+            DType::String => DataType2::Utf8,
+            DType::Int8 => DataType2::Int8,
+            DType::Int16 => DataType2::Int16,
+            DType::Int32 => DataType2::Int32,
+            DType::Int64 => DataType2::Int64,
+            DType::Decimal => {
+                DataType2::Decimal(DECIMAL_PRECISION as usize, DECIMAL_SCALE as usize)
+            }
+            DType::Boolean => DataType2::Boolean,
+            DType::Timestamp => DataType2::Timestamp(arrow2::datatypes::TimeUnit::Nanosecond, None),
+            DType::List(dt) => match dt.as_ref() {
+                DType::String => DataType2::Utf8,
+                DType::Int8 => DataType2::Int8,
+                DType::Int16 => DataType2::Int16,
+                DType::Int32 => DataType2::Int32,
+                DType::Int64 => DataType2::Int64,
+                DType::Decimal => {
+                    DataType2::Decimal(DECIMAL_PRECISION as usize, DECIMAL_SCALE as usize)
+                }
+                DType::Boolean => DataType2::Boolean,
+                DType::Timestamp => {
+                    DataType2::Timestamp(arrow2::datatypes::TimeUnit::Nanosecond, None)
+                }
+                _ => return Err(CommonError::General("Unsupported type4".to_string())),
+            },
+        })
+    }
+}
+
+impl TryFrom<DataType2> for DType {
+    type Error = CommonError;
+
+    fn try_from(dt: DataType2) -> Result<Self, Self::Error> {
+        Ok(match dt {
+            DataType2::Boolean => DType::Boolean,
+            DataType2::Int8 => DType::Int8,
+            DataType2::Int16 => DType::Int16,
+            DataType2::Int32 => DType::Int32,
+            DataType2::Int64 => DType::Int64,
+            DataType2::Timestamp(_, _) => DType::Timestamp,
+            DataType2::Utf8 => DType::String,
+            DataType2::Decimal(_, _) => DType::Decimal,
+            DataType2::List(f) => match f.data_type() {
+                DataType2::Boolean => DType::Boolean,
+                DataType2::Int8 => DType::Int8,
+                DataType2::Int16 => DType::Int16,
+                DataType2::Int32 => DType::Int32,
+                DataType2::Int64 => DType::Int64,
+                DataType2::Timestamp(_, _) => DType::Timestamp,
+                DataType2::Utf8 => DType::String,
+                DataType2::Decimal(_, _) => DType::Decimal,
+                _ => return Err(CommonError::General("Unsupported type5".to_string())),
+            },
+            _ => {
+                return Err(CommonError::General(format!("Unsupported type {:?}", dt)));
+            }
+        })
+    }
+}
 
 #[derive(Clone, PartialEq, PartialOrd, Eq, Ord, Debug, Hash, Default)]
 pub enum OptionalProperty<T> {

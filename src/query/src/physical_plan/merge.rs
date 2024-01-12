@@ -17,6 +17,7 @@ use datafusion::physical_plan::expressions::PhysicalSortExpr;
 use datafusion::physical_plan::metrics::BaselineMetrics;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
 use datafusion::physical_plan::metrics::MetricsSet;
+use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::physical_plan::Partitioning;
@@ -48,6 +49,12 @@ impl MergeExec {
             schema: Arc::new(schema),
             metrics: ExecutionPlanMetricsSet::new(),
         })
+    }
+}
+
+impl DisplayAs for MergeExec {
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "MergeExec")
     }
 }
 
@@ -102,16 +109,12 @@ impl ExecutionPlan for MergeExec {
         }))
     }
 
-    fn fmt_as(&self, _t: DisplayFormatType, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "MergeExec")
-    }
-
     fn metrics(&self) -> Option<MetricsSet> {
         Some(self.metrics.clone_inner())
     }
 
-    fn statistics(&self) -> Statistics {
-        Statistics::default()
+    fn statistics(&self) -> DFResult<Statistics> {
+        Ok(Statistics::new_unknown(self.schema.as_ref()))
     }
 }
 
@@ -143,7 +146,7 @@ impl MergeStream {
                                 Ok(col_idx) => Ok(batch.column(col_idx).clone()),
                                 Err(_) => {
                                     let v = ScalarValue::try_from(field.data_type())?;
-                                    Ok(v.to_array_of_size(batch.column(0).len()))
+                                    Ok(v.to_array_of_size(batch.column(0).len())?)
                                 }
                             },
                         )

@@ -6,7 +6,7 @@ pub mod context;
 pub mod custom_events;
 pub mod custom_properties;
 pub mod dashboards;
-pub mod datatype;
+// pub mod datatype;
 pub mod error;
 pub mod event_records;
 pub mod events;
@@ -37,6 +37,7 @@ use arrow::array::UInt32Array;
 use arrow::array::UInt64Array;
 use arrow::array::UInt8Array;
 use arrow::datatypes::TimeUnit;
+use common::types::DType;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 pub use context::Context;
@@ -54,13 +55,12 @@ use serde_json::json;
 use serde_json::Number;
 use serde_json::Value;
 
-use crate::datatype::DataType;
-
 pub struct PlatformProvider {
     pub events: Arc<dyn events::Provider>,
     pub custom_events: Arc<dyn custom_events::Provider>,
     pub event_properties: Arc<dyn properties::Provider>,
     pub user_properties: Arc<dyn properties::Provider>,
+    pub system_properties: Arc<dyn properties::Provider>,
     pub custom_properties: Arc<dyn custom_properties::Provider>,
     pub accounts: Arc<dyn accounts::Provider>,
     pub auth: Arc<dyn auth::Provider>,
@@ -86,6 +86,9 @@ impl PlatformProvider {
             user_properties: Arc::new(properties::ProviderImpl::new_user(
                 md.user_properties.clone(),
             )),
+            system_properties: Arc::new(properties::ProviderImpl::new_user(
+                md.system_properties.clone(),
+            )),
             custom_properties: Arc::new(stub::CustomProperties {}),
             accounts: Arc::new(accounts::ProviderImpl::new(md.accounts.clone())),
             auth: Arc::new(auth::ProviderImpl::new(md.accounts.clone(), auth_cfg)),
@@ -103,6 +106,7 @@ impl PlatformProvider {
             custom_events: Arc::new(stub::CustomEvents {}),
             event_properties: Arc::new(stub::Properties {}),
             user_properties: Arc::new(stub::Properties {}),
+            system_properties: Arc::new(stub::Properties {}),
             custom_properties: Arc::new(stub::CustomProperties {}),
             accounts: Arc::new(stub::Accounts {}),
             auth: Arc::new(stub::Auth {}),
@@ -268,9 +272,6 @@ pub enum PropValueOperation {
     False,
     Exists,
     Empty,
-    ArrAll,
-    ArrAny,
-    ArrNone,
     Regex,
     Like,
     NotLike,
@@ -292,9 +293,6 @@ impl TryInto<common::query::PropValueOperation> for PropValueOperation {
             PropValueOperation::False => common::query::PropValueOperation::False,
             PropValueOperation::Exists => common::query::PropValueOperation::Exists,
             PropValueOperation::Empty => common::query::PropValueOperation::Empty,
-            PropValueOperation::ArrAll => common::query::PropValueOperation::ArrAll,
-            PropValueOperation::ArrAny => common::query::PropValueOperation::ArrAny,
-            PropValueOperation::ArrNone => common::query::PropValueOperation::ArrNone,
             PropValueOperation::Regex => common::query::PropValueOperation::Regex,
             PropValueOperation::Like => common::query::PropValueOperation::Like,
             PropValueOperation::NotLike => common::query::PropValueOperation::NotLike,
@@ -318,9 +316,6 @@ impl TryInto<PropValueOperation> for common::query::PropValueOperation {
             common::query::PropValueOperation::False => PropValueOperation::False,
             common::query::PropValueOperation::Exists => PropValueOperation::Exists,
             common::query::PropValueOperation::Empty => PropValueOperation::Empty,
-            common::query::PropValueOperation::ArrAll => PropValueOperation::ArrAll,
-            common::query::PropValueOperation::ArrAny => PropValueOperation::ArrAny,
-            common::query::PropValueOperation::ArrNone => PropValueOperation::ArrNone,
             common::query::PropValueOperation::Regex => PropValueOperation::Regex,
             common::query::PropValueOperation::Like => PropValueOperation::Like,
             common::query::PropValueOperation::NotLike => PropValueOperation::NotLike,
@@ -374,6 +369,8 @@ impl TryInto<EventRef> for common::query::EventRef {
 #[serde(tag = "propertyType", rename_all = "camelCase")]
 pub enum PropertyRef {
     #[serde(rename_all = "camelCase")]
+    System { property_name: String },
+    #[serde(rename_all = "camelCase")]
     User { property_name: String },
     #[serde(rename_all = "camelCase")]
     Event { property_name: String },
@@ -386,6 +383,9 @@ impl TryInto<common::query::PropertyRef> for PropertyRef {
 
     fn try_into(self) -> std::result::Result<common::query::PropertyRef, Self::Error> {
         Ok(match self {
+            PropertyRef::System { property_name } => {
+                common::query::PropertyRef::System(property_name)
+            }
             PropertyRef::User { property_name } => common::query::PropertyRef::User(property_name),
             PropertyRef::Event { property_name } => {
                 common::query::PropertyRef::Event(property_name)
@@ -400,6 +400,9 @@ impl TryInto<PropertyRef> for common::query::PropertyRef {
 
     fn try_into(self) -> std::result::Result<PropertyRef, Self::Error> {
         Ok(match self {
+            common::query::PropertyRef::System(property_name) => {
+                PropertyRef::System { property_name }
+            }
             common::query::PropertyRef::User(property_name) => PropertyRef::User { property_name },
             common::query::PropertyRef::Event(property_name) => {
                 PropertyRef::Event { property_name }
@@ -491,7 +494,7 @@ pub struct Column {
     pub typ: ColumnType,
     pub name: String,
     pub is_nullable: bool,
-    pub data_type: DataType,
+    pub data_type: DType,
     pub step: Option<usize>,
     pub data: Vec<Value>,
     pub compare_values: Option<Vec<Value>>,

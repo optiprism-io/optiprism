@@ -1,14 +1,7 @@
-use std::error;
 use std::result;
 use std::string::FromUtf8Error;
-use std::sync::PoisonError;
 
 use thiserror::Error;
-use tokio::sync::RwLockWriteGuard;
-
-use crate::database::Column;
-use crate::database::TableRef;
-use crate::properties;
 
 pub type Result<T> = result::Result<T, MetadataError>;
 
@@ -22,6 +15,8 @@ pub enum MetadataError {
     BadRequest(String),
     #[error("internal: {0:?}")]
     Internal(String),
+    #[error("store {0:?}")]
+    Store(#[from] store::error::StoreError),
     #[error("rocksdb: {0:?}")]
     RocksDb(#[from] rocksdb::Error),
     #[error("from utf {0:?}")]

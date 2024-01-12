@@ -8,16 +8,12 @@ use datafusion_common::Column;
 use datafusion_common::DFSchema;
 use datafusion_common::ScalarValue;
 use datafusion_expr::col;
-use datafusion_expr::expr;
 use datafusion_expr::utils::exprlist_to_fields;
 use datafusion_expr::Aggregate;
-use datafusion_expr::Expr;
 use datafusion_expr::Extension;
 use datafusion_expr::Filter as PlanFilter;
 use datafusion_expr::LogicalPlan;
-use datafusion_expr::Sort;
 use metadata::dictionaries::provider_impl::SingleDictionaryProvider;
-use metadata::properties;
 use metadata::MetadataProvider;
 
 use crate::error::Result;
@@ -34,12 +30,12 @@ macro_rules! property_col {
             $md.$md_namespace
                 .get_by_name($ctx.organization_id, $ctx.project_id, $prop_name)?;
         let col_name = prop.column_name();
-        let expr = col(col_name.as_str());
 
+        let expr = col(col_name.as_str());
         let _aggr_schema =
             DFSchema::new_with_metadata(exprlist_to_fields(vec![&expr], &$input)?, HashMap::new())?;
         let agg_fn = Aggregate::try_new(Arc::new($input.clone()), vec![expr], vec![])?;
-        let expr = LogicalPlan::Aggregate(agg_fn);
+        let input = LogicalPlan::Aggregate(agg_fn);
 
         match prop.dictionary_type {
             Some(_) => {
@@ -51,13 +47,13 @@ macro_rules! property_col {
                 );
 
                 LogicalPlan::Extension(Extension {
-                    node: Arc::new(DictionaryDecodeNode::try_new($input, vec![(
-                        Column::from_name(col_name),
+                    node: Arc::new(DictionaryDecodeNode::try_new(input, vec![(
+                        Column::from_name(col_name.clone()),
                         Arc::new(dict),
                     )])?),
                 })
             }
-            None => expr,
+            None => input,
         }
     }};
 }
@@ -69,6 +65,8 @@ impl LogicalPlanBuilder {
         input: LogicalPlan,
         req: PropertyValues,
     ) -> Result<LogicalPlan> {
+        // todo add project_id filtering
+        // todo make obligatory
         let input = match &req.event {
             Some(event) => LogicalPlan::Filter(PlanFilter::try_new(
                 event_expression(&ctx, &metadata, event)?,
@@ -78,6 +76,9 @@ impl LogicalPlanBuilder {
         };
 
         let input = match &req.property {
+            PropertyRef::System(prop_name) => {
+                property_col!(ctx, metadata, input, prop_name, system_properties)
+            }
             PropertyRef::User(prop_name) => {
                 property_col!(ctx, metadata, input, prop_name, user_properties)
             }
@@ -87,7 +88,7 @@ impl LogicalPlanBuilder {
             PropertyRef::Custom(_id) => unimplemented!(),
         };
 
-        let expr_col = input.expressions()[0].clone();
+        // let expr_col = input.expressions()[0].clone();
 
         let input = match &req.filter {
             Some(filter) => LogicalPlan::Filter(PlanFilter::try_new(
@@ -102,15 +103,21 @@ impl LogicalPlanBuilder {
             )?),
             None => input,
         };
-        let input = LogicalPlan::Sort(Sort {
-            expr: vec![Expr::Sort(expr::Sort {
-                expr: Box::new(expr_col),
-                asc: true,
-                nulls_first: false,
-            })],
-            input: Arc::new(input),
-            fetch: None,
-        });
+        // let input = LogicalPlan::Sort(Sort {
+        // expr: vec![Expr::Sort(expr::Sort {
+        // expr: Box::new(expr_col),
+        // asc: true,
+        // nulls_first: false,
+        // })],
+        // input: Arc::new(input),
+        // fetch: None,
+        // });
+
+        // let input = LogicalPlan::Limit(Limit {
+        // skip: 0,
+        // fetch: Some(1000),
+        // input: Arc::new(input),
+        // });
 
         Ok(input)
     }

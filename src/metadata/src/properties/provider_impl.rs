@@ -1,15 +1,18 @@
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 use std::sync::RwLock;
 
-use async_trait::async_trait;
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::Utc;
+use common::types::DType;
 use common::types::OptionalProperty;
+use common::types::TABLE_EVENTS;
+use lru::LruCache;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
+use store::db::OptiDBImpl;
 
-use crate::error;
 use crate::error::MetadataError;
 use crate::index::check_insert_constraints;
 use crate::index::check_update_constraints;
@@ -17,9 +20,11 @@ use crate::index::delete_index;
 use crate::index::get_index;
 use crate::index::insert_index;
 use crate::index::next_seq;
+use crate::index::next_zero_seq;
 use crate::index::update_index;
 use crate::metadata::ListResponse;
 use crate::properties::CreatePropertyRequest;
+use crate::properties::DictionaryType;
 use crate::properties::Property;
 use crate::properties::Provider;
 use crate::properties::Type;
@@ -56,7 +61,7 @@ fn index_name_key(
 ) -> Option<Vec<u8>> {
     Some(
         make_index_key(
-            org_proj_ns(organization_id, project_id, typ.as_name().as_bytes()).as_slice(),
+            org_proj_ns(organization_id, project_id, typ.path().as_bytes()).as_slice(),
             IDX_NAME,
             name,
         )
@@ -72,7 +77,7 @@ fn index_display_name_key(
 ) -> Option<Vec<u8>> {
     display_name.map(|v| {
         make_index_key(
-            org_proj_ns(organization_id, project_id, typ.as_name().as_bytes()).as_slice(),
+            org_proj_ns(organization_id, project_id, typ.path().as_bytes()).as_slice(),
             IDX_DISPLAY_NAME,
             v.as_str(),
         )
@@ -82,21 +87,58 @@ fn index_display_name_key(
 
 pub struct ProviderImpl {
     db: Arc<TransactionDB>,
+    opti_db: Arc<OptiDBImpl>,
+    id_cache: RwLock<LruCache<(u64, u64, u64), Property>>,
+    name_cache: RwLock<LruCache<(u64, u64, String), Property>>,
     typ: Type,
 }
 
 impl ProviderImpl {
-    pub fn new_user(db: Arc<TransactionDB>) -> Self {
+    pub fn new_user(db: Arc<TransactionDB>, opti_db: Arc<OptiDBImpl>) -> Self {
+        let id_cache = RwLock::new(LruCache::new(
+            NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
+        ));
+        let name_cache = RwLock::new(LruCache::new(
+            NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
+        ));
         ProviderImpl {
             db,
+            opti_db,
+            id_cache,
+            name_cache,
             typ: Type::User,
         }
     }
 
-    pub fn new_event(db: Arc<TransactionDB>) -> Self {
+    pub fn new_event(db: Arc<TransactionDB>, opti_db: Arc<OptiDBImpl>) -> Self {
+        let id_cache = RwLock::new(LruCache::new(
+            NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
+        ));
+        let name_cache = RwLock::new(LruCache::new(
+            NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
+        ));
         ProviderImpl {
             db,
+            id_cache,
+            name_cache,
+            opti_db,
             typ: Type::Event,
+        }
+    }
+
+    pub fn new_system(db: Arc<TransactionDB>, opti_db: Arc<OptiDBImpl>) -> Self {
+        let id_cache = RwLock::new(LruCache::new(
+            NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
+        ));
+        let name_cache = RwLock::new(LruCache::new(
+            NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
+        ));
+        ProviderImpl {
+            db,
+            opti_db,
+            id_cache,
+            name_cache,
+            typ: Type::System,
         }
     }
 
@@ -107,14 +149,21 @@ impl ProviderImpl {
         project_id: u64,
         name: &str,
     ) -> Result<Property> {
-        let data = get_index(
-            &tx,
-            make_index_key(
-                org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
-                IDX_NAME,
-                name,
-            ),
-        )?;
+        if let Some(prop) =
+            self.name_cache
+                .write()
+                .unwrap()
+                .get(&(organization_id, project_id, name.to_string()))
+        {
+            return Ok(prop.to_owned());
+        }
+
+        let idx_key = make_index_key(
+            org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
+            IDX_NAME,
+            name,
+        );
+        let data = get_index(tx, idx_key)?;
 
         Ok(deserialize(&data)?)
     }
@@ -126,8 +175,17 @@ impl ProviderImpl {
         project_id: u64,
         id: u64,
     ) -> Result<Property> {
+        if let Some(prop) = self
+            .id_cache
+            .write()
+            .unwrap()
+            .get(&(organization_id, project_id, id))
+        {
+            return Ok(prop.to_owned());
+        }
+
         let key = make_data_value_key(
-            org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
+            org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
             id,
         );
 
@@ -152,12 +210,24 @@ impl ProviderImpl {
             req.display_name.clone(),
         );
 
-        check_insert_constraints(&tx, idx_keys.as_ref())?;
+        check_insert_constraints(tx, idx_keys.as_ref())?;
 
         let id = next_seq(
-            &tx,
+            tx,
             make_id_seq_key(
-                org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
+                org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
+            ),
+        )?;
+
+        let order = next_zero_seq(
+            tx,
+            make_id_seq_key(
+                org_proj_ns(
+                    organization_id,
+                    project_id,
+                    format!("{}/{}", self.typ.order_path(), req.data_type.short_name()).as_bytes(),
+                )
+                .as_slice(),
             ),
         )?;
         let created_at = Utc::now();
@@ -173,26 +243,47 @@ impl ProviderImpl {
             name: req.name,
             description: req.description,
             display_name: req.display_name,
+            order,
             typ: req.typ,
-            data_type: req.data_type,
+            data_type: req.data_type.clone(),
             status: req.status,
             nullable: req.nullable,
             is_array: req.is_array,
             is_dictionary: req.is_dictionary,
-            dictionary_type: req.dictionary_type,
+            dictionary_type: req.dictionary_type.clone(),
             is_system: req.is_system,
         };
 
-        let data = serialize(&prop)?;
-        tx.put(
-            make_data_value_key(
-                org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
-                prop.id,
-            ),
-            &data,
-        )?;
+        let idx_key = make_data_value_key(
+            org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
+            prop.id,
+        );
+        self.name_cache.write().unwrap().put(
+            (organization_id, project_id, prop.name.to_string()),
+            prop.clone(),
+        );
+        self.id_cache
+            .write()
+            .unwrap()
+            .put((organization_id, project_id, id), prop.clone());
 
-        insert_index(&tx, idx_keys.as_ref(), &data)?;
+        let data = serialize(&prop)?;
+        tx.put(idx_key, &data)?;
+
+        insert_index(tx, idx_keys.as_ref(), &data)?;
+
+        let dt = if let Some(dt) = &req.dictionary_type {
+            match dt {
+                DictionaryType::Int8 => DType::Int8,
+                DictionaryType::Int16 => DType::Int16,
+                DictionaryType::Int32 => DType::Int32,
+                DictionaryType::Int64 => DType::Int64,
+            }
+        } else {
+            req.data_type.clone()
+        };
+        self.opti_db
+            .add_field(TABLE_EVENTS, prop.column_name().as_str(), dt, req.nullable)?;
         Ok(prop)
     }
 }
@@ -221,7 +312,7 @@ impl Provider for ProviderImpl {
         match self._get_by_name(&tx, organization_id, project_id, req.name.as_str()) {
             Ok(event) => return Ok(event),
             Err(MetadataError::NotFound(_)) => {}
-            other => return other,
+            Err(err) => return Err(err),
         }
         let ret = self._create(&tx, organization_id, project_id, req)?;
 
@@ -244,7 +335,7 @@ impl Provider for ProviderImpl {
         let tx = self.db.transaction();
         list(
             &tx,
-            org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
+            org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
         )
     }
 
@@ -262,21 +353,22 @@ impl Provider for ProviderImpl {
 
         let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
         let mut idx_prev_keys: Vec<Option<Vec<u8>>> = Vec::new();
-        if let OptionalProperty::Some(name) = &req.name {
-            idx_keys.push(index_name_key(
-                organization_id,
-                project_id,
-                &self.typ,
-                name.as_str(),
-            ));
-            idx_prev_keys.push(index_name_key(
-                organization_id,
-                project_id,
-                &self.typ,
-                prev_prop.name.as_str(),
-            ));
-            prop.name = name.to_owned();
-        }
+        // name is persistent
+        // if let OptionalProperty::Some(name) = &req.name {
+        //     idx_keys.push(index_name_key(
+        //         organization_id,
+        //         project_id,
+        //         &self.typ,
+        //         name.as_str(),
+        //     ));
+        //     idx_prev_keys.push(index_name_key(
+        //         organization_id,
+        //         project_id,
+        //         &self.typ,
+        //         prev_prop.name.as_str(),
+        //     ));
+        //     prop.name = name.to_owned();
+        // }
         if let OptionalProperty::Some(display_name) = &req.display_name {
             idx_keys.push(index_display_name_key(
                 organization_id,
@@ -328,14 +420,21 @@ impl Provider for ProviderImpl {
             prop.dictionary_type = dictionary_type;
         }
 
+        let idx_key = make_data_value_key(
+            org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
+            prop.id,
+        );
+        self.name_cache.write().unwrap().put(
+            (organization_id, project_id, prop.name.to_string()),
+            prop.clone(),
+        );
+        self.id_cache
+            .write()
+            .unwrap()
+            .put((organization_id, project_id, prop.id), prop.clone());
+
         let data = serialize(&prop)?;
-        tx.put(
-            make_data_value_key(
-                org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
-                prop.id,
-            ),
-            &data,
-        )?;
+        tx.put(idx_key, &data)?;
 
         update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)?;
         tx.commit()?;
@@ -346,7 +445,7 @@ impl Provider for ProviderImpl {
         let tx = self.db.transaction();
         let prop = self._get_by_id(&tx, organization_id, project_id, id)?;
         tx.delete(make_data_value_key(
-            org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
+            org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
             id,
         ))?;
 
@@ -361,6 +460,14 @@ impl Provider for ProviderImpl {
             )
             .as_ref(),
         )?;
+        self.name_cache
+            .write()
+            .unwrap()
+            .pop(&(organization_id, project_id, prop.name.to_string()));
+        self.id_cache
+            .write()
+            .unwrap()
+            .pop(&(organization_id, project_id, prop.id));
         tx.commit()?;
         Ok(prop)
     }

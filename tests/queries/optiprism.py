@@ -17,14 +17,14 @@ def auth():
 token = auth()
 
 
-def aggregate_property_query(agg, field: str, prop_type="event",
+def aggregate_property_query(agg, field: str, prop_type="system",
                              breakdowns=None, period=2, time_unit="day", interval_unit="day"):
     b = []
     if breakdowns is not None:
         for breakdown in breakdowns:
             b.append({
                 "type": "property",
-                "propertyType": "event",
+                "propertyType": prop_type,
                 "propertyName": breakdown
             })
     q = {
@@ -52,7 +52,7 @@ def aggregate_property_query(agg, field: str, prop_type="event",
                 ],
                 "breakdowns": b,
                 "eventType": "regular",
-                "eventId": 8,
+                "eventId": 1,
                 "filters": []
             }
         ],
@@ -71,7 +71,7 @@ def aggregate_property_query(agg, field: str, prop_type="event",
         headers={"Content-Type": "application/json",
                  "Authorization": "Bearer " + token})
 
-    if len(resp.json()[0]) == 0:
+    if len(resp.json()) == 0:
         return []
 
     ts = resp.json()[1]
@@ -86,7 +86,7 @@ def aggregate_property_query(agg, field: str, prop_type="event",
         return [ts, val]
 
 
-def partitioned_aggregate_property_query(agg, outer_agg, typ: str, prop_type="event", period=2, time_unit="day",
+def partitioned_aggregate_property_query(agg, outer_agg, typ: str, prop_type="system", period=2, time_unit="day",
                                          interval_unit="day",
                                          breakdowns=None):
     b = []
@@ -142,7 +142,7 @@ def partitioned_aggregate_property_query(agg, outer_agg, typ: str, prop_type="ev
         headers={"Content-Type": "application/json",
                  "Authorization": "Bearer " + token})
 
-    if len(resp.json()[0]) == 0:
+    if len(resp.json()) == 0:
         return []
 
     ts = resp.json()[1]
@@ -159,13 +159,13 @@ def partitioned_aggregate_property_query(agg, outer_agg, typ: str, prop_type="ev
 
 def simple_query(query: str, time_last=2, unit="day",
                  interval_unit="day",
-                 breakdowns=None):
+                 breakdowns=None, filters=None):
     b = []
     if breakdowns is not None:
         for breakdown in breakdowns:
             b.append({
                 "type": "property",
-                "propertyType": "event",
+                "propertyType": "system",
                 "propertyName": breakdown
             })
 
@@ -191,7 +191,7 @@ def simple_query(query: str, time_last=2, unit="day",
                 ],
                 "eventType": "regular",
                 "eventId": 8,
-                "filters": [],
+                "filters": filters,
                 "breakdowns": b,
             }
         ],
@@ -202,13 +202,15 @@ def simple_query(query: str, time_last=2, unit="day",
         "segments": [],
         "breakdowns": []
     }
-
+    print(q)
     resp = requests.post(
         "{0}/organizations/1/projects/1/queries/event-segmentation?format=jsonCompact".format(op_addr),
         json=q,
         headers={"Content-Type": "application/json",
                  "Authorization": "Bearer " + token})
 
+    if len(resp.json()) == 0:
+        return []
     ts = resp.json()[1]
     if breakdowns is not None:
         group = resp.json()[2]
@@ -229,7 +231,7 @@ def all_aggregates_query(typ, time_last=2, unit="day",
         for breakdown in breakdowns:
             b.append({
                 "type": "property",
-                "propertyType": "event",
+                "propertyType": "system",
                 "propertyName": breakdown
             })
 
@@ -256,31 +258,31 @@ def all_aggregates_query(typ, time_last=2, unit="day",
                     {
                         "type": "aggregateProperty",
                         "aggregate": "count",
-                        "propertyType": "event",
+                        "propertyType": "system",
                         "propertyName": typ
                     },
                     {
                         "type": "aggregateProperty",
                         "aggregate": "min",
-                        "propertyType": "event",
+                        "propertyType": "system",
                         "propertyName": typ
                     },
                     {
                         "type": "aggregateProperty",
                         "aggregate": "max",
-                        "propertyType": "event",
+                        "propertyType": "system",
                         "propertyName": typ
                     },
                     {
                         "type": "aggregateProperty",
                         "aggregate": "avg",
-                        "propertyType": "event",
+                        "propertyType": "system",
                         "propertyName": typ
                     },
                     {
                         "type": "aggregateProperty",
                         "aggregate": "sum",
-                        "propertyType": "event",
+                        "propertyType": "system",
                         "propertyName": typ
                     }
                 ],

@@ -14,7 +14,6 @@ use metadata::reports::ProviderImpl;
 use metadata::reports::Query;
 use metadata::reports::Type;
 use metadata::reports::UpdateReportRequest;
-use metadata::store::Store;
 use uuid::Uuid;
 #[test]
 fn test_reports() -> Result<()> {

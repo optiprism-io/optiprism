@@ -1,19 +1,14 @@
 use std::collections::BTreeMap;
 use std::fmt::Debug;
-use std::fmt::Display;
-use std::fmt::Formatter;
 use std::result;
 
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::response::Response;
-use axum::Json;
 use common::error::CommonError;
 use common::http::ApiError;
 use metadata::error::MetadataError;
 use query::error::QueryError;
-use serde::Serialize;
-use serde::Serializer;
 use thiserror::Error;
 use tracing::debug;
 
@@ -53,8 +48,8 @@ pub enum PlatformError {
     NotFound(String),
     #[error("internal: {0:?}")]
     Internal(String),
-    #[error("entity map")]
-    EntityMap,
+    #[error("entity map {0:?}")]
+    EntityMap(String),
     #[error("serde: {0:?}")]
     Serde(#[from] serde_json::Error),
     #[error("password hash")]
@@ -98,6 +93,7 @@ impl PlatformError {
                 MetadataError::Bincode(err) => ApiError::internal(err.to_string()),
                 MetadataError::Io(err) => ApiError::internal(err.to_string()),
                 MetadataError::Other(err) => ApiError::internal(err.to_string()),
+                MetadataError::Store(err) => ApiError::internal(err.to_string()),
             },
             PlatformError::Query(err) => match err {
                 QueryError::Internal(err) => ApiError::internal(err),
@@ -107,6 +103,8 @@ impl PlatformError {
                 QueryError::Arrow(err) => ApiError::internal(err.to_string()),
                 QueryError::Metadata(err) => ApiError::internal(err.to_string()),
                 QueryError::Common(err) => ApiError::internal(err.to_string()),
+                QueryError::Store(err) => ApiError::internal(err.to_string()),
+                QueryError::Other(err) => ApiError::internal(err.to_string()),
             },
             PlatformError::BadRequest(msg) => ApiError::bad_request(msg),
             PlatformError::Internal(msg) => ApiError::internal(msg),
@@ -116,6 +114,7 @@ impl PlatformError {
                 CommonError::EntityMapping => ApiError::internal(err.to_string()),
                 CommonError::BadRequest(err) => ApiError::bad_request(err),
                 CommonError::Serde(err) => ApiError::bad_request(err.to_string()),
+                CommonError::General(err) => ApiError::internal(err),
             },
             PlatformError::Auth(err) => match err {
                 AuthError::InvalidCredentials => ApiError::unauthorized(err),
@@ -138,7 +137,7 @@ impl PlatformError {
                 ApiError::new(StatusCode::BAD_REQUEST).with_fields(fields)
             }
             PlatformError::NotFound(err) => ApiError::not_found(err),
-            PlatformError::EntityMap => ApiError::internal("map error"),
+            PlatformError::EntityMap(err) => ApiError::internal(err),
         }
     }
 }

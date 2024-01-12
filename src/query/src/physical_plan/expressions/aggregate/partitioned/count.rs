@@ -126,7 +126,7 @@ macro_rules! count {
                             .clone()
                             .unwrap()
                             .evaluate(batch)?
-                            .into_array(batch.num_rows())
+                            .into_array(batch.num_rows())?
                             .as_any()
                             .downcast_ref::<BooleanArray>()
                             .unwrap()
@@ -142,7 +142,7 @@ macro_rules! count {
                         .iter()
                         .map(|e| {
                             e.evaluate(batch)
-                                .and_then(|v| Ok(v.into_array(batch.num_rows()).clone()))
+                                .and_then(|v| Ok(v.into_array(batch.num_rows()).unwrap().clone()))
                         })
                         .collect::<result::Result<Vec<_>, _>>()?;
 
@@ -154,7 +154,7 @@ macro_rules! count {
                 let partitions = self
                     .partition_col
                     .evaluate(batch)?
-                    .into_array(batch.num_rows())
+                    .into_array(batch.num_rows())?
                     .as_any()
                     .downcast_ref::<Int64Array>()
                     .unwrap()
@@ -328,7 +328,7 @@ impl PartitionedAggregateExpr for PartitionedCount<i128> {
                     .clone()
                     .unwrap()
                     .evaluate(batch)?
-                    .into_array(batch.num_rows())
+                    .into_array(batch.num_rows())?
                     .as_any()
                     .downcast_ref::<BooleanArray>()
                     .unwrap()
@@ -342,7 +342,10 @@ impl PartitionedAggregateExpr for PartitionedCount<i128> {
             let arrs = groups
                 .exprs
                 .iter()
-                .map(|e| e.evaluate(batch).map(|v| v.into_array(batch.num_rows())))
+                .map(|e| {
+                    e.evaluate(batch)
+                        .map(|v| v.into_array(batch.num_rows()).unwrap())
+                })
                 .collect::<result::Result<Vec<_>, _>>()?;
 
             Some(groups.row_converter.convert_columns(&arrs)?)
@@ -353,7 +356,7 @@ impl PartitionedAggregateExpr for PartitionedCount<i128> {
         let partitions = self
             .partition_col
             .evaluate(batch)?
-            .into_array(batch.num_rows())
+            .into_array(batch.num_rows())?
             .as_any()
             .downcast_ref::<Int64Array>()
             .unwrap()
@@ -431,7 +434,7 @@ impl PartitionedAggregateExpr for PartitionedCount<i128> {
             let group_col = groups.row_converter.convert_rows(rows)?;
             let res_col = res_col_b.finish();
             let res_col = Arc::new(res_col) as ArrayRef;
-            Ok(vec![group_col, vec![res_col]].concat())
+            Ok([group_col, vec![res_col]].concat())
         } else {
             let mut res_col_b = Decimal128Builder::with_capacity(1)
                 .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?;

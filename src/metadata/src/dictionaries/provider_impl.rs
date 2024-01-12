@@ -3,12 +3,9 @@ use std::fmt::Formatter;
 use std::hash::Hash;
 use std::hash::Hasher;
 use std::sync::Arc;
-use std::sync::RwLock;
 
-use async_trait::async_trait;
 use byteorder::ByteOrder;
 use byteorder::LittleEndian;
-use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 
 use crate::dictionaries::Provider;
@@ -54,7 +51,7 @@ impl ProviderImpl {
 
 impl Debug for ProviderImpl {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        self.fmt(f)
+        write!(f, "dictionaries")
     }
 }
 
@@ -103,7 +100,10 @@ impl Provider for ProviderImpl {
         let tx = self.db.transaction();
         let store_key = make_key_key(organization_id, project_id, dict, key);
         match tx.get(store_key.as_slice())? {
-            None => Err(MetadataError::NotFound("key not found".to_string())),
+            None => Err(MetadataError::NotFound(format!(
+                "value for key {} not found",
+                key
+            ))),
             Some(value) => Ok(String::from_utf8(value)?),
         }
     }
@@ -118,7 +118,10 @@ impl Provider for ProviderImpl {
         let tx = self.db.transaction();
         let store_key = make_value_key(organization_id, project_id, dict, value);
         match tx.get(store_key.as_slice())? {
-            None => Err(MetadataError::NotFound("key not found".to_string())),
+            None => Err(MetadataError::NotFound(format!(
+                "key by value {} not found",
+                value
+            ))),
             Some(key) => Ok(LittleEndian::read_u64(key.as_slice())),
         }
     }

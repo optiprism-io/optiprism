@@ -1,6 +1,5 @@
 pub mod provider_impl;
 
-use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
 use common::types::OptionalProperty;
@@ -54,7 +53,7 @@ pub struct CreateDashboardRequest {
     pub panels: Vec<Panel>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateDashboardRequest {
     pub updated_by: u64,

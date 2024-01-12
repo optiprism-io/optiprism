@@ -4,7 +4,6 @@ use std::sync::Arc;
 use metadata::dictionaries::Provider;
 use metadata::dictionaries::ProviderImpl;
 use metadata::error::Result;
-use metadata::store::Store;
 use uuid::Uuid;
 #[test]
 fn test_dictionaries() -> Result<()> {

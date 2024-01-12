@@ -6,7 +6,7 @@ authors = ["Optiprism <dev@optiprism.io>"]
 
 [dependencies]
 anyhow = "1.0.66"
-arrow = { version = "42.0.0", features = ["prettyprint"] }
+arrow = { version = "49.0.0", features = ["prettyprint"] }
 bytesize = "1.1.0"
 chrono = { version = "0.4.23" }
 clap = { version = "4.0.29", features = ["derive"] }
@@ -29,6 +29,7 @@ rand = "0.8.5"
 rust_decimal = { version = "1.27.0", features = ["serde-float"] }
 serde = { version = "1.0.149", features = ["derive"] }
 service = { path = "../service" }
+store = { path = "../store" }
 strum = "0.24"
 strum_macros = "0.24"
 test_util = { path = "../test_util" }

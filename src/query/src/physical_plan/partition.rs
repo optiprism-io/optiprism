@@ -20,6 +20,7 @@ use datafusion::physical_plan::hash_utils::create_hashes;
 use datafusion::physical_plan::metrics::BaselineMetrics;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
 use datafusion::physical_plan::metrics::MetricsSet;
+use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::physical_plan::Partitioning;
@@ -52,7 +53,7 @@ impl PartitionExec {
         let mut schema = (*input.schema()).clone();
         let _a = schema.fields();
 
-        schema.fields = vec![vec![Arc::new(field)], schema.fields.to_vec()]
+        schema.fields = [vec![Arc::new(field)], schema.fields.to_vec()]
             .concat()
             .into();
         Ok(Self {
@@ -62,6 +63,12 @@ impl PartitionExec {
             schema: Arc::new(schema),
             metrics: ExecutionPlanMetricsSet::new(),
         })
+    }
+}
+
+impl DisplayAs for PartitionExec {
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "PartitionExec")
     }
 }
 
@@ -122,12 +129,8 @@ impl ExecutionPlan for PartitionExec {
         Some(self.metrics.clone_inner())
     }
 
-    fn fmt_as(&self, _t: DisplayFormatType, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "PartitionExec")
-    }
-
-    fn statistics(&self) -> Statistics {
-        Statistics::default()
+    fn statistics(&self) -> DFResult<Statistics> {
+        Ok(Statistics::new_unknown(self.schema.as_ref()))
     }
 }
 
@@ -158,7 +161,7 @@ impl Stream for PartitionStream {
                 let arrs = self
                     .partition_expr
                     .iter()
-                    .map(|expr| Ok(expr.evaluate(&batch)?.into_array(batch.num_rows())))
+                    .map(|expr| Ok(expr.evaluate(&batch)?.into_array(batch.num_rows()).unwrap()))
                     .collect::<DFResult<Vec<_>>>()?;
 
                 self.hash_buffer.clear();
@@ -168,7 +171,7 @@ impl Stream for PartitionStream {
 
                 let result = RecordBatch::try_new(
                     self.schema.clone(),
-                    vec![
+                    [
                         vec![Arc::new(hash_arr) as ArrayRef],
                         batch.columns().to_owned(),
                     ]
@@ -194,7 +197,6 @@ mod tests {
     use datafusion::physical_plan::memory::MemoryExec;
     use datafusion::physical_plan::ExecutionPlan;
     use datafusion::prelude::SessionContext;
-    pub use datafusion_common::Result;
     use store::test_util::parse_markdown_tables;
 
     use crate::physical_plan::partition::PartitionExec;

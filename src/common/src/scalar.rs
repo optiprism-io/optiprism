@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
 use arrow_schema::DataType;
-use arrow_schema::Field;
-use arrow_schema::Fields;
 use datafusion_common::ScalarValue;
 use serde::Deserialize;
 use serde::Deserializer;
@@ -31,7 +29,6 @@ pub enum ScalarValueRef {
     Binary(Option<Vec<u8>>),
     FixedSizeBinary(i32, Option<Vec<u8>>),
     LargeBinary(Option<Vec<u8>>),
-    List(Option<Vec<ScalarValueRef>>, Arc<Field>),
     Date32(Option<i32>),
     Date64(Option<i64>),
     Time32Second(Option<i32>),
@@ -45,7 +42,6 @@ pub enum ScalarValueRef {
     IntervalYearMonth(Option<i32>),
     IntervalDayTime(Option<i64>),
     IntervalMonthDayNano(Option<i128>),
-    Struct(Option<Vec<ScalarValueRef>>, Fields),
     Dictionary(Box<DataType>, Box<ScalarValueRef>),
 }
 
@@ -69,14 +65,6 @@ impl From<ScalarValueRef> for ScalarValue {
             ScalarValueRef::LargeUtf8(v) => ScalarValue::LargeUtf8(v),
             ScalarValueRef::Binary(v) => ScalarValue::Binary(v),
             ScalarValueRef::LargeBinary(v) => ScalarValue::LargeBinary(v),
-            ScalarValueRef::List(v, f) => ScalarValue::List(
-                v.map(|v| {
-                    v.iter()
-                        .map(|v| v.to_owned().into())
-                        .collect::<Vec<ScalarValue>>()
-                }),
-                f,
-            ),
             ScalarValueRef::Date32(v) => ScalarValue::Date32(v),
             ScalarValueRef::Date64(v) => ScalarValue::Date64(v),
             ScalarValueRef::TimestampSecond(v, f) => ScalarValue::TimestampSecond(v, f),
@@ -86,20 +74,12 @@ impl From<ScalarValueRef> for ScalarValue {
             ScalarValueRef::IntervalYearMonth(v) => ScalarValue::IntervalYearMonth(v),
             ScalarValueRef::IntervalDayTime(v) => ScalarValue::IntervalDayTime(v),
             ScalarValueRef::IntervalMonthDayNano(v) => ScalarValue::IntervalMonthDayNano(v),
-            ScalarValueRef::Struct(v, f) => ScalarValue::Struct(
-                v.map(|v| {
-                    v.iter()
-                        .map(|v| v.to_owned().into())
-                        .collect::<Vec<ScalarValue>>()
-                }),
-                f,
-            ),
-            ScalarValueRef::Dictionary(t, v) => ScalarValue::Dictionary(t, Box::new((*v).into())),
             ScalarValueRef::FixedSizeBinary(a, b) => ScalarValue::FixedSizeBinary(a, b),
             ScalarValueRef::Time32Second(v) => ScalarValue::Time32Second(v),
             ScalarValueRef::Time32Millisecond(v) => ScalarValue::Time32Second(v),
             ScalarValueRef::Time64Microsecond(v) => ScalarValue::Time64Microsecond(v),
             ScalarValueRef::Time64Nanosecond(v) => ScalarValue::Time64Nanosecond(v),
+            _ => unimplemented!(),
         }
     }
 }
@@ -124,10 +104,6 @@ impl From<&ScalarValue> for ScalarValueRef {
             ScalarValue::LargeUtf8(v) => ScalarValueRef::LargeUtf8(v),
             ScalarValue::Binary(v) => ScalarValueRef::Binary(v),
             ScalarValue::LargeBinary(v) => ScalarValueRef::LargeBinary(v),
-            ScalarValue::List(v, f) => ScalarValueRef::List(
-                v.map(|v| v.iter().map(|v| v.into()).collect::<Vec<ScalarValueRef>>()),
-                f,
-            ),
             ScalarValue::Date32(v) => ScalarValueRef::Date32(v),
             ScalarValue::Date64(v) => ScalarValueRef::Date64(v),
             ScalarValue::TimestampSecond(v, f) => ScalarValueRef::TimestampSecond(v, f),
@@ -137,18 +113,12 @@ impl From<&ScalarValue> for ScalarValueRef {
             ScalarValue::IntervalYearMonth(v) => ScalarValueRef::IntervalYearMonth(v),
             ScalarValue::IntervalDayTime(v) => ScalarValueRef::IntervalDayTime(v),
             ScalarValue::IntervalMonthDayNano(v) => ScalarValueRef::IntervalMonthDayNano(v),
-            ScalarValue::Struct(v, f) => ScalarValueRef::Struct(
-                v.map(|v| v.iter().map(|v| v.into()).collect::<Vec<ScalarValueRef>>()),
-                f,
-            ),
-            ScalarValue::Dictionary(t, v) => {
-                ScalarValueRef::Dictionary(t, Box::new(ScalarValueRef::from(&*v)))
-            }
             ScalarValue::FixedSizeBinary(a, b) => ScalarValueRef::FixedSizeBinary(a, b),
             ScalarValue::Time32Second(v) => ScalarValueRef::Time32Second(v),
             ScalarValue::Time32Millisecond(v) => ScalarValueRef::Time32Second(v),
             ScalarValue::Time64Microsecond(v) => ScalarValueRef::Time64Microsecond(v),
             ScalarValue::Time64Nanosecond(v) => ScalarValueRef::Time64Nanosecond(v),
+            _ => unimplemented!(),
         }
     }
 }

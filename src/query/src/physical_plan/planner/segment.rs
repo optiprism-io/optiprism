@@ -29,7 +29,7 @@ use crate::physical_plan::expressions::segmentation::count::Count;
 use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
 use crate::physical_plan::expressions::segmentation::SegmentExpr;
 use crate::physical_plan::planner::build_filter;
-use crate::physical_plan::planner::planner::col;
+use crate::physical_plan::planner::col;
 
 fn aggregate<T>(agg: &logical_plan::segment::AggregateFunction) -> AggregateFunction<T>
 where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display {
