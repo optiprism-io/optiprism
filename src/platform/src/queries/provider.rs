@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use arrow::array::Array;
-use axum::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
 use common::rbac::ProjectPermission;

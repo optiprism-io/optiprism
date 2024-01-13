@@ -49,13 +49,9 @@ use arrow::datatypes::IntervalUnit;
 use arrow::datatypes::SchemaRef;
 use arrow::datatypes::TimeUnit;
 use arrow2::array::Int128Array;
-use async_trait::async_trait;
-use common::query::event_segmentation::EventSegmentation;
 pub use context::Context;
 pub use error::Result;
 pub use provider_impl::QueryProvider;
-
-use crate::queries::property_values::PropertyValues;
 
 pub mod context;
 pub mod datasources;

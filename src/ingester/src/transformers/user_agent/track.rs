@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use metadata::properties;
 use metadata::properties::Properties;
 use uaparser::UserAgentParser;
 

@@ -1,24 +1,15 @@
 use chrono::DateTime;
 use chrono::Utc;
 
-use crate::queries::event_segmentation::EventSegmentation;
-use crate::queries::property_values::ListPropertyValuesRequest;
-use crate::Context;
-use crate::ListResponse;
 use crate::PlatformError;
-use crate::QueryResponse;
 
 pub mod event_segmentation;
 pub mod property_values;
-pub mod queries;
+pub mod provider;
 
-use axum::async_trait;
-pub use queries::Queries;
+pub use provider::Queries;
 use serde::Deserialize;
 use serde::Serialize;
-use serde_json::Value;
-
-use crate::Result;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]

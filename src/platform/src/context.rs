@@ -29,7 +29,6 @@ use common::rbac::PROJECT_PERMISSIONS;
 use hyper::Body;
 use serde_json::Value;
 
-use crate::accounts::Accounts;
 use crate::auth;
 use crate::auth::token::parse_access_token;
 use crate::error::AuthError;

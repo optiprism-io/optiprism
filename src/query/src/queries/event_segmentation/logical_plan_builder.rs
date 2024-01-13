@@ -31,7 +31,6 @@ use datafusion_expr::ScalarFunctionDefinition;
 use datafusion_expr::Sort;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
-use tracing::debug;
 
 use crate::context::Format;
 use crate::error::Result;

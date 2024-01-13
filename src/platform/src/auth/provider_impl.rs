@@ -111,15 +111,15 @@ impl Provider for ProviderImpl {
         Ok(tokens)
     }
 
-    async fn update_name(&self, ctx: Context, req: UpdateNameRequest) -> Result<Account> {
+    async fn update_name(&self, _ctx: Context, _req: UpdateNameRequest) -> Result<Account> {
         todo!()
     }
 
-    async fn update_email(&self, ctx: Context, req: UpdateEmailRequest) -> Result<Account> {
+    async fn update_email(&self, _ctx: Context, _req: UpdateEmailRequest) -> Result<Account> {
         todo!()
     }
 
-    async fn update_password(&self, ctx: Context, req: UpdatePasswordRequest) -> Result<Account> {
+    async fn update_password(&self, _ctx: Context, _req: UpdatePasswordRequest) -> Result<Account> {
         todo!()
     }
 }

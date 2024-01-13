@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use common::types;
-use metadata::properties;
 use metadata::properties::Properties;
 use uaparser::Parser;
 use uaparser::UserAgentParser;

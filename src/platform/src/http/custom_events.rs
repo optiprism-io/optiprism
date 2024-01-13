@@ -7,7 +7,6 @@ use axum::routing;
 use axum::Router;
 use common::http::Json;
 
-use crate::custom_events;
 use crate::custom_events::CreateCustomEventRequest;
 use crate::custom_events::CustomEvent;
 use crate::custom_events::CustomEvents;

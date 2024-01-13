@@ -24,7 +24,6 @@ use futures::Stream;
 use futures::StreamExt;
 use store::arrow_conversion::arrow2_to_arrow1;
 use store::db::OptiDBImpl;
-use tracing::debug;
 
 use crate::error::Result;
 

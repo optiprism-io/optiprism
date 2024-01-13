@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use axum::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
 use common::rbac::OrganizationRole;
@@ -8,15 +7,11 @@ use common::rbac::Permission;
 use common::rbac::ProjectRole;
 use common::rbac::Role;
 use common::types::OptionalProperty;
-use metadata::accounts;
 use metadata::accounts::Accounts as MDAccounts;
 use serde::Deserialize;
 use serde::Serialize;
 
 use crate::auth::password::make_password_hash;
-use crate::auth::UpdateEmailRequest;
-use crate::auth::UpdateNameRequest;
-use crate::auth::UpdatePasswordRequest;
 use crate::Context;
 use crate::ListResponse;
 use crate::PlatformError;

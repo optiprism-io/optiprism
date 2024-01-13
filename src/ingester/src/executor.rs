@@ -3,12 +3,10 @@ use std::sync::Arc;
 
 use common::types::DType;
 use common::types::DICT_USERS;
-use metadata::dictionaries;
 use metadata::dictionaries::Dictionaries;
 use metadata::events;
 use metadata::events::CreateEventRequest;
 use metadata::events::Events;
-use metadata::projects;
 use metadata::projects::Projects;
 use metadata::properties;
 use metadata::properties::CreatePropertyRequest;

@@ -13,7 +13,6 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::error::MetadataError;
-use crate::events;
 use crate::events::Events;
 use crate::index::check_insert_constraints;
 use crate::index::check_update_constraints;

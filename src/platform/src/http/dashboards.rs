@@ -7,7 +7,6 @@ use axum::routing;
 use axum::Router;
 use common::http::Json;
 
-use crate::dashboards;
 use crate::dashboards::CreateDashboardRequest;
 use crate::dashboards::Dashboard;
 use crate::dashboards::Dashboards;

@@ -6,7 +6,6 @@ use common::types::COLUMN_EVENT;
 use common::types::COLUMN_EVENT_ID;
 use common::types::COLUMN_PROJECT_ID;
 use common::types::COLUMN_USER_ID;
-use metadata::dictionaries;
 use metadata::dictionaries::Dictionaries;
 use metadata::properties::DictionaryType;
 use rust_decimal::prelude::ToPrimitive;

@@ -8,7 +8,6 @@ use axum::Router;
 use common::http::Json;
 use serde_json::Value;
 
-use crate::queries;
 use crate::queries::event_segmentation::EventSegmentation;
 use crate::queries::property_values::ListPropertyValuesRequest;
 use crate::queries::Queries;

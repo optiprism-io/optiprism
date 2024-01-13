@@ -1,11 +1,9 @@
 use std::sync::Arc;
 
-use axum::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
 use common::rbac::ProjectPermission;
 use common::types::OptionalProperty;
-use metadata::custom_events;
 use metadata::custom_events::CustomEvents as MDCustomEvents;
 use serde::Deserialize;
 use serde::Serialize;

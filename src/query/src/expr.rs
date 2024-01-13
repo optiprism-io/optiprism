@@ -20,7 +20,6 @@ use datafusion_expr::or;
 use datafusion_expr::Expr;
 use datafusion_expr::ExprSchemable;
 use datafusion_expr::Operator;
-use metadata::dictionaries;
 use metadata::dictionaries::Dictionaries;
 use metadata::properties::DictionaryType;
 use metadata::MetadataProvider;
