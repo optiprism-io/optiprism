@@ -7,9 +7,9 @@ use axum::routing;
 use axum::Router;
 use common::http::Json;
 
-use crate::dashboards;
 use crate::dashboards::CreateDashboardRequest;
 use crate::dashboards::Dashboard;
+use crate::dashboards::Dashboards;
 use crate::dashboards::UpdateDashboardRequest;
 use crate::Context;
 use crate::ListResponse;
@@ -17,7 +17,7 @@ use crate::Result;
 
 async fn create(
     ctx: Context,
-    Extension(provider): Extension<Arc<dyn dashboards::Provider>>,
+    Extension(provider): Extension<Arc<Dashboards>>,
     Path((organization_id, project_id)): Path<(u64, u64)>,
     Json(request): Json<CreateDashboardRequest>,
 ) -> Result<(StatusCode, Json<Dashboard>)> {
@@ -33,7 +33,7 @@ async fn create(
 
 async fn get_by_id(
     ctx: Context,
-    Extension(provider): Extension<Arc<dyn dashboards::Provider>>,
+    Extension(provider): Extension<Arc<Dashboards>>,
     Path((organization_id, project_id, dashboard_id)): Path<(u64, u64, u64)>,
 ) -> Result<Json<Dashboard>> {
     Ok(Json(
@@ -45,7 +45,7 @@ async fn get_by_id(
 
 async fn list(
     ctx: Context,
-    Extension(provider): Extension<Arc<dyn dashboards::Provider>>,
+    Extension(provider): Extension<Arc<Dashboards>>,
     Path((organization_id, project_id)): Path<(u64, u64)>,
 ) -> Result<Json<ListResponse<Dashboard>>> {
     Ok(Json(provider.list(ctx, organization_id, project_id).await?))
@@ -53,7 +53,7 @@ async fn list(
 
 async fn update(
     ctx: Context,
-    Extension(provider): Extension<Arc<dyn dashboards::Provider>>,
+    Extension(provider): Extension<Arc<Dashboards>>,
     Path((organization_id, project_id, dashboard_id)): Path<(u64, u64, u64)>,
     Json(request): Json<UpdateDashboardRequest>,
 ) -> Result<Json<Dashboard>> {
@@ -66,7 +66,7 @@ async fn update(
 
 async fn delete(
     ctx: Context,
-    Extension(provider): Extension<Arc<dyn dashboards::Provider>>,
+    Extension(provider): Extension<Arc<Dashboards>>,
     Path((organization_id, project_id, dashboard_id)): Path<(u64, u64, u64)>,
 ) -> Result<Json<Dashboard>> {
     Ok(Json(

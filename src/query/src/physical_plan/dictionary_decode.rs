@@ -37,7 +37,7 @@ use datafusion::physical_plan::Statistics;
 use datafusion_common::Result as DFResult;
 use futures::Stream;
 use futures::StreamExt;
-use metadata::dictionaries::provider_impl::SingleDictionaryProvider;
+use metadata::dictionaries::SingleDictionaryProvider;
 
 #[derive(Debug)]
 pub struct DictionaryDecodeExec {

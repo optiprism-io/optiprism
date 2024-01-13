@@ -48,7 +48,7 @@ use ingester::Transformer;
 use metadata::MetadataProvider;
 use platform::auth;
 use query::datasources::local::LocalTable;
-use query::ProviderImpl;
+use query::QueryProvider;
 use rand::thread_rng;
 use store::db::OptiDBImpl;
 use store::db::Options;
@@ -110,7 +110,7 @@ pub struct Config<R> {
 fn init_platform(md: Arc<MetadataProvider>, db: Arc<OptiDBImpl>, router: Router) -> Result<Router> {
     let data_provider: Arc<dyn TableProvider> =
         Arc::new(LocalTable::try_new(db.clone(), "events".to_string())?);
-    let query_provider = Arc::new(ProviderImpl::try_new_from_provider(
+    let query_provider = Arc::new(QueryProvider::try_new_from_provider(
         md.clone(),
         db.clone(),
         data_provider,

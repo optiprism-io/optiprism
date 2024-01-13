@@ -9,9 +9,8 @@ use common::query::TimeIntervalUnit;
 use common::types::OptionalProperty;
 use metadata::error::Result;
 use metadata::reports::CreateReportRequest;
-use metadata::reports::Provider;
-use metadata::reports::ProviderImpl;
 use metadata::reports::Query;
+use metadata::reports::Reports;
 use metadata::reports::Type;
 use metadata::reports::UpdateReportRequest;
 use uuid::Uuid;
@@ -21,7 +20,7 @@ fn test_reports() -> Result<()> {
     path.push(format!("{}.db", Uuid::new_v4()));
 
     let db = Arc::new(metadata::rocksdb::new(path).unwrap());
-    let reports: Box<dyn Provider> = Box::new(ProviderImpl::new(db.clone()));
+    let reports: Box<Reports> = Box::new(Reports::new(db.clone()));
     let create_report_req = CreateReportRequest {
         created_by: 0,
         tags: Some(vec![]),

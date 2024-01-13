@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use metadata::properties;
+use metadata::properties::Properties;
 
 use crate::error::Result;
 use crate::transformers::geo::resolve_properties;
@@ -11,12 +11,12 @@ use crate::Transformer;
 pub struct Geo {
     // todo make common?
     city_rdr: maxminddb::Reader<Vec<u8>>,
-    user_properties: Arc<dyn properties::Provider>,
+    user_properties: Arc<Properties>,
 }
 
 impl Geo {
     pub fn try_new(
-        user_properties: Arc<dyn properties::Provider>,
+        user_properties: Arc<Properties>,
         city_rdr: maxminddb::Reader<Vec<u8>>,
     ) -> Result<Self> {
         Ok(Self {

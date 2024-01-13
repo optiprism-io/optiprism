@@ -7,9 +7,9 @@ use axum::routing;
 use axum::Router;
 use common::http::Json;
 
-use crate::events;
 use crate::events::CreateEventRequest;
 use crate::events::Event;
+use crate::events::Events;
 use crate::events::UpdateEventRequest;
 use crate::Context;
 use crate::ListResponse;
@@ -17,7 +17,7 @@ use crate::Result;
 
 async fn create(
     ctx: Context,
-    Extension(provider): Extension<Arc<dyn events::Provider>>,
+    Extension(provider): Extension<Arc<Events>>,
     Path((organization_id, project_id)): Path<(u64, u64)>,
     Json(request): Json<CreateEventRequest>,
 ) -> Result<(StatusCode, Json<Event>)> {
@@ -33,7 +33,7 @@ async fn create(
 
 async fn get_by_id(
     ctx: Context,
-    Extension(provider): Extension<Arc<dyn events::Provider>>,
+    Extension(provider): Extension<Arc<Events>>,
     Path((organization_id, project_id, event_id)): Path<(u64, u64, u64)>,
 ) -> Result<Json<Event>> {
     Ok(Json(
@@ -45,7 +45,7 @@ async fn get_by_id(
 
 async fn get_by_name(
     ctx: Context,
-    Extension(provider): Extension<Arc<dyn events::Provider>>,
+    Extension(provider): Extension<Arc<Events>>,
     Path((organization_id, project_id)): Path<(u64, u64)>,
     Path(event_name): Path<String>,
 ) -> Result<Json<Event>> {
@@ -58,7 +58,7 @@ async fn get_by_name(
 
 async fn list(
     ctx: Context,
-    Extension(provider): Extension<Arc<dyn events::Provider>>,
+    Extension(provider): Extension<Arc<Events>>,
     Path((organization_id, project_id)): Path<(u64, u64)>,
 ) -> Result<Json<ListResponse<Event>>> {
     Ok(Json(provider.list(ctx, organization_id, project_id).await?))
@@ -66,7 +66,7 @@ async fn list(
 
 async fn update(
     ctx: Context,
-    Extension(provider): Extension<Arc<dyn events::Provider>>,
+    Extension(provider): Extension<Arc<Events>>,
     Path((organization_id, project_id, event_id)): Path<(u64, u64, u64)>,
     Json(request): Json<UpdateEventRequest>,
 ) -> Result<Json<Event>> {
@@ -79,7 +79,7 @@ async fn update(
 
 async fn delete(
     ctx: Context,
-    Extension(provider): Extension<Arc<dyn events::Provider>>,
+    Extension(provider): Extension<Arc<Events>>,
     Path((organization_id, project_id, event_id)): Path<(u64, u64, u64)>,
 ) -> Result<Json<Event>> {
     Ok(Json(
@@ -91,7 +91,7 @@ async fn delete(
 
 async fn attach_property(
     ctx: Context,
-    Extension(provider): Extension<Arc<dyn events::Provider>>,
+    Extension(provider): Extension<Arc<Events>>,
     Path((organization_id, project_id, event_id, prop_id)): Path<(u64, u64, u64, u64)>,
 ) -> Result<Json<Event>> {
     Ok(Json(
@@ -103,7 +103,7 @@ async fn attach_property(
 
 async fn detach_property(
     ctx: Context,
-    Extension(provider): Extension<Arc<dyn events::Provider>>,
+    Extension(provider): Extension<Arc<Events>>,
     Path((organization_id, project_id, event_id, prop_id)): Path<(u64, u64, u64, u64)>,
 ) -> Result<Json<Event>> {
     Ok(Json(

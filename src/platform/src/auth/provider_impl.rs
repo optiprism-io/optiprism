@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use axum::async_trait;
 use chrono::Duration;
+use metadata::accounts::Accounts;
 use metadata::accounts::CreateAccountRequest;
 use password_hash::PasswordHash;
 
@@ -11,16 +12,21 @@ use super::token::make_access_token;
 use super::token::make_refresh_token;
 use super::token::parse_refresh_token;
 use super::SignUpRequest;
+use super::UpdateEmailRequest;
+use super::UpdateNameRequest;
+use super::UpdatePasswordRequest;
+use crate::accounts::Account;
 use crate::auth::Config;
 use crate::auth::LogInRequest;
 use crate::auth::Provider;
 use crate::auth::TokensResponse;
 use crate::error::AuthError;
+use crate::Context;
 use crate::Result;
 
 #[derive(Clone)]
 pub struct ProviderImpl {
-    accounts: Arc<dyn metadata::accounts::Provider>,
+    accounts: Arc<Accounts>,
     access_token_duration: Duration,
     access_token_key: String,
     refresh_token_duration: Duration,
@@ -28,7 +34,7 @@ pub struct ProviderImpl {
 }
 
 impl ProviderImpl {
-    pub fn new(accounts: Arc<dyn metadata::accounts::Provider>, cfg: Config) -> Self {
+    pub fn new(accounts: Arc<Accounts>, cfg: Config) -> Self {
         Self {
             accounts,
             access_token_duration: cfg.access_token_duration,
@@ -103,5 +109,17 @@ impl Provider for ProviderImpl {
         let tokens = self.make_tokens(refresh_claims.account_id)?;
 
         Ok(tokens)
+    }
+
+    async fn update_name(&self, _ctx: Context, _req: UpdateNameRequest) -> Result<Account> {
+        todo!()
+    }
+
+    async fn update_email(&self, _ctx: Context, _req: UpdateEmailRequest) -> Result<Account> {
+        todo!()
+    }
+
+    async fn update_password(&self, _ctx: Context, _req: UpdatePasswordRequest) -> Result<Account> {
+        todo!()
     }
 }

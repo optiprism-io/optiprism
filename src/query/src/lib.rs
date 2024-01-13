@@ -49,13 +49,9 @@ use arrow::datatypes::IntervalUnit;
 use arrow::datatypes::SchemaRef;
 use arrow::datatypes::TimeUnit;
 use arrow2::array::Int128Array;
-use async_trait::async_trait;
-use common::query::event_segmentation::EventSegmentation;
 pub use context::Context;
 pub use error::Result;
-pub use provider_impl::ProviderImpl;
-
-use crate::queries::property_values::PropertyValues;
+pub use provider_impl::QueryProvider;
 
 pub mod context;
 pub mod datasources;
@@ -294,12 +290,6 @@ pub enum ColumnType {
     Metric,
     MetricValue,
     FunnelMetricValue,
-}
-
-#[async_trait]
-pub trait Provider: Sync + Send {
-    async fn property_values(&self, ctx: Context, req: PropertyValues) -> Result<ArrayRef>;
-    async fn event_segmentation(&self, ctx: Context, es: EventSegmentation) -> Result<DataTable>;
 }
 
 #[derive(Clone, Debug)]

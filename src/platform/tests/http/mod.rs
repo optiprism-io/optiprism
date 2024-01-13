@@ -24,6 +24,7 @@ mod tests {
     use datafusion::datasource::TableProvider;
     use hyper::Server;
     use lazy_static::lazy_static;
+    use metadata::accounts::Accounts;
     use metadata::MetadataProvider;
     use platform::auth;
     use platform::auth::password::make_password_hash;
@@ -32,7 +33,7 @@ mod tests {
     use platform::PlatformProvider;
     use query::datasources::local::LocalTable;
     use query::test_util::create_entities;
-    use query::ProviderImpl;
+    use query::QueryProvider;
     use serde_json::json;
     use store::db::OptiDBImpl;
     use store::db::Options;
@@ -52,7 +53,7 @@ mod tests {
 
     pub async fn create_admin_acc_and_login(
         auth: &Arc<dyn platform::auth::Provider>,
-        md_acc: &Arc<dyn metadata::accounts::Provider>,
+        md_acc: &Arc<Accounts>,
     ) -> anyhow::Result<HeaderMap> {
         let pwd = "password";
 
@@ -106,7 +107,7 @@ mod tests {
         }
         let data_provider: Arc<dyn TableProvider> =
             Arc::new(LocalTable::try_new(db.clone(), "events".to_string())?);
-        let query_provider = Arc::new(ProviderImpl::try_new_from_provider(
+        let query_provider = Arc::new(QueryProvider::try_new_from_provider(
             md.clone(),
             db.clone(),
             data_provider,

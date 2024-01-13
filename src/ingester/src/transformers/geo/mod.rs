@@ -6,7 +6,7 @@ use std::sync::Arc;
 use common::types;
 use maxminddb;
 use maxminddb::geoip2;
-use metadata::properties;
+use metadata::properties::Properties;
 
 use crate::error::Result;
 use crate::Context;
@@ -18,7 +18,7 @@ pub fn resolve_properties(
     ctx: &RequestContext,
     context: &Context,
     mut user_props: Vec<PropertyAndValue>,
-    props_prov: &Arc<dyn properties::Provider>,
+    props_prov: &Arc<Properties>,
     city_rdr: &maxminddb::Reader<Vec<u8>>,
 ) -> Result<Vec<PropertyAndValue>> {
     let org_id = ctx.organization_id.unwrap();

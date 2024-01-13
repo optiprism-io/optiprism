@@ -4,7 +4,7 @@ use axum::routing;
 use axum::Router;
 use common::http::Json;
 
-use crate::http::Properties;
+use crate::http::PropertiesLayer;
 use crate::properties::Property;
 use crate::properties::UpdatePropertyRequest;
 use crate::Context;
@@ -13,7 +13,7 @@ use crate::Result;
 
 async fn get_event_by_id(
     ctx: Context,
-    Extension(provider): Extension<Properties>,
+    Extension(provider): Extension<PropertiesLayer>,
     Path((organization_id, project_id, property_id)): Path<(u64, u64, u64)>,
 ) -> Result<Json<Property>> {
     Ok(Json(
@@ -26,7 +26,7 @@ async fn get_event_by_id(
 
 async fn get_user_by_id(
     ctx: Context,
-    Extension(provider): Extension<Properties>,
+    Extension(provider): Extension<PropertiesLayer>,
     Path((organization_id, project_id, property_id)): Path<(u64, u64, u64)>,
 ) -> Result<Json<Property>> {
     Ok(Json(
@@ -39,7 +39,7 @@ async fn get_user_by_id(
 
 async fn get_event_by_name(
     ctx: Context,
-    Extension(provider): Extension<Properties>,
+    Extension(provider): Extension<PropertiesLayer>,
     Path((organization_id, project_id, prop_name)): Path<(u64, u64, String)>,
 ) -> Result<Json<Property>> {
     Ok(Json(
@@ -52,7 +52,7 @@ async fn get_event_by_name(
 
 async fn get_user_by_name(
     ctx: Context,
-    Extension(provider): Extension<Properties>,
+    Extension(provider): Extension<PropertiesLayer>,
     Path((organization_id, project_id, prop_name)): Path<(u64, u64, String)>,
 ) -> Result<Json<Property>> {
     Ok(Json(
@@ -65,7 +65,7 @@ async fn get_user_by_name(
 
 async fn list_event(
     ctx: Context,
-    Extension(provider): Extension<Properties>,
+    Extension(provider): Extension<PropertiesLayer>,
     Path((organization_id, project_id)): Path<(u64, u64)>,
 ) -> Result<Json<ListResponse<Property>>> {
     Ok(Json(
@@ -78,7 +78,7 @@ async fn list_event(
 
 async fn list_user(
     ctx: Context,
-    Extension(provider): Extension<Properties>,
+    Extension(provider): Extension<PropertiesLayer>,
     Path((organization_id, project_id)): Path<(u64, u64)>,
 ) -> Result<Json<ListResponse<Property>>> {
     Ok(Json(
@@ -88,7 +88,7 @@ async fn list_user(
 
 async fn update_event(
     ctx: Context,
-    Extension(provider): Extension<Properties>,
+    Extension(provider): Extension<PropertiesLayer>,
     Path((organization_id, project_id, prop_id)): Path<(u64, u64, u64)>,
     Json(request): Json<UpdatePropertyRequest>,
 ) -> Result<Json<Property>> {
@@ -102,7 +102,7 @@ async fn update_event(
 
 async fn update_user(
     ctx: Context,
-    Extension(provider): Extension<Properties>,
+    Extension(provider): Extension<PropertiesLayer>,
     Path((organization_id, project_id, prop_id)): Path<(u64, u64, u64)>,
     Json(request): Json<UpdatePropertyRequest>,
 ) -> Result<Json<Property>> {
@@ -116,7 +116,7 @@ async fn update_user(
 
 async fn delete_event(
     ctx: Context,
-    Extension(provider): Extension<Properties>,
+    Extension(provider): Extension<PropertiesLayer>,
     Path((organization_id, project_id, prop_id)): Path<(u64, u64, u64)>,
 ) -> Result<Json<Property>> {
     Ok(Json(
@@ -129,7 +129,7 @@ async fn delete_event(
 
 async fn delete_user(
     ctx: Context,
-    Extension(provider): Extension<Properties>,
+    Extension(provider): Extension<PropertiesLayer>,
     Path((organization_id, project_id, prop_id)): Path<(u64, u64, u64)>,
 ) -> Result<Json<Property>> {
     Ok(Json(

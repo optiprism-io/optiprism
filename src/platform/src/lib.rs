@@ -4,18 +4,17 @@ pub mod accounts;
 pub mod auth;
 pub mod context;
 pub mod custom_events;
-pub mod custom_properties;
 pub mod dashboards;
 // pub mod datatype;
 pub mod error;
 pub mod event_records;
 pub mod events;
-pub mod group_records;
+mod group_records;
 pub mod http;
 pub mod properties;
 pub mod queries;
 pub mod reports;
-pub mod stub;
+// pub mod stub;
 
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -55,66 +54,52 @@ use serde_json::json;
 use serde_json::Number;
 use serde_json::Value;
 
+use crate::accounts::Accounts;
+use crate::custom_events::CustomEvents;
+use crate::dashboards::Dashboards;
+use crate::events::Events;
+use crate::properties::Properties;
+use crate::queries::Queries;
+use crate::reports::Reports;
+
 pub struct PlatformProvider {
-    pub events: Arc<dyn events::Provider>,
-    pub custom_events: Arc<dyn custom_events::Provider>,
-    pub event_properties: Arc<dyn properties::Provider>,
-    pub user_properties: Arc<dyn properties::Provider>,
-    pub system_properties: Arc<dyn properties::Provider>,
-    pub custom_properties: Arc<dyn custom_properties::Provider>,
-    pub accounts: Arc<dyn accounts::Provider>,
+    pub events: Arc<Events>,
+    pub custom_events: Arc<CustomEvents>,
+    pub event_properties: Arc<Properties>,
+    pub user_properties: Arc<Properties>,
+    pub system_properties: Arc<Properties>,
+    pub accounts: Arc<Accounts>,
     pub auth: Arc<dyn auth::Provider>,
-    pub query: Arc<dyn queries::Provider>,
-    pub dashboards: Arc<dyn dashboards::Provider>,
-    pub reports: Arc<dyn reports::Provider>,
-    pub event_records: Arc<dyn event_records::Provider>,
-    pub group_records: Arc<dyn group_records::Provider>,
+    pub query: Arc<Queries>,
+    pub dashboards: Arc<Dashboards>,
+    pub reports: Arc<Reports>,
+    // pub event_records: Arc<dyn event_records::Provider>,
+    // pub group_records: Arc<dyn group_records::Provider>,
 }
 
 impl PlatformProvider {
     pub fn new(
         md: Arc<MetadataProvider>,
-        query_prov: Arc<query::ProviderImpl>,
+        query_prov: Arc<query::QueryProvider>,
         auth_cfg: auth::Config,
     ) -> Self {
         Self {
-            events: Arc::new(events::ProviderImpl::new(md.events.clone())),
-            custom_events: Arc::new(custom_events::ProviderImpl::new(md.custom_events.clone())),
-            event_properties: Arc::new(properties::ProviderImpl::new_event(
+            events: Arc::new(events::Events::new(md.events.clone())),
+            custom_events: Arc::new(custom_events::CustomEvents::new(md.custom_events.clone())),
+            event_properties: Arc::new(properties::Properties::new_event(
                 md.event_properties.clone(),
             )),
-            user_properties: Arc::new(properties::ProviderImpl::new_user(
-                md.user_properties.clone(),
-            )),
-            system_properties: Arc::new(properties::ProviderImpl::new_user(
+            user_properties: Arc::new(properties::Properties::new_user(md.user_properties.clone())),
+            system_properties: Arc::new(properties::Properties::new_user(
                 md.system_properties.clone(),
             )),
-            custom_properties: Arc::new(stub::CustomProperties {}),
-            accounts: Arc::new(accounts::ProviderImpl::new(md.accounts.clone())),
+            accounts: Arc::new(accounts::Accounts::new(md.accounts.clone())),
             auth: Arc::new(auth::ProviderImpl::new(md.accounts.clone(), auth_cfg)),
-            query: Arc::new(queries::ProviderImpl::new(query_prov)),
-            dashboards: Arc::new(dashboards::ProviderImpl::new(md.dashboards.clone())),
-            reports: Arc::new(reports::ProviderImpl::new(md.reports.clone())),
-            event_records: Arc::new(stub::EventRecords {}),
-            group_records: Arc::new(stub::GroupRecords {}),
-        }
-    }
-
-    pub fn new_stub() -> Self {
-        PlatformProvider {
-            events: Arc::new(stub::Events {}),
-            custom_events: Arc::new(stub::CustomEvents {}),
-            event_properties: Arc::new(stub::Properties {}),
-            user_properties: Arc::new(stub::Properties {}),
-            system_properties: Arc::new(stub::Properties {}),
-            custom_properties: Arc::new(stub::CustomProperties {}),
-            accounts: Arc::new(stub::Accounts {}),
-            auth: Arc::new(stub::Auth {}),
-            query: Arc::new(stub::Queries {}),
-            dashboards: Arc::new(stub::Dashboards {}),
-            reports: Arc::new(stub::Reports {}),
-            event_records: Arc::new(stub::EventRecords {}),
-            group_records: Arc::new(stub::GroupRecords {}),
+            query: Arc::new(queries::Queries::new(query_prov)),
+            dashboards: Arc::new(dashboards::Dashboards::new(md.dashboards.clone())),
+            reports: Arc::new(reports::Reports::new(md.reports.clone())),
+            // event_records: Arc::new(stub::EventRecords {}),
+            // group_records: Arc::new(stub::GroupRecords {}),
         }
     }
 }

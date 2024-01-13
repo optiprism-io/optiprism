@@ -3,7 +3,7 @@ use std::io;
 use std::sync::Arc;
 
 use common::DECIMAL_SCALE;
-use metadata::dictionaries;
+use metadata::dictionaries::Dictionaries;
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
 use rand::rngs::ThreadRng;
@@ -55,8 +55,8 @@ impl Product {
 }
 
 pub struct ProductProvider {
-    dicts: Arc<dyn dictionaries::Provider>,
-    properties: Arc<dyn metadata::properties::Provider>,
+    dicts: Arc<Dictionaries>,
+    properties: Arc<metadata::properties::Properties>,
     org_id: u64,
     proj_id: u64,
     pub products: Vec<Product>,
@@ -76,8 +76,8 @@ impl ProductProvider {
         org_id: u64,
         proj_id: u64,
         rng: &mut ThreadRng,
-        dicts: Arc<dyn dictionaries::Provider>,
-        properties: Arc<dyn metadata::properties::Provider>,
+        dicts: Arc<Dictionaries>,
+        properties: Arc<metadata::properties::Properties>,
         rdr: R,
     ) -> Result<Self> {
         let mut rdr = csv::Reader::from_reader(rdr);

@@ -14,7 +14,7 @@ use datafusion_common::DFSchemaRef;
 use datafusion_expr::logical_plan::LogicalPlan;
 use datafusion_expr::logical_plan::UserDefinedLogicalNode;
 use datafusion_expr::Expr;
-use metadata::dictionaries::provider_impl::SingleDictionaryProvider;
+use metadata::dictionaries::SingleDictionaryProvider;
 
 use crate::Result;
 

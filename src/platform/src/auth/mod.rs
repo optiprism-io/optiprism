@@ -9,7 +9,9 @@ use serde::Deserialize;
 use serde::Serialize;
 use validator::validate_email;
 
+use crate::accounts::Account;
 use crate::error::ValidationError;
+use crate::Context;
 use crate::Result;
 
 #[async_trait]
@@ -17,6 +19,9 @@ pub trait Provider: Sync + Send {
     async fn sign_up(&self, req: SignUpRequest) -> Result<TokensResponse>;
     async fn log_in(&self, req: LogInRequest) -> Result<TokensResponse>;
     async fn refresh_token(&self, refresh_token: &str) -> Result<TokensResponse>;
+    async fn update_name(&self, ctx: Context, req: UpdateNameRequest) -> Result<Account>;
+    async fn update_email(&self, ctx: Context, req: UpdateEmailRequest) -> Result<Account>;
+    async fn update_password(&self, ctx: Context, req: UpdatePasswordRequest) -> Result<Account>;
 }
 
 #[derive(Clone)]
@@ -83,4 +88,19 @@ pub struct RecoverPasswordRequest {
 pub struct TokensResponse {
     pub access_token: String,
     pub refresh_token: String,
+}
+
+pub struct UpdateNameRequest {
+    pub name: String,
+    pub current_password: String,
+}
+
+pub struct UpdateEmailRequest {
+    pub email: String,
+    pub current_password: String,
+}
+
+pub struct UpdatePasswordRequest {
+    pub current_password: String,
+    pub new_password: String,
 }

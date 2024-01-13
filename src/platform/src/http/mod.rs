@@ -1,7 +1,6 @@
 pub mod accounts;
 pub mod auth;
 pub mod custom_events;
-pub mod custom_properties;
 pub mod dashboards;
 pub mod event_records;
 pub mod events;
@@ -26,14 +25,15 @@ use tower_http::trace::TraceLayer;
 use tracing::info;
 
 use crate::context::print_request_response;
+use crate::properties::Properties;
 use crate::PlatformProvider;
 
 pub struct Service {}
 
 #[derive(Clone)]
-pub struct Properties {
-    event: Arc<dyn crate::properties::Provider>,
-    user: Arc<dyn crate::properties::Provider>,
+pub struct PropertiesLayer {
+    event: Arc<Properties>,
+    user: Arc<Properties>,
 }
 
 pub fn attach_routes(
@@ -49,7 +49,6 @@ pub fn attach_routes(
     router = custom_events::attach_routes(router);
     router = properties::attach_event_routes(router);
     router = properties::attach_user_routes(router);
-    router = custom_properties::attach_routes(router);
     router = queries::attach_routes(router);
     router = dashboards::attach_routes(router);
     router = reports::attach_routes(router);
@@ -70,17 +69,16 @@ pub fn attach_routes(
         .layer(Extension(platform.auth.clone()))
         .layer(Extension(platform.events.clone()))
         .layer(Extension(platform.custom_events.clone()))
-        .layer(Extension(Properties {
+        .layer(Extension(PropertiesLayer {
             event: platform.event_properties.clone(),
             user: platform.user_properties.clone(),
         }))
-        .layer(Extension(platform.custom_properties.clone()))
         .layer(Extension(auth_cfg))
         .layer(Extension(platform.query.clone()))
         .layer(Extension(platform.dashboards.clone()))
-        .layer(Extension(platform.reports.clone()))
-        .layer(Extension(platform.event_records.clone()))
-        .layer(Extension(platform.group_records.clone()));
+        .layer(Extension(platform.reports.clone()));
+    // .layer(Extension(platform.event_records.clone()))
+    // .layer(Extension(platform.group_records.clone()));
 
     router = router
         .layer(CookieManagerLayer::new())

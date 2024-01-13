@@ -7,7 +7,7 @@ use common::types::USER_PROPERTY_DEVICE_MODEL;
 use common::types::USER_PROPERTY_OS;
 use common::types::USER_PROPERTY_OS_FAMILY;
 use common::types::USER_PROPERTY_OS_VERSION_MAJOR;
-use metadata::dictionaries;
+use metadata::dictionaries::Dictionaries;
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
 use rand::rngs::ThreadRng;
@@ -65,8 +65,8 @@ impl ProfileProvider {
     pub fn try_new_from_csv<R: io::Read>(
         org_id: u64,
         proj_id: u64,
-        dicts: &Arc<dyn dictionaries::Provider>,
-        properties: &Arc<dyn metadata::properties::Provider>,
+        dicts: &Arc<Dictionaries>,
+        properties: &Arc<metadata::properties::Properties>,
         geo_rdr: R,
         device_rdr: R,
     ) -> Result<Self> {
