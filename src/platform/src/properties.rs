@@ -1,12 +1,12 @@
-mod provider_impl;
+use std::sync::Arc;
 
 use axum::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
+use common::rbac::ProjectPermission;
 use common::types::DType;
 use common::types::OptionalProperty;
 use metadata::properties;
-pub use provider_impl::ProviderImpl;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -15,43 +15,99 @@ use crate::ListResponse;
 use crate::PlatformError;
 use crate::Result;
 
-#[async_trait]
-pub trait Provider: Sync + Send {
-    async fn get_by_id(
+pub struct Properties {
+    prov: Arc<metadata::properties::Properties>,
+}
+
+impl Properties {
+    pub fn new_user(prov: Arc<metadata::properties::Properties>) -> Self {
+        Self { prov }
+    }
+
+    pub fn new_event(prov: Arc<metadata::properties::Properties>) -> Self {
+        Self { prov }
+    }
+    pub async fn get_by_id(
         &self,
         ctx: Context,
         organization_id: u64,
         project_id: u64,
         id: u64,
-    ) -> Result<Property>;
-    async fn get_by_name(
+    ) -> Result<Property> {
+        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ViewSchema)?;
+
+        self.prov
+            .get_by_id(organization_id, project_id, id)?
+            .try_into()
+    }
+
+    pub async fn get_by_name(
         &self,
         ctx: Context,
         organization_id: u64,
         project_id: u64,
         name: &str,
-    ) -> Result<Property>;
-    async fn list(
+    ) -> Result<Property> {
+        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ViewSchema)?;
+
+        let event = self.prov.get_by_name(organization_id, project_id, name)?;
+
+        event.try_into()
+    }
+
+    pub async fn list(
         &self,
         ctx: Context,
         organization_id: u64,
         project_id: u64,
-    ) -> Result<ListResponse<Property>>;
-    async fn update(
+    ) -> Result<ListResponse<Property>> {
+        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ViewSchema)?;
+        let resp = self.prov.list(organization_id, project_id)?;
+
+        resp.try_into()
+    }
+
+    pub async fn update(
         &self,
         ctx: Context,
         organization_id: u64,
         project_id: u64,
         property_id: u64,
         req: UpdatePropertyRequest,
-    ) -> Result<Property>;
-    async fn delete(
+    ) -> Result<Property> {
+        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ManageSchema)?;
+
+        let md_req = metadata::properties::UpdatePropertyRequest {
+            updated_by: ctx.account_id.unwrap(),
+            tags: req.tags,
+            description: req.description,
+            display_name: req.display_name,
+            status: req.status.into(),
+            is_dictionary: Default::default(),
+            dictionary_type: Default::default(),
+            ..Default::default()
+        };
+
+        let prop = self
+            .prov
+            .update(organization_id, project_id, property_id, md_req)?;
+
+        prop.try_into()
+    }
+
+    pub async fn delete(
         &self,
         ctx: Context,
         organization_id: u64,
         project_id: u64,
         id: u64,
-    ) -> Result<Property>;
+    ) -> Result<Property> {
+        ctx.check_project_permission(organization_id, project_id, ProjectPermission::DeleteSchema)?;
+
+        self.prov
+            .delete(organization_id, project_id, id)?
+            .try_into()
+    }
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone, Eq, PartialEq)]

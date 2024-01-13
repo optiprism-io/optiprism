@@ -38,16 +38,15 @@ use crate::Column;
 use crate::ColumnType;
 use crate::Context;
 use crate::DataTable;
-use crate::Provider;
 use crate::Result;
 
-pub struct ProviderImpl {
+pub struct QueryProvider {
     metadata: Arc<MetadataProvider>,
     db: Arc<OptiDBImpl>,
     table_source: Arc<DefaultTableSource>,
 }
 
-impl ProviderImpl {
+impl QueryProvider {
     pub fn try_new_from_provider(
         metadata: Arc<MetadataProvider>,
         db: Arc<OptiDBImpl>,
@@ -66,9 +65,8 @@ impl ProviderImpl {
     // }
 }
 
-#[async_trait]
-impl Provider for ProviderImpl {
-    async fn property_values(&self, ctx: Context, req: PropertyValues) -> Result<ArrayRef> {
+impl QueryProvider {
+    pub async fn property_values(&self, ctx: Context, req: PropertyValues) -> Result<ArrayRef> {
         let fields = prop_val_fields(&ctx, &req, self.metadata.clone())?;
         let schema = self.db.schema1("events")?;
         let projection = fields
@@ -101,7 +99,11 @@ impl Provider for ProviderImpl {
         Ok(result.column(0).to_owned())
     }
 
-    async fn event_segmentation(&self, ctx: Context, es: EventSegmentation) -> Result<DataTable> {
+    pub async fn event_segmentation(
+        &self,
+        ctx: Context,
+        es: EventSegmentation,
+    ) -> Result<DataTable> {
         let cur_time = Utc::now();
         let schema = self.db.schema1("events")?;
         let fields = es_fields(&ctx, &es, self.metadata.clone())?;

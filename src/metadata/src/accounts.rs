@@ -48,7 +48,7 @@ impl Accounts {
         Accounts { db }
     }
 
-    fn _get_by_id(&self, tx: &Transaction<TransactionDB>, id: u64) -> Result<Account> {
+    fn get_by_id_(&self, tx: &Transaction<TransactionDB>, id: u64) -> Result<Account> {
         let key = make_data_value_key(NAMESPACE, id);
         match tx.get(key)? {
             None => Err(MetadataError::NotFound("account not found".to_string())),
@@ -76,7 +76,7 @@ impl Accounts {
 
     pub fn get_by_id(&self, id: u64) -> Result<Account> {
         let tx = self.db.transaction();
-        self._get_by_id(&tx, id)
+        self.get_by_id_(&tx, id)
     }
 
     pub fn get_by_email(&self, email: &str) -> Result<Account> {
@@ -93,7 +93,7 @@ impl Accounts {
     pub fn update(&self, account_id: u64, req: UpdateAccountRequest) -> Result<Account> {
         let tx = self.db.transaction();
 
-        let prev_account = self._get_by_id(&tx, account_id)?;
+        let prev_account = self.get_by_id_(&tx, account_id)?;
         let mut account = prev_account.clone();
 
         let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
@@ -134,7 +134,7 @@ impl Accounts {
 
     pub fn delete(&self, id: u64) -> Result<Account> {
         let tx = self.db.transaction();
-        let account = self._get_by_id(&tx, id)?;
+        let account = self.get_by_id_(&tx, id)?;
         tx.delete(make_data_value_key(NAMESPACE, id))?;
 
         delete_index(&tx, index_keys(&account.email).as_ref())?;

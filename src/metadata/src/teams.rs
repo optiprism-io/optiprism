@@ -52,7 +52,7 @@ impl Teams {
         Teams { db }
     }
 
-    fn _get_by_id(
+    fn get_by_id_(
         &self,
         tx: &Transaction<TransactionDB>,
         organization_id: u64,
@@ -102,7 +102,7 @@ impl Teams {
     pub fn get_by_id(&self, organization_id: u64, team_id: u64) -> Result<Team> {
         let tx = self.db.transaction();
 
-        self._get_by_id(&tx, organization_id, team_id)
+        self.get_by_id_(&tx, organization_id, team_id)
     }
 
     pub fn list(&self, organization_id: u64) -> Result<ListResponse<Team>> {
@@ -119,7 +119,7 @@ impl Teams {
     ) -> Result<Team> {
         let tx = self.db.transaction();
 
-        let prev_team = self._get_by_id(&tx, organization_id, team_id)?;
+        let prev_team = self.get_by_id_(&tx, organization_id, team_id)?;
         let mut team = prev_team.clone();
 
         let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
@@ -149,7 +149,7 @@ impl Teams {
     pub fn delete(&self, organization_id: u64, team_id: u64) -> Result<Team> {
         let tx = self.db.transaction();
 
-        let team = self._get_by_id(&tx, organization_id, team_id)?;
+        let team = self.get_by_id_(&tx, organization_id, team_id)?;
         tx.delete(make_data_value_key(
             org_ns(organization_id, NAMESPACE).as_slice(),
             team_id,

@@ -118,7 +118,7 @@ impl CustomEvents {
         Ok(())
     }
 
-    fn _get_by_id(
+    fn get_by_id_(
         &self,
         tx: &Transaction<TransactionDB>,
         organization_id: u64,
@@ -193,7 +193,7 @@ impl CustomEvents {
     pub fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<CustomEvent> {
         let tx = self.db.transaction();
 
-        self._get_by_id(&tx, organization_id, project_id, id)
+        self.get_by_id_(&tx, organization_id, project_id, id)
     }
 
     pub fn get_by_name(
@@ -231,7 +231,7 @@ impl CustomEvents {
     ) -> Result<CustomEvent> {
         let tx = self.db.transaction();
 
-        let prev_event = self._get_by_id(&tx, organization_id, project_id, event_id)?;
+        let prev_event = self.get_by_id_(&tx, organization_id, project_id, event_id)?;
         let mut event = prev_event.clone();
 
         let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
@@ -290,7 +290,7 @@ impl CustomEvents {
 
     pub fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<CustomEvent> {
         let tx = self.db.transaction();
-        let event = self._get_by_id(&tx, organization_id, project_id, id)?;
+        let event = self.get_by_id_(&tx, organization_id, project_id, id)?;
         tx.delete(make_data_value_key(
             org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
             id,

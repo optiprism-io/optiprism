@@ -79,7 +79,7 @@ impl Events {
         Events { db }
     }
 
-    fn _get_by_id(
+    fn get_by_id_(
         &self,
         tx: &Transaction<TransactionDB>,
         organization_id: u64,
@@ -97,7 +97,7 @@ impl Events {
         }
     }
 
-    fn _create(
+    fn create_(
         &self,
         tx: &Transaction<TransactionDB>,
         organization_id: u64,
@@ -149,7 +149,7 @@ impl Events {
         Ok(event)
     }
 
-    fn _get_by_name(
+    fn get_by_name_(
         &self,
         tx: &Transaction<TransactionDB>,
         organization_id: u64,
@@ -175,7 +175,7 @@ impl Events {
         req: CreateEventRequest,
     ) -> Result<Event> {
         let tx = self.db.transaction();
-        let ret = self._create(&tx, organization_id, project_id, req);
+        let ret = self.create_(&tx, organization_id, project_id, req);
         tx.commit()?;
         ret
     }
@@ -187,13 +187,13 @@ impl Events {
         req: CreateEventRequest,
     ) -> Result<Event> {
         let tx = self.db.transaction();
-        match self._get_by_name(&tx, organization_id, project_id, req.name.as_str()) {
+        match self.get_by_name_(&tx, organization_id, project_id, req.name.as_str()) {
             Ok(event) => return Ok(event),
             Err(MetadataError::NotFound(_)) => {}
             other => return other,
         }
 
-        let ret = self._create(&tx, organization_id, project_id, req);
+        let ret = self.create_(&tx, organization_id, project_id, req);
         tx.commit()?;
         ret
     }
@@ -201,12 +201,12 @@ impl Events {
     pub fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event> {
         let tx = self.db.transaction();
 
-        self._get_by_id(&tx, organization_id, project_id, id)
+        self.get_by_id_(&tx, organization_id, project_id, id)
     }
 
     pub fn get_by_name(&self, organization_id: u64, project_id: u64, name: &str) -> Result<Event> {
         let tx = self.db.transaction();
-        self._get_by_name(&tx, organization_id, project_id, name)
+        self.get_by_name_(&tx, organization_id, project_id, name)
     }
 
     pub fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Event>> {
@@ -226,7 +226,7 @@ impl Events {
     ) -> Result<Event> {
         let tx = self.db.transaction();
 
-        let prev_event = self._get_by_id(&tx, organization_id, project_id, event_id)?;
+        let prev_event = self.get_by_id_(&tx, organization_id, project_id, event_id)?;
         let mut event = prev_event.clone();
 
         let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
@@ -298,7 +298,7 @@ impl Events {
     ) -> Result<Event> {
         let tx = self.db.transaction();
 
-        let mut event = self._get_by_id(&tx, organization_id, project_id, event_id)?;
+        let mut event = self.get_by_id_(&tx, organization_id, project_id, event_id)?;
         event.properties = match event.properties {
             None => Some(vec![prop_id]),
             Some(props) => match props.iter().find(|x| prop_id == **x) {
@@ -330,7 +330,7 @@ impl Events {
         prop_id: u64,
     ) -> Result<Event> {
         let tx = self.db.transaction();
-        let mut event = self._get_by_id(&tx, organization_id, project_id, event_id)?;
+        let mut event = self.get_by_id_(&tx, organization_id, project_id, event_id)?;
         event.properties = match event.properties {
             None => {
                 return Err(MetadataError::NotFound("property not found".to_string()));
@@ -358,7 +358,7 @@ impl Events {
 
     pub fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event> {
         let tx = self.db.transaction();
-        let event = self._get_by_id(&tx, organization_id, project_id, id)?;
+        let event = self.get_by_id_(&tx, organization_id, project_id, id)?;
         tx.delete(make_data_value_key(
             org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
             id,

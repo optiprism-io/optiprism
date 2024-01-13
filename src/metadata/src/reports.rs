@@ -30,7 +30,7 @@ impl Reports {
         Reports { db }
     }
 
-    fn _get_by_id(
+    fn get_by_id_(
         &self,
         tx: &Transaction<TransactionDB>,
         organization_id: u64,
@@ -90,7 +90,7 @@ impl Reports {
     pub fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Report> {
         let tx = self.db.transaction();
 
-        self._get_by_id(&tx, organization_id, project_id, id)
+        self.get_by_id_(&tx, organization_id, project_id, id)
     }
 
     pub fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Report>> {
@@ -109,7 +109,7 @@ impl Reports {
         req: UpdateReportRequest,
     ) -> Result<Report> {
         let tx = self.db.transaction();
-        let prev_report = self._get_by_id(&tx, organization_id, project_id, report_id)?;
+        let prev_report = self.get_by_id_(&tx, organization_id, project_id, report_id)?;
         let mut report = prev_report.clone();
 
         report.updated_at = Some(Utc::now());
@@ -141,7 +141,7 @@ impl Reports {
 
     pub fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Report> {
         let tx = self.db.transaction();
-        let report = self._get_by_id(&tx, organization_id, project_id, id)?;
+        let report = self.get_by_id_(&tx, organization_id, project_id, id)?;
         tx.delete(make_data_value_key(
             org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
             id,

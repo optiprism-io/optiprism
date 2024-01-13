@@ -1,10 +1,11 @@
-pub mod provider_impl;
+use std::sync::Arc;
 
 use axum::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
+use common::rbac::ProjectPermission;
 use common::types::OptionalProperty;
-pub use provider_impl::ProviderImpl;
+use metadata::reports::Reports as MDReports;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -13,43 +14,122 @@ use crate::Context;
 use crate::ListResponse;
 use crate::Result;
 
-#[async_trait]
-pub trait Provider: Sync + Send {
-    async fn create(
+pub struct Reports {
+    prov: Arc<MDReports>,
+}
+
+impl Reports {
+    pub fn new(prov: Arc<MDReports>) -> Self {
+        Self { prov }
+    }
+    pub async fn create(
         &self,
         ctx: Context,
         organization_id: u64,
         project_id: u64,
         request: CreateReportRequest,
-    ) -> Result<Report>;
-    async fn get_by_id(
+    ) -> Result<Report> {
+        ctx.check_project_permission(
+            organization_id,
+            project_id,
+            ProjectPermission::ManageReports,
+        )?;
+
+        let report = self.prov.create(
+            organization_id,
+            project_id,
+            metadata::reports::CreateReportRequest {
+                created_by: ctx.account_id.unwrap(),
+                tags: request.tags,
+                name: request.name,
+                description: request.description,
+                typ: request.typ.into(),
+                query: request.query.into(),
+            },
+        )?;
+
+        Ok(report.into())
+    }
+
+    pub async fn get_by_id(
         &self,
         ctx: Context,
         organization_id: u64,
         project_id: u64,
         id: u64,
-    ) -> Result<Report>;
-    async fn list(
+    ) -> Result<Report> {
+        ctx.check_project_permission(
+            organization_id,
+            project_id,
+            ProjectPermission::ExploreReports,
+        )?;
+
+        Ok(self.prov.get_by_id(organization_id, project_id, id)?.into())
+    }
+
+    pub async fn list(
         &self,
         ctx: Context,
         organization_id: u64,
         project_id: u64,
-    ) -> Result<ListResponse<Report>>;
-    async fn update(
+    ) -> Result<ListResponse<Report>> {
+        ctx.check_project_permission(
+            organization_id,
+            project_id,
+            ProjectPermission::ExploreReports,
+        )?;
+        let resp = self.prov.list(organization_id, project_id)?;
+        Ok(ListResponse {
+            data: resp.data.into_iter().map(|v| v.into()).collect(),
+            meta: resp.meta.into(),
+        })
+    }
+
+    pub async fn update(
         &self,
         ctx: Context,
         organization_id: u64,
         project_id: u64,
-        event_id: u64,
+        report_id: u64,
         req: UpdateReportRequest,
-    ) -> Result<Report>;
-    async fn delete(
+    ) -> Result<Report> {
+        ctx.check_project_permission(
+            organization_id,
+            project_id,
+            ProjectPermission::ManageReports,
+        )?;
+
+        let md_req = metadata::reports::UpdateReportRequest {
+            updated_by: ctx.account_id.unwrap(),
+            tags: req.tags,
+            name: req.name,
+            description: req.description,
+            typ: req.typ.into(),
+            query: req.query.into(),
+        };
+
+        let report = self
+            .prov
+            .update(organization_id, project_id, report_id, md_req)?;
+
+        Ok(report.into())
+    }
+
+    pub async fn delete(
         &self,
         ctx: Context,
         organization_id: u64,
         project_id: u64,
         id: u64,
-    ) -> Result<Report>;
+    ) -> Result<Report> {
+        ctx.check_project_permission(
+            organization_id,
+            project_id,
+            ProjectPermission::ManageReports,
+        )?;
+
+        Ok(self.prov.delete(organization_id, project_id, id)?.into())
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]

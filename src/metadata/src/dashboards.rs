@@ -30,7 +30,7 @@ impl Dashboards {
         Dashboards { db }
     }
 
-    fn _get_by_id(
+    fn get_by_id_(
         &self,
         tx: &Transaction<TransactionDB>,
         organization_id: u64,
@@ -89,7 +89,7 @@ impl Dashboards {
     pub fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Dashboard> {
         let tx = self.db.transaction();
 
-        self._get_by_id(&tx, organization_id, project_id, id)
+        self.get_by_id_(&tx, organization_id, project_id, id)
     }
 
     pub fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Dashboard>> {
@@ -109,7 +109,7 @@ impl Dashboards {
     ) -> Result<Dashboard> {
         let tx = self.db.transaction();
 
-        let prev_dashboard = self._get_by_id(&tx, organization_id, project_id, dashboard_id)?;
+        let prev_dashboard = self.get_by_id_(&tx, organization_id, project_id, dashboard_id)?;
         let mut dashboard = prev_dashboard.clone();
 
         dashboard.updated_at = Some(Utc::now());
@@ -141,7 +141,7 @@ impl Dashboards {
 
     pub fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Dashboard> {
         let tx = self.db.transaction();
-        let dashboard = self._get_by_id(&tx, organization_id, project_id, id)?;
+        let dashboard = self.get_by_id_(&tx, organization_id, project_id, id)?;
         tx.delete(make_data_value_key(
             org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
             id,

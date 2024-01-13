@@ -44,7 +44,7 @@ impl Organizations {
         Organizations { db }
     }
 
-    fn _get_by_id(&self, tx: &Transaction<TransactionDB>, id: u64) -> Result<Organization> {
+    fn get_by_id_(&self, tx: &Transaction<TransactionDB>, id: u64) -> Result<Organization> {
         let key = make_data_value_key(NAMESPACE, id);
 
         match tx.get(key)? {
@@ -84,7 +84,7 @@ impl Organizations {
     pub fn get_by_id(&self, id: u64) -> Result<Organization> {
         let tx = self.db.transaction();
 
-        self._get_by_id(&tx, id)
+        self.get_by_id_(&tx, id)
     }
 
     pub fn list(&self) -> Result<ListResponse<Organization>> {
@@ -96,7 +96,7 @@ impl Organizations {
     pub fn update(&self, org_id: u64, req: UpdateOrganizationRequest) -> Result<Organization> {
         let tx = self.db.transaction();
 
-        let prev_org = self._get_by_id(&tx, org_id)?;
+        let prev_org = self.get_by_id_(&tx, org_id)?;
 
         let mut org = prev_org.clone();
 
@@ -124,7 +124,7 @@ impl Organizations {
     pub fn delete(&self, id: u64) -> Result<Organization> {
         let tx = self.db.transaction();
 
-        let org = self._get_by_id(&tx, id)?;
+        let org = self.get_by_id_(&tx, id)?;
         tx.delete(make_data_value_key(NAMESPACE, id))?;
 
         delete_index(&tx, index_keys(&org.name).as_ref())?;

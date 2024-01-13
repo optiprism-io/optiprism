@@ -10,6 +10,7 @@ use common::http::Json;
 use crate::events;
 use crate::events::CreateEventRequest;
 use crate::events::Event;
+use crate::events::Events;
 use crate::events::UpdateEventRequest;
 use crate::Context;
 use crate::ListResponse;

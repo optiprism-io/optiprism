@@ -35,7 +35,7 @@ use metadata::test_util::CreatePropertyMainRequest;
 use metadata::MetadataProvider;
 use platform::auth;
 use query::datasources::local::LocalTable;
-use query::ProviderImpl;
+use query::QueryProvider;
 use scan_dir::ScanDir;
 use store::db::OptiDBImpl;
 use store::db::Options;
@@ -409,7 +409,7 @@ pub async fn gen(args: &Test, _proj_id: u64) -> Result<(), anyhow::Error> {
         )?;
     }
 
-    let query_provider = Arc::new(ProviderImpl::try_new_from_provider(
+    let query_provider = Arc::new(QueryProvider::try_new_from_provider(
         md.clone(),
         db.clone(),
         data_provider,

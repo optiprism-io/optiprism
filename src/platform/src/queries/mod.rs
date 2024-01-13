@@ -10,10 +10,10 @@ use crate::QueryResponse;
 
 pub mod event_segmentation;
 pub mod property_values;
-pub mod provider_impl;
+pub mod queries;
 
 use axum::async_trait;
-pub use provider_impl::ProviderImpl;
+pub use queries::Queries;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
@@ -31,26 +31,6 @@ pub enum QueryResponseFormat {
 pub struct QueryParams {
     format: Option<QueryResponseFormat>,
     timestamp: Option<i64>,
-}
-
-#[async_trait]
-pub trait Provider: Sync + Send {
-    async fn event_segmentation(
-        &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
-        req: EventSegmentation,
-        params: QueryParams,
-    ) -> Result<QueryResponse>;
-
-    async fn property_values(
-        &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
-        req: ListPropertyValuesRequest,
-    ) -> Result<ListResponse<Value>>;
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]

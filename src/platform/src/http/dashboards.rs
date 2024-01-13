@@ -10,6 +10,7 @@ use common::http::Json;
 use crate::dashboards;
 use crate::dashboards::CreateDashboardRequest;
 use crate::dashboards::Dashboard;
+use crate::dashboards::Dashboards;
 use crate::dashboards::UpdateDashboardRequest;
 use crate::Context;
 use crate::ListResponse;

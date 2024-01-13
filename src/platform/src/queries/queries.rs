@@ -6,11 +6,11 @@ use chrono::DateTime;
 use chrono::Utc;
 use common::rbac::ProjectPermission;
 use query::context::Format;
+use query::QueryProvider;
 use serde_json::Value;
 
 use crate::queries::event_segmentation::EventSegmentation;
 use crate::queries::property_values::ListPropertyValuesRequest;
-use crate::queries::Provider;
 use crate::queries::QueryParams;
 use crate::queries::QueryResponseFormat;
 use crate::Context;
@@ -18,19 +18,16 @@ use crate::ListResponse;
 use crate::QueryResponse;
 use crate::Result;
 
-pub struct ProviderImpl {
-    query: Arc<dyn query::Provider>,
+pub struct Queries {
+    query: Arc<QueryProvider>,
 }
 
-impl ProviderImpl {
-    pub fn new(query: Arc<dyn query::Provider>) -> Self {
+impl Queries {
+    pub fn new(query: Arc<QueryProvider>) -> Self {
         Self { query }
     }
-}
 
-#[async_trait]
-impl Provider for ProviderImpl {
-    async fn event_segmentation(
+    pub async fn event_segmentation(
         &self,
         ctx: Context,
         organization_id: u64,
@@ -81,7 +78,7 @@ impl Provider for ProviderImpl {
         Ok(resp)
     }
 
-    async fn property_values(
+    pub async fn property_values(
         &self,
         ctx: Context,
         organization_id: u64,

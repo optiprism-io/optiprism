@@ -29,6 +29,7 @@ use common::rbac::PROJECT_PERMISSIONS;
 use hyper::Body;
 use serde_json::Value;
 
+use crate::accounts::Accounts;
 use crate::auth;
 use crate::auth::token::parse_access_token;
 use crate::error::AuthError;
@@ -178,7 +179,7 @@ where S: Send + Sync
         let claims = parse_access_token(bearer.token(), &auth_cfg.access_token_key)
             .map_err(|err| err.wrap_into(AuthError::CantParseAccessToken))?;
         let Extension(md_acc_prov) =
-            Extension::<Arc<dyn metadata::accounts::Provider>>::from_request_parts(parts, state)
+            Extension::<Arc<metadata::accounts::Accounts>>::from_request_parts(parts, state)
                 .await
                 .map_err(|err| PlatformError::Internal(err.to_string()))?;
 

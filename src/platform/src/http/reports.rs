@@ -10,6 +10,7 @@ use common::http::Json;
 use crate::reports;
 use crate::reports::CreateReportRequest;
 use crate::reports::Report;
+use crate::reports::Reports;
 use crate::reports::UpdateReportRequest;
 use crate::Context;
 use crate::ListResponse;

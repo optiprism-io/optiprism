@@ -10,9 +10,6 @@ use serde::Serialize;
 use validator::validate_email;
 
 use crate::accounts::Account;
-use crate::accounts::UpdateEmailRequest;
-use crate::accounts::UpdateNameRequest;
-use crate::accounts::UpdatePasswordRequest;
 use crate::error::ValidationError;
 use crate::Context;
 use crate::Result;

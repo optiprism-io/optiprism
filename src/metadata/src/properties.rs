@@ -142,7 +142,7 @@ impl Properties {
         }
     }
 
-    fn _get_by_name(
+    fn get_by_name_(
         &self,
         tx: &Transaction<TransactionDB>,
         organization_id: u64,
@@ -168,7 +168,7 @@ impl Properties {
         Ok(deserialize(&data)?)
     }
 
-    fn _get_by_id(
+    fn get_by_id_(
         &self,
         tx: &Transaction<TransactionDB>,
         organization_id: u64,
@@ -195,7 +195,7 @@ impl Properties {
         }
     }
 
-    fn _create(
+    fn create_(
         &self,
         tx: &Transaction<TransactionDB>,
         organization_id: u64,
@@ -294,7 +294,7 @@ impl Properties {
         req: CreatePropertyRequest,
     ) -> Result<Property> {
         let tx = self.db.transaction();
-        let ret = self._create(&tx, organization_id, project_id, req)?;
+        let ret = self.create_(&tx, organization_id, project_id, req)?;
         tx.commit()?;
 
         Ok(ret)
@@ -307,12 +307,12 @@ impl Properties {
         req: CreatePropertyRequest,
     ) -> Result<Property> {
         let tx = self.db.transaction();
-        match self._get_by_name(&tx, organization_id, project_id, req.name.as_str()) {
+        match self.get_by_name_(&tx, organization_id, project_id, req.name.as_str()) {
             Ok(event) => return Ok(event),
             Err(MetadataError::NotFound(_)) => {}
             Err(err) => return Err(err),
         }
-        let ret = self._create(&tx, organization_id, project_id, req)?;
+        let ret = self.create_(&tx, organization_id, project_id, req)?;
 
         tx.commit()?;
 
@@ -321,7 +321,7 @@ impl Properties {
 
     pub fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Property> {
         let tx = self.db.transaction();
-        self._get_by_id(&tx, organization_id, project_id, id)
+        self.get_by_id_(&tx, organization_id, project_id, id)
     }
 
     pub fn get_by_name(
@@ -331,7 +331,7 @@ impl Properties {
         name: &str,
     ) -> Result<Property> {
         let tx = self.db.transaction();
-        self._get_by_name(&tx, organization_id, project_id, name)
+        self.get_by_name_(&tx, organization_id, project_id, name)
     }
 
     pub fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Property>> {
@@ -446,7 +446,7 @@ impl Properties {
 
     pub fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Property> {
         let tx = self.db.transaction();
-        let prop = self._get_by_id(&tx, organization_id, project_id, id)?;
+        let prop = self.get_by_id_(&tx, organization_id, project_id, id)?;
         tx.delete(make_data_value_key(
             org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
             id,

@@ -1,10 +1,11 @@
-pub mod provider_impl;
+use std::sync::Arc;
 
 use axum::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
+use common::rbac::ProjectPermission;
 use common::types::OptionalProperty;
-pub use provider_impl::ProviderImpl;
+use metadata::events::Events as MDEvents;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -13,66 +14,151 @@ use crate::ListResponse;
 use crate::PlatformError;
 use crate::Result;
 
-#[async_trait]
-pub trait Provider: Sync + Send {
-    async fn create(
+pub struct Events {
+    prov: Arc<MDEvents>,
+}
+
+impl Events {
+    pub fn new(prov: Arc<MDEvents>) -> Self {
+        Self { prov }
+    }
+    pub async fn create(
         &self,
         ctx: Context,
         organization_id: u64,
         project_id: u64,
         request: CreateEventRequest,
-    ) -> Result<Event>;
-    async fn get_by_id(
+    ) -> Result<Event> {
+        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ManageSchema)?;
+
+        let event = self.prov.create(
+            organization_id,
+            project_id,
+            metadata::events::CreateEventRequest {
+                created_by: ctx.account_id.unwrap(),
+                tags: request.tags,
+                name: request.name,
+                display_name: request.display_name,
+                description: request.description,
+                status: request.status.into(),
+                is_system: request.is_system,
+                properties: None,
+                custom_properties: None,
+            },
+        )?;
+
+        event.try_into()
+    }
+
+    pub async fn get_by_id(
         &self,
         ctx: Context,
         organization_id: u64,
         project_id: u64,
         id: u64,
-    ) -> Result<Event>;
-    async fn get_by_name(
+    ) -> Result<Event> {
+        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ViewSchema)?;
+
+        self.prov
+            .get_by_id(organization_id, project_id, id)?
+            .try_into()
+    }
+
+    pub async fn get_by_name(
         &self,
         ctx: Context,
         organization_id: u64,
         project_id: u64,
         name: &str,
-    ) -> Result<Event>;
-    async fn list(
+    ) -> Result<Event> {
+        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ViewSchema)?;
+
+        let event = self.prov.get_by_name(organization_id, project_id, name)?;
+
+        event.try_into()
+    }
+
+    pub async fn list(
         &self,
         ctx: Context,
         organization_id: u64,
         project_id: u64,
-    ) -> Result<ListResponse<Event>>;
-    async fn update(
+    ) -> Result<ListResponse<Event>> {
+        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ViewSchema)?;
+        let resp = self.prov.list(organization_id, project_id)?;
+
+        resp.try_into()
+    }
+
+    pub async fn update(
         &self,
         ctx: Context,
         organization_id: u64,
         project_id: u64,
         event_id: u64,
         req: UpdateEventRequest,
-    ) -> Result<Event>;
-    async fn attach_property(
+    ) -> Result<Event> {
+        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ManageSchema)?;
+
+        let md_req = metadata::events::UpdateEventRequest {
+            updated_by: ctx.account_id.unwrap(),
+            tags: req.tags,
+            display_name: req.display_name,
+            description: req.description,
+            status: req.status.into(),
+            ..Default::default()
+        };
+
+        let event = self
+            .prov
+            .update(organization_id, project_id, event_id, md_req)?;
+
+        event.try_into()
+    }
+
+    pub async fn attach_property(
         &self,
         ctx: Context,
         organization_id: u64,
         project_id: u64,
         event_id: u64,
         prop_id: u64,
-    ) -> Result<Event>;
-    async fn detach_property(
+    ) -> Result<Event> {
+        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ManageSchema)?;
+
+        self.prov
+            .attach_property(organization_id, project_id, event_id, prop_id)?
+            .try_into()
+    }
+
+    pub async fn detach_property(
         &self,
         ctx: Context,
         organization_id: u64,
         project_id: u64,
         event_id: u64,
         prop_id: u64,
-    ) -> Result<Event>;
-    async fn delete(
+    ) -> Result<Event> {
+        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ManageSchema)?;
+
+        self.prov
+            .detach_property(organization_id, project_id, event_id, prop_id)?
+            .try_into()
+    }
+
+    pub async fn delete(
         &self,
         ctx: Context,
         organization_id: u64,
         project_id: u64,
         id: u64,
-    ) -> Result<Event>;
+    ) -> Result<Event> {
+        ctx.check_project_permission(organization_id, project_id, ProjectPermission::DeleteSchema)?;
+
+        self.prov
+            .delete(organization_id, project_id, id)?
+            .try_into()
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
