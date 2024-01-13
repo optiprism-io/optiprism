@@ -11,11 +11,16 @@ use super::token::make_access_token;
 use super::token::make_refresh_token;
 use super::token::parse_refresh_token;
 use super::SignUpRequest;
+use super::UpdateEmailRequest;
+use super::UpdateNameRequest;
+use super::UpdatePasswordRequest;
+use crate::accounts::Account;
 use crate::auth::Config;
 use crate::auth::LogInRequest;
 use crate::auth::Provider;
 use crate::auth::TokensResponse;
 use crate::error::AuthError;
+use crate::Context;
 use crate::Result;
 
 #[derive(Clone)]
@@ -103,5 +108,17 @@ impl Provider for ProviderImpl {
         let tokens = self.make_tokens(refresh_claims.account_id)?;
 
         Ok(tokens)
+    }
+
+    async fn update_name(&self, ctx: Context, req: UpdateNameRequest) -> Result<Account> {
+        todo!()
+    }
+
+    async fn update_email(&self, ctx: Context, req: UpdateEmailRequest) -> Result<Account> {
+        todo!()
+    }
+
+    async fn update_password(&self, ctx: Context, req: UpdatePasswordRequest) -> Result<Account> {
+        todo!()
     }
 }

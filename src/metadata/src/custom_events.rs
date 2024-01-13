@@ -2,19 +2,19 @@ use std::sync::Arc;
 
 use bincode::deserialize;
 use bincode::serialize;
+use chrono::DateTime;
 use chrono::Utc;
+use common::query::EventFilter;
 use common::query::EventRef;
 use common::types::OptionalProperty;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
+use serde::Deserialize;
+use serde::Serialize;
 
-use crate::custom_events::CreateCustomEventRequest;
-use crate::custom_events::CustomEvent;
-use crate::custom_events::Event;
-use crate::custom_events::Provider;
-use crate::custom_events::UpdateCustomEventRequest;
 use crate::error::MetadataError;
 use crate::events;
+use crate::events::Events;
 use crate::index::check_insert_constraints;
 use crate::index::check_update_constraints;
 use crate::index::delete_index;
@@ -49,15 +49,15 @@ fn index_name_key(organization_id: u64, project_id: u64, name: &str) -> Option<V
     )
 }
 
-pub struct ProviderImpl {
+pub struct CustomEvents {
     db: Arc<TransactionDB>,
-    events: Arc<dyn events::Provider>,
+    events: Arc<Events>,
     max_events_level: usize,
 }
 
-impl ProviderImpl {
-    pub fn new(db: Arc<TransactionDB>, events: Arc<dyn events::Provider>) -> Self {
-        ProviderImpl {
+impl CustomEvents {
+    pub fn new(db: Arc<TransactionDB>, events: Arc<Events>) -> Self {
+        CustomEvents {
             db,
             events,
             max_events_level: MAX_EVENTS_LEVEL,
@@ -137,10 +137,8 @@ impl ProviderImpl {
             Some(value) => Ok(deserialize(&value)?),
         }
     }
-}
 
-impl Provider for ProviderImpl {
-    fn create(
+    pub fn create(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -192,13 +190,13 @@ impl Provider for ProviderImpl {
         Ok(event)
     }
 
-    fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<CustomEvent> {
+    pub fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<CustomEvent> {
         let tx = self.db.transaction();
 
         self._get_by_id(&tx, organization_id, project_id, id)
     }
 
-    fn get_by_name(
+    pub fn get_by_name(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -216,7 +214,7 @@ impl Provider for ProviderImpl {
         Ok(deserialize::<CustomEvent>(&data)?)
     }
 
-    fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<CustomEvent>> {
+    pub fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<CustomEvent>> {
         let tx = self.db.transaction();
         list(
             &tx,
@@ -224,7 +222,7 @@ impl Provider for ProviderImpl {
         )
     }
 
-    fn update(
+    pub fn update(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -290,7 +288,7 @@ impl Provider for ProviderImpl {
         Ok(event)
     }
 
-    fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<CustomEvent> {
+    pub fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<CustomEvent> {
         let tx = self.db.transaction();
         let event = self._get_by_id(&tx, organization_id, project_id, id)?;
         tx.delete(make_data_value_key(
@@ -305,4 +303,55 @@ impl Provider for ProviderImpl {
         tx.commit()?;
         Ok(event)
     }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
+pub enum Status {
+    #[default]
+    Enabled,
+    Disabled,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct Event {
+    pub event: EventRef,
+    pub filters: Option<Vec<EventFilter>>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct CustomEvent {
+    pub id: u64,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: Option<DateTime<Utc>>,
+    pub created_by: u64,
+    pub updated_by: Option<u64>,
+    pub project_id: u64,
+    pub tags: Option<Vec<String>>,
+    pub name: String,
+    pub description: Option<String>,
+    pub status: Status,
+    pub is_system: bool,
+    pub events: Vec<Event>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct CreateCustomEventRequest {
+    pub created_by: u64,
+    pub tags: Option<Vec<String>>,
+    pub name: String,
+    pub description: Option<String>,
+    pub status: Status,
+    pub is_system: bool,
+    pub events: Vec<Event>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
+pub struct UpdateCustomEventRequest {
+    pub updated_by: u64,
+    pub tags: OptionalProperty<Option<Vec<String>>>,
+    pub name: OptionalProperty<String>,
+    pub description: OptionalProperty<Option<String>>,
+    pub status: OptionalProperty<Status>,
+    pub is_system: OptionalProperty<bool>,
+    pub events: OptionalProperty<Vec<Event>>,
 }

@@ -4,8 +4,8 @@ use std::sync::Arc;
 use common::types::OptionalProperty;
 use metadata::error::Result;
 use metadata::events::CreateEventRequest;
+use metadata::events::Events;
 use metadata::events::Provider;
-use metadata::events::ProviderImpl;
 use metadata::events::Status;
 use metadata::events::UpdateEventRequest;
 use uuid::Uuid;
@@ -15,7 +15,7 @@ fn test_events() -> Result<()> {
     path.push(format!("{}.db", Uuid::new_v4()));
 
     let db = Arc::new(metadata::rocksdb::new(path).unwrap());
-    let events: Box<dyn Provider> = Box::new(ProviderImpl::new(db.clone()));
+    let events: Box<dyn Provider> = Box::new(Events::new(db.clone()));
     let create_event_req = CreateEventRequest {
         created_by: 0,
         tags: Some(vec![]),

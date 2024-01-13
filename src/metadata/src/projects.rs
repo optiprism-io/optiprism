@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use bincode::deserialize;
 use bincode::serialize;
+use chrono::DateTime;
 use chrono::Utc;
 use common::types::OptionalProperty;
 use rand::distributions::Alphanumeric;
@@ -9,6 +10,8 @@ use rand::distributions::DistString;
 use rand::thread_rng;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
+use serde::Deserialize;
+use serde::Serialize;
 
 use crate::error::MetadataError;
 use crate::index::check_insert_constraints;
@@ -19,10 +22,6 @@ use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
 use crate::metadata::ListResponse;
-use crate::projects::CreateProjectRequest;
-use crate::projects::Project;
-use crate::projects::Provider;
-use crate::projects::UpdateProjectRequest;
 use crate::store::path_helpers::list;
 use crate::store::path_helpers::make_data_value_key;
 use crate::store::path_helpers::make_id_seq_key;
@@ -56,13 +55,13 @@ fn index_token_key(token: &str) -> Option<Vec<u8>> {
     Some(make_index_key(NAMESPACE, IDX_NAME, token).to_vec())
 }
 
-pub struct ProviderImpl {
+pub struct Projects {
     db: Arc<TransactionDB>,
 }
 
-impl ProviderImpl {
+impl Projects {
     pub fn new(db: Arc<TransactionDB>) -> Self {
-        ProviderImpl { db }
+        Projects { db }
     }
 
     fn _get_by_id(
@@ -78,10 +77,8 @@ impl ProviderImpl {
             Some(value) => Ok(deserialize(&value)?),
         }
     }
-}
 
-impl Provider for ProviderImpl {
-    fn create(&self, organization_id: u64, req: CreateProjectRequest) -> Result<Project> {
+    pub fn create(&self, organization_id: u64, req: CreateProjectRequest) -> Result<Project> {
         let tx = self.db.transaction();
         let token = Alphanumeric.sample_string(&mut thread_rng(), 64);
 
@@ -116,24 +113,24 @@ impl Provider for ProviderImpl {
         Ok(project)
     }
 
-    fn get_by_id(&self, organization_id: u64, project_id: u64) -> Result<Project> {
+    pub fn get_by_id(&self, organization_id: u64, project_id: u64) -> Result<Project> {
         let tx = self.db.transaction();
         self._get_by_id(&tx, organization_id, project_id)
     }
 
-    fn get_by_token(&self, token: &str) -> Result<Project> {
+    pub fn get_by_token(&self, token: &str) -> Result<Project> {
         let tx = self.db.transaction();
         let data = get_index(&tx, index_token_key(token).unwrap())?;
         Ok(deserialize::<Project>(&data)?)
     }
 
-    fn list(&self, organization_id: u64) -> Result<ListResponse<Project>> {
+    pub fn list(&self, organization_id: u64) -> Result<ListResponse<Project>> {
         let tx = self.db.transaction();
 
         list(&tx, org_ns(organization_id, NAMESPACE).as_slice())
     }
 
-    fn update(
+    pub fn update(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -168,7 +165,7 @@ impl Provider for ProviderImpl {
         Ok(project)
     }
 
-    fn delete(&self, organization_id: u64, project_id: u64) -> Result<Project> {
+    pub fn delete(&self, organization_id: u64, project_id: u64) -> Result<Project> {
         let tx = self.db.transaction();
 
         let project = self._get_by_id(&tx, organization_id, project_id)?;
@@ -181,4 +178,28 @@ impl Provider for ProviderImpl {
         tx.commit()?;
         Ok(project)
     }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Project {
+    pub id: u64,
+    pub created_at: DateTime<Utc>,
+    pub created_by: u64,
+    pub updated_at: Option<DateTime<Utc>>,
+    pub updated_by: Option<u64>,
+    pub organization_id: u64,
+    pub name: String,
+    pub token: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CreateProjectRequest {
+    pub created_by: u64,
+    pub name: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UpdateProjectRequest {
+    pub updated_by: u64,
+    pub name: OptionalProperty<String>,
 }

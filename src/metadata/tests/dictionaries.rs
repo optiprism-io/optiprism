@@ -1,8 +1,8 @@
 use std::env::temp_dir;
 use std::sync::Arc;
 
+use metadata::dictionaries::Dictionaries;
 use metadata::dictionaries::Provider;
-use metadata::dictionaries::ProviderImpl;
 use metadata::error::Result;
 use uuid::Uuid;
 #[test]
@@ -11,7 +11,7 @@ fn test_dictionaries() -> Result<()> {
     path.push(format!("{}.db", Uuid::new_v4()));
 
     let db = Arc::new(metadata::rocksdb::new(path).unwrap());
-    let dicts: Box<dyn Provider> = Box::new(ProviderImpl::new(db.clone()));
+    let dicts: Box<dyn Provider> = Box::new(Dictionaries::new(db.clone()));
 
     assert!(dicts.get_key(1, 1, "d1", "v1").is_err());
     assert!(dicts.get_value(1, 1, "d1", 1).is_err());

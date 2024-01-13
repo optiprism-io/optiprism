@@ -2,16 +2,15 @@ use std::sync::Arc;
 
 use bincode::deserialize;
 use bincode::serialize;
+use chrono::DateTime;
 use chrono::Utc;
 use common::types::OptionalProperty;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
+use serde::Deserialize;
+use serde::Serialize;
 
 use crate::error::MetadataError;
-use crate::events::CreateEventRequest;
-use crate::events::Event;
-use crate::events::Provider;
-use crate::events::UpdateEventRequest;
 use crate::index::check_insert_constraints;
 use crate::index::check_update_constraints;
 use crate::index::delete_index;
@@ -71,13 +70,13 @@ fn index_display_name_key(
     })
 }
 
-pub struct ProviderImpl {
+pub struct Events {
     db: Arc<TransactionDB>,
 }
 
-impl ProviderImpl {
+impl Events {
     pub fn new(db: Arc<TransactionDB>) -> Self {
-        ProviderImpl { db }
+        Events { db }
     }
 
     fn _get_by_id(
@@ -168,9 +167,7 @@ impl ProviderImpl {
 
         Ok(deserialize(&data)?)
     }
-}
 
-impl Provider for ProviderImpl {
     fn create(
         &self,
         organization_id: u64,
@@ -201,18 +198,18 @@ impl Provider for ProviderImpl {
         ret
     }
 
-    fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event> {
+    pub fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event> {
         let tx = self.db.transaction();
 
         self._get_by_id(&tx, organization_id, project_id, id)
     }
 
-    fn get_by_name(&self, organization_id: u64, project_id: u64, name: &str) -> Result<Event> {
+    pub fn get_by_name(&self, organization_id: u64, project_id: u64, name: &str) -> Result<Event> {
         let tx = self.db.transaction();
         self._get_by_name(&tx, organization_id, project_id, name)
     }
 
-    fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Event>> {
+    pub fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Event>> {
         let tx = self.db.transaction();
         list(
             &tx,
@@ -220,7 +217,7 @@ impl Provider for ProviderImpl {
         )
     }
 
-    fn update(
+    pub fn update(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -359,7 +356,7 @@ impl Provider for ProviderImpl {
         Ok(event)
     }
 
-    fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event> {
+    pub fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event> {
         let tx = self.db.transaction();
         let event = self._get_by_id(&tx, organization_id, project_id, id)?;
         tx.delete(make_data_value_key(
@@ -391,4 +388,55 @@ impl Provider for ProviderImpl {
 
         Ok(id)
     }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
+pub enum Status {
+    #[default]
+    Enabled,
+    Disabled,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct Event {
+    pub id: u64,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: Option<DateTime<Utc>>,
+    pub created_by: u64,
+    pub updated_by: Option<u64>,
+    pub project_id: u64,
+    pub tags: Option<Vec<String>>,
+    pub name: String,
+    pub display_name: Option<String>,
+    pub description: Option<String>,
+    pub status: Status,
+    pub is_system: bool,
+    pub properties: Option<Vec<u64>>,
+    pub custom_properties: Option<Vec<u64>>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct CreateEventRequest {
+    pub created_by: u64,
+    pub tags: Option<Vec<String>>,
+    pub name: String,
+    pub display_name: Option<String>,
+    pub description: Option<String>,
+    pub status: Status,
+    pub is_system: bool,
+    pub properties: Option<Vec<u64>>,
+    pub custom_properties: Option<Vec<u64>>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
+pub struct UpdateEventRequest {
+    pub updated_by: u64,
+    pub tags: OptionalProperty<Option<Vec<String>>>,
+    pub name: OptionalProperty<String>,
+    pub display_name: OptionalProperty<Option<String>>,
+    pub description: OptionalProperty<Option<String>>,
+    pub status: OptionalProperty<Status>,
+    pub is_system: OptionalProperty<bool>,
+    pub properties: OptionalProperty<Option<Vec<u64>>>,
+    pub custom_properties: OptionalProperty<Option<Vec<u64>>>,
 }

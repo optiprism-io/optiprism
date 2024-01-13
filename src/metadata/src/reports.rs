@@ -2,18 +2,18 @@ use std::sync::Arc;
 
 use bincode::deserialize;
 use bincode::serialize;
+use chrono::DateTime;
 use chrono::Utc;
+use common::query::event_segmentation::EventSegmentation;
 use common::types::OptionalProperty;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
+use serde::Deserialize;
+use serde::Serialize;
 
 use crate::error::MetadataError;
 use crate::index::next_seq;
 use crate::metadata::ListResponse;
-use crate::reports::CreateReportRequest;
-use crate::reports::Provider;
-use crate::reports::Report;
-use crate::reports::UpdateReportRequest;
 use crate::store::path_helpers::list;
 use crate::store::path_helpers::make_data_value_key;
 use crate::store::path_helpers::make_id_seq_key;
@@ -22,13 +22,12 @@ use crate::Result;
 
 const NAMESPACE: &[u8] = b"reports";
 
-pub struct ProviderImpl {
+pub struct Reports {
     db: Arc<TransactionDB>,
 }
-
-impl ProviderImpl {
+impl Reports {
     pub fn new(db: Arc<TransactionDB>) -> Self {
-        ProviderImpl { db }
+        Reports { db }
     }
 
     fn _get_by_id(
@@ -48,10 +47,8 @@ impl ProviderImpl {
             Some(value) => Ok(deserialize(&value)?),
         }
     }
-}
 
-impl Provider for ProviderImpl {
-    fn create(
+    pub fn create(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -90,13 +87,13 @@ impl Provider for ProviderImpl {
         Ok(report)
     }
 
-    fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Report> {
+    pub fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Report> {
         let tx = self.db.transaction();
 
         self._get_by_id(&tx, organization_id, project_id, id)
     }
 
-    fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Report>> {
+    pub fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Report>> {
         let tx = self.db.transaction();
         list(
             &tx,
@@ -104,7 +101,7 @@ impl Provider for ProviderImpl {
         )
     }
 
-    fn update(
+    pub fn update(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -142,7 +139,7 @@ impl Provider for ProviderImpl {
         Ok(report)
     }
 
-    fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Report> {
+    pub fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Report> {
         let tx = self.db.transaction();
         let report = self._get_by_id(&tx, organization_id, project_id, id)?;
         tx.delete(make_data_value_key(
@@ -152,4 +149,56 @@ impl Provider for ProviderImpl {
         tx.commit()?;
         Ok(report)
     }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum Type {
+    EventSegmentation,
+    Funnel,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub enum Query {
+    EventSegmentation(EventSegmentation),
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct Report {
+    pub id: u64,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: Option<DateTime<Utc>>,
+    pub created_by: u64,
+    pub updated_by: Option<u64>,
+    pub project_id: u64,
+    pub tags: Option<Vec<String>>,
+    pub name: String,
+    pub description: Option<String>,
+    #[serde(rename = "type")]
+    pub typ: Type,
+    pub query: Query,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateReportRequest {
+    pub created_by: u64,
+    pub tags: Option<Vec<String>>,
+    pub name: String,
+    pub description: Option<String>,
+    #[serde(rename = "type")]
+    pub typ: Type,
+    pub query: Query,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateReportRequest {
+    pub updated_by: u64,
+    pub tags: OptionalProperty<Option<Vec<String>>>,
+    pub name: OptionalProperty<String>,
+    pub description: OptionalProperty<Option<String>>,
+    pub typ: OptionalProperty<Type>,
+    pub query: OptionalProperty<Query>,
 }

@@ -3,11 +3,11 @@ use std::sync::Arc;
 
 use common::query::EventRef;
 use common::types::OptionalProperty;
-use metadata::custom_events::provider_impl::MAX_EVENTS_LEVEL;
+use metadata::custom_events::custom_events::MAX_EVENTS_LEVEL;
 use metadata::custom_events::CreateCustomEventRequest;
+use metadata::custom_events::CustomEvents;
 use metadata::custom_events::Event;
 use metadata::custom_events::Provider;
-use metadata::custom_events::ProviderImpl;
 use metadata::custom_events::Status;
 use metadata::custom_events::UpdateCustomEventRequest;
 use metadata::error::MetadataError;
@@ -20,9 +20,9 @@ fn get_providers(max_events_level: usize) -> (Arc<dyn events::Provider>, Arc<dyn
     let mut path = temp_dir();
     path.push(format!("{}.db", Uuid::new_v4()));
     let db = Arc::new(metadata::rocksdb::new(path).unwrap());
-    let events_prov = Arc::new(events::ProviderImpl::new(db.clone()));
+    let events_prov = Arc::new(events::Events::new(db.clone()));
     let custom_events = Arc::new(
-        ProviderImpl::new(db, events_prov.clone()).with_max_events_level(max_events_level),
+        CustomEvents::new(db, events_prov.clone()).with_max_events_level(max_events_level),
     );
 
     (events_prov, custom_events)

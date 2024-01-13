@@ -2,15 +2,14 @@ use std::sync::Arc;
 
 use bincode::deserialize;
 use bincode::serialize;
+use chrono::DateTime;
 use chrono::Utc;
 use common::types::OptionalProperty;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
+use serde::Deserialize;
+use serde::Serialize;
 
-use crate::dashboards::CreateDashboardRequest;
-use crate::dashboards::Dashboard;
-use crate::dashboards::Provider;
-use crate::dashboards::UpdateDashboardRequest;
 use crate::error::MetadataError;
 use crate::index::next_seq;
 use crate::metadata::ListResponse;
@@ -22,13 +21,13 @@ use crate::Result;
 
 const NAMESPACE: &[u8] = b"dashboards";
 
-pub struct ProviderImpl {
+pub struct Dashboards {
     db: Arc<TransactionDB>,
 }
 
-impl ProviderImpl {
+impl Dashboards {
     pub fn new(db: Arc<TransactionDB>) -> Self {
-        ProviderImpl { db }
+        Dashboards { db }
     }
 
     fn _get_by_id(
@@ -48,10 +47,8 @@ impl ProviderImpl {
             Some(value) => Ok(deserialize(&value)?),
         }
     }
-}
 
-impl Provider for ProviderImpl {
-    fn create(
+    pub fn create(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -89,13 +86,13 @@ impl Provider for ProviderImpl {
         Ok(dashboard)
     }
 
-    fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Dashboard> {
+    pub fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Dashboard> {
         let tx = self.db.transaction();
 
         self._get_by_id(&tx, organization_id, project_id, id)
     }
 
-    fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Dashboard>> {
+    pub fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Dashboard>> {
         let tx = self.db.transaction();
         list(
             &tx,
@@ -103,7 +100,7 @@ impl Provider for ProviderImpl {
         )
     }
 
-    fn update(
+    pub fn update(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -142,7 +139,7 @@ impl Provider for ProviderImpl {
         Ok(dashboard)
     }
 
-    fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Dashboard> {
+    pub fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Dashboard> {
         let tx = self.db.transaction();
         let dashboard = self._get_by_id(&tx, organization_id, project_id, id)?;
         tx.delete(make_data_value_key(
@@ -152,4 +149,57 @@ impl Provider for ProviderImpl {
         tx.commit()?;
         Ok(dashboard)
     }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum Type {
+    Report,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct Panel {
+    #[serde(rename = "type")]
+    pub typ: Type,
+    pub report_id: u64,
+    pub x: usize,
+    pub y: usize,
+    pub w: usize,
+    pub h: usize,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct Dashboard {
+    pub id: u64,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: Option<DateTime<Utc>>,
+    pub created_by: u64,
+    pub updated_by: Option<u64>,
+    pub project_id: u64,
+    pub tags: Option<Vec<String>>,
+    pub name: String,
+    pub description: Option<String>,
+    pub panels: Vec<Panel>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateDashboardRequest {
+    pub created_by: u64,
+    pub tags: Option<Vec<String>>,
+    pub name: String,
+    pub description: Option<String>,
+    pub panels: Vec<Panel>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateDashboardRequest {
+    pub updated_by: u64,
+    pub tags: OptionalProperty<Option<Vec<String>>>,
+    pub name: OptionalProperty<String>,
+    pub description: OptionalProperty<Option<String>>,
+    pub panels: OptionalProperty<Vec<Panel>>,
 }

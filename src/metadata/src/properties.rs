@@ -2,15 +2,21 @@ use std::num::NonZeroUsize;
 use std::sync::Arc;
 use std::sync::RwLock;
 
+use arrow::datatypes;
 use bincode::deserialize;
 use bincode::serialize;
+use chrono::DateTime;
 use chrono::Utc;
 use common::types::DType;
 use common::types::OptionalProperty;
 use common::types::TABLE_EVENTS;
+use convert_case::Case;
+use convert_case::Casing;
 use lru::LruCache;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
+use serde::Deserialize;
+use serde::Serialize;
 use store::db::OptiDBImpl;
 
 use crate::error::MetadataError;
@@ -23,12 +29,6 @@ use crate::index::next_seq;
 use crate::index::next_zero_seq;
 use crate::index::update_index;
 use crate::metadata::ListResponse;
-use crate::properties::CreatePropertyRequest;
-use crate::properties::DictionaryType;
-use crate::properties::Property;
-use crate::properties::Provider;
-use crate::properties::Type;
-use crate::properties::UpdatePropertyRequest;
 use crate::store::path_helpers::list;
 use crate::store::path_helpers::make_data_value_key;
 use crate::store::path_helpers::make_id_seq_key;
@@ -85,7 +85,7 @@ fn index_display_name_key(
     })
 }
 
-pub struct ProviderImpl {
+pub struct Properties {
     db: Arc<TransactionDB>,
     opti_db: Arc<OptiDBImpl>,
     id_cache: RwLock<LruCache<(u64, u64, u64), Property>>,
@@ -93,7 +93,7 @@ pub struct ProviderImpl {
     typ: Type,
 }
 
-impl ProviderImpl {
+impl Properties {
     pub fn new_user(db: Arc<TransactionDB>, opti_db: Arc<OptiDBImpl>) -> Self {
         let id_cache = RwLock::new(LruCache::new(
             NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
@@ -101,7 +101,7 @@ impl ProviderImpl {
         let name_cache = RwLock::new(LruCache::new(
             NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
         ));
-        ProviderImpl {
+        Properties {
             db,
             opti_db,
             id_cache,
@@ -117,7 +117,7 @@ impl ProviderImpl {
         let name_cache = RwLock::new(LruCache::new(
             NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
         ));
-        ProviderImpl {
+        Properties {
             db,
             id_cache,
             name_cache,
@@ -133,7 +133,7 @@ impl ProviderImpl {
         let name_cache = RwLock::new(LruCache::new(
             NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
         ));
-        ProviderImpl {
+        Properties {
             db,
             opti_db,
             id_cache,
@@ -286,10 +286,8 @@ impl ProviderImpl {
             .add_field(TABLE_EVENTS, prop.column_name().as_str(), dt, req.nullable)?;
         Ok(prop)
     }
-}
 
-impl Provider for ProviderImpl {
-    fn create(
+    pub fn create(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -302,7 +300,7 @@ impl Provider for ProviderImpl {
         Ok(ret)
     }
 
-    fn get_or_create(
+    pub fn get_or_create(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -321,17 +319,22 @@ impl Provider for ProviderImpl {
         Ok(ret)
     }
 
-    fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Property> {
+    pub fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Property> {
         let tx = self.db.transaction();
         self._get_by_id(&tx, organization_id, project_id, id)
     }
 
-    fn get_by_name(&self, organization_id: u64, project_id: u64, name: &str) -> Result<Property> {
+    pub fn get_by_name(
+        &self,
+        organization_id: u64,
+        project_id: u64,
+        name: &str,
+    ) -> Result<Property> {
         let tx = self.db.transaction();
         self._get_by_name(&tx, organization_id, project_id, name)
     }
 
-    fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Property>> {
+    pub fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Property>> {
         let tx = self.db.transaction();
         list(
             &tx,
@@ -339,7 +342,7 @@ impl Provider for ProviderImpl {
         )
     }
 
-    fn update(
+    pub fn update(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -441,7 +444,7 @@ impl Provider for ProviderImpl {
         Ok(prop)
     }
 
-    fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Property> {
+    pub fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Property> {
         let tx = self.db.transaction();
         let prop = self._get_by_id(&tx, organization_id, project_id, id)?;
         tx.delete(make_data_value_key(
@@ -471,4 +474,135 @@ impl Provider for ProviderImpl {
         tx.commit()?;
         Ok(prop)
     }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
+pub enum Status {
+    #[default]
+    Enabled,
+    Disabled,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub enum Type {
+    System,
+    Event,
+    User,
+}
+
+impl Type {
+    pub fn path(&self) -> &str {
+        match self {
+            Type::System => "system_properties",
+            Type::Event => "event_properties",
+            Type::User => "user_properties",
+        }
+    }
+
+    pub fn order_path(&self) -> &str {
+        match self {
+            Type::System => "system_properties/order",
+            _ => "properties/order",
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub enum DictionaryType {
+    Int8,
+    Int16,
+    Int32,
+    Int64,
+}
+
+impl From<DictionaryType> for datatypes::DataType {
+    fn from(value: DictionaryType) -> Self {
+        match value {
+            DictionaryType::Int8 => datatypes::DataType::Int8,
+            DictionaryType::Int16 => datatypes::DataType::Int16,
+            DictionaryType::Int32 => datatypes::DataType::Int32,
+            DictionaryType::Int64 => datatypes::DataType::Int64,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct Property {
+    pub id: u64,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: Option<DateTime<Utc>>,
+    pub created_by: u64,
+    pub updated_by: Option<u64>,
+    pub project_id: u64,
+    pub tags: Option<Vec<String>>,
+    pub name: String,
+    pub description: Option<String>,
+    pub display_name: Option<String>,
+    pub order: u64,
+    pub typ: Type,
+    pub data_type: DType,
+    pub status: Status,
+    pub is_system: bool,
+    pub nullable: bool,
+    // this also defines whether property is required or not
+    pub is_array: bool,
+    pub is_dictionary: bool,
+    pub dictionary_type: Option<DictionaryType>,
+}
+
+impl Property {
+    pub fn column_name(&self) -> String {
+        match self.typ {
+            Type::System => {
+                let mut name: String = self
+                    .name
+                    .chars()
+                    .filter(|c| {
+                        c.is_ascii_alphabetic() || c.is_numeric() || c.is_whitespace() || c == &'_'
+                    })
+                    .collect();
+                name = name.to_case(Case::Snake);
+                name = name.trim().to_string();
+
+                name
+            }
+            _ => {
+                format!("{}_{}", self.data_type.short_name(), self.order)
+            }
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct CreatePropertyRequest {
+    pub created_by: u64,
+    pub tags: Option<Vec<String>>,
+    pub name: String,
+    pub description: Option<String>,
+    pub display_name: Option<String>,
+    pub typ: Type,
+    pub data_type: DType,
+    pub status: Status,
+    pub is_system: bool,
+    pub nullable: bool,
+    pub is_array: bool,
+    pub is_dictionary: bool,
+    pub dictionary_type: Option<DictionaryType>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
+pub struct UpdatePropertyRequest {
+    pub updated_by: u64,
+    pub tags: OptionalProperty<Option<Vec<String>>>,
+    pub name: OptionalProperty<String>,
+    pub description: OptionalProperty<Option<String>>,
+    pub display_name: OptionalProperty<Option<String>>,
+    pub typ: OptionalProperty<Type>,
+    pub data_type: OptionalProperty<DType>,
+    pub status: OptionalProperty<Status>,
+    pub is_system: OptionalProperty<bool>,
+    pub nullable: OptionalProperty<bool>,
+    pub is_array: OptionalProperty<bool>,
+    pub is_dictionary: OptionalProperty<bool>,
+    pub dictionary_type: OptionalProperty<Option<DictionaryType>>,
 }

@@ -2,13 +2,14 @@ use std::sync::Arc;
 
 use bincode::deserialize;
 use bincode::serialize;
+use chrono::DateTime;
 use chrono::Utc;
 use common::types::OptionalProperty;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
+use serde::Deserialize;
+use serde::Serialize;
 
-use super::CreateOrganizationRequest;
-use super::Organization;
 use crate::error::MetadataError;
 use crate::index::check_insert_constraints;
 use crate::index::check_update_constraints;
@@ -17,8 +18,6 @@ use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
 use crate::metadata::ListResponse;
-use crate::organizations::Provider;
-use crate::organizations::UpdateOrganizationRequest;
 use crate::store::path_helpers::list;
 use crate::store::path_helpers::make_data_value_key;
 use crate::store::path_helpers::make_id_seq_key;
@@ -36,16 +35,16 @@ fn index_name_key(name: &str) -> Option<Vec<u8>> {
     Some(make_index_key(NAMESPACE, IDX_NAME, name).to_vec())
 }
 
-pub struct ProviderImpl {
+pub struct Organizations {
     db: Arc<TransactionDB>,
 }
 
-impl ProviderImpl {
+impl Organizations {
     pub fn new(db: Arc<TransactionDB>) -> Self {
-        ProviderImpl { db }
+        Organizations { db }
     }
 
-    pub fn _get_by_id(&self, tx: &Transaction<TransactionDB>, id: u64) -> Result<Organization> {
+    fn _get_by_id(&self, tx: &Transaction<TransactionDB>, id: u64) -> Result<Organization> {
         let key = make_data_value_key(NAMESPACE, id);
 
         match tx.get(key)? {
@@ -55,10 +54,8 @@ impl ProviderImpl {
             Some(value) => Ok(deserialize(&value)?),
         }
     }
-}
 
-impl Provider for ProviderImpl {
-    fn create(&self, req: CreateOrganizationRequest) -> Result<Organization> {
+    pub fn create(&self, req: CreateOrganizationRequest) -> Result<Organization> {
         let tx = self.db.transaction();
 
         let idx_keys = index_keys(&req.name);
@@ -84,19 +81,19 @@ impl Provider for ProviderImpl {
         Ok(org)
     }
 
-    fn get_by_id(&self, id: u64) -> Result<Organization> {
+    pub fn get_by_id(&self, id: u64) -> Result<Organization> {
         let tx = self.db.transaction();
 
         self._get_by_id(&tx, id)
     }
 
-    fn list(&self) -> Result<ListResponse<Organization>> {
+    pub fn list(&self) -> Result<ListResponse<Organization>> {
         let tx = self.db.transaction();
 
         list(&tx, NAMESPACE)
     }
 
-    fn update(&self, org_id: u64, req: UpdateOrganizationRequest) -> Result<Organization> {
+    pub fn update(&self, org_id: u64, req: UpdateOrganizationRequest) -> Result<Organization> {
         let tx = self.db.transaction();
 
         let prev_org = self._get_by_id(&tx, org_id)?;
@@ -124,7 +121,7 @@ impl Provider for ProviderImpl {
         Ok(org)
     }
 
-    fn delete(&self, id: u64) -> Result<Organization> {
+    pub fn delete(&self, id: u64) -> Result<Organization> {
         let tx = self.db.transaction();
 
         let org = self._get_by_id(&tx, id)?;
@@ -134,4 +131,26 @@ impl Provider for ProviderImpl {
         tx.commit()?;
         Ok(org)
     }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Organization {
+    pub id: u64,
+    pub created_at: DateTime<Utc>,
+    pub created_by: u64,
+    pub updated_at: Option<DateTime<Utc>>,
+    pub updated_by: Option<u64>,
+    pub name: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct CreateOrganizationRequest {
+    pub created_by: u64,
+    pub name: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct UpdateOrganizationRequest {
+    pub updated_by: u64,
+    pub name: OptionalProperty<String>,
 }

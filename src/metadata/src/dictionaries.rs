@@ -8,7 +8,6 @@ use byteorder::ByteOrder;
 use byteorder::LittleEndian;
 use rocksdb::TransactionDB;
 
-use crate::dictionaries::Provider;
 use crate::error::MetadataError;
 use crate::error::Result;
 use crate::index::next_seq;
@@ -39,24 +38,24 @@ fn make_value_key(organization_id: u64, project_id: u64, dict: &str, value: &str
     .concat()
 }
 
-pub struct ProviderImpl {
+pub struct Dictionaries {
     db: Arc<TransactionDB>,
 }
 
-impl ProviderImpl {
+impl Dictionaries {
     pub fn new(db: Arc<TransactionDB>) -> Self {
         Self { db }
     }
 }
 
-impl Debug for ProviderImpl {
+impl Debug for Dictionaries {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "dictionaries")
     }
 }
 
-impl Provider for ProviderImpl {
-    fn get_key_or_create(
+impl Dictionaries {
+    pub fn get_key_or_create(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -90,7 +89,7 @@ impl Provider for ProviderImpl {
         res
     }
 
-    fn get_value(
+    pub fn get_value(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -108,7 +107,7 @@ impl Provider for ProviderImpl {
         }
     }
 
-    fn get_key(
+    pub fn get_key(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -132,7 +131,7 @@ pub struct SingleDictionaryProvider {
     organization_id: u64,
     project_id: u64,
     dict: String,
-    provider: Arc<dyn Provider>,
+    dictionaries: Arc<Dictionaries>,
 }
 
 impl Hash for SingleDictionaryProvider {
@@ -148,18 +147,18 @@ impl SingleDictionaryProvider {
         organization_id: u64,
         project_id: u64,
         dict: String,
-        provider: Arc<dyn Provider>,
+        dictionaries: Arc<Dictionaries>,
     ) -> Self {
         Self {
             organization_id,
             project_id,
             dict,
-            provider,
+            dictionaries,
         }
     }
 
     pub fn get_key_or_create(&self, value: &str) -> Result<u64> {
-        self.provider.get_key_or_create(
+        self.dictionaries.get_key_or_create(
             self.organization_id,
             self.project_id,
             self.dict.as_str(),
@@ -168,7 +167,7 @@ impl SingleDictionaryProvider {
     }
 
     pub fn get_value(&self, key: u64) -> Result<String> {
-        self.provider.get_value(
+        self.dictionaries.get_value(
             self.organization_id,
             self.project_id,
             self.dict.as_str(),
@@ -183,7 +182,7 @@ impl SingleDictionaryProvider {
         _dict: &str,
         value: &str,
     ) -> Result<u64> {
-        self.provider.get_key(
+        self.dictionaries.get_key(
             self.organization_id,
             self.project_id,
             self.dict.as_str(),
