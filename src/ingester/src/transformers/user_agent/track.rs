@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use metadata::properties;
+use metadata::properties::Properties;
 use uaparser::UserAgentParser;
 
 use crate::error::Result;
@@ -11,14 +12,11 @@ use crate::Transformer;
 
 pub struct UserAgent {
     ua_parser: UserAgentParser,
-    user_properties: Arc<dyn properties::Provider>,
+    user_properties: Arc<Properties>,
 }
 
 impl UserAgent {
-    pub fn try_new(
-        user_properties: Arc<dyn properties::Provider>,
-        ua_parser: UserAgentParser,
-    ) -> Result<Self> {
+    pub fn try_new(user_properties: Arc<Properties>, ua_parser: UserAgentParser) -> Result<Self> {
         Ok(Self {
             ua_parser,
             user_properties,

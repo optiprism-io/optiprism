@@ -18,12 +18,12 @@ use crate::index::get_index;
 use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
+use crate::list;
+use crate::make_data_value_key;
+use crate::make_id_seq_key;
+use crate::make_index_key;
 use crate::metadata::ListResponse;
-use crate::store::path_helpers::list;
-use crate::store::path_helpers::make_data_value_key;
-use crate::store::path_helpers::make_id_seq_key;
-use crate::store::path_helpers::make_index_key;
-use crate::store::path_helpers::org_proj_ns;
+use crate::org_proj_ns;
 use crate::Result;
 
 const NAMESPACE: &[u8] = b"events";
@@ -168,7 +168,7 @@ impl Events {
         Ok(deserialize(&data)?)
     }
 
-    fn create(
+    pub fn create(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -180,7 +180,7 @@ impl Events {
         ret
     }
 
-    fn get_or_create(
+    pub fn get_or_create(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -289,7 +289,7 @@ impl Events {
         Ok(event)
     }
 
-    fn attach_property(
+    pub fn attach_property(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -322,7 +322,7 @@ impl Events {
         Ok(event)
     }
 
-    fn detach_property(
+    pub fn detach_property(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -378,7 +378,7 @@ impl Events {
         Ok(event)
     }
 
-    fn generate_record_id(&self, organization_id: u64, project_id: u64) -> Result<u64> {
+    pub fn generate_record_id(&self, organization_id: u64, project_id: u64) -> Result<u64> {
         let tx = self.db.transaction();
 
         let id = next_seq(

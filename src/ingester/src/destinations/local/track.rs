@@ -7,6 +7,7 @@ use common::types::COLUMN_EVENT_ID;
 use common::types::COLUMN_PROJECT_ID;
 use common::types::COLUMN_USER_ID;
 use metadata::dictionaries;
+use metadata::dictionaries::Dictionaries;
 use metadata::properties::DictionaryType;
 use rust_decimal::prelude::ToPrimitive;
 use store::db::OptiDBImpl;
@@ -23,11 +24,11 @@ use crate::Track;
 
 pub struct Local {
     db: Arc<OptiDBImpl>,
-    dict: Arc<dyn dictionaries::Provider>,
+    dict: Arc<Dictionaries>,
 }
 
 impl Local {
-    pub fn new(db: Arc<OptiDBImpl>, dict: Arc<dyn dictionaries::Provider>) -> Self {
+    pub fn new(db: Arc<OptiDBImpl>, dict: Arc<Dictionaries>) -> Self {
         Self { db, dict }
     }
 }
@@ -35,7 +36,7 @@ impl Local {
 fn property_to_value(
     ctx: &RequestContext,
     prop: &PropertyAndValue,
-    dict: &Arc<dyn dictionaries::Provider>,
+    dict: &Arc<Dictionaries>,
 ) -> Result<Value> {
     let val = if prop.property.is_dictionary {
         if let PropValue::String(str_v) = &prop.value {

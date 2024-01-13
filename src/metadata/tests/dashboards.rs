@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use metadata::dashboards::CreateDashboardRequest;
 use metadata::dashboards::Dashboards;
-use metadata::dashboards::Provider;
 use metadata::dashboards::UpdateDashboardRequest;
 use metadata::error::Result;
 use uuid::Uuid;
@@ -14,7 +13,7 @@ fn test_dashboards() -> Result<()> {
     path.push(format!("{}.db", Uuid::new_v4()));
 
     let db = Arc::new(metadata::rocksdb::new(path).unwrap());
-    let dashboards: Box<dyn Provider> = Box::new(Dashboards::new(db.clone()));
+    let dashboards: Box<Dashboards> = Box::new(Dashboards::new(db.clone()));
     let create_dash_req = CreateDashboardRequest {
         created_by: 0,
         tags: None,

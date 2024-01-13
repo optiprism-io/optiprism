@@ -17,7 +17,7 @@ use crate::Result;
 
 async fn create(
     ctx: Context,
-    Extension(provider): Extension<Arc<dyn custom_events::Provider>>,
+    Extension(provider): Extension<Arc<CustomEvents>>,
     Path((organization_id, project_id)): Path<(u64, u64)>,
     Json(request): Json<CreateCustomEventRequest>,
 ) -> Result<(StatusCode, Json<CustomEvent>)> {
@@ -33,7 +33,7 @@ async fn create(
 
 async fn get_by_id(
     ctx: Context,
-    Extension(provider): Extension<Arc<dyn custom_events::Provider>>,
+    Extension(provider): Extension<Arc<CustomEvents>>,
     Path((organization_id, project_id, event_id)): Path<(u64, u64, u64)>,
 ) -> Result<Json<CustomEvent>> {
     Ok(Json(
@@ -45,7 +45,7 @@ async fn get_by_id(
 
 async fn list(
     ctx: Context,
-    Extension(provider): Extension<Arc<dyn custom_events::Provider>>,
+    Extension(provider): Extension<Arc<CustomEvents>>,
     Path((organization_id, project_id)): Path<(u64, u64)>,
 ) -> Result<Json<ListResponse<CustomEvent>>> {
     Ok(Json(provider.list(ctx, organization_id, project_id).await?))
@@ -53,7 +53,7 @@ async fn list(
 
 async fn update(
     ctx: Context,
-    Extension(provider): Extension<Arc<dyn custom_events::Provider>>,
+    Extension(provider): Extension<Arc<CustomEvents>>,
     Path((organization_id, project_id, event_id)): Path<(u64, u64, u64)>,
     Json(request): Json<UpdateCustomEventRequest>,
 ) -> Result<Json<CustomEvent>> {
@@ -66,7 +66,7 @@ async fn update(
 
 async fn delete(
     ctx: Context,
-    Extension(provider): Extension<Arc<dyn custom_events::Provider>>,
+    Extension(provider): Extension<Arc<CustomEvents>>,
     Path((organization_id, project_id, event_id)): Path<(u64, u64, u64)>,
 ) -> Result<Json<CustomEvent>> {
     Ok(Json(

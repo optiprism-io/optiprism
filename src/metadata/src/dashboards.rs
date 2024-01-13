@@ -12,11 +12,11 @@ use serde::Serialize;
 
 use crate::error::MetadataError;
 use crate::index::next_seq;
+use crate::list;
+use crate::make_data_value_key;
+use crate::make_id_seq_key;
 use crate::metadata::ListResponse;
-use crate::store::path_helpers::list;
-use crate::store::path_helpers::make_data_value_key;
-use crate::store::path_helpers::make_id_seq_key;
-use crate::store::path_helpers::org_proj_ns;
+use crate::org_proj_ns;
 use crate::Result;
 
 const NAMESPACE: &[u8] = b"dashboards";

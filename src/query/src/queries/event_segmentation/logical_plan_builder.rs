@@ -29,7 +29,7 @@ use datafusion_expr::Filter;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::ScalarFunctionDefinition;
 use datafusion_expr::Sort;
-use metadata::dictionaries::dictionaries::SingleDictionaryProvider;
+use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
 use tracing::debug;
 

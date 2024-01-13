@@ -17,7 +17,7 @@ use crate::Result;
 
 async fn create(
     ctx: Context,
-    Extension(provider): Extension<Arc<dyn reports::Provider>>,
+    Extension(provider): Extension<Arc<Reports>>,
     Path((organization_id, project_id)): Path<(u64, u64)>,
     Json(request): Json<CreateReportRequest>,
 ) -> Result<(StatusCode, Json<Report>)> {
@@ -33,7 +33,7 @@ async fn create(
 
 async fn get_by_id(
     ctx: Context,
-    Extension(provider): Extension<Arc<dyn reports::Provider>>,
+    Extension(provider): Extension<Arc<Reports>>,
     Path((organization_id, project_id, report_id)): Path<(u64, u64, u64)>,
 ) -> Result<Json<Report>> {
     Ok(Json(
@@ -45,7 +45,7 @@ async fn get_by_id(
 
 async fn list(
     ctx: Context,
-    Extension(provider): Extension<Arc<dyn reports::Provider>>,
+    Extension(provider): Extension<Arc<Reports>>,
     Path((organization_id, project_id)): Path<(u64, u64)>,
 ) -> Result<Json<ListResponse<Report>>> {
     Ok(Json(provider.list(ctx, organization_id, project_id).await?))
@@ -53,7 +53,7 @@ async fn list(
 
 async fn update(
     ctx: Context,
-    Extension(provider): Extension<Arc<dyn reports::Provider>>,
+    Extension(provider): Extension<Arc<Reports>>,
     Path((organization_id, project_id, report_id)): Path<(u64, u64, u64)>,
     Json(request): Json<UpdateReportRequest>,
 ) -> Result<Json<Report>> {
@@ -66,7 +66,7 @@ async fn update(
 
 async fn delete(
     ctx: Context,
-    Extension(provider): Extension<Arc<dyn reports::Provider>>,
+    Extension(provider): Extension<Arc<Reports>>,
     Path((organization_id, project_id, report_id)): Path<(u64, u64, u64)>,
 ) -> Result<Json<Report>> {
     Ok(Json(

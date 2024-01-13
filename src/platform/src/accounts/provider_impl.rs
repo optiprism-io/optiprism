@@ -18,11 +18,11 @@ use crate::ListResponse;
 use crate::Result;
 
 pub struct ProviderImpl {
-    prov: Arc<dyn accounts::Provider>,
+    prov: Arc<Accounts>,
 }
 
 impl ProviderImpl {
-    pub fn new(prov: Arc<dyn accounts::Provider>) -> Self {
+    pub fn new(prov: Arc<Accounts>) -> Self {
         Self { prov }
     }
 }

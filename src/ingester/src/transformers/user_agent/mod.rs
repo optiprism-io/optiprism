@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use common::types;
 use metadata::properties;
+use metadata::properties::Properties;
 use uaparser::Parser;
 use uaparser::UserAgentParser;
 
@@ -19,7 +20,7 @@ pub fn resolve_properties(
     ctx: &RequestContext,
     context: &Context,
     mut user_props: Vec<PropertyAndValue>,
-    props_prov: &Arc<dyn properties::Provider>,
+    props_prov: &Arc<Properties>,
     ua_parser: &UserAgentParser,
 ) -> Result<Vec<PropertyAndValue>> {
     let ua = context.user_agent.clone().unwrap();

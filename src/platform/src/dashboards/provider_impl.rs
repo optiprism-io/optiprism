@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::async_trait;
 use common::rbac::ProjectPermission;
-use metadata::dashboards::Provider as DashboardsProvider;
+use metadata::dashboards::Dashboards;
 
 use crate::dashboards::CreateDashboardRequest;
 use crate::dashboards::Dashboard;
@@ -13,11 +13,11 @@ use crate::ListResponse;
 use crate::Result;
 
 pub struct ProviderImpl {
-    prov: Arc<dyn DashboardsProvider>,
+    prov: Arc<Dashboards>,
 }
 
 impl ProviderImpl {
-    pub fn new(prov: Arc<dyn DashboardsProvider>) -> Self {
+    pub fn new(prov: Arc<Dashboards>) -> Self {
         Self { prov }
     }
 }

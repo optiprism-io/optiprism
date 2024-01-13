@@ -14,7 +14,7 @@ use crate::Result;
 
 async fn list(
     ctx: Context,
-    Extension(provider): Extension<Arc<dyn custom_properties::Provider>>,
+    Extension(provider): Extension<Arc<CustomProperties>>,
     Path((organization_id, project_id)): Path<(u64, u64)>,
 ) -> Result<Json<ListResponse<CustomProperty>>> {
     Ok(Json(provider.list(ctx, organization_id, project_id).await?))

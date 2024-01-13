@@ -28,12 +28,12 @@ use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::next_zero_seq;
 use crate::index::update_index;
+use crate::list;
+use crate::make_data_value_key;
+use crate::make_id_seq_key;
+use crate::make_index_key;
 use crate::metadata::ListResponse;
-use crate::store::path_helpers::list;
-use crate::store::path_helpers::make_data_value_key;
-use crate::store::path_helpers::make_id_seq_key;
-use crate::store::path_helpers::make_index_key;
-use crate::store::path_helpers::org_proj_ns;
+use crate::org_proj_ns;
 use crate::Result;
 
 const IDX_NAME: &[u8] = b"name";

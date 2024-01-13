@@ -4,12 +4,16 @@ use std::sync::Arc;
 use common::types::DType;
 use common::types::DICT_USERS;
 use metadata::dictionaries;
+use metadata::dictionaries::Dictionaries;
 use metadata::events;
 use metadata::events::CreateEventRequest;
+use metadata::events::Events;
 use metadata::projects;
+use metadata::projects::Projects;
 use metadata::properties;
 use metadata::properties::CreatePropertyRequest;
 use metadata::properties::DictionaryType;
+use metadata::properties::Properties;
 use metadata::properties::Status;
 use store::db::OptiDBImpl;
 
@@ -26,7 +30,7 @@ use crate::Transformer;
 
 fn resolve_property(
     ctx: &RequestContext,
-    properties: &Arc<dyn properties::Provider>,
+    properties: &Arc<Properties>,
     _db: &Arc<OptiDBImpl>,
     typ: properties::Type,
     name: String,
@@ -71,7 +75,7 @@ fn resolve_property(
 
 fn resolve_properties(
     ctx: &RequestContext,
-    properties: &Arc<dyn properties::Provider>,
+    properties: &Arc<Properties>,
     db: &Arc<OptiDBImpl>,
     typ: properties::Type,
     props: &HashMap<String, PropValue>,
@@ -87,11 +91,11 @@ pub struct Executor<T> {
     transformers: Vec<Arc<dyn Transformer<T>>>,
     destinations: Vec<Arc<dyn Destination<T>>>,
     db: Arc<OptiDBImpl>,
-    event_properties: Arc<dyn properties::Provider>,
-    user_properties: Arc<dyn properties::Provider>,
-    events: Arc<dyn events::Provider>,
-    projects: Arc<dyn projects::Provider>,
-    dicts: Arc<dyn dictionaries::Provider>,
+    event_properties: Arc<Properties>,
+    user_properties: Arc<Properties>,
+    events: Arc<Events>,
+    projects: Arc<Projects>,
+    dicts: Arc<Dictionaries>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -100,11 +104,11 @@ impl Executor<Track> {
         transformers: Vec<Arc<dyn Transformer<Track>>>,
         destinations: Vec<Arc<dyn Destination<Track>>>,
         db: Arc<OptiDBImpl>,
-        event_properties: Arc<dyn properties::Provider>,
-        user_properties: Arc<dyn properties::Provider>,
-        events: Arc<dyn events::Provider>,
-        projects: Arc<dyn projects::Provider>,
-        dicts: Arc<dyn dictionaries::Provider>,
+        event_properties: Arc<Properties>,
+        user_properties: Arc<Properties>,
+        events: Arc<Events>,
+        projects: Arc<Projects>,
+        dicts: Arc<Dictionaries>,
     ) -> Self {
         Self {
             transformers,
@@ -213,11 +217,11 @@ impl Executor<Identify> {
         transformers: Vec<Arc<dyn Transformer<Identify>>>,
         destinations: Vec<Arc<dyn Destination<Identify>>>,
         db: Arc<OptiDBImpl>,
-        event_properties: Arc<dyn properties::Provider>,
-        user_properties: Arc<dyn properties::Provider>,
-        events: Arc<dyn events::Provider>,
-        projects: Arc<dyn projects::Provider>,
-        dicts: Arc<dyn dictionaries::Provider>,
+        event_properties: Arc<Properties>,
+        user_properties: Arc<Properties>,
+        events: Arc<Events>,
+        projects: Arc<Projects>,
+        dicts: Arc<Dictionaries>,
     ) -> Self {
         Self {
             transformers,

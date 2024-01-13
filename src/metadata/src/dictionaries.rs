@@ -11,8 +11,8 @@ use rocksdb::TransactionDB;
 use crate::error::MetadataError;
 use crate::error::Result;
 use crate::index::next_seq;
-use crate::store::path_helpers::make_id_seq_key;
-use crate::store::path_helpers::org_proj_ns;
+use crate::make_id_seq_key;
+use crate::org_proj_ns;
 
 const NAMESPACE: &[u8] = b"dictinaries";
 

@@ -21,6 +21,7 @@ use datafusion_expr::Expr;
 use datafusion_expr::ExprSchemable;
 use datafusion_expr::Operator;
 use metadata::dictionaries;
+use metadata::dictionaries::Dictionaries;
 use metadata::properties::DictionaryType;
 use metadata::MetadataProvider;
 
@@ -145,7 +146,7 @@ pub fn event_filters_expression(
 
 pub fn encode_property_dict_values(
     ctx: &Context,
-    dictionaries: &Arc<dyn dictionaries::Provider>,
+    dictionaries: &Arc<Dictionaries>,
     dict_type: &DictionaryType,
     col_name: &str,
     values: &[ScalarValue],
@@ -186,8 +187,8 @@ pub fn encode_property_dict_values(
 
 fn prop_expression(
     ctx: &Context,
-    prop: &Arc<dyn metadata::properties::Provider>,
-    dicts: &Arc<dyn metadata::dictionaries::Provider>,
+    prop: &Arc<metadata::properties::Properties>,
+    dicts: &Arc<metadata::dictionaries::Dictionaries>,
     prop_name: &str,
     operation: &PropValueOperation,
     values: Option<Vec<ScalarValue>>,

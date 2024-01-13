@@ -13,7 +13,7 @@ use datafusion_expr::Aggregate;
 use datafusion_expr::Extension;
 use datafusion_expr::Filter as PlanFilter;
 use datafusion_expr::LogicalPlan;
-use metadata::dictionaries::dictionaries::SingleDictionaryProvider;
+use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
 
 use crate::error::Result;

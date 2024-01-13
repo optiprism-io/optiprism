@@ -11,15 +11,15 @@ use crate::ListResponse;
 use crate::Result;
 
 pub struct ProviderImpl {
-    prov: Arc<dyn metadata::properties::Provider>,
+    prov: Arc<metadata::properties::Properties>,
 }
 
 impl ProviderImpl {
-    pub fn new_user(prov: Arc<dyn metadata::properties::Provider>) -> Self {
+    pub fn new_user(prov: Arc<metadata::properties::Properties>) -> Self {
         Self { prov }
     }
 
-    pub fn new_event(prov: Arc<dyn metadata::properties::Provider>) -> Self {
+    pub fn new_event(prov: Arc<metadata::properties::Properties>) -> Self {
         Self { prov }
     }
 }
