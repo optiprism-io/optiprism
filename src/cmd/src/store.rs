@@ -116,7 +116,7 @@ fn init_platform(md: Arc<MetadataProvider>, db: Arc<OptiDBImpl>, router: Router)
         data_provider,
     )?);
 
-    let auth_cfg = auth::Config {
+    let auth_cfg = auth::provider::Config {
         access_token_duration: Duration::days(1),
         access_token_key: "access".to_owned(),
         refresh_token_duration: Duration::days(1),

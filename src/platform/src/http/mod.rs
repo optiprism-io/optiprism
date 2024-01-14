@@ -24,6 +24,7 @@ use tower_http::services::ServeFile;
 use tower_http::trace::TraceLayer;
 use tracing::info;
 
+use crate::auth::provider::Config;
 use crate::context::print_request_response;
 use crate::properties::Properties;
 use crate::PlatformProvider;
@@ -40,7 +41,7 @@ pub fn attach_routes(
     mut router: Router,
     md: &Arc<MetadataProvider>,
     platform: &Arc<PlatformProvider>,
-    auth_cfg: crate::auth::Config,
+    auth_cfg: Config,
     ui: Option<PathBuf>,
 ) -> Router {
     router = accounts::attach_routes(router);

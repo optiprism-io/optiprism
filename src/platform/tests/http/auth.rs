@@ -4,8 +4,12 @@ use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::types::OptionalProperty;
 use metadata::accounts::UpdateAccountRequest;
-use platform::auth::SignUpRequest;
-use platform::auth::TokensResponse;
+use platform::accounts::Account;
+use platform::auth::provider::SignUpRequest;
+use platform::auth::provider::TokensResponse;
+use platform::auth::provider::UpdateEmailRequest;
+use platform::auth::provider::UpdateNameRequest;
+use platform::auth::provider::UpdatePasswordRequest;
 use platform::http::auth::RefreshTokenRequest;
 use reqwest::header::HeaderMap;
 use reqwest::Client;
@@ -38,8 +42,7 @@ async fn test_auth() {
             email: "user@gmail.com".to_string(),
             password: pwd.clone(),
             password_repeat: pwd.clone(),
-            first_name: Some("first".to_string()),
-            last_name: Some("last".to_string()),
+            name: Some("name".to_string()),
         };
 
         let resp = cl
@@ -57,8 +60,7 @@ async fn test_auth() {
                 updated_by: 2,
                 password: OptionalProperty::None,
                 email: OptionalProperty::None,
-                first_name: OptionalProperty::None,
-                last_name: OptionalProperty::None,
+                name: OptionalProperty::None,
                 role: OptionalProperty::None,
                 organizations: OptionalProperty::Some(Some(vec![(1, OrganizationRole::Member)])),
                 projects: OptionalProperty::Some(Some(vec![(1, ProjectRole::Reader)])),
@@ -82,7 +84,7 @@ async fn test_auth() {
         assert_response_status_eq!(resp, StatusCode::UNAUTHORIZED);
     }
 
-    // list without events should be empty
+    // list without accounts should be empty
     {
         let mut jwt_headers = headers.clone();
         jwt_headers.insert(
@@ -132,7 +134,20 @@ async fn test_auth() {
         new_jwt_headers
     };
 
-    // list without events should be empty
+    // get should return profile
+    {
+        let resp = cl
+            .get(format!("{auth_addr}/profile"))
+            .headers(new_jwt_headers.clone())
+            .send()
+            .await
+            .unwrap();
+        assert_response_status_eq!(resp, StatusCode::OK);
+        let acc: Account = serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
+        assert_eq!(acc.name, Some("name".to_string()));
+    }
+
+    // list without accounts should be empty
     {
         let resp = cl
             .get(format!(
@@ -145,5 +160,108 @@ async fn test_auth() {
 
         assert_response_status_eq!(resp, StatusCode::OK);
         assert_response_json_eq!(resp, EMPTY_LIST.to_string());
+    }
+
+    // update name
+    {
+        let req = UpdateNameRequest {
+            name: "new name".to_string(),
+        };
+
+        let resp = cl
+            .put(format!("{auth_addr}/profile/name"))
+            .body(serde_json::to_string(&req).unwrap())
+            .headers(new_jwt_headers.clone())
+            .send()
+            .await
+            .unwrap();
+
+        assert_response_status_eq!(resp, StatusCode::OK);
+    }
+
+    // update email with wrong password
+    {
+        let req = UpdateEmailRequest {
+            email: "new@test.com".to_string(),
+            current_password: "wrong".to_string(),
+        };
+
+        let resp = cl
+            .put(format!("{auth_addr}/profile/email"))
+            .body(serde_json::to_string(&req).unwrap())
+            .headers(new_jwt_headers.clone())
+            .send()
+            .await
+            .unwrap();
+
+        assert_response_status_eq!(resp, StatusCode::UNAUTHORIZED);
+    }
+
+    // update email
+    {
+        let req = UpdateEmailRequest {
+            email: "new@test.com".to_string(),
+            current_password: "password".to_string(),
+        };
+
+        let resp = cl
+            .put(format!("{auth_addr}/profile/email"))
+            .body(serde_json::to_string(&req).unwrap())
+            .headers(new_jwt_headers.clone())
+            .send()
+            .await
+            .unwrap();
+
+        assert_response_status_eq!(resp, StatusCode::OK);
+    }
+
+    // update password with wrong password
+    {
+        let req = UpdatePasswordRequest {
+            current_password: "wrong".to_string(),
+            new_password: "new".to_string(),
+        };
+
+        let resp = cl
+            .put(format!("{auth_addr}/profile/password"))
+            .body(serde_json::to_string(&req).unwrap())
+            .headers(new_jwt_headers.clone())
+            .send()
+            .await
+            .unwrap();
+
+        assert_response_status_eq!(resp, StatusCode::UNAUTHORIZED);
+    }
+
+    // update password
+    {
+        let req = UpdatePasswordRequest {
+            current_password: "password".to_string(),
+            new_password: "new".to_string(),
+        };
+
+        let resp = cl
+            .put(format!("{auth_addr}/profile/password"))
+            .body(serde_json::to_string(&req).unwrap())
+            .headers(new_jwt_headers.clone())
+            .send()
+            .await
+            .unwrap();
+
+        assert_response_status_eq!(resp, StatusCode::OK);
+    }
+
+    // get should return updated profile
+    {
+        let resp = cl
+            .get(format!("{auth_addr}/profile"))
+            .headers(new_jwt_headers.clone())
+            .send()
+            .await
+            .unwrap();
+        assert_response_status_eq!(resp, StatusCode::OK);
+        let acc: Account = serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
+        assert_eq!(acc.name, Some("new name".to_string()));
+        assert_eq!(acc.email, "new@test.com".to_string());
     }
 }

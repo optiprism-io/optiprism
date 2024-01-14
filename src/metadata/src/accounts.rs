@@ -108,11 +108,8 @@ impl Accounts {
 
         account.updated_at = Some(Utc::now());
         account.updated_by = Some(req.updated_by);
-        if let OptionalProperty::Some(first_name) = req.first_name {
-            account.first_name = first_name;
-        }
-        if let OptionalProperty::Some(last_name) = req.last_name {
-            account.last_name = last_name;
+        if let OptionalProperty::Some(name) = req.name {
+            account.name = name;
         }
         if let OptionalProperty::Some(organizations) = req.organizations {
             account.organizations = organizations;
@@ -152,8 +149,7 @@ pub struct Account {
     pub updated_by: Option<u64>,
     pub password_hash: String,
     pub email: String,
-    pub first_name: Option<String>,
-    pub last_name: Option<String>,
+    pub name: Option<String>,
     pub role: Option<Role>,
     pub organizations: Option<Vec<(u64, OrganizationRole)>>,
     pub projects: Option<Vec<(u64, ProjectRole)>>,
@@ -165,8 +161,7 @@ pub struct CreateAccountRequest {
     pub created_by: Option<u64>,
     pub password_hash: String,
     pub email: String,
-    pub first_name: Option<String>,
-    pub last_name: Option<String>,
+    pub name: Option<String>,
     pub role: Option<Role>,
     pub organizations: Option<Vec<(u64, OrganizationRole)>>,
     pub projects: Option<Vec<(u64, ProjectRole)>>,
@@ -183,8 +178,7 @@ impl CreateAccountRequest {
             updated_by: None,
             password_hash: self.password_hash,
             email: self.email,
-            first_name: self.first_name,
-            last_name: self.last_name,
+            name: self.name,
             role: self.role,
             organizations: self.organizations,
             projects: self.projects,
@@ -198,8 +192,7 @@ pub struct UpdateAccountRequest {
     pub updated_by: u64,
     pub password: OptionalProperty<String>,
     pub email: OptionalProperty<String>,
-    pub first_name: OptionalProperty<Option<String>>,
-    pub last_name: OptionalProperty<Option<String>>,
+    pub name: OptionalProperty<Option<String>>,
     pub role: OptionalProperty<Option<Role>>,
     pub organizations: OptionalProperty<Option<Vec<(u64, OrganizationRole)>>>,
     pub projects: OptionalProperty<Option<Vec<(u64, ProjectRole)>>>,

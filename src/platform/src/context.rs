@@ -29,7 +29,7 @@ use common::rbac::PROJECT_PERMISSIONS;
 use hyper::Body;
 use serde_json::Value;
 
-use crate::auth;
+use crate::auth::provider::Config;
 use crate::auth::token::parse_access_token;
 use crate::error::AuthError;
 use crate::PlatformError;
@@ -171,7 +171,7 @@ where S: Send + Sync
                 .await
                 .map_err(|_err| AuthError::CantParseBearerHeader)?;
 
-        let Extension(auth_cfg) = Extension::<auth::Config>::from_request_parts(parts, state)
+        let Extension(auth_cfg) = Extension::<Config>::from_request_parts(parts, state)
             .await
             .map_err(|err| PlatformError::Internal(err.to_string()))?;
 
@@ -238,7 +238,9 @@ where
         }
     };
 
-    if let Ok(body) = std::str::from_utf8(&bytes) {
+    if !bytes.is_empty()
+        && let Ok(body) = std::str::from_utf8(&bytes)
+    {
         let v = serde_json::from_slice::<Value>(body.as_bytes())?;
         tracing::debug!("{} body = {}", direction, serde_json::to_string_pretty(&v)?);
     }

@@ -14,6 +14,8 @@ pub enum MetadataError {
     #[error("bad request {0:?}")]
     BadRequest(String),
     #[error("internal: {0:?}")]
+    Forbidden(String),
+    #[error("forbidden: {0:?}")]
     Internal(String),
     #[error("store {0:?}")]
     Store(#[from] store::error::StoreError),

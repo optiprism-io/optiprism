@@ -1,3 +1,4 @@
+#![feature(let_chains)]
 extern crate core;
 
 pub mod accounts;
@@ -55,6 +56,8 @@ use serde_json::Number;
 use serde_json::Value;
 
 use crate::accounts::Accounts;
+use crate::auth::provider::Config;
+use crate::auth::Auth;
 use crate::custom_events::CustomEvents;
 use crate::dashboards::Dashboards;
 use crate::events::Events;
@@ -69,7 +72,7 @@ pub struct PlatformProvider {
     pub user_properties: Arc<Properties>,
     pub system_properties: Arc<Properties>,
     pub accounts: Arc<Accounts>,
-    pub auth: Arc<dyn auth::Provider>,
+    pub auth: Arc<Auth>,
     pub query: Arc<Queries>,
     pub dashboards: Arc<Dashboards>,
     pub reports: Arc<Reports>,
@@ -81,7 +84,7 @@ impl PlatformProvider {
     pub fn new(
         md: Arc<MetadataProvider>,
         query_prov: Arc<query::QueryProvider>,
-        auth_cfg: auth::Config,
+        auth_cfg: Config,
     ) -> Self {
         Self {
             events: Arc::new(events::Events::new(md.events.clone())),
@@ -94,7 +97,7 @@ impl PlatformProvider {
                 md.system_properties.clone(),
             )),
             accounts: Arc::new(accounts::Accounts::new(md.accounts.clone())),
-            auth: Arc::new(auth::ProviderImpl::new(md.accounts.clone(), auth_cfg)),
+            auth: Arc::new(auth::Auth::new(md.accounts.clone(), auth_cfg)),
             query: Arc::new(queries::Queries::new(query_prov)),
             dashboards: Arc::new(dashboards::Dashboards::new(md.dashboards.clone())),
             reports: Arc::new(reports::Reports::new(md.reports.clone())),
