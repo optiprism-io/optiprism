@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use axum::extract::Extension;
-use axum::extract::Path;
 use axum::routing::get;
 use axum::routing::post;
 use axum::routing::put;
@@ -16,7 +15,6 @@ use tower_cookies::Cookie;
 use tower_cookies::Cookies;
 
 use crate::accounts::Account;
-use crate::auth;
 use crate::auth::provider::Config;
 use crate::auth::provider::LogInRequest;
 use crate::auth::provider::SignUpRequest;
@@ -25,9 +23,6 @@ use crate::auth::provider::UpdateEmailRequest;
 use crate::auth::provider::UpdateNameRequest;
 use crate::auth::provider::UpdatePasswordRequest;
 use crate::auth::Auth;
-use crate::events::Event;
-use crate::events::Events;
-use crate::events::UpdateEventRequest;
 use crate::Context;
 use crate::PlatformError;
 use crate::Result;

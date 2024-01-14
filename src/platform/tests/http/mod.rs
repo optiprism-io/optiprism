@@ -26,7 +26,6 @@ mod tests {
     use lazy_static::lazy_static;
     use metadata::accounts::Accounts;
     use metadata::MetadataProvider;
-    use platform::auth;
     use platform::auth::password::make_password_hash;
     use platform::auth::provider::Config;
     use platform::auth::provider::LogInRequest;

@@ -10,7 +10,6 @@ use platform::auth::provider::TokensResponse;
 use platform::auth::provider::UpdateEmailRequest;
 use platform::auth::provider::UpdateNameRequest;
 use platform::auth::provider::UpdatePasswordRequest;
-use platform::events::Event;
 use platform::http::auth::RefreshTokenRequest;
 use reqwest::header::HeaderMap;
 use reqwest::Client;

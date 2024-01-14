@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use chrono::Duration;
-use common::rbac::ProjectPermission;
 use common::types::OptionalProperty;
 use metadata::accounts::Accounts;
 use metadata::accounts::CreateAccountRequest;
@@ -19,7 +18,6 @@ use super::token::parse_refresh_token;
 use crate::accounts::Account;
 use crate::error::AuthError;
 use crate::error::ValidationError;
-use crate::events::Event;
 use crate::Context;
 use crate::Result;
 
@@ -107,10 +105,7 @@ impl Auth {
     }
 
     pub async fn get(&self, ctx: Context) -> Result<Account> {
-        Ok(self
-            .accounts
-            .get_by_id(ctx.account_id.unwrap())?
-            .try_into()?)
+        self.accounts.get_by_id(ctx.account_id.unwrap())?.try_into()
     }
 
     pub async fn update_name(&self, ctx: Context, req: String) -> Result<()> {
