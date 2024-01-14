@@ -415,7 +415,7 @@ pub async fn gen(args: &Test, _proj_id: u64) -> Result<(), anyhow::Error> {
         data_provider,
     )?);
 
-    let auth_cfg = auth::Config {
+    let auth_cfg = auth::provider::Config {
         access_token_duration: Duration::days(1),
         access_token_key: "access".to_owned(),
         refresh_token_duration: Duration::days(1),

@@ -94,6 +94,7 @@ impl PlatformError {
                 MetadataError::Io(err) => ApiError::internal(err.to_string()),
                 MetadataError::Other(err) => ApiError::internal(err.to_string()),
                 MetadataError::Store(err) => ApiError::internal(err.to_string()),
+                MetadataError::Forbidden(err) => ApiError::forbidden(err),
             },
             PlatformError::Query(err) => match err {
                 QueryError::Internal(err) => ApiError::internal(err),

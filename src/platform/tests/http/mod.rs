@@ -28,7 +28,9 @@ mod tests {
     use metadata::MetadataProvider;
     use platform::auth;
     use platform::auth::password::make_password_hash;
-    use platform::auth::LogInRequest;
+    use platform::auth::provider::Config;
+    use platform::auth::provider::LogInRequest;
+    use platform::auth::Auth;
     use platform::http::attach_routes;
     use platform::PlatformProvider;
     use query::datasources::local::LocalTable;
@@ -42,7 +44,7 @@ mod tests {
 
     lazy_static! {
         pub static ref EMPTY_LIST: serde_json::Value = json!({"data":[],"meta":{"next":null}});
-        pub static ref AUTH_CFG: auth::Config = auth::Config {
+        pub static ref AUTH_CFG: Config = Config {
             access_token_duration: Duration::days(1),
             access_token_key: "access_secret".to_string(),
             refresh_token_duration: Duration::days(1),
@@ -52,7 +54,7 @@ mod tests {
     static HTTP_PORT: AtomicU16 = AtomicU16::new(8080);
 
     pub async fn create_admin_acc_and_login(
-        auth: &Arc<dyn platform::auth::Provider>,
+        auth: &Arc<Auth>,
         md_acc: &Arc<Accounts>,
     ) -> anyhow::Result<HeaderMap> {
         let pwd = "password";
@@ -61,8 +63,7 @@ mod tests {
             created_by: Some(1),
             password_hash: make_password_hash(pwd)?.to_string(),
             email: "admin@mail.com".to_string(),
-            first_name: None,
-            last_name: None,
+            name: Some("name".to_string()),
             role: None,
             organizations: Some(vec![(1, OrganizationRole::Admin)]),
             projects: None,
