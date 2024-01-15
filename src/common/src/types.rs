@@ -37,6 +37,7 @@ pub const EVENT_PROPERTY_PAGE_REFERER: &str = "Page Referer";
 pub const EVENT_PROPERTY_PAGE_SEARCH: &str = "Page Search";
 pub const EVENT_PROPERTY_PAGE_TITLE: &str = "Page Title";
 pub const EVENT_PROPERTY_PAGE_URL: &str = "Page URL";
+pub const EVENT_PROPERTY_SESSION_BEGIN_TIME: &str = "Session Begin Time";
 
 pub const USER_PROPERTY_CLIENT_FAMILY: &str = "Client Family";
 pub const USER_PROPERTY_CLIENT_VERSION_MINOR: &str = "Client Version Minor";
@@ -78,7 +79,8 @@ lazy_static! {
 pub const EVENT_CLICK: &str = "Click";
 pub const EVENT_PAGE: &str = "Page";
 pub const EVENT_SCREEN: &str = "Screen";
-
+pub const EVENT_SESSION_BEGIN: &str = "Session Begin";
+pub const EVENT_SESSION_END: &str = "Session End";
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum DType {

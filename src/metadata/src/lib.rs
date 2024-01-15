@@ -1,3 +1,5 @@
+extern crate core;
+
 pub mod accounts;
 pub mod custom_events;
 pub mod dashboards;
@@ -11,6 +13,7 @@ pub mod projects;
 pub mod properties;
 pub mod reports;
 pub mod rocksdb;
+mod sessions;
 pub mod teams;
 pub mod test_util;
 

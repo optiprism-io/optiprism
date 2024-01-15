@@ -1,13 +1,17 @@
 use std::sync::Arc;
 
+use chrono::Utc;
 use common::types::DType;
 use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_EVENT_ID;
 use common::types::COLUMN_PROJECT_ID;
 use common::types::COLUMN_USER_ID;
+use common::types::EVENT_PROPERTY_SESSION_BEGIN_TIME;
+use common::types::EVENT_SESSION_BEGIN;
 use metadata::dictionaries::Dictionaries;
 use metadata::properties::DictionaryType;
+use metadata::MetadataProvider;
 use rust_decimal::prelude::ToPrimitive;
 use store::db::OptiDBImpl;
 use store::NamedValue;
@@ -23,12 +27,12 @@ use crate::Track;
 
 pub struct Local {
     db: Arc<OptiDBImpl>,
-    dict: Arc<Dictionaries>,
+    md: Arc<MetadataProvider>,
 }
 
 impl Local {
-    pub fn new(db: Arc<OptiDBImpl>, dict: Arc<Dictionaries>) -> Self {
-        Self { db, dict }
+    pub fn new(db: Arc<OptiDBImpl>, md: Arc<MetadataProvider>) -> Self {
+        Self { db, md }
     }
 }
 
@@ -79,7 +83,78 @@ fn property_to_value(
 
 impl Destination<Track> for Local {
     fn send(&self, ctx: &RequestContext, req: Track) -> Result<()> {
-        let event_id = req.resolved_event.as_ref().unwrap().event.id;
+        let ts = Utc::now();
+        let is_new_session = self.md.sessions.set_current_time(
+            ctx.organization_id.unwrap(),
+            ctx.organization_id.unwrap(),
+            req.resolved_user_id.unwrap() as u64,
+            ts.clone(),
+        )?;
+
+        if is_new_session {
+            let record_id = self
+                .md
+                .events
+                .next_record_sequence(ctx.organization_id.unwrap(), ctx.project_id.unwrap())?;
+
+            let record_id = self
+                .md
+                .events
+                .next_record_sequence(ctx.organization_id.unwrap(), ctx.project_id.unwrap())?;
+
+            let event_id = self
+                .md
+                .events
+                .get_by_name(
+                    ctx.organization_id.unwrap(),
+                    ctx.project_id.unwrap(),
+                    EVENT_SESSION_BEGIN,
+                )?
+                .id;
+
+            let values = vec![
+                NamedValue::new(
+                    COLUMN_PROJECT_ID.to_string(),
+                    Value::Int64(Some(ctx.project_id.unwrap() as i64)),
+                ),
+                NamedValue::new(
+                    COLUMN_USER_ID.to_string(),
+                    Value::Int64(Some(req.resolved_user_id.unwrap())),
+                ),
+                NamedValue::new(
+                    COLUMN_CREATED_AT.to_string(),
+                    Value::Timestamp(Some(req.timestamp.timestamp())),
+                ),
+                NamedValue::new(
+                    COLUMN_EVENT_ID.to_string(),
+                    Value::Int64(Some(record_id as i64)),
+                ),
+                NamedValue::new(
+                    COLUMN_EVENT.to_string(),
+                    Value::Int64(Some(event_id as i64)),
+                ),
+                NamedValue::new(
+                    self.md
+                        .event_properties
+                        .get_by_name(
+                            ctx.organization_id.unwrap(),
+                            ctx.project_id.unwrap(),
+                            EVENT_PROPERTY_SESSION_BEGIN_TIME,
+                        )?
+                        .column_name(),
+                    Value::Timestamp(Some(ts.timestamp())),
+                ),
+            ];
+
+            self.db.insert("events", values)?;
+        }
+
+        let record_id = self
+            .md
+            .events
+            .next_record_sequence(ctx.organization_id.unwrap(), ctx.project_id.unwrap())?;
+
+        let event_id = req.resolved_event.as_ref().unwrap().id;
 
         let mut values = vec![
             NamedValue::new(
@@ -96,7 +171,7 @@ impl Destination<Track> for Local {
             ),
             NamedValue::new(
                 COLUMN_EVENT_ID.to_string(),
-                Value::Int64(Some(req.resolved_event.as_ref().unwrap().record_id as i64)),
+                Value::Int64(Some(record_id as i64)),
             ),
             NamedValue::new(
                 COLUMN_EVENT.to_string(),
@@ -111,7 +186,7 @@ impl Destination<Track> for Local {
             .unwrap_or_else(Vec::new);
 
         for prop in &event_props {
-            let value = property_to_value(ctx, prop, &self.dict)?;
+            let value = property_to_value(ctx, prop, &self.md.dictionaries)?;
             values.push(NamedValue::new(prop.property.column_name(), value));
         }
 
@@ -122,7 +197,7 @@ impl Destination<Track> for Local {
             .unwrap_or_else(Vec::new);
 
         for prop in &user_props {
-            let value = property_to_value(ctx, prop, &self.dict)?;
+            let value = property_to_value(ctx, prop, &self.md.dictionaries)?;
             values.push(NamedValue::new(prop.property.column_name(), value));
         }
         self.db.insert("events", values)?;

@@ -23,6 +23,8 @@ use crate::properties;
 use crate::properties::Properties;
 use crate::reports;
 use crate::reports::Reports;
+use crate::sessions;
+use crate::sessions::Sessions;
 use crate::Result;
 
 pub struct MetadataProvider {
@@ -37,6 +39,7 @@ pub struct MetadataProvider {
     pub projects: Arc<Projects>,
     pub accounts: Arc<Accounts>,
     pub dictionaries: Arc<Dictionaries>,
+    pub sessions: Arc<Sessions>,
 }
 
 impl MetadataProvider {
@@ -62,7 +65,8 @@ impl MetadataProvider {
             organizations: Arc::new(organizations::Organizations::new(db.clone())),
             projects: Arc::new(projects::Projects::new(db.clone())),
             accounts: Arc::new(accounts::Accounts::new(db.clone())),
-            dictionaries: Arc::new(dictionaries::Dictionaries::new(db)),
+            dictionaries: Arc::new(dictionaries::Dictionaries::new(db.clone())),
+            sessions: Arc::new(sessions::Sessions::new(db)),
         })
     }
 }

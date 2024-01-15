@@ -13,6 +13,7 @@ use metadata::properties::CreatePropertyRequest;
 use metadata::properties::DictionaryType;
 use metadata::properties::Properties;
 use metadata::properties::Status;
+use metadata::MetadataProvider;
 use store::db::OptiDBImpl;
 
 use crate::error::IngesterError;
@@ -89,11 +90,7 @@ pub struct Executor<T> {
     transformers: Vec<Arc<dyn Transformer<T>>>,
     destinations: Vec<Arc<dyn Destination<T>>>,
     db: Arc<OptiDBImpl>,
-    event_properties: Arc<Properties>,
-    user_properties: Arc<Properties>,
-    events: Arc<Events>,
-    projects: Arc<Projects>,
-    dicts: Arc<Dictionaries>,
+    md: Arc<MetadataProvider>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -102,38 +99,30 @@ impl Executor<Track> {
         transformers: Vec<Arc<dyn Transformer<Track>>>,
         destinations: Vec<Arc<dyn Destination<Track>>>,
         db: Arc<OptiDBImpl>,
-        event_properties: Arc<Properties>,
-        user_properties: Arc<Properties>,
-        events: Arc<Events>,
-        projects: Arc<Projects>,
-        dicts: Arc<Dictionaries>,
+        md: Arc<MetadataProvider>,
     ) -> Self {
         Self {
             transformers,
             destinations,
             db,
-            event_properties,
-            user_properties,
-            events,
-            projects,
-            dicts,
+            md,
         }
     }
 
     pub fn execute(&mut self, ctx: &RequestContext, mut req: Track) -> Result<()> {
-        let project = self.projects.get_by_token(ctx.token.as_str())?;
+        let project = self.md.projects.get_by_token(ctx.token.as_str())?;
         let mut ctx = ctx.to_owned();
         ctx.organization_id = Some(project.organization_id);
         ctx.project_id = Some(project.id);
 
         let user_id = match (&req.user_id, &req.anonymous_id) {
-            (Some(user_id), None) => self.dicts.get_key_or_create(
+            (Some(user_id), None) => self.md.dictionaries.get_key_or_create(
                 ctx.organization_id.unwrap(),
                 ctx.project_id.unwrap(),
                 DICT_USERS,
                 user_id.as_str(),
             )?,
-            (None, Some(user_id)) => self.dicts.get_key_or_create(
+            (None, Some(user_id)) => self.md.dictionaries.get_key_or_create(
                 ctx.organization_id.unwrap(),
                 ctx.project_id.unwrap(),
                 DICT_USERS,
@@ -150,7 +139,7 @@ impl Executor<Track> {
         if let Some(props) = &req.properties {
             req.resolved_properties = Some(resolve_properties(
                 &ctx,
-                &self.event_properties,
+                &self.md.event_properties,
                 &self.db,
                 properties::Type::Event,
                 props,
@@ -160,7 +149,7 @@ impl Executor<Track> {
         if let Some(props) = &req.user_properties {
             req.resolved_user_properties = Some(resolve_properties(
                 &ctx,
-                &self.user_properties,
+                &self.md.user_properties,
                 &self.db,
                 properties::Type::Event,
                 props,
@@ -182,21 +171,13 @@ impl Executor<Track> {
             custom_properties: None,
         };
 
-        let md_event = self.events.get_or_create(
+        let md_event = self.md.events.get_or_create(
             ctx.organization_id.unwrap(),
             ctx.project_id.unwrap(),
             event_req,
         )?;
 
-        let record_id = self
-            .events
-            .generate_record_id(ctx.organization_id.unwrap(), ctx.project_id.unwrap())?;
-        let event = Event {
-            record_id,
-            event: md_event,
-        };
-
-        req.resolved_event = Some(event);
+        req.resolved_event = Some(md_event);
 
         for transformer in &mut self.transformers {
             req = transformer.process(&ctx, req)?;
@@ -215,28 +196,19 @@ impl Executor<Identify> {
         transformers: Vec<Arc<dyn Transformer<Identify>>>,
         destinations: Vec<Arc<dyn Destination<Identify>>>,
         db: Arc<OptiDBImpl>,
-        event_properties: Arc<Properties>,
-        user_properties: Arc<Properties>,
-        events: Arc<Events>,
-        projects: Arc<Projects>,
-        dicts: Arc<Dictionaries>,
+        md: Arc<MetadataProvider>,
     ) -> Self {
         Self {
             transformers,
             destinations,
             db,
-            event_properties,
-            user_properties,
-            events,
-            projects,
-
-            dicts,
+            md,
         }
     }
 
     pub fn execute(&mut self, ctx: &RequestContext, mut req: Identify) -> Result<()> {
         let ctx = ctx.to_owned();
-        let project = self.projects.get_by_token(ctx.token.as_str())?;
+        let project = self.md.projects.get_by_token(ctx.token.as_str())?;
         let mut ctx = ctx.to_owned();
         ctx.organization_id = Some(project.organization_id);
         ctx.project_id = Some(project.id);

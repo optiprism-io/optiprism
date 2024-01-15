@@ -157,18 +157,13 @@ fn init_ingester(
     track_transformers.push(Arc::new(geo) as Arc<dyn Transformer<Track>>);
 
     let mut track_destinations = Vec::new();
-    let track_local_dst =
-        ingester::destinations::local::track::Local::new(db.clone(), md.dictionaries.clone());
+    let track_local_dst = ingester::destinations::local::track::Local::new(db.clone(), md.clone());
     track_destinations.push(Arc::new(track_local_dst) as Arc<dyn Destination<Track>>);
     let track_exec = Executor::<Track>::new(
         track_transformers.clone(),
         track_destinations.clone(),
         db.clone(),
-        md.event_properties.clone(),
-        md.user_properties.clone(),
-        md.events.clone(),
-        md.projects.clone(),
-        md.dictionaries.clone(),
+        md.clone(),
     );
 
     let mut identify_transformers = Vec::new();
@@ -189,11 +184,7 @@ fn init_ingester(
         identify_transformers,
         identify_destinations,
         db.clone(),
-        md.event_properties.clone(),
-        md.user_properties.clone(),
-        md.events.clone(),
-        md.projects.clone(),
-        md.dictionaries.clone(),
+        md.clone(),
     );
 
     info!("attaching ingester routes...");
@@ -217,6 +208,7 @@ pub async fn start(args: &Shop, _proj_id: u64) -> Result<()> {
     init_metrics();
     info!("system initialization...");
     init_system(&md, &db, args.partitions.unwrap_or_else(num_cpus::get))?;
+
     if let Some(ui_path) = &args.ui_path {
         if !ui_path.try_exists()? {
             return Err(Error::FileNotFound(format!(
@@ -249,6 +241,7 @@ pub async fn start(args: &Shop, _proj_id: u64) -> Result<()> {
     info!("creating org structure and admin account...");
     let (org_id, proj_id) = crate::init_test_org_structure(&md)?;
     info!("project initialization...");
+
     init_project(org_id, proj_id, &md)?;
 
     info!("store initialization...");

@@ -378,7 +378,7 @@ impl Events {
         Ok(event)
     }
 
-    pub fn generate_record_id(&self, organization_id: u64, project_id: u64) -> Result<u64> {
+    pub fn next_record_sequence(&self, organization_id: u64, project_id: u64) -> Result<u64> {
         let tx = self.db.transaction();
 
         let id = next_seq(
@@ -386,6 +386,7 @@ impl Events {
             make_id_seq_key(org_proj_ns(organization_id, project_id, RECORDS_NAMESPACE).as_slice()),
         )?;
 
+        tx.commit()?;
         Ok(id)
     }
 }

@@ -92,7 +92,7 @@ pub struct Track {
     pub timestamp: DateTime<Utc>,
     pub context: Context,
     pub event: String,
-    pub resolved_event: Option<Event>,
+    pub resolved_event: Option<events::Event>,
     pub properties: Option<HashMap<String, PropValue>>,
     pub user_properties: Option<HashMap<String, PropValue>>,
     pub resolved_properties: Option<Vec<PropertyAndValue>>,

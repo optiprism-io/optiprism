@@ -25,7 +25,10 @@ use common::types::EVENT_PROPERTY_PAGE_REFERER;
 use common::types::EVENT_PROPERTY_PAGE_SEARCH;
 use common::types::EVENT_PROPERTY_PAGE_TITLE;
 use common::types::EVENT_PROPERTY_PAGE_URL;
+use common::types::EVENT_PROPERTY_SESSION_BEGIN_TIME;
 use common::types::EVENT_SCREEN;
+use common::types::EVENT_SESSION_BEGIN;
+use common::types::EVENT_SESSION_END;
 use common::types::USER_PROPERTY_CITY;
 use common::types::USER_PROPERTY_CLIENT_FAMILY;
 use common::types::USER_PROPERTY_CLIENT_VERSION_MAJOR;
@@ -170,7 +173,9 @@ pub fn init_project(org_id: u64, project_id: u64, md: &Arc<MetadataProvider>) ->
     create_event(md, org_id, project_id, EVENT_CLICK.to_string())?;
     create_event(md, org_id, project_id, EVENT_PAGE.to_string())?;
     create_event(md, org_id, project_id, EVENT_SCREEN.to_string())?;
-    let user_props = vec![
+    create_event(md, org_id, project_id, EVENT_SESSION_BEGIN.to_string())?;
+    create_event(md, org_id, project_id, EVENT_SESSION_END.to_string())?;
+    let user_dict_props = vec![
         USER_PROPERTY_CLIENT_FAMILY,
         USER_PROPERTY_CLIENT_VERSION_MINOR,
         USER_PROPERTY_CLIENT_VERSION_MAJOR,
@@ -187,7 +192,7 @@ pub fn init_project(org_id: u64, project_id: u64, md: &Arc<MetadataProvider>) ->
         USER_PROPERTY_COUNTRY,
         USER_PROPERTY_CITY,
     ];
-    for prop in user_props {
+    for prop in user_dict_props {
         create_property(md, org_id, project_id, CreatePropertyMainRequest {
             name: prop.to_string(),
             typ: Type::User,
@@ -197,7 +202,7 @@ pub fn init_project(org_id: u64, project_id: u64, md: &Arc<MetadataProvider>) ->
         })?;
     }
 
-    let event_props = vec![
+    let event_str_props = vec![
         EVENT_PROPERTY_A_NAME,
         EVENT_PROPERTY_A_HREF,
         EVENT_PROPERTY_A_ID,
@@ -210,7 +215,7 @@ pub fn init_project(org_id: u64, project_id: u64, md: &Arc<MetadataProvider>) ->
         EVENT_PROPERTY_PAGE_URL,
     ];
 
-    for prop in event_props {
+    for prop in event_str_props {
         create_property(md, org_id, project_id, CreatePropertyMainRequest {
             name: prop.to_string(),
             typ: Type::Event,
@@ -219,6 +224,14 @@ pub fn init_project(org_id: u64, project_id: u64, md: &Arc<MetadataProvider>) ->
             dict: None,
         })?;
     }
+
+    create_property(md, org_id, project_id, CreatePropertyMainRequest {
+        name: EVENT_PROPERTY_SESSION_BEGIN_TIME.to_string(),
+        typ: Type::Event,
+        data_type: DType::Timestamp,
+        nullable: false,
+        dict: None,
+    })?;
 
     Ok(())
 }
