@@ -12,6 +12,7 @@ pub mod event_records;
 pub mod events;
 mod group_records;
 pub mod http;
+pub mod projects;
 pub mod properties;
 pub mod queries;
 pub mod reports;

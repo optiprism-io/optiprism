@@ -82,7 +82,7 @@ pub fn attach_routes(router: Router) -> Router {
         Router::new()
             .route("/", routing::post(create).get(list))
             .route(
-                "/:project_id",
+                "/:dashboard_id",
                 routing::get(get_by_id).delete(delete).put(update),
             ),
     )

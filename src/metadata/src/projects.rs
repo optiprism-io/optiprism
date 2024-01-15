@@ -1,8 +1,10 @@
 use std::sync::Arc;
+use std::time;
 
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::DateTime;
+use chrono::Duration;
 use chrono::Utc;
 use common::types::OptionalProperty;
 use rand::distributions::Alphanumeric;
@@ -12,6 +14,8 @@ use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
+use serde_with::serde_as;
+use serde_with::DurationSeconds;
 
 use crate::error::MetadataError;
 use crate::index::check_insert_constraints;
@@ -100,7 +104,10 @@ impl Projects {
             updated_by: None,
             organization_id,
             name: req.name,
+            description: req.description,
+            tags: req.tags,
             token,
+            session_duration: req.session_duration,
         };
         let data = serialize(&project)?;
         tx.put(
@@ -153,6 +160,16 @@ impl Projects {
 
         project.updated_at = Some(Utc::now());
         project.updated_by = Some(req.updated_by);
+        if let OptionalProperty::Some(tags) = req.tags {
+            project.tags = tags;
+        }
+        if let OptionalProperty::Some(description) = req.description {
+            project.description = description;
+        }
+
+        if let OptionalProperty::Some(session_duration) = req.session_duration {
+            project.session_duration = session_duration;
+        }
 
         let data = serialize(&project)?;
         tx.put(
@@ -180,6 +197,7 @@ impl Projects {
     }
 }
 
+#[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Project {
     pub id: u64,
@@ -189,17 +207,28 @@ pub struct Project {
     pub updated_by: Option<u64>,
     pub organization_id: u64,
     pub name: String,
+    pub description: Option<String>,
+    pub tags: Option<Vec<String>>,
     pub token: String,
+    pub session_duration: u64,
 }
 
+#[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CreateProjectRequest {
     pub created_by: u64,
     pub name: String,
+    pub description: Option<String>,
+    pub tags: Option<Vec<String>>,
+    pub session_duration: u64,
 }
 
+#[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct UpdateProjectRequest {
     pub updated_by: u64,
     pub name: OptionalProperty<String>,
+    pub description: OptionalProperty<Option<String>>,
+    pub tags: OptionalProperty<Option<Vec<String>>>,
+    pub session_duration: OptionalProperty<u64>,
 }

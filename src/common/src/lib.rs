@@ -1,4 +1,5 @@
 pub mod arrow;
+pub mod defaults;
 pub mod error;
 pub mod http;
 pub mod query;

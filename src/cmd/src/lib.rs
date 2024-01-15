@@ -3,6 +3,7 @@ use std::sync::Arc;
 use ::store::db::OptiDBImpl;
 use ::store::error::StoreError;
 use ::store::table::Options as TableOptions;
+use common::defaults::SESSION_DURATION;
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::rbac::Role;
@@ -247,6 +248,9 @@ fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<(
     let proj = match md.projects.create(org.id, CreateProjectRequest {
         created_by: admin.id,
         name: "Test Project".to_string(),
+        description: None,
+        tags: None,
+        session_duration: SESSION_DURATION.num_seconds() as u64,
     }) {
         Ok(proj) => proj,
         Err(_err) => md.projects.get_by_id(1, 1)?,
