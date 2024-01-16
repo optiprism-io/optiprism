@@ -5,6 +5,7 @@ use common::types::OptionalProperty;
 use metadata::accounts::Accounts;
 use metadata::accounts::CreateAccountRequest;
 use metadata::accounts::UpdateAccountRequest;
+use metadata::error::MetadataError;
 use password_hash::PasswordHash;
 use serde::Deserialize;
 use serde::Serialize;
@@ -17,8 +18,8 @@ use super::token::make_refresh_token;
 use super::token::parse_refresh_token;
 use crate::accounts::Account;
 use crate::error::AuthError;
-use crate::error::ValidationError;
 use crate::Context;
+use crate::PlatformError;
 use crate::Result;
 
 #[derive(Clone)]
@@ -59,10 +60,25 @@ impl Auth {
     }
 
     pub async fn sign_up(&self, req: SignUpRequest) -> Result<TokensResponse> {
+        if !validate_email(&req.email) {
+            return Err(PlatformError::invalid_field("email", "invalid email"));
+        }
+
+        match zxcvbn::zxcvbn(&req.password, &[&req.email]) {
+            Ok(ent) if ent.score() < 3 => {
+                return Err(PlatformError::invalid_field(
+                    "password",
+                    "password is too simple",
+                ));
+            }
+            Err(err) => return Err(PlatformError::invalid_field("password", err.to_string())),
+            _ => {}
+        }
+
         let password_hash = make_password_hash(req.password.as_str())
             .map_err(|err| err.wrap_into(AuthError::InvalidPasswordHashing))?;
 
-        let account = self.accounts.create(CreateAccountRequest {
+        let maybe_account = self.accounts.create(CreateAccountRequest {
             created_by: None,
             password_hash,
             email: req.email,
@@ -71,7 +87,17 @@ impl Auth {
             organizations: None,
             projects: None,
             teams: None,
-        })?;
+        });
+
+        let account = match maybe_account {
+            Ok(account) => account,
+            Err(MetadataError::AlreadyExists(_)) => {
+                return Err(PlatformError::AlreadyExists(
+                    "account already exists".to_string(),
+                ));
+            }
+            Err(other) => return Err(other.into()),
+        };
 
         let tokens = self.make_tokens(account.id)?;
 
@@ -79,7 +105,9 @@ impl Auth {
     }
 
     pub async fn log_in(&self, req: LogInRequest) -> Result<TokensResponse> {
-        req.validate()?;
+        if !validate_email(&req.email) {
+            return Err(PlatformError::invalid_field("email", "invalid email"));
+        }
 
         let account = self
             .accounts
@@ -105,10 +133,19 @@ impl Auth {
     }
 
     pub async fn get(&self, ctx: Context) -> Result<Account> {
-        self.accounts.get_by_id(ctx.account_id.unwrap())?.try_into()
+        match self.accounts.get_by_id(ctx.account_id.unwrap()) {
+            Ok(acc) => Ok(acc.try_into()?),
+            Err(MetadataError::NotFound(_)) => {
+                Err(PlatformError::NotFound("account not found".to_string()))
+            }
+            Err(err) => Err(err.into()),
+        }
     }
 
     pub async fn update_name(&self, ctx: Context, req: String) -> Result<()> {
+        if req.is_empty() {
+            return Err(PlatformError::invalid_field("name", "empty name"));
+        }
         let md_req = UpdateAccountRequest {
             updated_by: ctx.account_id.unwrap(),
             name: OptionalProperty::Some(Some(req)),
@@ -130,13 +167,18 @@ impl Auth {
         ctx: Context,
         req: UpdateEmailRequest,
     ) -> Result<TokensResponse> {
+        if !validate_email(&req.email) {
+            return Err(PlatformError::invalid_field("email", "invalid email"));
+        }
+
         let account = self.accounts.get_by_id(ctx.account_id.unwrap())?;
 
-        verify_password(
-            req.current_password,
+        if let Err(err) = verify_password(
+            &req.password,
             PasswordHash::new(account.password_hash.as_str())?,
-        )
-        .map_err(|_err| AuthError::InvalidCredentials)?;
+        ) {
+            return Err(PlatformError::invalid_field("password", err.to_string()));
+        }
 
         let md_req = UpdateAccountRequest {
             updated_by: ctx.account_id.unwrap(),
@@ -149,7 +191,16 @@ impl Auth {
             password: OptionalProperty::None,
         };
 
-        self.accounts.update(ctx.account_id.unwrap(), md_req)?;
+        match self.accounts.update(ctx.account_id.unwrap(), md_req) {
+            Ok(_) => {}
+            Err(MetadataError::AlreadyExists(_)) => {
+                return Err(PlatformError::invalid_field(
+                    "email",
+                    "email already exists",
+                ));
+            }
+            Err(other) => return Err(other.into()),
+        };
 
         let tokens = self.make_tokens(account.id)?;
 
@@ -163,11 +214,14 @@ impl Auth {
     ) -> Result<TokensResponse> {
         let account = self.accounts.get_by_id(ctx.account_id.unwrap())?;
 
-        verify_password(
-            req.current_password,
+        if verify_password(
+            &req.password,
             PasswordHash::new(account.password_hash.as_str())?,
         )
-        .map_err(|_err| AuthError::InvalidCredentials)?;
+        .is_err()
+        {
+            return Err(PlatformError::invalid_field("password", "invalid password"));
+        }
 
         let password_hash = make_password_hash(req.new_password.as_str())
             .map_err(|err| err.wrap_into(AuthError::InvalidPasswordHashing))?;
@@ -208,39 +262,11 @@ pub struct SignUpRequest {
     pub name: Option<String>,
 }
 
-impl SignUpRequest {
-    pub fn validate(&self) -> Result<()> {
-        let mut res_err = ValidationError::new();
-        if !validate_email(&self.email) {
-            res_err.push_invalid("email")
-        }
-
-        match zxcvbn::zxcvbn(&self.password, &[&self.email]) {
-            Ok(ent) if ent.score() < 3 => res_err.push("password", "password is too simple"),
-            Err(err) => res_err.push("password", err.to_string()),
-            _ => {}
-        }
-
-        res_err.result()
-    }
-}
-
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LogInRequest {
     pub email: String,
     pub password: String,
-}
-
-impl LogInRequest {
-    pub fn validate(&self) -> Result<()> {
-        let mut err = ValidationError::new();
-        if !validate_email(&self.email) {
-            err.push_invalid("email")
-        }
-
-        err.result()
-    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -266,12 +292,12 @@ pub struct UpdateNameRequest {
 #[serde(rename_all = "camelCase")]
 pub struct UpdateEmailRequest {
     pub email: String,
-    pub current_password: String,
+    pub password: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdatePasswordRequest {
-    pub current_password: String,
+    pub password: String,
     pub new_password: String,
 }

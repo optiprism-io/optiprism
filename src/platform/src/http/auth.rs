@@ -127,7 +127,7 @@ async fn update_email(
 ) -> Result<Json<TokensResponse>> {
     let req = UpdateEmailRequest {
         email: request.email.to_string(),
-        current_password: request.current_password.to_string(),
+        password: request.password.to_string(),
     };
 
     Ok(Json(provider.update_email(ctx, req).await?))
@@ -139,7 +139,7 @@ async fn update_password(
     Json(request): Json<UpdatePasswordRequest>,
 ) -> Result<Json<TokensResponse>> {
     let req = UpdatePasswordRequest {
-        current_password: request.current_password.to_string(),
+        password: request.password.to_string(),
         new_password: request.new_password.to_string(),
     };
 
@@ -147,15 +147,12 @@ async fn update_password(
 }
 
 pub fn attach_routes(router: Router) -> Router {
-    router.nest(
-        "/auth",
-        Router::new()
-            .route("/signup", post(sign_up))
-            .route("/login", post(log_in))
-            .route("/refresh-token", post(refresh_token))
-            .route("/profile", get(get_profile))
-            .route("/profile/name", put(update_name))
-            .route("/profile/email", put(update_email))
-            .route("/profile/password", put(update_password)),
-    )
+    router
+        .route("/auth/signup", post(sign_up))
+        .route("/auth/login", post(log_in))
+        .route("/auth/refresh-token", post(refresh_token))
+        .route("/profile", get(get_profile))
+        .route("/profile/name", put(update_name))
+        .route("/profile/email", put(update_email))
+        .route("/profile/password", put(update_password))
 }
