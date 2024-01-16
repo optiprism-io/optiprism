@@ -183,7 +183,7 @@ async fn test_auth() {
     {
         let req = UpdateEmailRequest {
             email: "new@test.com".to_string(),
-            current_password: "wrong".to_string(),
+            password: "wrong".to_string(),
         };
 
         let resp = cl
@@ -201,7 +201,7 @@ async fn test_auth() {
     {
         let req = UpdateEmailRequest {
             email: "new@test.com".to_string(),
-            current_password: "password".to_string(),
+            password: "password".to_string(),
         };
 
         let resp = cl
@@ -218,7 +218,7 @@ async fn test_auth() {
     // update password with wrong password
     {
         let req = UpdatePasswordRequest {
-            current_password: "wrong".to_string(),
+            password: "wrong".to_string(),
             new_password: "new".to_string(),
         };
 
@@ -236,7 +236,7 @@ async fn test_auth() {
     // update password
     {
         let req = UpdatePasswordRequest {
-            current_password: "password".to_string(),
+            password: "password".to_string(),
             new_password: "new".to_string(),
         };
 

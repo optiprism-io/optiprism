@@ -40,6 +40,8 @@ pub enum PlatformError {
     InvalidFields(BTreeMap<String, String>),
     #[error("bad request: {0:?}")]
     BadRequest(String),
+    #[error("already exists: {0:?}")]
+    AlreadyExists(String),
     #[error("unauthorized: {0:?}")]
     Unauthorized(String),
     #[error("forbidden: {0:?}")]
@@ -75,6 +77,13 @@ pub enum PlatformError {
 }
 
 impl PlatformError {
+    pub fn invalid_field(field: &str, error: impl Into<String>) -> Self {
+        PlatformError::InvalidFields(
+            vec![(field.to_string(), error.into())]
+                .into_iter()
+                .collect(),
+        )
+    }
     pub fn wrap_into(self, err: impl Into<PlatformError>) -> PlatformError {
         PlatformError::Wrapped(Box::new(self), Box::new(err.into()))
     }
@@ -139,38 +148,7 @@ impl PlatformError {
             }
             PlatformError::NotFound(err) => ApiError::not_found(err),
             PlatformError::EntityMap(err) => ApiError::internal(err),
-        }
-    }
-}
-
-#[derive(Default)]
-pub struct ValidationError {
-    fields: BTreeMap<String, String>,
-    _message: Option<String>,
-}
-
-impl ValidationError {
-    pub fn new() -> Self {
-        Self {
-            fields: BTreeMap::new(),
-            _message: None,
-        }
-    }
-
-    pub fn push(&mut self, field: impl Into<String>, err: impl Into<String>) {
-        self.fields.insert(field.into(), err.into());
-    }
-
-    pub fn push_invalid(&mut self, field: impl Into<String>) {
-        self.fields
-            .insert(field.into(), "invalid field value".into());
-    }
-
-    pub fn result(self) -> Result<()> {
-        if self.fields.is_empty() {
-            Ok(())
-        } else {
-            Err(PlatformError::InvalidFields(self.fields))
+            PlatformError::AlreadyExists(err) => ApiError::conflict(err),
         }
     }
 }

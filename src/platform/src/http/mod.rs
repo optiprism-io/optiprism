@@ -35,6 +35,7 @@ pub struct Service {}
 pub struct PropertiesLayer {
     event: Arc<Properties>,
     user: Arc<Properties>,
+    system: Arc<Properties>,
 }
 
 pub fn attach_routes(
@@ -50,6 +51,7 @@ pub fn attach_routes(
     router = custom_events::attach_routes(router);
     router = properties::attach_event_routes(router);
     router = properties::attach_user_routes(router);
+    router = properties::attach_system_routes(router);
     router = queries::attach_routes(router);
     router = dashboards::attach_routes(router);
     router = reports::attach_routes(router);
@@ -73,6 +75,7 @@ pub fn attach_routes(
         .layer(Extension(PropertiesLayer {
             event: platform.event_properties.clone(),
             user: platform.user_properties.clone(),
+            system: platform.system_properties.clone(),
         }))
         .layer(Extension(auth_cfg))
         .layer(Extension(platform.query.clone()))
