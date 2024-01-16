@@ -5,6 +5,7 @@ pub mod dashboards;
 pub mod event_records;
 pub mod events;
 pub mod group_records;
+pub mod projects;
 pub mod properties;
 pub mod queries;
 pub mod reports;
@@ -45,6 +46,7 @@ pub fn attach_routes(
     auth_cfg: Config,
     ui: Option<PathBuf>,
 ) -> Router {
+    router = projects::attach_routes(router);
     router = accounts::attach_routes(router);
     router = auth::attach_routes(router);
     router = events::attach_routes(router);
@@ -67,6 +69,7 @@ pub fn attach_routes(
     // fixme get rid of cloning
     router = router.clone().nest("/api/v1", router);
     router = router
+        .layer(Extension(md.projects.clone()))
         .layer(Extension(md.accounts.clone()))
         .layer(Extension(platform.accounts.clone()))
         .layer(Extension(platform.auth.clone()))

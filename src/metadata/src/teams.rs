@@ -17,7 +17,7 @@ use crate::index::delete_index;
 use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
-use crate::list;
+use crate::list_data;
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
@@ -108,7 +108,7 @@ impl Teams {
     pub fn list(&self, organization_id: u64) -> Result<ListResponse<Team>> {
         let tx = self.db.transaction();
 
-        list(&tx, org_ns(organization_id, NAMESPACE).as_slice())
+        list_data(&tx, org_ns(organization_id, NAMESPACE).as_slice())
     }
 
     pub fn update(

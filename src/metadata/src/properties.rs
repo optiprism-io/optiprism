@@ -28,7 +28,7 @@ use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::next_zero_seq;
 use crate::index::update_index;
-use crate::list;
+use crate::list_data;
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
@@ -336,7 +336,7 @@ impl Properties {
 
     pub fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Property>> {
         let tx = self.db.transaction();
-        list(
+        list_data(
             &tx,
             org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
         )

@@ -1,3 +1,5 @@
+extern crate core;
+
 pub mod accounts;
 pub mod custom_events;
 pub mod dashboards;
@@ -11,6 +13,7 @@ pub mod projects;
 pub mod properties;
 pub mod reports;
 pub mod rocksdb;
+mod sessions;
 pub mod teams;
 pub mod test_util;
 
@@ -62,7 +65,7 @@ pub fn make_id_seq_key(ns: &[u8]) -> Vec<u8> {
     [ns, b"/id_seq"].concat()
 }
 
-pub fn list<T>(tx: &Transaction<TransactionDB>, ns: &[u8]) -> Result<ListResponse<T>>
+pub fn list_data<T>(tx: &Transaction<TransactionDB>, ns: &[u8]) -> Result<ListResponse<T>>
 where T: DeserializeOwned {
     let prefix = make_data_key(ns);
 
@@ -71,6 +74,28 @@ where T: DeserializeOwned {
         .filter_map(|x| {
             let x = x.unwrap();
             if x.0.len() < prefix.len() || !prefix.as_slice().cmp(&x.0[..prefix.len()]).is_eq() {
+                return None;
+            }
+
+            Some(deserialize(x.1.as_ref()))
+        })
+        .collect::<bincode::Result<_>>()?;
+
+    Ok(ListResponse {
+        data: list,
+        meta: ResponseMetadata { next: None },
+    })
+}
+
+pub fn list<T>(tx: &Transaction<TransactionDB>, path: &[u8]) -> Result<ListResponse<T>>
+where T: DeserializeOwned {
+    let prefix = path;
+
+    let list = tx
+        .prefix_iterator("")
+        .filter_map(|x| {
+            let x = x.unwrap();
+            if x.0.len() < prefix.len() || !prefix.cmp(&x.0[..prefix.len()]).is_eq() {
                 return None;
             }
 

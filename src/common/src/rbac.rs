@@ -19,6 +19,7 @@ pub enum Role {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum OrganizationPermission {
     ManageProjects,
+    ExploreProjects,
     DeleteOrganization,
     All,
 }

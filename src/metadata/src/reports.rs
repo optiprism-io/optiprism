@@ -13,7 +13,7 @@ use serde::Serialize;
 
 use crate::error::MetadataError;
 use crate::index::next_seq;
-use crate::list;
+use crate::list_data;
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::metadata::ListResponse;
@@ -95,7 +95,7 @@ impl Reports {
 
     pub fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Report>> {
         let tx = self.db.transaction();
-        list(
+        list_data(
             &tx,
             org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
         )
