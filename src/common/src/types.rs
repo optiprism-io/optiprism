@@ -7,8 +7,6 @@ use serde::Deserialize;
 use serde::Deserializer;
 use serde::Serialize;
 use serde::Serializer;
-use serde_with::SerializeAs;
-use serde_with::__private__::SerializeAsWrap;
 
 use crate::error::CommonError;
 
@@ -37,7 +35,7 @@ pub const EVENT_PROPERTY_PAGE_REFERER: &str = "Page Referer";
 pub const EVENT_PROPERTY_PAGE_SEARCH: &str = "Page Search";
 pub const EVENT_PROPERTY_PAGE_TITLE: &str = "Page Title";
 pub const EVENT_PROPERTY_PAGE_URL: &str = "Page URL";
-pub const EVENT_PROPERTY_SESSION_BEGIN_TIME: &str = "Session Begin Time";
+pub const EVENT_PROPERTY_SESSION_LENGTH: &str = "Session Length";
 
 pub const USER_PROPERTY_CLIENT_FAMILY: &str = "Client Family";
 pub const USER_PROPERTY_CLIENT_VERSION_MINOR: &str = "Client Version Minor";

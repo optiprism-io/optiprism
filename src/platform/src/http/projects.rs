@@ -7,10 +7,6 @@ use axum::routing;
 use axum::Router;
 use common::http::Json;
 
-use crate::dashboards::CreateDashboardRequest;
-use crate::dashboards::Dashboard;
-use crate::dashboards::Dashboards;
-use crate::dashboards::UpdateDashboardRequest;
 use crate::projects::CreateProjectRequest;
 use crate::projects::Project;
 use crate::projects::Projects;
@@ -22,7 +18,7 @@ use crate::Result;
 async fn create(
     ctx: Context,
     Extension(provider): Extension<Arc<Projects>>,
-    Path((organization_id, project_id)): Path<(u64, u64)>,
+    Path((organization_id, _project_id)): Path<(u64, u64)>,
     Json(request): Json<CreateProjectRequest>,
 ) -> Result<(StatusCode, Json<Project>)> {
     Ok((
@@ -44,7 +40,7 @@ async fn get_by_id(
 async fn list(
     ctx: Context,
     Extension(provider): Extension<Arc<Projects>>,
-    Path((organization_id)): Path<(u64)>,
+    Path(organization_id): Path<u64>,
 ) -> Result<Json<ListResponse<Project>>> {
     Ok(Json(provider.list(ctx, organization_id).await?))
 }

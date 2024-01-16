@@ -81,3 +81,12 @@ pub struct ListResponse<T> {
     pub data: Vec<T>,
     pub meta: ResponseMetadata,
 }
+
+impl<T> IntoIterator for ListResponse<T> {
+    type Item = T;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.data.into_iter()
+    }
+}

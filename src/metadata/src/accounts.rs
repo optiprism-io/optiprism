@@ -21,7 +21,7 @@ use crate::index::get_index;
 use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
-use crate::list;
+use crate::list_data;
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
@@ -87,7 +87,7 @@ impl Accounts {
 
     pub fn list(&self) -> Result<ListResponse<Account>> {
         let tx = self.db.transaction();
-        list(&tx, NAMESPACE)
+        list_data(&tx, NAMESPACE)
     }
 
     pub fn update(&self, account_id: u64, req: UpdateAccountRequest) -> Result<Account> {

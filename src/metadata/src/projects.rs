@@ -1,10 +1,8 @@
 use std::sync::Arc;
-use std::time;
 
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::DateTime;
-use chrono::Duration;
 use chrono::Utc;
 use common::types::OptionalProperty;
 use rand::distributions::Alphanumeric;
@@ -15,7 +13,6 @@ use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_with::serde_as;
-use serde_with::DurationSeconds;
 
 use crate::error::MetadataError;
 use crate::index::check_insert_constraints;
@@ -25,7 +22,7 @@ use crate::index::get_index;
 use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
-use crate::list;
+use crate::list_data;
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
@@ -134,7 +131,7 @@ impl Projects {
     pub fn list(&self, organization_id: u64) -> Result<ListResponse<Project>> {
         let tx = self.db.transaction();
 
-        list(&tx, org_ns(organization_id, NAMESPACE).as_slice())
+        list_data(&tx, org_ns(organization_id, NAMESPACE).as_slice())
     }
 
     pub fn update(

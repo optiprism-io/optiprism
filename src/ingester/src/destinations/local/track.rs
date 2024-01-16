@@ -7,7 +7,6 @@ use common::types::COLUMN_EVENT;
 use common::types::COLUMN_EVENT_ID;
 use common::types::COLUMN_PROJECT_ID;
 use common::types::COLUMN_USER_ID;
-use common::types::EVENT_PROPERTY_SESSION_BEGIN_TIME;
 use common::types::EVENT_SESSION_BEGIN;
 use metadata::dictionaries::Dictionaries;
 use metadata::properties::DictionaryType;
@@ -88,15 +87,10 @@ impl Destination<Track> for Local {
             ctx.organization_id.unwrap(),
             ctx.organization_id.unwrap(),
             req.resolved_user_id.unwrap() as u64,
-            ts.clone(),
+            ts,
         )?;
 
         if is_new_session {
-            let record_id = self
-                .md
-                .events
-                .next_record_sequence(ctx.organization_id.unwrap(), ctx.project_id.unwrap())?;
-
             let record_id = self
                 .md
                 .events
@@ -132,17 +126,6 @@ impl Destination<Track> for Local {
                 NamedValue::new(
                     COLUMN_EVENT.to_string(),
                     Value::Int64(Some(event_id as i64)),
-                ),
-                NamedValue::new(
-                    self.md
-                        .event_properties
-                        .get_by_name(
-                            ctx.organization_id.unwrap(),
-                            ctx.project_id.unwrap(),
-                            EVENT_PROPERTY_SESSION_BEGIN_TIME,
-                        )?
-                        .column_name(),
-                    Value::Timestamp(Some(ts.timestamp())),
                 ),
             ];
 

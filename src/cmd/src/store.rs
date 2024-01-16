@@ -25,7 +25,6 @@ use common::types::USER_PROPERTY_OS;
 use common::types::USER_PROPERTY_OS_FAMILY;
 use common::types::USER_PROPERTY_OS_VERSION_MAJOR;
 use crossbeam_channel::bounded;
-use datafusion::datasource::TableProvider;
 use dateparser::DateTimeUtc;
 use enum_iterator::all;
 use events_gen::generator;
@@ -37,18 +36,7 @@ use events_gen::store::scenario;
 use events_gen::store::scenario::EventRecord;
 use events_gen::store::scenario::Scenario;
 use events_gen::store::schema::create_properties;
-use ingester::error::IngesterError;
-use ingester::executor::Executor;
-use ingester::transformers::geo;
-use ingester::transformers::user_agent;
-use ingester::Destination;
-use ingester::Identify;
-use ingester::Track;
-use ingester::Transformer;
 use metadata::MetadataProvider;
-use platform::auth;
-use query::datasources::local::LocalTable;
-use query::QueryProvider;
 use rand::thread_rng;
 use store::db::OptiDBImpl;
 use store::db::Options;
@@ -58,12 +46,14 @@ use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tracing::debug;
 use tracing::info;
-use uaparser::UserAgentParser;
 
 use crate::error::Error;
 use crate::error::Result;
+use crate::init_ingester;
 use crate::init_metrics;
+use crate::init_platform;
 use crate::init_project;
+use crate::init_session_cleaner;
 use crate::init_system;
 
 #[derive(Parser, Clone)]
@@ -91,7 +81,7 @@ pub struct Shop {
     #[arg(long)]
     ua_db_path: PathBuf,
     #[arg(long)]
-    geo_city_path: PathBuf,
+    pub geo_city_path: PathBuf,
 }
 
 pub struct Config<R> {
@@ -105,94 +95,6 @@ pub struct Config<R> {
     pub new_daily_users: usize,
     pub batch_size: usize,
     pub partitions: usize,
-}
-
-fn init_platform(md: Arc<MetadataProvider>, db: Arc<OptiDBImpl>, router: Router) -> Result<Router> {
-    let data_provider: Arc<dyn TableProvider> =
-        Arc::new(LocalTable::try_new(db.clone(), "events".to_string())?);
-    let query_provider = Arc::new(QueryProvider::try_new_from_provider(
-        md.clone(),
-        db.clone(),
-        data_provider,
-    )?);
-
-    let auth_cfg = auth::provider::Config {
-        access_token_duration: Duration::days(1),
-        access_token_key: "access".to_owned(),
-        refresh_token_duration: Duration::days(1),
-        refresh_token_key: "refresh".to_owned(),
-    };
-
-    let platform_provider = Arc::new(platform::PlatformProvider::new(
-        md.clone(),
-        query_provider,
-        auth_cfg.clone(),
-    ));
-
-    info!("attaching platform routes...");
-    Ok(platform::http::attach_routes(
-        router,
-        &md,
-        &platform_provider,
-        auth_cfg,
-        None,
-    ))
-}
-
-fn init_ingester(
-    args: &Shop,
-    md: &Arc<MetadataProvider>,
-    db: &Arc<OptiDBImpl>,
-    router: Router,
-) -> Result<Router> {
-    let mut track_transformers = Vec::new();
-    let ua_parser = UserAgentParser::from_file(File::open(args.ua_db_path.clone())?)
-        .map_err(|e| Error::Internal(e.to_string()))?;
-    let ua = user_agent::track::UserAgent::try_new(md.user_properties.clone(), ua_parser)?;
-    track_transformers.push(Arc::new(ua) as Arc<dyn Transformer<Track>>);
-
-    // todo make common
-    let city_rdr = maxminddb::Reader::open_readfile(args.geo_city_path.clone())?;
-    let geo = geo::track::Geo::try_new(md.user_properties.clone(), city_rdr)?;
-    track_transformers.push(Arc::new(geo) as Arc<dyn Transformer<Track>>);
-
-    let mut track_destinations = Vec::new();
-    let track_local_dst = ingester::destinations::local::track::Local::new(db.clone(), md.clone());
-    track_destinations.push(Arc::new(track_local_dst) as Arc<dyn Destination<Track>>);
-    let track_exec = Executor::<Track>::new(
-        track_transformers.clone(),
-        track_destinations.clone(),
-        db.clone(),
-        md.clone(),
-    );
-
-    let mut identify_transformers = Vec::new();
-    info!("initializing ua parser...");
-    let ua_parser = UserAgentParser::from_file(File::open(args.ua_db_path.clone())?)
-        .map_err(|e| IngesterError::Internal(e.to_string()))?;
-    let ua = user_agent::identify::UserAgent::try_new(md.user_properties.clone(), ua_parser)?;
-    identify_transformers.push(Arc::new(ua) as Arc<dyn Transformer<Identify>>);
-
-    info!("initializing geo...");
-    let city_rdr = maxminddb::Reader::open_readfile(args.geo_city_path.clone())?;
-    let geo = geo::identify::Geo::try_new(md.user_properties.clone(), city_rdr)?;
-    identify_transformers.push(Arc::new(geo) as Arc<dyn Transformer<Identify>>);
-    let mut identify_destinations = Vec::new();
-    let identify_debug_dst = ingester::destinations::debug::identify::Debug::new();
-    identify_destinations.push(Arc::new(identify_debug_dst) as Arc<dyn Destination<Identify>>);
-    let identify_exec = Executor::<Identify>::new(
-        identify_transformers,
-        identify_destinations,
-        db.clone(),
-        md.clone(),
-    );
-
-    info!("attaching ingester routes...");
-    Ok(ingester::sources::http::attach_routes(
-        router,
-        track_exec,
-        identify_exec,
-    ))
 }
 
 pub async fn start(args: &Shop, _proj_id: u64) -> Result<()> {
@@ -312,8 +214,10 @@ pub async fn start(args: &Shop, _proj_id: u64) -> Result<()> {
     let router = Router::new();
     info!("initializing platform...");
     let router = init_platform(md.clone(), db.clone(), router)?;
+    info!("initializing session cleaner");
+    init_session_cleaner(md.clone(), db.clone())?;
     info!("initializing ingester...");
-    let router = init_ingester(args, &md, &db, router)?;
+    let router = init_ingester(&args.geo_city_path, &args.ua_db_path, &md, &db, router)?;
 
     let server =
         Server::bind(&args.host).serve(router.into_make_service_with_connect_info::<SocketAddr>());

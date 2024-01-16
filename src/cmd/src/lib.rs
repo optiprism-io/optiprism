@@ -1,8 +1,16 @@
+use std::fs::File;
+use std::path::PathBuf;
 use std::sync::Arc;
+use std::thread;
 
 use ::store::db::OptiDBImpl;
 use ::store::error::StoreError;
 use ::store::table::Options as TableOptions;
+use ::store::NamedValue;
+use ::store::Value;
+use axum::Router;
+use chrono::Duration;
+use chrono::Utc;
 use common::defaults::SESSION_DURATION;
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
@@ -25,7 +33,7 @@ use common::types::EVENT_PROPERTY_PAGE_REFERER;
 use common::types::EVENT_PROPERTY_PAGE_SEARCH;
 use common::types::EVENT_PROPERTY_PAGE_TITLE;
 use common::types::EVENT_PROPERTY_PAGE_URL;
-use common::types::EVENT_PROPERTY_SESSION_BEGIN_TIME;
+use common::types::EVENT_PROPERTY_SESSION_LENGTH;
 use common::types::EVENT_SCREEN;
 use common::types::EVENT_SESSION_BEGIN;
 use common::types::EVENT_SESSION_END;
@@ -44,6 +52,15 @@ use common::types::USER_PROPERTY_OS_VERSION_MAJOR;
 use common::types::USER_PROPERTY_OS_VERSION_MINOR;
 use common::types::USER_PROPERTY_OS_VERSION_PATCH;
 use common::types::USER_PROPERTY_OS_VERSION_PATCH_MINOR;
+use datafusion::datasource::TableProvider;
+use ingester::error::IngesterError;
+use ingester::executor::Executor;
+use ingester::transformers::geo;
+use ingester::transformers::user_agent;
+use ingester::Destination;
+use ingester::Identify;
+use ingester::Track;
+use ingester::Transformer;
 use metadata::accounts::CreateAccountRequest;
 use metadata::organizations::CreateOrganizationRequest;
 use metadata::projects::CreateProjectRequest;
@@ -57,8 +74,14 @@ use metrics::describe_counter;
 use metrics::describe_histogram;
 use metrics::Unit;
 use metrics_exporter_prometheus::PrometheusBuilder;
+use platform::auth;
 use platform::auth::password::make_password_hash;
+use query::datasources::local::LocalTable;
+use query::QueryProvider;
 use tracing::info;
+use uaparser::UserAgentParser;
+
+use crate::error::Error;
 
 pub mod error;
 pub mod store;
@@ -226,12 +249,177 @@ pub fn init_project(org_id: u64, project_id: u64, md: &Arc<MetadataProvider>) ->
     }
 
     create_property(md, org_id, project_id, CreatePropertyMainRequest {
-        name: EVENT_PROPERTY_SESSION_BEGIN_TIME.to_string(),
+        name: EVENT_PROPERTY_SESSION_LENGTH.to_string(),
         typ: Type::Event,
         data_type: DType::Timestamp,
         nullable: false,
         dict: None,
     })?;
+
+    Ok(())
+}
+
+fn init_platform(
+    md: Arc<MetadataProvider>,
+    db: Arc<OptiDBImpl>,
+    router: Router,
+) -> crate::error::Result<Router> {
+    let data_provider: Arc<dyn TableProvider> =
+        Arc::new(LocalTable::try_new(db.clone(), "events".to_string())?);
+    let query_provider = Arc::new(QueryProvider::try_new_from_provider(
+        md.clone(),
+        db.clone(),
+        data_provider,
+    )?);
+
+    let auth_cfg = auth::provider::Config {
+        access_token_duration: Duration::days(1),
+        access_token_key: "access".to_owned(),
+        refresh_token_duration: Duration::days(1),
+        refresh_token_key: "refresh".to_owned(),
+    };
+
+    let platform_provider = Arc::new(platform::PlatformProvider::new(
+        md.clone(),
+        query_provider,
+        auth_cfg.clone(),
+    ));
+
+    info!("attaching platform routes...");
+    Ok(platform::http::attach_routes(
+        router,
+        &md,
+        &platform_provider,
+        auth_cfg,
+        None,
+    ))
+}
+
+fn init_ingester(
+    geo_city_path: &PathBuf,
+    ua_db_path: &PathBuf,
+    md: &Arc<MetadataProvider>,
+    db: &Arc<OptiDBImpl>,
+    router: Router,
+) -> crate::error::Result<Router> {
+    let mut track_transformers = Vec::new();
+    let ua_parser = UserAgentParser::from_file(File::open(ua_db_path)?)
+        .map_err(|e| Error::Internal(e.to_string()))?;
+    let ua = user_agent::track::UserAgent::try_new(md.user_properties.clone(), ua_parser)?;
+    track_transformers.push(Arc::new(ua) as Arc<dyn Transformer<Track>>);
+
+    // todo make common
+    let city_rdr = maxminddb::Reader::open_readfile(geo_city_path)?;
+    let geo = geo::track::Geo::try_new(md.user_properties.clone(), city_rdr)?;
+    track_transformers.push(Arc::new(geo) as Arc<dyn Transformer<Track>>);
+
+    let mut track_destinations = Vec::new();
+    let track_local_dst = ingester::destinations::local::track::Local::new(db.clone(), md.clone());
+    track_destinations.push(Arc::new(track_local_dst) as Arc<dyn Destination<Track>>);
+    let track_exec = Executor::<Track>::new(
+        track_transformers.clone(),
+        track_destinations.clone(),
+        db.clone(),
+        md.clone(),
+    );
+
+    let mut identify_transformers = Vec::new();
+    info!("initializing ua parser...");
+    let ua_parser = UserAgentParser::from_file(File::open(ua_db_path)?)
+        .map_err(|e| IngesterError::Internal(e.to_string()))?;
+    let ua = user_agent::identify::UserAgent::try_new(md.user_properties.clone(), ua_parser)?;
+    identify_transformers.push(Arc::new(ua) as Arc<dyn Transformer<Identify>>);
+
+    info!("initializing geo...");
+    let city_rdr = maxminddb::Reader::open_readfile(geo_city_path)?;
+    let geo = geo::identify::Geo::try_new(md.user_properties.clone(), city_rdr)?;
+    identify_transformers.push(Arc::new(geo) as Arc<dyn Transformer<Identify>>);
+    let mut identify_destinations = Vec::new();
+    let identify_debug_dst = ingester::destinations::debug::identify::Debug::new();
+    identify_destinations.push(Arc::new(identify_debug_dst) as Arc<dyn Destination<Identify>>);
+    let identify_exec = Executor::<Identify>::new(
+        identify_transformers,
+        identify_destinations,
+        db.clone(),
+        md.clone(),
+    );
+
+    info!("attaching ingester routes...");
+    Ok(ingester::sources::http::attach_routes(
+        router,
+        track_exec,
+        identify_exec,
+    ))
+}
+
+fn init_session_cleaner(
+    md: Arc<MetadataProvider>,
+    db: Arc<OptiDBImpl>,
+) -> crate::error::Result<()> {
+    thread::spawn(move || {
+        loop {
+            thread::sleep(std::time::Duration::from_secs(1));
+            for org in md.organizations.list().unwrap() {
+                for project in md.projects.list(org.id).unwrap() {
+                    md.sessions
+                        .check_for_deletion(org.id, project.id, |sess| {
+                            let now = Utc::now();
+                            let sess_len = now - sess.created_at;
+                            if sess_len.num_seconds() < SESSION_DURATION {
+                                return Ok(false);
+                            }
+                            let record_id =
+                                md.events.next_record_sequence(org.id, project.id).unwrap();
+
+                            let event_id = md
+                                .events
+                                .get_by_name(org.id, project.id, EVENT_SESSION_END)
+                                .unwrap()
+                                .id;
+
+                            let values = vec![
+                                NamedValue::new(
+                                    COLUMN_PROJECT_ID.to_string(),
+                                    Value::Int64(Some(project.id as i64)),
+                                ),
+                                NamedValue::new(
+                                    COLUMN_USER_ID.to_string(),
+                                    Value::Int64(Some(sess.user_id as i64)),
+                                ),
+                                NamedValue::new(
+                                    COLUMN_CREATED_AT.to_string(),
+                                    Value::Timestamp(Some(now.timestamp())),
+                                ),
+                                NamedValue::new(
+                                    COLUMN_EVENT_ID.to_string(),
+                                    Value::Int64(Some(record_id as i64)),
+                                ),
+                                NamedValue::new(
+                                    COLUMN_EVENT.to_string(),
+                                    Value::Int64(Some(event_id as i64)),
+                                ),
+                                NamedValue::new(
+                                    md.event_properties
+                                        .get_by_name(
+                                            org.id,
+                                            project.id,
+                                            EVENT_PROPERTY_SESSION_LENGTH,
+                                        )
+                                        .unwrap()
+                                        .column_name(),
+                                    Value::Timestamp(Some(sess_len.num_seconds())),
+                                ),
+                            ];
+
+                            db.insert("events", values).unwrap();
+
+                            Ok(true)
+                        })
+                        .unwrap();
+                }
+            }
+        }
+    });
 
     Ok(())
 }
@@ -263,7 +451,7 @@ fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<(
         name: "Test Project".to_string(),
         description: None,
         tags: None,
-        session_duration: SESSION_DURATION.num_seconds() as u64,
+        session_duration: SESSION_DURATION as u64,
     }) {
         Ok(proj) => proj,
         Err(_err) => md.projects.get_by_id(1, 1)?,
