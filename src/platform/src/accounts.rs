@@ -77,7 +77,7 @@ impl Accounts {
         };
         if let OptionalProperty::Some(password) = req.password {
             md_req
-                .password
+                .password_hash
                 .insert(make_password_hash(password.as_str())?);
         }
 

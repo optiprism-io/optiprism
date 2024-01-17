@@ -451,7 +451,7 @@ fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<(
         name: "Test Project".to_string(),
         description: None,
         tags: None,
-        session_duration: SESSION_DURATION as u64,
+        session_duration_seconds: SESSION_DURATION as u64,
     }) {
         Ok(proj) => proj,
         Err(_err) => md.projects.get_by_id(1, 1)?,

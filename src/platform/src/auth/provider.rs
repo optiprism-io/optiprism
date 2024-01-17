@@ -154,7 +154,7 @@ impl Auth {
             organizations: OptionalProperty::None,
             projects: OptionalProperty::None,
             teams: OptionalProperty::None,
-            password: OptionalProperty::None,
+            password_hash: OptionalProperty::None,
         };
 
         self.accounts.update(ctx.account_id.unwrap(), md_req)?;
@@ -188,7 +188,7 @@ impl Auth {
             organizations: OptionalProperty::None,
             projects: OptionalProperty::None,
             teams: OptionalProperty::None,
-            password: OptionalProperty::None,
+            password_hash: OptionalProperty::None,
         };
 
         match self.accounts.update(ctx.account_id.unwrap(), md_req) {
@@ -234,7 +234,7 @@ impl Auth {
             organizations: OptionalProperty::None,
             projects: OptionalProperty::None,
             teams: OptionalProperty::None,
-            password: OptionalProperty::Some(password_hash),
+            password_hash: OptionalProperty::Some(password_hash),
         };
 
         self.accounts.update(ctx.account_id.unwrap(), md_req)?;

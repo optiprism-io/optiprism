@@ -33,7 +33,7 @@ impl Projects {
             tags: request.tags,
             name: request.name,
             description: request.description,
-            session_duration: request.session_duration,
+            session_duration_seconds: request.session_duration,
         };
 
         let dashboard = self.prov.create(organization_id, md)?;
@@ -77,7 +77,7 @@ impl Projects {
             tags: req.tags,
             name: req.name,
             description: req.description,
-            session_duration: req.session_duration,
+            session_duration_seconds: req.session_duration,
         };
 
         let project = self.prov.update(organization_id, project_id, md_req)?;
@@ -123,7 +123,7 @@ impl From<metadata::projects::Project> for crate::projects::Project {
             tags: value.tags,
             name: value.name,
             description: value.description,
-            session_duration: value.session_duration,
+            session_duration: value.session_duration_seconds,
         }
     }
 }
