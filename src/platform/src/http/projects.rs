@@ -38,9 +38,9 @@ async fn get_by_id(
 async fn list(
     ctx: Context,
     Extension(provider): Extension<Arc<Projects>>,
-    Path(organization_id): Path<u64>,
+    Path(project_id): Path<u64>,
 ) -> Result<Json<ListResponse<Project>>> {
-    Ok(Json(provider.list(ctx, organization_id).await?))
+    Ok(Json(provider.list(ctx, project_id).await?))
 }
 
 async fn update(

@@ -21,7 +21,6 @@ pub fn resolve_properties(
     props_prov: &Arc<Properties>,
     city_rdr: &maxminddb::Reader<Vec<u8>>,
 ) -> Result<Vec<PropertyAndValue>> {
-    let org_id = ctx.organization_id.unwrap();
     let proj_id = ctx.project_id.unwrap();
 
     let ip = match context.ip {

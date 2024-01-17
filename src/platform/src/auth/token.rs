@@ -18,6 +18,8 @@ use crate::error::Result;
 pub struct AccessClaims {
     pub exp: i64,
     pub account_id: u64,
+    pub organization_id: u64,
+    pub project_id: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -42,6 +44,8 @@ pub fn make_token<T: Serialize>(claims: T, key: impl AsRef<[u8]>) -> Result<Stri
 
 pub fn make_access_token(
     account_id: u64,
+    organization_id: u64,
+    project_id: u64,
     expires: Duration,
     token_key: impl AsRef<[u8]>,
 ) -> Result<String> {
@@ -49,6 +53,8 @@ pub fn make_access_token(
         AccessClaims {
             exp: (Utc::now() + expires).timestamp(),
             account_id,
+            organization_id,
+            project_id,
         },
         token_key,
     )

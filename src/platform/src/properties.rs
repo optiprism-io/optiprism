@@ -27,13 +27,13 @@ impl Properties {
         Self { prov }
     }
     pub async fn get_by_id(&self, ctx: Context, project_id: u64, id: u64) -> Result<Property> {
-        ctx.check_project_permission(project_id, ProjectPermission::ViewSchema)?;
+        ctx.check_project_permission(ProjectPermission::ViewSchema)?;
 
         self.prov.get_by_id(project_id, id)?.try_into()
     }
 
     pub async fn get_by_name(&self, ctx: Context, project_id: u64, name: &str) -> Result<Property> {
-        ctx.check_project_permission(project_id, ProjectPermission::ViewSchema)?;
+        ctx.check_project_permission(ProjectPermission::ViewSchema)?;
 
         let event = self.prov.get_by_name(project_id, name)?;
 
@@ -41,7 +41,7 @@ impl Properties {
     }
 
     pub async fn list(&self, ctx: Context, project_id: u64) -> Result<ListResponse<Property>> {
-        ctx.check_project_permission(project_id, ProjectPermission::ViewSchema)?;
+        ctx.check_project_permission(ProjectPermission::ViewSchema)?;
         let resp = self.prov.list(project_id)?;
 
         resp.try_into()
@@ -55,7 +55,7 @@ impl Properties {
         property_id: u64,
         req: UpdatePropertyRequest,
     ) -> Result<Property> {
-        ctx.check_project_permission(project_id, ProjectPermission::ManageSchema)?;
+        ctx.check_project_permission(ProjectPermission::ManageSchema)?;
 
         let md_req = metadata::properties::UpdatePropertyRequest {
             updated_by: ctx.account_id.unwrap(),
@@ -74,7 +74,7 @@ impl Properties {
     }
 
     pub async fn delete(&self, ctx: Context, project_id: u64, id: u64) -> Result<Property> {
-        ctx.check_project_permission(project_id, ProjectPermission::DeleteSchema)?;
+        ctx.check_project_permission(ProjectPermission::DeleteSchema)?;
 
         self.prov.delete(project_id, id)?.try_into()
     }

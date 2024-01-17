@@ -25,7 +25,6 @@ pub fn resolve_properties(
     let ua = context.user_agent.clone().unwrap();
     let client = ua_parser.parse(&ua);
 
-    let org_id = ctx.organization_id.unwrap();
     let proj_id = ctx.project_id.unwrap();
     // client family
     {

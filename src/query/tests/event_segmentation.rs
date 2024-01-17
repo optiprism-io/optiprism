@@ -322,7 +322,7 @@ mod tests {
 
         let custom_event = md
             .custom_events
-            .create(1, 1, CreateCustomEventRequest {
+            .create(1, CreateCustomEventRequest {
                 created_by: 0,
                 tags: None,
                 name: "".to_string(),

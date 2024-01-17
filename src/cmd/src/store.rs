@@ -167,7 +167,6 @@ pub async fn start(args: &Shop, _proj_id: u64) -> Result<()> {
         let args_clone = args.clone();
         thread::spawn(move || {
             let store_cfg = Config {
-                org_id: 1,
                 project_id: proj_id,
                 from_date,
                 to_date,
@@ -193,7 +192,6 @@ pub async fn start(args: &Shop, _proj_id: u64) -> Result<()> {
 
         info!("starting future data generation...");
         let store_cfg = Config {
-            org_id: 1,
             project_id: proj_id,
             from_date: to_date,
             to_date: to_date + future_duration,
@@ -241,11 +239,11 @@ where R: io::Read {
     info!("creating entities...");
 
     info!("creating properties...");
-    create_properties(cfg.cfg.project_id, &md, &db)?;
+    create_properties(cfg.project_id, &md, &db)?;
 
     info!("loading profiles...");
     let profiles = ProfileProvider::try_new_from_csv(
-        cfg.cfg.project_id,
+        cfg.project_id,
         &md.dictionaries,
         &md.user_properties,
         cfg.geo_rdr,
@@ -253,7 +251,7 @@ where R: io::Read {
     )?;
     info!("loading products...");
     let products = ProductProvider::try_new_from_csv(
-        cfg.cfg.project_id,
+        cfg.project_id,
         &mut rng,
         md.dictionaries.clone(),
         md.event_properties.clone(),
@@ -263,11 +261,11 @@ where R: io::Read {
     for event in all::<Event>() {
         let md_event = md
             .events
-            .get_by_name(cfg.cfg.project_id, event.to_string().as_str())
+            .get_by_name(cfg.project_id, event.to_string().as_str())
             .unwrap();
         events_map.insert(event, md_event.id);
         md.dictionaries
-            .get_key_or_create(1, 1, "event_event", event.to_string().as_str())
+            .get_key_or_create(1, "event_event", event.to_string().as_str())
             .unwrap();
     }
 
@@ -312,7 +310,7 @@ where R: io::Read {
 
     let mut idx = 0;
     while let Some(event) = tx.recv()? {
-        write_event(cfg.cfg.project_id, &db, &md, event, idx)?;
+        write_event(cfg.project_id, &db, &md, event, idx)?;
         idx += 1;
         if idx % 1000000 == 0 {
             println!("{idx}");
@@ -326,14 +324,14 @@ pub fn future_gen<R>(md: Arc<MetadataProvider>, db: Arc<OptiDBImpl>, cfg: Config
 where R: io::Read {
     let mut rng = thread_rng();
     let profiles = ProfileProvider::try_new_from_csv(
-        cfg.cfg.project_id,
+        cfg.project_id,
         &md.dictionaries,
         &md.user_properties,
         cfg.geo_rdr,
         cfg.device_rdr,
     )?;
     let products = ProductProvider::try_new_from_csv(
-        cfg.cfg.project_id,
+        cfg.project_id,
         &mut rng,
         md.dictionaries.clone(),
         md.event_properties.clone(),
@@ -343,11 +341,11 @@ where R: io::Read {
     for event in all::<Event>() {
         let md_event = md
             .events
-            .get_by_name(cfg.cfg.project_id, event.to_string().as_str())
+            .get_by_name(cfg.project_id, event.to_string().as_str())
             .unwrap();
         events_map.insert(event, md_event.id);
         md.dictionaries
-            .get_key_or_create(1, 1, "event_event", event.to_string().as_str())
+            .get_key_or_create(1, "event_event", event.to_string().as_str())
             .unwrap();
     }
 
@@ -403,7 +401,7 @@ where R: io::Read {
                     if ts > cur {
                         thread::sleep(std::time::Duration::from_secs((ts - cur) as u64));
                     }
-                    write_event(cfg.cfg.project_id, &db, &md, event, 0).unwrap();
+                    write_event(cfg.project_id, &db, &md, event, 0).unwrap();
                 }
             }
         }

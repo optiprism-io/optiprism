@@ -10,16 +10,14 @@ pub enum Format {
 
 #[derive(Default, Clone)]
 pub struct Context {
-    pub
     pub project_id: u64,
     pub format: Format,
     pub cur_time: DateTime<Utc>,
 }
 
 impl Context {
-    pub fn new( project_id: u64) -> Self {
+    pub fn new(project_id: u64) -> Self {
         Self {
-
             project_id,
             ..Default::default()
         }

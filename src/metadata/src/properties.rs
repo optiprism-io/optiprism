@@ -307,7 +307,6 @@ impl Properties {
 
     pub fn update(
         &self,
-
         project_id: u64,
         property_id: u64,
         req: UpdatePropertyRequest,

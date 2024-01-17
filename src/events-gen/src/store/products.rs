@@ -227,9 +227,9 @@ impl ProductProvider {
 
     pub fn string_name(&self, key: u64) -> Result<String> {
         Ok(self.dicts.get_value(
-            self.self.proj_id,
+            self.proj_id,
             self.properties
-                .get_by_name(self.self.proj_id, "Product Name")
+                .get_by_name(self.proj_id, "Product Name")
                 .unwrap()
                 .column_name()
                 .as_str(),

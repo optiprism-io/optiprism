@@ -46,6 +46,8 @@ impl Auth {
         Ok(TokensResponse {
             access_token: make_access_token(
                 account_id,
+                1,
+                1,
                 self.access_token_duration,
                 self.access_token_key.as_str(),
             )

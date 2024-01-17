@@ -53,7 +53,7 @@ async fn get_system_by_id(
 async fn get_event_by_name(
     ctx: Context,
     Extension(provider): Extension<PropertiesLayer>,
-    Path((project_id, prop_name)): Path<(u64, u64, String)>,
+    Path((project_id, prop_name)): Path<(u64, String)>,
 ) -> Result<Json<Property>> {
     Ok(Json(
         provider
@@ -66,7 +66,7 @@ async fn get_event_by_name(
 async fn get_user_by_name(
     ctx: Context,
     Extension(provider): Extension<PropertiesLayer>,
-    Path((project_id, prop_name)): Path<(u64, u64, String)>,
+    Path((project_id, prop_name)): Path<(u64, String)>,
 ) -> Result<Json<Property>> {
     Ok(Json(
         provider
@@ -79,7 +79,7 @@ async fn get_user_by_name(
 async fn get_system_by_name(
     ctx: Context,
     Extension(provider): Extension<PropertiesLayer>,
-    Path((project_id, prop_name)): Path<(u64, u64, String)>,
+    Path((project_id, prop_name)): Path<(u64, String)>,
 ) -> Result<Json<Property>> {
     Ok(Json(
         provider

@@ -43,7 +43,6 @@ fn property_to_value(
     let val = if prop.property.is_dictionary {
         if let PropValue::String(str_v) = &prop.value {
             let dict_id = dict.get_key_or_create(
-                ctx.organization_id.unwrap(),
                 ctx.project_id.unwrap(),
                 prop.property.column_name().as_str(),
                 str_v.as_str(),
@@ -84,8 +83,7 @@ impl Destination<Track> for Local {
     fn send(&self, ctx: &RequestContext, req: Track) -> Result<()> {
         let ts = Utc::now();
         let is_new_session = self.md.sessions.set_current_time(
-            ctx.organization_id.unwrap(),
-            ctx.organization_id.unwrap(),
+            ctx.project_id.unwrap(),
             req.resolved_user_id.unwrap() as u64,
             ts,
         )?;
@@ -94,16 +92,12 @@ impl Destination<Track> for Local {
             let record_id = self
                 .md
                 .events
-                .next_record_sequence(ctx.organization_id.unwrap(), ctx.project_id.unwrap())?;
+                .next_record_sequence(ctx.project_id.unwrap())?;
 
             let event_id = self
                 .md
                 .events
-                .get_by_name(
-                    ctx.organization_id.unwrap(),
-                    ctx.project_id.unwrap(),
-                    EVENT_SESSION_BEGIN,
-                )?
+                .get_by_name(ctx.project_id.unwrap(), EVENT_SESSION_BEGIN)?
                 .id;
 
             let values = vec![
@@ -135,7 +129,7 @@ impl Destination<Track> for Local {
         let record_id = self
             .md
             .events
-            .next_record_sequence(ctx.organization_id.unwrap(), ctx.project_id.unwrap())?;
+            .next_record_sequence(ctx.project_id.unwrap())?;
 
         let event_id = req.resolved_event.as_ref().unwrap().id;
 

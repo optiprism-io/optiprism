@@ -91,18 +91,16 @@ macro_rules! breakdowns_to_dicts {
 
 macro_rules! dictionary_prop_to_col {
     ($self:expr, $md_namespace:ident, $prop_name:expr,  $decode_cols:expr) => {{
-        let prop = $self.metadata.$md_namespace.get_by_name(
-            $
-            $self.ctx.project_id,
-            $prop_name.as_str(),
-        )?;
+        let prop = $self
+            .metadata
+            .$md_namespace
+            .get_by_name($self.ctx.project_id, $prop_name.as_str())?;
         if !prop.is_dictionary {
             continue;
         }
 
         let col_name = prop.column_name();
         let dict = SingleDictionaryProvider::new(
-            $
             $self.ctx.project_id,
             col_name.clone(),
             $self.metadata.dictionaries.clone(),

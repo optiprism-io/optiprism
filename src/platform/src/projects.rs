@@ -29,6 +29,7 @@ impl Projects {
             name: request.name,
             description: request.description,
             session_duration_seconds: request.session_duration,
+            organization_id: ctx.organization_id,
         };
 
         let dashboard = self.prov.create(md)?;
@@ -42,9 +43,9 @@ impl Projects {
         Ok(self.prov.get_by_id(id)?.into())
     }
 
-    pub async fn list(&self, ctx: Context) -> Result<ListResponse<Project>> {
+    pub async fn list(&self, ctx: Context, organization_id: u64) -> Result<ListResponse<Project>> {
         ctx.check_organization_permission(OrganizationPermission::ExploreProjects)?;
-        let resp = self.prov.list(organization_id)?;
+        let resp = self.prov.list(Some(organization_id))?;
 
         Ok(ListResponse {
             data: resp.data.into_iter().map(|v| v.into()).collect(),
@@ -55,7 +56,6 @@ impl Projects {
     pub async fn update(
         &self,
         ctx: Context,
-
         project_id: u64,
         req: UpdateProjectRequest,
     ) -> Result<Project> {

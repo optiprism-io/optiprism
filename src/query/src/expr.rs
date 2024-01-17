@@ -150,7 +150,7 @@ pub fn encode_property_dict_values(
     for value in values.iter() {
         if let ScalarValue::Utf8(inner) = value {
             if let Some(str_value) = inner {
-                let key = dictionaries.get_key(ctx.ctx.project_id, col_name, str_value.as_str())?;
+                let key = dictionaries.get_key(ctx.project_id, col_name, str_value.as_str())?;
 
                 let scalar_value = match dict_type {
                     DictionaryType::Int8 => ScalarValue::Int8(Some(key as i8)),

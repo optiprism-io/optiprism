@@ -115,7 +115,7 @@ async fn test_event_properties() {
             is_system: false,
         };
 
-        let resp = md.event_properties.create(1, 1, req).unwrap();
+        let resp = md.event_properties.create(1, req).unwrap();
         assert_eq!(resp.id, 1);
     }
 

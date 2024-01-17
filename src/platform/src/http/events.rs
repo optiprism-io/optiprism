@@ -76,7 +76,7 @@ async fn delete(
 async fn attach_property(
     ctx: Context,
     Extension(provider): Extension<Arc<Events>>,
-    Path((project_id, event_id, prop_id)): Path<(u64, u64, u64, u64)>,
+    Path((project_id, event_id, prop_id)): Path<(u64, u64, u64)>,
 ) -> Result<Json<Event>> {
     Ok(Json(
         provider
@@ -88,7 +88,7 @@ async fn attach_property(
 async fn detach_property(
     ctx: Context,
     Extension(provider): Extension<Arc<Events>>,
-    Path((project_id, event_id, prop_id)): Path<(u64, u64, u64, u64)>,
+    Path((project_id, event_id, prop_id)): Path<(u64, u64, u64)>,
 ) -> Result<Json<Event>> {
     Ok(Json(
         provider

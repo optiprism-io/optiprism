@@ -107,7 +107,7 @@ impl Projects {
         Ok(deserialize::<Project>(&data)?)
     }
 
-    pub fn list(&self) -> Result<ListResponse<Project>> {
+    pub fn list(&self, organization_id: Option<u64>) -> Result<ListResponse<Project>> {
         let tx = self.db.transaction();
 
         list_data(&tx, NAMESPACE)

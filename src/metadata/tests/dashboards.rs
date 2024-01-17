@@ -31,40 +31,40 @@ fn test_dashboards() -> Result<()> {
     };
 
     // try to get, delete, update unexisting event
-    assert!(dashboards.get_by_id(1, 1, 1).is_err());
-    assert!(dashboards.delete(1, 1, 1).is_err());
+    assert!(dashboards.get_by_id(1, 1).is_err());
+    assert!(dashboards.delete(1, 1).is_err());
     // assert_eq!(events.list_events()?, vec![]);
     // create two events
 
     let mut create_dash1 = create_dash_req.clone();
     create_dash1.name = "dash1".to_string();
-    let res = dashboards.create(1, 1, create_dash1.clone())?;
+    let res = dashboards.create(1, create_dash1.clone())?;
     assert_eq!(res.id, 1);
     let mut create_dash2 = create_dash_req.clone();
     create_dash2.name = "dash2".to_string();
-    let res = dashboards.create(1, 1, create_dash2.clone())?;
+    let res = dashboards.create(1, create_dash2.clone())?;
     assert_eq!(res.id, 2);
 
     // check existence by id
-    assert_eq!(dashboards.get_by_id(1, 1, 1)?.id, 1);
-    assert_eq!(dashboards.get_by_id(1, 1, 2)?.id, 2);
+    assert_eq!(dashboards.get_by_id(1, 1)?.id, 1);
+    assert_eq!(dashboards.get_by_id(1, 2)?.id, 2);
 
     let mut update_dash1 = update_dash_req.clone();
 
     update_dash1.name.insert("d2".to_string());
     assert_eq!(
-        dashboards.update(1, 1, 1, update_dash1.clone())?.name,
+        dashboards.update(1, 1, update_dash1.clone())?.name,
         "d2".to_string()
     );
 
-    assert_eq!(dashboards.list(1, 1)?.data[0].id, 1);
+    assert_eq!(dashboards.list(1)?.data[0].id, 1);
 
     // delete events
-    assert_eq!(dashboards.delete(1, 1, 1)?.id, 1);
-    assert_eq!(dashboards.delete(1, 1, 2)?.id, 2);
+    assert_eq!(dashboards.delete(1, 1)?.id, 1);
+    assert_eq!(dashboards.delete(1, 2)?.id, 2);
 
     // events should gone now
-    assert!(dashboards.get_by_id(1, 1, 1).is_err());
-    assert!(dashboards.get_by_id(1, 1, 2).is_err());
+    assert!(dashboards.get_by_id(1, 1).is_err());
+    assert!(dashboards.get_by_id(1, 2).is_err());
     Ok(())
 }

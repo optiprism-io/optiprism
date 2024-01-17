@@ -59,7 +59,6 @@ pub struct CreatePropertyMainRequest {
 
 pub fn create_property(
     md: &Arc<MetadataProvider>,
-
     proj_id: u64,
     main_req: CreatePropertyMainRequest,
 ) -> anyhow::Result<Property> {

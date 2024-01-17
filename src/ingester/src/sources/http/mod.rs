@@ -119,7 +119,6 @@ async fn track(
     common::http::Json(request): common::http::Json<TrackRequest>,
 ) -> Result<StatusCode> {
     let ctx = RequestContext {
-        organization_id: None,
         project_id: None,
         client_ip: addr.ip(),
         token,
@@ -136,7 +135,6 @@ async fn click(
     common::http::Json(request): common::http::Json<TrackRequest>,
 ) -> Result<StatusCode> {
     let ctx = RequestContext {
-        organization_id: None,
         project_id: None,
         client_ip: addr.ip(),
         token,
@@ -153,7 +151,6 @@ async fn page(
     common::http::Json(request): common::http::Json<TrackRequest>,
 ) -> Result<StatusCode> {
     let ctx = RequestContext {
-        organization_id: None,
         project_id: None,
         client_ip: addr.ip(),
         token,
@@ -170,7 +167,6 @@ async fn screen(
     common::http::Json(request): common::http::Json<TrackRequest>,
 ) -> Result<StatusCode> {
     let ctx = RequestContext {
-        organization_id: None,
         project_id: None,
         client_ip: addr.ip(),
         token,
@@ -187,7 +183,6 @@ async fn identify(
     common::http::Json(request): common::http::Json<IdentifyRequest>,
 ) -> Result<StatusCode> {
     let ctx = RequestContext {
-        organization_id: None,
         project_id: None,
         client_ip: addr.ip(),
         token,

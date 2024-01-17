@@ -217,10 +217,10 @@ pub async fn gen(args: &Test, _proj_id: u64) -> Result<(), anyhow::Error> {
     init_system(&md, &db, args.partitions.unwrap_or_else(num_cpus::get))?;
 
     info!("creating org structure and admin account...");
-    let (_ proj_id) = crate::init_test_org_structure(&md)?;
+    let (proj_id) = crate::init_test_org_structure(&md)?;
 
     info!("project initialization...");
-    init_project(1, proj_id, &md)?;
+    init_project(proj_id, &md)?;
 
     info!("starting sample data generation...");
     let _partitions = args.partitions.unwrap_or_else(num_cpus::get);
@@ -240,7 +240,7 @@ pub async fn gen(args: &Test, _proj_id: u64) -> Result<(), anyhow::Error> {
     ];
 
     for (name, dt) in props {
-        create_property(&md, 1, proj_id, CreatePropertyMainRequest {
+        create_property(&md, proj_id, CreatePropertyMainRequest {
             name: name.to_string(),
             typ: Type::System, // do this to keep property names as is
             data_type: dt,
@@ -249,7 +249,7 @@ pub async fn gen(args: &Test, _proj_id: u64) -> Result<(), anyhow::Error> {
         })?;
     }
 
-    create_property(&md, 1, proj_id, CreatePropertyMainRequest {
+    create_property(&md, proj_id, CreatePropertyMainRequest {
         name: "string_dict".to_string(),
         typ: Type::System,
         data_type: DType::String,
@@ -258,12 +258,11 @@ pub async fn gen(args: &Test, _proj_id: u64) -> Result<(), anyhow::Error> {
     })?;
 
     md.dictionaries
-        .get_key_or_create(1, 1, "string_dict", "привет")?;
+        .get_key_or_create(1, "string_dict", "привет")?;
+    md.dictionaries.get_key_or_create(1, "string_dict", "мир")?;
+    let e = create_event(&md, proj_id, "event".to_string())?;
     md.dictionaries
-        .get_key_or_create(1, 1, "string_dict", "мир")?;
-    let e = create_event(&md, 1, proj_id, "event".to_string())?;
-    md.dictionaries
-        .get_key_or_create(1, proj_id, "event", "event")?;
+        .get_key_or_create(proj_id, "event", "event")?;
 
     let now = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0)
         .unwrap()

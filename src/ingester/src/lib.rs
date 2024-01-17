@@ -25,7 +25,6 @@ pub trait Destination<T>: Send + Sync {
 #[derive(Debug, Clone)]
 pub struct RequestContext {
     project_id: Option<u64>,
-    organization_id: Option<u64>,
     client_ip: IpAddr,
     token: String,
 }
