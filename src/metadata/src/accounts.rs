@@ -120,7 +120,9 @@ impl Accounts {
         if let OptionalProperty::Some(teams) = req.teams {
             account.teams = teams;
         }
-
+        if let OptionalProperty::Some(hash) = req.password_hash {
+            account.password_hash = hash;
+        }
         let data = serialize(&account)?;
         tx.put(make_data_value_key(NAMESPACE, account.id), &data)?;
 
@@ -190,7 +192,7 @@ impl CreateAccountRequest {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 pub struct UpdateAccountRequest {
     pub updated_by: u64,
-    pub password: OptionalProperty<String>,
+    pub password_hash: OptionalProperty<String>,
     pub email: OptionalProperty<String>,
     pub name: OptionalProperty<Option<String>>,
     pub role: OptionalProperty<Option<Role>>,

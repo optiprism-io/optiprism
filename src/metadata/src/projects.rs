@@ -104,7 +104,7 @@ impl Projects {
             description: req.description,
             tags: req.tags,
             token,
-            session_duration: req.session_duration,
+            session_duration_seconds: req.session_duration_seconds,
         };
         let data = serialize(&project)?;
         tx.put(
@@ -164,8 +164,8 @@ impl Projects {
             project.description = description;
         }
 
-        if let OptionalProperty::Some(session_duration) = req.session_duration {
-            project.session_duration = session_duration;
+        if let OptionalProperty::Some(session_duration) = req.session_duration_seconds {
+            project.session_duration_seconds = session_duration;
         }
 
         let data = serialize(&project)?;
@@ -207,7 +207,7 @@ pub struct Project {
     pub description: Option<String>,
     pub tags: Option<Vec<String>>,
     pub token: String,
-    pub session_duration: u64,
+    pub session_duration_seconds: u64,
 }
 
 #[serde_as]
@@ -217,7 +217,7 @@ pub struct CreateProjectRequest {
     pub name: String,
     pub description: Option<String>,
     pub tags: Option<Vec<String>>,
-    pub session_duration: u64,
+    pub session_duration_seconds: u64,
 }
 
 #[serde_as]
@@ -227,5 +227,5 @@ pub struct UpdateProjectRequest {
     pub name: OptionalProperty<String>,
     pub description: OptionalProperty<Option<String>>,
     pub tags: OptionalProperty<Option<Vec<String>>>,
-    pub session_duration: OptionalProperty<u64>,
+    pub session_duration_seconds: OptionalProperty<u64>,
 }

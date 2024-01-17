@@ -58,7 +58,7 @@ async fn test_auth() {
         md.accounts
             .update(2, UpdateAccountRequest {
                 updated_by: 2,
-                password: OptionalProperty::None,
+                password_hash: OptionalProperty::None,
                 email: OptionalProperty::None,
                 name: OptionalProperty::None,
                 role: OptionalProperty::None,
