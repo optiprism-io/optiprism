@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use std::fs;
 use std::net::SocketAddr;
 use std::ops::Add;
@@ -27,6 +28,9 @@ use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 use datafusion::datasource::TableProvider;
 use hyper::Server;
+use indicatif::ProgressBar;
+use indicatif::ProgressState;
+use indicatif::ProgressStyle;
 use metadata::properties::DictionaryType;
 use metadata::properties::Type;
 use metadata::test_util::create_event;
@@ -269,8 +273,22 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
         .duration_trunc(Duration::days(1))?;
 
     let users = 10;
-    let days = 50;
+    let days = 365;
     let events = 20;
+    let total = (users * days * events) as u64;
+    let pb = ProgressBar::new(total);
+
+    pb.set_style(
+        ProgressStyle::with_template(
+            "{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {pos}/{len} events ({eta})",
+        )
+        .unwrap()
+        .with_key("eta", |state: &ProgressState, w: &mut dyn Write| {
+            write!(w, "{:.1}s", state.eta().as_secs_f64()).unwrap()
+        })
+        .progress_chars("#>-"),
+    );
+
     let mut vals: Vec<NamedValue> = vec![];
     let mut i = 0;
     for user in 0..users {
@@ -383,13 +401,14 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
                 let diff = Duration::seconds(d);
                 event_time = event_time.add(diff);
                 i += 1;
+                pb.inc(1);
             }
             cur_time = cur_time.add(Duration::days(1));
         }
     }
     db.flush()?;
 
-    info!("successfully generated!");
+    info!("successfully generated {i} events!");
     let data_provider: Arc<dyn TableProvider> =
         Arc::new(LocalTable::try_new(db.clone(), "events".to_string())?);
 

@@ -142,7 +142,6 @@ pub struct OptiDBImpl {
 
 fn log_op(op: LogOp, log: &mut File) -> Result<usize> {
     let data = serialize(&op)?;
-
     let mut a = Vec::with_capacity(1024 * 10);
     let crc = hash_crc32(&data);
     let vv = crc.to_le_bytes();
@@ -375,7 +374,7 @@ fn write_level0(
         let popts = parquet::write::WriteOptions {
             write_statistics: true,
             compression: parquet::write::CompressionOptions::Snappy,
-            version: parquet::write::Version::V1,
+            version: parquet::write::Version::V2,
             // todo define page size
             data_pagesize_limit: None,
         };

@@ -5,7 +5,7 @@ op_addr = "http://localhost:8080/api/v1"
 
 def auth():
     auth_body = {
-        "email": "admin@email.com",
+        "email": "admin@admin.com",
         "password": "admin"
     }
 
@@ -66,7 +66,7 @@ def aggregate_property_query(agg, field: str, prop_type="system",
 
     print(q)
     resp = requests.post(
-        "{0}/organizations/1/projects/1/queries/event-segmentation?format=jsonCompact".format(op_addr),
+        "{0}/projects/1/queries/event-segmentation?format=jsonCompact".format(op_addr),
         json=q,
         headers={"Content-Type": "application/json",
                  "Authorization": "Bearer " + token})
@@ -137,7 +137,7 @@ def partitioned_aggregate_property_query(agg, outer_agg, typ: str, prop_type="sy
     }
 
     resp = requests.post(
-        "{0}/organizations/1/projects/1/queries/event-segmentation?format=jsonCompact".format(op_addr),
+        "{0}/projects/1/queries/event-segmentation?format=jsonCompact".format(op_addr),
         json=q,
         headers={"Content-Type": "application/json",
                  "Authorization": "Bearer " + token})
@@ -204,7 +204,7 @@ def simple_query(query: str, time_last=2, unit="day",
     }
     print(q)
     resp = requests.post(
-        "{0}/organizations/1/projects/1/queries/event-segmentation?format=jsonCompact".format(op_addr),
+        "{0}/projects/1/queries/event-segmentation?format=jsonCompact".format(op_addr),
         json=q,
         headers={"Content-Type": "application/json",
                  "Authorization": "Bearer " + token})
@@ -297,7 +297,7 @@ def all_aggregates_query(typ, time_last=2, unit="day",
     }
 
     resp = requests.post(
-        "{0}/organizations/1/projects/1/queries/event-segmentation?format=jsonCompact".format(op_addr),
+        "{0}/projects/1/queries/event-segmentation?format=jsonCompact".format(op_addr),
         json=q,
         headers={"Content-Type": "application/json",
                  "Authorization": "Bearer " + token})

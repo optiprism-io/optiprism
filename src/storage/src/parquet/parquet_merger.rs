@@ -324,7 +324,7 @@ impl PagesIndexChunk {
     pub fn from_arrow(arrs: &[Box<dyn Array>], index_cols: &[ColumnDescriptor]) -> Result<Self> {
         let opts = ArrowWriteOptions {
             write_statistics: true,
-            compression: CompressionOptions::Snappy, // todo
+            compression: CompressionOptions::Snappy,
             version: Version::V2,
             data_pagesize_limit: None,
         };
