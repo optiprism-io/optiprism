@@ -20,13 +20,8 @@ impl Projects {
     pub fn new(prov: Arc<MDProjects>) -> Self {
         Self { prov }
     }
-    pub async fn create(
-        &self,
-        ctx: Context,
-        organization_id: u64,
-        request: CreateProjectRequest,
-    ) -> Result<Project> {
-        ctx.check_organization_permission(organization_id, OrganizationPermission::ManageProjects)?;
+    pub async fn create(&self, ctx: Context, request: CreateProjectRequest) -> Result<Project> {
+        ctx.check_organization_permission(OrganizationPermission::ManageProjects)?;
 
         let md = metadata::projects::CreateProjectRequest {
             created_by: ctx.account_id.unwrap(),
@@ -36,25 +31,19 @@ impl Projects {
             session_duration_seconds: request.session_duration,
         };
 
-        let dashboard = self.prov.create(organization_id, md)?;
+        let dashboard = self.prov.create(md)?;
 
         Ok(dashboard.into())
     }
 
-    pub async fn get_by_id(&self, ctx: Context, organization_id: u64, id: u64) -> Result<Project> {
-        ctx.check_organization_permission(
-            organization_id,
-            OrganizationPermission::ExploreProjects,
-        )?;
+    pub async fn get_by_id(&self, ctx: Context, id: u64) -> Result<Project> {
+        ctx.check_organization_permission(OrganizationPermission::ExploreProjects)?;
 
-        Ok(self.prov.get_by_id(organization_id, id)?.into())
+        Ok(self.prov.get_by_id(id)?.into())
     }
 
-    pub async fn list(&self, ctx: Context, organization_id: u64) -> Result<ListResponse<Project>> {
-        ctx.check_organization_permission(
-            organization_id,
-            OrganizationPermission::ExploreProjects,
-        )?;
+    pub async fn list(&self, ctx: Context) -> Result<ListResponse<Project>> {
+        ctx.check_organization_permission(OrganizationPermission::ExploreProjects)?;
         let resp = self.prov.list(organization_id)?;
 
         Ok(ListResponse {
@@ -66,11 +55,11 @@ impl Projects {
     pub async fn update(
         &self,
         ctx: Context,
-        organization_id: u64,
+
         project_id: u64,
         req: UpdateProjectRequest,
     ) -> Result<Project> {
-        ctx.check_organization_permission(organization_id, OrganizationPermission::ManageProjects)?;
+        ctx.check_organization_permission(OrganizationPermission::ManageProjects)?;
 
         let md_req = metadata::projects::UpdateProjectRequest {
             updated_by: ctx.account_id.unwrap(),
@@ -80,20 +69,15 @@ impl Projects {
             session_duration_seconds: req.session_duration,
         };
 
-        let project = self.prov.update(organization_id, project_id, md_req)?;
+        let project = self.prov.update(project_id, md_req)?;
 
         Ok(project.into())
     }
 
-    pub async fn delete(
-        &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
-    ) -> Result<Project> {
-        ctx.check_organization_permission(organization_id, OrganizationPermission::ManageProjects)?;
+    pub async fn delete(&self, ctx: Context, project_id: u64) -> Result<Project> {
+        ctx.check_organization_permission(OrganizationPermission::ManageProjects)?;
 
-        Ok(self.prov.delete(organization_id, project_id)?.into())
+        Ok(self.prov.delete(project_id)?.into())
     }
 }
 

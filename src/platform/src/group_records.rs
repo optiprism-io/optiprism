@@ -17,23 +17,17 @@ pub trait Provider: Sync + Send {
     async fn list(
         &self,
         ctx: Context,
-        organization_id: u64,
+
         project_id: u64,
         request: ListGroupRecordsRequest,
     ) -> Result<ListResponse<GroupRecord>>;
 
-    async fn get_by_id(
-        &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
-        id: u64,
-    ) -> Result<GroupRecord>;
+    async fn get_by_id(&self, ctx: Context, project_id: u64, id: u64) -> Result<GroupRecord>;
 
     async fn update(
         &self,
         ctx: Context,
-        organization_id: u64,
+
         project_id: u64,
         id: u64,
         req: UpdateGroupRecordRequest,

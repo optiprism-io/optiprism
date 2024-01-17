@@ -12,7 +12,7 @@ use crate::error::MetadataError;
 use crate::error::Result;
 use crate::index::next_seq;
 use crate::make_id_seq_key;
-use crate::org_proj_ns;
+use crate::project_ns;
 
 const NAMESPACE: &[u8] = b"dictinaries";
 
@@ -20,18 +20,18 @@ fn dict_ns(dict: &str) -> Vec<u8> {
     [NAMESPACE, b"/", dict.as_bytes()].concat()
 }
 
-fn make_key_key(organization_id: u64, project_id: u64, dict: &str, key: u64) -> Vec<u8> {
+fn make_key_key(project_id: u64, dict: &str, key: u64) -> Vec<u8> {
     [
-        org_proj_ns(organization_id, project_id, dict_ns(dict).as_slice()).as_slice(),
+        project_ns(project_id, dict_ns(dict).as_slice()).as_slice(),
         b"keys/",
         key.to_le_bytes().as_ref(),
     ]
     .concat()
 }
 
-fn make_value_key(organization_id: u64, project_id: u64, dict: &str, value: &str) -> Vec<u8> {
+fn make_value_key(project_id: u64, dict: &str, value: &str) -> Vec<u8> {
     [
-        org_proj_ns(organization_id, project_id, dict_ns(dict).as_slice()).as_slice(),
+        project_ns(project_id, dict_ns(dict).as_slice()).as_slice(),
         b"values/",
         value.as_bytes(),
     ]
@@ -55,29 +55,17 @@ impl Debug for Dictionaries {
 }
 
 impl Dictionaries {
-    pub fn get_key_or_create(
-        &self,
-        organization_id: u64,
-        project_id: u64,
-        dict: &str,
-        value: &str,
-    ) -> Result<u64> {
+    pub fn get_key_or_create(&self, project_id: u64, dict: &str, value: &str) -> Result<u64> {
         let tx = self.db.transaction();
-        let res = match tx.get(make_value_key(organization_id, project_id, dict, value))? {
+        let res = match tx.get(make_value_key(project_id, dict, value))? {
             None => {
                 let id = next_seq(
                     &tx,
-                    make_id_seq_key(
-                        org_proj_ns(organization_id, project_id, dict_ns(dict).as_slice())
-                            .as_slice(),
-                    ),
+                    make_id_seq_key(project_ns(project_id, dict_ns(dict).as_slice()).as_slice()),
                 )?;
+                tx.put(make_key_key(project_id, dict, id), value.as_bytes())?;
                 tx.put(
-                    make_key_key(organization_id, project_id, dict, id),
-                    value.as_bytes(),
-                )?;
-                tx.put(
-                    make_value_key(organization_id, project_id, dict, value),
+                    make_value_key(project_id, dict, value),
                     id.to_le_bytes().as_ref(),
                 )?;
 
@@ -89,15 +77,9 @@ impl Dictionaries {
         res
     }
 
-    pub fn get_value(
-        &self,
-        organization_id: u64,
-        project_id: u64,
-        dict: &str,
-        key: u64,
-    ) -> Result<String> {
+    pub fn get_value(&self, project_id: u64, dict: &str, key: u64) -> Result<String> {
         let tx = self.db.transaction();
-        let store_key = make_key_key(organization_id, project_id, dict, key);
+        let store_key = make_key_key(project_id, dict, key);
         match tx.get(store_key.as_slice())? {
             None => Err(MetadataError::NotFound(format!(
                 "value for key {} not found",
@@ -107,15 +89,9 @@ impl Dictionaries {
         }
     }
 
-    pub fn get_key(
-        &self,
-        organization_id: u64,
-        project_id: u64,
-        dict: &str,
-        value: &str,
-    ) -> Result<u64> {
+    pub fn get_key(&self, project_id: u64, dict: &str, value: &str) -> Result<u64> {
         let tx = self.db.transaction();
-        let store_key = make_value_key(organization_id, project_id, dict, value);
+        let store_key = make_value_key(project_id, dict, value);
         match tx.get(store_key.as_slice())? {
             None => Err(MetadataError::NotFound(format!(
                 "key by value {} not found",
@@ -128,7 +104,6 @@ impl Dictionaries {
 
 #[derive(Debug)]
 pub struct SingleDictionaryProvider {
-    organization_id: u64,
     project_id: u64,
     dict: String,
     dictionaries: Arc<Dictionaries>,
@@ -136,21 +111,14 @@ pub struct SingleDictionaryProvider {
 
 impl Hash for SingleDictionaryProvider {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.organization_id.hash(state);
         self.project_id.hash(state);
         self.dict.hash(state);
     }
 }
 
 impl SingleDictionaryProvider {
-    pub fn new(
-        organization_id: u64,
-        project_id: u64,
-        dict: String,
-        dictionaries: Arc<Dictionaries>,
-    ) -> Self {
+    pub fn new(project_id: u64, dict: String, dictionaries: Arc<Dictionaries>) -> Self {
         Self {
-            organization_id,
             project_id,
             dict,
             dictionaries,
@@ -158,35 +126,17 @@ impl SingleDictionaryProvider {
     }
 
     pub fn get_key_or_create(&self, value: &str) -> Result<u64> {
-        self.dictionaries.get_key_or_create(
-            self.organization_id,
-            self.project_id,
-            self.dict.as_str(),
-            value,
-        )
+        self.dictionaries
+            .get_key_or_create(self.project_id, self.dict.as_str(), value)
     }
 
     pub fn get_value(&self, key: u64) -> Result<String> {
-        self.dictionaries.get_value(
-            self.organization_id,
-            self.project_id,
-            self.dict.as_str(),
-            key,
-        )
+        self.dictionaries
+            .get_value(self.project_id, self.dict.as_str(), key)
     }
 
-    pub fn get_key(
-        &self,
-        _organization_id: u64,
-        _project_id: u64,
-        _dict: &str,
-        value: &str,
-    ) -> Result<u64> {
-        self.dictionaries.get_key(
-            self.organization_id,
-            self.project_id,
-            self.dict.as_str(),
-            value,
-        )
+    pub fn get_key(&self, _project_id: u64, _dict: &str, value: &str) -> Result<u64> {
+        self.dictionaries
+            .get_key(self.project_id, self.dict.as_str(), value)
     }
 }

@@ -17,7 +17,7 @@ use crate::list_data;
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::metadata::ListResponse;
-use crate::org_proj_ns;
+use crate::project_ns;
 use crate::Result;
 
 const NAMESPACE: &[u8] = b"reports";
@@ -33,14 +33,11 @@ impl Reports {
     fn get_by_id_(
         &self,
         tx: &Transaction<TransactionDB>,
-        organization_id: u64,
+
         project_id: u64,
         id: u64,
     ) -> Result<Report> {
-        let key = make_data_value_key(
-            org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
-            id,
-        );
+        let key = make_data_value_key(project_ns(project_id, NAMESPACE).as_slice(), id);
 
         match tx.get(key)? {
             None => Err(MetadataError::NotFound("report not found".to_string())),
@@ -48,18 +45,13 @@ impl Reports {
         }
     }
 
-    pub fn create(
-        &self,
-        organization_id: u64,
-        project_id: u64,
-        req: CreateReportRequest,
-    ) -> Result<Report> {
+    pub fn create(&self, project_id: u64, req: CreateReportRequest) -> Result<Report> {
         let tx = self.db.transaction();
 
         let created_at = Utc::now();
         let id = next_seq(
             &tx,
-            make_id_seq_key(org_proj_ns(organization_id, project_id, NAMESPACE).as_slice()),
+            make_id_seq_key(project_ns(project_id, NAMESPACE).as_slice()),
         )?;
 
         let report = Report {
@@ -77,39 +69,33 @@ impl Reports {
         };
         let data = serialize(&report)?;
         tx.put(
-            make_data_value_key(
-                org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
-                report.id,
-            ),
+            make_data_value_key(project_ns(project_id, NAMESPACE).as_slice(), report.id),
             data,
         )?;
         tx.commit()?;
         Ok(report)
     }
 
-    pub fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Report> {
+    pub fn get_by_id(&self, project_id: u64, id: u64) -> Result<Report> {
         let tx = self.db.transaction();
 
-        self.get_by_id_(&tx, organization_id, project_id, id)
+        self.get_by_id_(&tx, project_id, id)
     }
 
-    pub fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Report>> {
+    pub fn list(&self, project_id: u64) -> Result<ListResponse<Report>> {
         let tx = self.db.transaction();
-        list_data(
-            &tx,
-            org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
-        )
+        list_data(&tx, project_ns(project_id, NAMESPACE).as_slice())
     }
 
     pub fn update(
         &self,
-        organization_id: u64,
+
         project_id: u64,
         report_id: u64,
         req: UpdateReportRequest,
     ) -> Result<Report> {
         let tx = self.db.transaction();
-        let prev_report = self.get_by_id_(&tx, organization_id, project_id, report_id)?;
+        let prev_report = self.get_by_id_(&tx, project_id, report_id)?;
         let mut report = prev_report.clone();
 
         report.updated_at = Some(Utc::now());
@@ -129,21 +115,18 @@ impl Reports {
 
         let data = serialize(&report)?;
         tx.put(
-            make_data_value_key(
-                org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
-                report.id,
-            ),
+            make_data_value_key(project_ns(project_id, NAMESPACE).as_slice(), report.id),
             data,
         )?;
         tx.commit()?;
         Ok(report)
     }
 
-    pub fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Report> {
+    pub fn delete(&self, project_id: u64, id: u64) -> Result<Report> {
         let tx = self.db.transaction();
-        let report = self.get_by_id_(&tx, organization_id, project_id, id)?;
+        let report = self.get_by_id_(&tx, project_id, id)?;
         tx.delete(make_data_value_key(
-            org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
+            project_ns(project_id, NAMESPACE).as_slice(),
             id,
         ))?;
         tx.commit()?;

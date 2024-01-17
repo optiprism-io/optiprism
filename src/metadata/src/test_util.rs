@@ -30,13 +30,13 @@ pub fn init_db() -> anyhow::Result<(Arc<MetadataProvider>, Arc<OptiDBImpl>)> {
 
 pub fn create_event(
     md: &Arc<MetadataProvider>,
-    org_id: u64,
+
     proj_id: u64,
     name: String,
 ) -> anyhow::Result<Event> {
     Ok(md
         .events
-        .get_or_create(org_id, proj_id, events::CreateEventRequest {
+        .get_or_create(proj_id, events::CreateEventRequest {
             created_by: 0,
             tags: None,
             name,
@@ -59,7 +59,7 @@ pub struct CreatePropertyMainRequest {
 
 pub fn create_property(
     md: &Arc<MetadataProvider>,
-    org_id: u64,
+
     proj_id: u64,
     main_req: CreatePropertyMainRequest,
 ) -> anyhow::Result<Property> {
@@ -80,9 +80,9 @@ pub fn create_property(
     };
 
     let prop = match main_req.typ {
-        Type::System => md.system_properties.get_or_create(org_id, proj_id, req)?,
-        Type::Event => md.event_properties.get_or_create(org_id, proj_id, req)?,
-        Type::User => md.user_properties.get_or_create(org_id, proj_id, req)?,
+        Type::System => md.system_properties.get_or_create(proj_id, req)?,
+        Type::Event => md.event_properties.get_or_create(proj_id, req)?,
+        Type::User => md.user_properties.get_or_create(proj_id, req)?,
     };
 
     Ok(prop)

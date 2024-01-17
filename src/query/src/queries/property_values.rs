@@ -28,7 +28,7 @@ macro_rules! property_col {
     ($ctx:expr,$md:expr,$input:expr,$prop_name:expr,$md_namespace:ident) => {{
         let prop =
             $md.$md_namespace
-                .get_by_name($ctx.organization_id, $ctx.project_id, $prop_name)?;
+                .get_by_name($$ctx.project_id, $prop_name)?;
         let col_name = prop.column_name();
 
         let expr = col(col_name.as_str());
@@ -40,7 +40,7 @@ macro_rules! property_col {
         match prop.dictionary_type {
             Some(_) => {
                 let dict = SingleDictionaryProvider::new(
-                    $ctx.organization_id,
+                    $ctx.
                     $ctx.project_id,
                     col_name.clone(),
                     $md.dictionaries.clone(),

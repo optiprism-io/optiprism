@@ -26,42 +26,23 @@ impl Properties {
     pub fn new_event(prov: Arc<metadata::properties::Properties>) -> Self {
         Self { prov }
     }
-    pub async fn get_by_id(
-        &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
-        id: u64,
-    ) -> Result<Property> {
-        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ViewSchema)?;
+    pub async fn get_by_id(&self, ctx: Context, project_id: u64, id: u64) -> Result<Property> {
+        ctx.check_project_permission(project_id, ProjectPermission::ViewSchema)?;
 
-        self.prov
-            .get_by_id(organization_id, project_id, id)?
-            .try_into()
+        self.prov.get_by_id(project_id, id)?.try_into()
     }
 
-    pub async fn get_by_name(
-        &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
-        name: &str,
-    ) -> Result<Property> {
-        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ViewSchema)?;
+    pub async fn get_by_name(&self, ctx: Context, project_id: u64, name: &str) -> Result<Property> {
+        ctx.check_project_permission(project_id, ProjectPermission::ViewSchema)?;
 
-        let event = self.prov.get_by_name(organization_id, project_id, name)?;
+        let event = self.prov.get_by_name(project_id, name)?;
 
         event.try_into()
     }
 
-    pub async fn list(
-        &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
-    ) -> Result<ListResponse<Property>> {
-        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ViewSchema)?;
-        let resp = self.prov.list(organization_id, project_id)?;
+    pub async fn list(&self, ctx: Context, project_id: u64) -> Result<ListResponse<Property>> {
+        ctx.check_project_permission(project_id, ProjectPermission::ViewSchema)?;
+        let resp = self.prov.list(project_id)?;
 
         resp.try_into()
     }
@@ -69,12 +50,12 @@ impl Properties {
     pub async fn update(
         &self,
         ctx: Context,
-        organization_id: u64,
+
         project_id: u64,
         property_id: u64,
         req: UpdatePropertyRequest,
     ) -> Result<Property> {
-        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ManageSchema)?;
+        ctx.check_project_permission(project_id, ProjectPermission::ManageSchema)?;
 
         let md_req = metadata::properties::UpdatePropertyRequest {
             updated_by: ctx.account_id.unwrap(),
@@ -87,25 +68,15 @@ impl Properties {
             ..Default::default()
         };
 
-        let prop = self
-            .prov
-            .update(organization_id, project_id, property_id, md_req)?;
+        let prop = self.prov.update(project_id, property_id, md_req)?;
 
         prop.try_into()
     }
 
-    pub async fn delete(
-        &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
-        id: u64,
-    ) -> Result<Property> {
-        ctx.check_project_permission(organization_id, project_id, ProjectPermission::DeleteSchema)?;
+    pub async fn delete(&self, ctx: Context, project_id: u64, id: u64) -> Result<Property> {
+        ctx.check_project_permission(project_id, ProjectPermission::DeleteSchema)?;
 
-        self.prov
-            .delete(organization_id, project_id, id)?
-            .try_into()
+        self.prov.delete(project_id, id)?.try_into()
     }
 }
 

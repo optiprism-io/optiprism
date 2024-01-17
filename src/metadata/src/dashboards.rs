@@ -16,7 +16,7 @@ use crate::list_data;
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::metadata::ListResponse;
-use crate::org_proj_ns;
+use crate::project_ns;
 use crate::Result;
 
 const NAMESPACE: &[u8] = b"dashboards";
@@ -33,14 +33,10 @@ impl Dashboards {
     fn get_by_id_(
         &self,
         tx: &Transaction<TransactionDB>,
-        organization_id: u64,
         project_id: u64,
         id: u64,
     ) -> Result<Dashboard> {
-        let key = make_data_value_key(
-            org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
-            id,
-        );
+        let key = make_data_value_key(project_ns(project_id, NAMESPACE).as_slice(), id);
 
         match tx.get(key)? {
             None => Err(MetadataError::NotFound("dashboard not found".to_string())),
@@ -48,17 +44,12 @@ impl Dashboards {
         }
     }
 
-    pub fn create(
-        &self,
-        organization_id: u64,
-        project_id: u64,
-        req: CreateDashboardRequest,
-    ) -> Result<Dashboard> {
+    pub fn create(&self, project_id: u64, req: CreateDashboardRequest) -> Result<Dashboard> {
         let tx = self.db.transaction();
         let created_at = Utc::now();
         let id = next_seq(
             &tx,
-            make_id_seq_key(org_proj_ns(organization_id, project_id, NAMESPACE).as_slice()),
+            make_id_seq_key(project_ns(project_id, NAMESPACE).as_slice()),
         )?;
 
         let dashboard = Dashboard {
@@ -75,10 +66,7 @@ impl Dashboards {
         };
         let data = serialize(&dashboard)?;
         tx.put(
-            make_data_value_key(
-                org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
-                dashboard.id,
-            ),
+            make_data_value_key(project_ns(project_id, NAMESPACE).as_slice(), dashboard.id),
             data,
         )?;
 
@@ -86,30 +74,26 @@ impl Dashboards {
         Ok(dashboard)
     }
 
-    pub fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Dashboard> {
+    pub fn get_by_id(&self, project_id: u64, id: u64) -> Result<Dashboard> {
         let tx = self.db.transaction();
 
-        self.get_by_id_(&tx, organization_id, project_id, id)
+        self.get_by_id_(&tx, project_id, id)
     }
 
-    pub fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Dashboard>> {
+    pub fn list(&self, project_id: u64) -> Result<ListResponse<Dashboard>> {
         let tx = self.db.transaction();
-        list_data(
-            &tx,
-            org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
-        )
+        list_data(&tx, project_ns(project_id, NAMESPACE).as_slice())
     }
 
     pub fn update(
         &self,
-        organization_id: u64,
         project_id: u64,
         dashboard_id: u64,
         req: UpdateDashboardRequest,
     ) -> Result<Dashboard> {
         let tx = self.db.transaction();
 
-        let prev_dashboard = self.get_by_id_(&tx, organization_id, project_id, dashboard_id)?;
+        let prev_dashboard = self.get_by_id_(&tx, project_id, dashboard_id)?;
         let mut dashboard = prev_dashboard.clone();
 
         dashboard.updated_at = Some(Utc::now());
@@ -129,21 +113,18 @@ impl Dashboards {
 
         let data = serialize(&dashboard)?;
         tx.put(
-            make_data_value_key(
-                org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
-                dashboard.id,
-            ),
+            make_data_value_key(project_ns(project_id, NAMESPACE).as_slice(), dashboard.id),
             data,
         )?;
         tx.commit()?;
         Ok(dashboard)
     }
 
-    pub fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Dashboard> {
+    pub fn delete(&self, project_id: u64, id: u64) -> Result<Dashboard> {
         let tx = self.db.transaction();
-        let dashboard = self.get_by_id_(&tx, organization_id, project_id, id)?;
+        let dashboard = self.get_by_id_(&tx, project_id, id)?;
         tx.delete(make_data_value_key(
-            org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
+            project_ns(project_id, NAMESPACE).as_slice(),
             id,
         ))?;
         tx.commit()?;

@@ -348,11 +348,7 @@ pub mod test_util {
 
     use crate::error::Result;
 
-    pub async fn events_provider(
-        db: Arc<OptiDBImpl>,
-        _org_id: u64,
-        _proj_id: u64,
-    ) -> Result<LogicalPlan> {
+    pub async fn events_provider(db: Arc<OptiDBImpl>, _proj_id: u64) -> Result<LogicalPlan> {
         let schema = Schema::new(vec![
             Field::new("project_id", DataType::Int64, false),
             Field::new("user_id", DataType::Int64, false),
@@ -401,13 +397,13 @@ pub mod test_util {
     pub fn create_property(
         md: &Arc<MetadataProvider>,
         _db: &Arc<OptiDBImpl>,
-        org_id: u64,
+
         proj_id: u64,
         req: CreatePropertyRequest,
     ) -> Result<Property> {
         let prop = match req.typ {
-            Type::Event => md.event_properties.create(org_id, proj_id, req)?,
-            Type::User => md.user_properties.create(org_id, proj_id, req)?,
+            Type::Event => md.event_properties.create(proj_id, req)?,
+            Type::User => md.user_properties.create(proj_id, req)?,
             _ => unimplemented!(),
         };
 
@@ -419,7 +415,7 @@ pub mod test_util {
     pub async fn create_entities(
         md: Arc<MetadataProvider>,
         db: &Arc<OptiDBImpl>,
-        org_id: u64,
+
         proj_id: u64,
     ) -> Result<()> {
         db.add_field("events", COLUMN_PROJECT_ID, DType::Int64, false)?;
@@ -428,7 +424,7 @@ pub mod test_util {
         db.add_field("events", COLUMN_EVENT, DType::Int64, false)?;
         // create user props
 
-        let country_prop = create_property(&md, db, org_id, proj_id, CreatePropertyRequest {
+        let country_prop = create_property(&md, db, proj_id, CreatePropertyRequest {
             created_by: 0,
             tags: None,
             name: "Country".to_string(),
@@ -444,20 +440,15 @@ pub mod test_util {
             dictionary_type: Some(properties::DictionaryType::Int8),
         })?;
 
+        md.dictionaries
+            .get_key_or_create(proj_id, country_prop.column_name().as_str(), "spain")?;
         md.dictionaries.get_key_or_create(
-            org_id,
-            proj_id,
-            country_prop.column_name().as_str(),
-            "spain",
-        )?;
-        md.dictionaries.get_key_or_create(
-            org_id,
             proj_id,
             country_prop.column_name().as_str(),
             "german",
         )?;
 
-        create_property(&md, db, org_id, proj_id, CreatePropertyRequest {
+        create_property(&md, db, proj_id, CreatePropertyRequest {
             created_by: 0,
             tags: None,
             name: "Device".to_string(),
@@ -473,7 +464,7 @@ pub mod test_util {
             is_system: false,
         })?;
 
-        create_property(&md, db, org_id, proj_id, CreatePropertyRequest {
+        create_property(&md, db, proj_id, CreatePropertyRequest {
             created_by: 0,
             tags: None,
             name: "Is Premium".to_string(),
@@ -490,34 +481,32 @@ pub mod test_util {
         })?;
 
         // create events
-        md.events
-            .create(org_id, proj_id, events::CreateEventRequest {
-                created_by: 0,
-                tags: None,
-                name: "View Product".to_string(),
-                display_name: None,
-                description: None,
-                status: events::Status::Enabled,
-                properties: None,
-                custom_properties: None,
-                is_system: false,
-            })?;
+        md.events.create(proj_id, events::CreateEventRequest {
+            created_by: 0,
+            tags: None,
+            name: "View Product".to_string(),
+            display_name: None,
+            description: None,
+            status: events::Status::Enabled,
+            properties: None,
+            custom_properties: None,
+            is_system: false,
+        })?;
 
-        md.events
-            .create(org_id, proj_id, events::CreateEventRequest {
-                created_by: 0,
-                tags: None,
-                name: "Buy Product".to_string(),
-                display_name: None,
-                description: None,
-                status: events::Status::Enabled,
-                properties: None,
-                custom_properties: None,
-                is_system: false,
-            })?;
+        md.events.create(proj_id, events::CreateEventRequest {
+            created_by: 0,
+            tags: None,
+            name: "Buy Product".to_string(),
+            display_name: None,
+            description: None,
+            status: events::Status::Enabled,
+            properties: None,
+            custom_properties: None,
+            is_system: false,
+        })?;
 
         // create event props
-        create_property(&md, db, org_id, proj_id, CreatePropertyRequest {
+        create_property(&md, db, proj_id, CreatePropertyRequest {
             created_by: 0,
             tags: None,
             name: "Product Name".to_string(),
@@ -533,7 +522,7 @@ pub mod test_util {
             is_system: false,
         })?;
 
-        create_property(&md, db, org_id, proj_id, CreatePropertyRequest {
+        create_property(&md, db, proj_id, CreatePropertyRequest {
             created_by: 0,
             tags: None,
             name: "Revenue".to_string(),

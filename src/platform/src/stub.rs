@@ -192,7 +192,7 @@ impl custom_events::Provider for CustomEvents {
     async fn create(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
         _req: CreateCustomEventRequest,
     ) -> Result<CustomEvent> {
@@ -202,7 +202,7 @@ impl custom_events::Provider for CustomEvents {
     async fn get_by_id(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
         _id: u64,
     ) -> Result<CustomEvent> {
@@ -212,7 +212,7 @@ impl custom_events::Provider for CustomEvents {
     async fn list(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
     ) -> Result<ListResponse<CustomEvent>> {
         Ok(ListResponse {
@@ -226,7 +226,7 @@ impl custom_events::Provider for CustomEvents {
     async fn update(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
         _event_id: u64,
         _req: UpdateCustomEventRequest,
@@ -237,7 +237,7 @@ impl custom_events::Provider for CustomEvents {
     async fn delete(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
         _id: u64,
     ) -> Result<CustomEvent> {
@@ -273,7 +273,7 @@ impl events::Provider for Events {
     async fn create(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
         _request: CreateEventRequest,
     ) -> Result<Event> {
@@ -283,7 +283,7 @@ impl events::Provider for Events {
     async fn get_by_id(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
         _id: u64,
     ) -> Result<Event> {
@@ -293,7 +293,7 @@ impl events::Provider for Events {
     async fn get_by_name(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
         _name: &str,
     ) -> Result<Event> {
@@ -303,7 +303,7 @@ impl events::Provider for Events {
     async fn list(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
     ) -> Result<ListResponse<Event>> {
         Ok(ListResponse {
@@ -317,7 +317,7 @@ impl events::Provider for Events {
     async fn update(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
         _event_id: u64,
         _req: UpdateEventRequest,
@@ -328,7 +328,7 @@ impl events::Provider for Events {
     async fn attach_property(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
         _event_id: u64,
         _prop_id: u64,
@@ -339,7 +339,7 @@ impl events::Provider for Events {
     async fn detach_property(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
         _event_id: u64,
         _prop_id: u64,
@@ -350,7 +350,7 @@ impl events::Provider for Events {
     async fn delete(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
         _id: u64,
     ) -> Result<Event> {
@@ -392,7 +392,7 @@ impl properties::Provider for Properties {
     async fn get_by_id(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
         _id: u64,
     ) -> Result<Property> {
@@ -402,7 +402,7 @@ impl properties::Provider for Properties {
     async fn get_by_name(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
         _name: &str,
     ) -> Result<Property> {
@@ -412,7 +412,7 @@ impl properties::Provider for Properties {
     async fn list(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
     ) -> Result<ListResponse<Property>> {
         Ok(ListResponse {
@@ -426,7 +426,7 @@ impl properties::Provider for Properties {
     async fn update(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
         _property_id: u64,
         _req: UpdatePropertyRequest,
@@ -437,7 +437,7 @@ impl properties::Provider for Properties {
     async fn delete(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
         _id: u64,
     ) -> Result<Property> {
@@ -468,7 +468,7 @@ impl custom_properties::Provider for CustomProperties {
     async fn list(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
     ) -> Result<ListResponse<CustomProperty>> {
         Ok(ListResponse {
@@ -511,7 +511,7 @@ impl queries::Provider for Queries {
     async fn event_segmentation(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
         _req: EventSegmentation,
         _query: QueryParams,
@@ -532,7 +532,7 @@ impl queries::Provider for Queries {
     async fn property_values(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
         _req: ListPropertyValuesRequest,
     ) -> Result<ListResponse<Value>> {
@@ -576,7 +576,7 @@ impl dashboards::Provider for Dashboards {
     async fn create(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
         _request: CreateDashboardRequest,
     ) -> Result<Dashboard> {
@@ -586,7 +586,7 @@ impl dashboards::Provider for Dashboards {
     async fn get_by_id(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
         _id: u64,
     ) -> Result<Dashboard> {
@@ -596,7 +596,7 @@ impl dashboards::Provider for Dashboards {
     async fn list(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
     ) -> Result<ListResponse<Dashboard>> {
         Ok(ListResponse {
@@ -610,7 +610,7 @@ impl dashboards::Provider for Dashboards {
     async fn update(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
         _event_id: u64,
         _req: UpdateDashboardRequest,
@@ -621,7 +621,7 @@ impl dashboards::Provider for Dashboards {
     async fn delete(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
         _id: u64,
     ) -> Result<Dashboard> {
@@ -654,7 +654,7 @@ impl reports::Provider for Reports {
     async fn create(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
         _request: CreateReportRequest,
     ) -> Result<Report> {
@@ -664,7 +664,7 @@ impl reports::Provider for Reports {
     async fn get_by_id(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
         _id: u64,
     ) -> Result<Report> {
@@ -674,7 +674,7 @@ impl reports::Provider for Reports {
     async fn list(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
     ) -> Result<ListResponse<Report>> {
         Ok(ListResponse {
@@ -688,7 +688,7 @@ impl reports::Provider for Reports {
     async fn update(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
         _event_id: u64,
         _req: UpdateReportRequest,
@@ -699,7 +699,7 @@ impl reports::Provider for Reports {
     async fn delete(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
         _id: u64,
     ) -> Result<Report> {
@@ -732,7 +732,7 @@ impl event_records::Provider for EventRecords {
     async fn list(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
         _request: ListEventRecordsRequest,
     ) -> Result<ListResponse<EventRecord>> {
@@ -747,7 +747,7 @@ impl event_records::Provider for EventRecords {
     async fn get_by_id(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
         _id: u64,
     ) -> Result<EventRecord> {
@@ -776,7 +776,7 @@ impl group_records::Provider for GroupRecords {
     async fn list(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
         _request: ListGroupRecordsRequest,
     ) -> Result<ListResponse<GroupRecord>> {
@@ -791,7 +791,7 @@ impl group_records::Provider for GroupRecords {
     async fn get_by_id(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
         _id: u64,
     ) -> Result<GroupRecord> {
@@ -801,7 +801,7 @@ impl group_records::Provider for GroupRecords {
     async fn update(
         &self,
         _ctx: Context,
-        _organization_id: u64,
+        _
         _project_id: u64,
         _id: u64,
         _req: UpdateGroupRecordRequest,

@@ -63,7 +63,6 @@ pub struct ProfileProvider {
 
 impl ProfileProvider {
     pub fn try_new_from_csv<R: io::Read>(
-        org_id: u64,
         proj_id: u64,
         dicts: &Arc<Dictionaries>,
         properties: &Arc<metadata::properties::Properties>,
@@ -83,10 +82,9 @@ impl ProfileProvider {
                         .country
                         .map(|v| {
                             dicts.get_key_or_create(
-                                org_id,
                                 proj_id,
                                 properties
-                                    .get_by_name(org_id, proj_id, USER_PROPERTY_COUNTRY)
+                                    .get_by_name(proj_id, USER_PROPERTY_COUNTRY)
                                     .unwrap()
                                     .column_name()
                                     .as_str(),
@@ -98,10 +96,9 @@ impl ProfileProvider {
                         .city
                         .map(|v| {
                             dicts.get_key_or_create(
-                                org_id,
                                 proj_id,
                                 properties
-                                    .get_by_name(org_id, proj_id, USER_PROPERTY_CITY)
+                                    .get_by_name(proj_id, USER_PROPERTY_CITY)
                                     .unwrap()
                                     .column_name()
                                     .as_str(),
@@ -132,10 +129,9 @@ impl ProfileProvider {
                         .device
                         .map(|v| {
                             dicts.get_key_or_create(
-                                org_id,
                                 proj_id,
                                 properties
-                                    .get_by_name(org_id, proj_id, USER_PROPERTY_DEVICE_MODEL)
+                                    .get_by_name(proj_id, USER_PROPERTY_DEVICE_MODEL)
                                     .unwrap()
                                     .column_name()
                                     .as_str(),
@@ -147,10 +143,9 @@ impl ProfileProvider {
                         .device_category
                         .map(|v| {
                             dicts.get_key_or_create(
-                                org_id,
                                 proj_id,
                                 properties
-                                    .get_by_name(org_id, proj_id, USER_PROPERTY_OS_FAMILY)
+                                    .get_by_name(proj_id, USER_PROPERTY_OS_FAMILY)
                                     .unwrap()
                                     .column_name()
                                     .as_str(),
@@ -162,10 +157,9 @@ impl ProfileProvider {
                         .os
                         .map(|v| {
                             dicts.get_key_or_create(
-                                org_id,
                                 proj_id,
                                 properties
-                                    .get_by_name(org_id, proj_id, USER_PROPERTY_OS)
+                                    .get_by_name(proj_id, USER_PROPERTY_OS)
                                     .unwrap()
                                     .column_name()
                                     .as_str(),
@@ -177,10 +171,9 @@ impl ProfileProvider {
                         .os_version
                         .map(|v| {
                             dicts.get_key_or_create(
-                                org_id,
                                 proj_id,
                                 properties
-                                    .get_by_name(org_id, proj_id, USER_PROPERTY_OS_VERSION_MAJOR)
+                                    .get_by_name(proj_id, USER_PROPERTY_OS_VERSION_MAJOR)
                                     .unwrap()
                                     .column_name()
                                     .as_str(),

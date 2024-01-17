@@ -26,26 +26,19 @@ use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
 use crate::metadata::ListResponse;
-use crate::org_proj_ns;
+use crate::project_ns;
 use crate::Result;
 
 const NAMESPACE: &[u8] = b"custom_events";
 const IDX_NAME: &[u8] = b"name";
 pub const MAX_EVENTS_LEVEL: usize = 3;
 
-fn index_keys(organization_id: u64, project_id: u64, name: &str) -> Vec<Option<Vec<u8>>> {
-    [index_name_key(organization_id, project_id, name)].to_vec()
+fn index_keys(project_id: u64, name: &str) -> Vec<Option<Vec<u8>>> {
+    [index_name_key(project_id, name)].to_vec()
 }
 
-fn index_name_key(organization_id: u64, project_id: u64, name: &str) -> Option<Vec<u8>> {
-    Some(
-        make_index_key(
-            org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
-            IDX_NAME,
-            name,
-        )
-        .to_vec(),
-    )
+fn index_name_key(project_id: u64, name: &str) -> Option<Vec<u8>> {
+    Some(make_index_key(project_ns(project_id, NAMESPACE).as_slice(), IDX_NAME, name).to_vec())
 }
 
 pub struct CustomEvents {
@@ -73,7 +66,6 @@ impl CustomEvents {
 
     fn validate_events<'a>(
         &'a self,
-        organization_id: u64,
         project_id: u64,
         events: &'a [Event],
         level: usize,
@@ -89,11 +81,10 @@ impl CustomEvents {
         for event in events.iter() {
             match &event.event {
                 EventRef::RegularName(name) => {
-                    self.events
-                        .get_by_name(organization_id, project_id, name.as_str())?;
+                    self.events.get_by_name(project_id, name.as_str())?;
                 }
                 EventRef::Regular(id) => {
-                    self.events.get_by_id(organization_id, project_id, *id)?;
+                    self.events.get_by_id(project_id, *id)?;
                 }
                 EventRef::Custom(id) => {
                     if ids.contains(id) {
@@ -101,15 +92,9 @@ impl CustomEvents {
                             "custom event already exist".to_string(),
                         ));
                     }
-                    let custom_event = self.get_by_id(organization_id, project_id, *id)?;
+                    let custom_event = self.get_by_id(project_id, *id)?;
                     ids.push(custom_event.id);
-                    self.validate_events(
-                        organization_id,
-                        project_id,
-                        &custom_event.events,
-                        level + 1,
-                        ids,
-                    )?;
+                    self.validate_events(project_id, &custom_event.events, level + 1, ids)?;
                 }
             }
         }
@@ -120,14 +105,10 @@ impl CustomEvents {
     fn get_by_id_(
         &self,
         tx: &Transaction<TransactionDB>,
-        organization_id: u64,
         project_id: u64,
         id: u64,
     ) -> Result<CustomEvent> {
-        let key = make_data_value_key(
-            org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
-            id,
-        );
+        let key = make_data_value_key(project_ns(project_id, NAMESPACE).as_slice(), id);
 
         match tx.get(key)? {
             None => Err(MetadataError::NotFound(
@@ -137,20 +118,15 @@ impl CustomEvents {
         }
     }
 
-    pub fn create(
-        &self,
-        organization_id: u64,
-        project_id: u64,
-        req: CreateCustomEventRequest,
-    ) -> Result<CustomEvent> {
+    pub fn create(&self, project_id: u64, req: CreateCustomEventRequest) -> Result<CustomEvent> {
         if req.events.is_empty() {
             return Err(MetadataError::BadRequest("empty events".to_string()));
         }
 
         let mut ids = Vec::new();
-        self.validate_events(organization_id, project_id, &req.events, 0, &mut ids)?;
+        self.validate_events(project_id, &req.events, 0, &mut ids)?;
 
-        let idx_keys = index_keys(organization_id, project_id, &req.name);
+        let idx_keys = index_keys(project_id, &req.name);
 
         let tx = self.db.transaction();
         check_insert_constraints(&tx, idx_keys.as_ref())?;
@@ -158,7 +134,7 @@ impl CustomEvents {
         let created_at = Utc::now();
         let id = next_seq(
             &tx,
-            make_id_seq_key(org_proj_ns(organization_id, project_id, NAMESPACE).as_slice()),
+            make_id_seq_key(project_ns(project_id, NAMESPACE).as_slice()),
         )?;
 
         let event = CustomEvent {
@@ -177,10 +153,7 @@ impl CustomEvents {
         };
         let data = serialize(&event)?;
         self.db.put(
-            make_data_value_key(
-                org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
-                event.id,
-            ),
+            make_data_value_key(project_ns(project_id, NAMESPACE).as_slice(), event.id),
             &data,
         )?;
 
@@ -189,59 +162,42 @@ impl CustomEvents {
         Ok(event)
     }
 
-    pub fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<CustomEvent> {
+    pub fn get_by_id(&self, project_id: u64, id: u64) -> Result<CustomEvent> {
         let tx = self.db.transaction();
 
-        self.get_by_id_(&tx, organization_id, project_id, id)
+        self.get_by_id_(&tx, project_id, id)
     }
 
-    pub fn get_by_name(
-        &self,
-        organization_id: u64,
-        project_id: u64,
-        name: &str,
-    ) -> Result<CustomEvent> {
+    pub fn get_by_name(&self, project_id: u64, name: &str) -> Result<CustomEvent> {
         let tx = self.db.transaction();
         let data = get_index(
             &tx,
-            make_index_key(
-                org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
-                IDX_NAME,
-                name,
-            ),
+            make_index_key(project_ns(project_id, NAMESPACE).as_slice(), IDX_NAME, name),
         )?;
         Ok(deserialize::<CustomEvent>(&data)?)
     }
 
-    pub fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<CustomEvent>> {
+    pub fn list(&self, project_id: u64) -> Result<ListResponse<CustomEvent>> {
         let tx = self.db.transaction();
-        list_data(
-            &tx,
-            org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
-        )
+        list_data(&tx, project_ns(project_id, NAMESPACE).as_slice())
     }
 
     pub fn update(
         &self,
-        organization_id: u64,
         project_id: u64,
         event_id: u64,
         req: UpdateCustomEventRequest,
     ) -> Result<CustomEvent> {
         let tx = self.db.transaction();
 
-        let prev_event = self.get_by_id_(&tx, organization_id, project_id, event_id)?;
+        let prev_event = self.get_by_id_(&tx, project_id, event_id)?;
         let mut event = prev_event.clone();
 
         let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
         let mut idx_prev_keys: Vec<Option<Vec<u8>>> = Vec::new();
         if let OptionalProperty::Some(name) = &req.name {
-            idx_keys.push(index_name_key(organization_id, project_id, name.as_str()));
-            idx_prev_keys.push(index_name_key(
-                organization_id,
-                project_id,
-                prev_event.name.as_str(),
-            ));
+            idx_keys.push(index_name_key(project_id, name.as_str()));
+            idx_prev_keys.push(index_name_key(project_id, prev_event.name.as_str()));
             event.name = name.to_owned();
         }
 
@@ -268,17 +224,14 @@ impl CustomEvents {
             }
 
             let mut ids = vec![event.id];
-            self.validate_events(organization_id, project_id, &events, 0, &mut ids)?;
+            self.validate_events(project_id, &events, 0, &mut ids)?;
 
             event.events = events;
         }
 
         let data = serialize(&event)?;
         tx.put(
-            make_data_value_key(
-                org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
-                event.id,
-            ),
+            make_data_value_key(project_ns(project_id, NAMESPACE).as_slice(), event.id),
             &data,
         )?;
 
@@ -287,18 +240,15 @@ impl CustomEvents {
         Ok(event)
     }
 
-    pub fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<CustomEvent> {
+    pub fn delete(&self, project_id: u64, id: u64) -> Result<CustomEvent> {
         let tx = self.db.transaction();
-        let event = self.get_by_id_(&tx, organization_id, project_id, id)?;
+        let event = self.get_by_id_(&tx, project_id, id)?;
         tx.delete(make_data_value_key(
-            org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
+            project_ns(project_id, NAMESPACE).as_slice(),
             id,
         ))?;
 
-        delete_index(
-            &tx,
-            index_keys(organization_id, project_id, &event.name).as_ref(),
-        )?;
+        delete_index(&tx, index_keys(project_id, &event.name).as_ref())?;
         tx.commit()?;
         Ok(event)
     }

@@ -33,35 +33,29 @@ use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
 use crate::metadata::ListResponse;
-use crate::org_proj_ns;
+use crate::project_ns;
 use crate::Result;
 
 const IDX_NAME: &[u8] = b"name";
 const IDX_DISPLAY_NAME: &[u8] = b"display_name";
 
 fn index_keys(
-    organization_id: u64,
     project_id: u64,
     typ: &Type,
     name: &str,
     display_name: Option<String>,
 ) -> Vec<Option<Vec<u8>>> {
     [
-        index_name_key(organization_id, project_id, typ, name),
-        index_display_name_key(organization_id, project_id, typ, display_name),
+        index_name_key(project_id, typ, name),
+        index_display_name_key(project_id, typ, display_name),
     ]
     .to_vec()
 }
 
-fn index_name_key(
-    organization_id: u64,
-    project_id: u64,
-    typ: &Type,
-    name: &str,
-) -> Option<Vec<u8>> {
+fn index_name_key(project_id: u64, typ: &Type, name: &str) -> Option<Vec<u8>> {
     Some(
         make_index_key(
-            org_proj_ns(organization_id, project_id, typ.path().as_bytes()).as_slice(),
+            project_ns(project_id, typ.path().as_bytes()).as_slice(),
             IDX_NAME,
             name,
         )
@@ -70,14 +64,13 @@ fn index_name_key(
 }
 
 fn index_display_name_key(
-    organization_id: u64,
     project_id: u64,
     typ: &Type,
     display_name: Option<String>,
 ) -> Option<Vec<u8>> {
     display_name.map(|v| {
         make_index_key(
-            org_proj_ns(organization_id, project_id, typ.path().as_bytes()).as_slice(),
+            project_ns(project_id, typ.path().as_bytes()).as_slice(),
             IDX_DISPLAY_NAME,
             v.as_str(),
         )
@@ -88,8 +81,8 @@ fn index_display_name_key(
 pub struct Properties {
     db: Arc<TransactionDB>,
     opti_db: Arc<OptiDBImpl>,
-    id_cache: RwLock<LruCache<(u64, u64, u64), Property>>,
-    name_cache: RwLock<LruCache<(u64, u64, String), Property>>,
+    id_cache: RwLock<LruCache<(u64, u64), Property>>,
+    name_cache: RwLock<LruCache<(u64, String), Property>>,
     typ: Type,
 }
 
@@ -145,21 +138,20 @@ impl Properties {
     fn get_by_name_(
         &self,
         tx: &Transaction<TransactionDB>,
-        organization_id: u64,
         project_id: u64,
         name: &str,
     ) -> Result<Property> {
-        if let Some(prop) =
-            self.name_cache
-                .write()
-                .unwrap()
-                .get(&(organization_id, project_id, name.to_string()))
+        if let Some(prop) = self
+            .name_cache
+            .write()
+            .unwrap()
+            .get(&(project_id, name.to_string()))
         {
             return Ok(prop.to_owned());
         }
 
         let idx_key = make_index_key(
-            org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
+            project_ns(project_id, self.typ.path().as_bytes()).as_slice(),
             IDX_NAME,
             name,
         );
@@ -171,21 +163,16 @@ impl Properties {
     fn get_by_id_(
         &self,
         tx: &Transaction<TransactionDB>,
-        organization_id: u64,
+
         project_id: u64,
         id: u64,
     ) -> Result<Property> {
-        if let Some(prop) = self
-            .id_cache
-            .write()
-            .unwrap()
-            .get(&(organization_id, project_id, id))
-        {
+        if let Some(prop) = self.id_cache.write().unwrap().get(&(project_id, id)) {
             return Ok(prop.to_owned());
         }
 
         let key = make_data_value_key(
-            org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
+            project_ns(project_id, self.typ.path().as_bytes()).as_slice(),
             id,
         );
 
@@ -198,32 +185,23 @@ impl Properties {
     fn create_(
         &self,
         tx: &Transaction<TransactionDB>,
-        organization_id: u64,
+
         project_id: u64,
         req: CreatePropertyRequest,
     ) -> Result<Property> {
-        let idx_keys = index_keys(
-            organization_id,
-            project_id,
-            &self.typ,
-            &req.name,
-            req.display_name.clone(),
-        );
+        let idx_keys = index_keys(project_id, &self.typ, &req.name, req.display_name.clone());
 
         check_insert_constraints(tx, idx_keys.as_ref())?;
 
         let id = next_seq(
             tx,
-            make_id_seq_key(
-                org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
-            ),
+            make_id_seq_key(project_ns(project_id, self.typ.path().as_bytes()).as_slice()),
         )?;
 
         let order = next_zero_seq(
             tx,
             make_id_seq_key(
-                org_proj_ns(
-                    organization_id,
+                project_ns(
                     project_id,
                     format!("{}/{}", self.typ.order_path(), req.data_type.short_name()).as_bytes(),
                 )
@@ -255,17 +233,17 @@ impl Properties {
         };
 
         let idx_key = make_data_value_key(
-            org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
+            project_ns(project_id, self.typ.path().as_bytes()).as_slice(),
             prop.id,
         );
-        self.name_cache.write().unwrap().put(
-            (organization_id, project_id, prop.name.to_string()),
-            prop.clone(),
-        );
+        self.name_cache
+            .write()
+            .unwrap()
+            .put((project_id, prop.name.to_string()), prop.clone());
         self.id_cache
             .write()
             .unwrap()
-            .put((organization_id, project_id, id), prop.clone());
+            .put((project_id, id), prop.clone());
 
         let data = serialize(&prop)?;
         tx.put(idx_key, &data)?;
@@ -287,71 +265,56 @@ impl Properties {
         Ok(prop)
     }
 
-    pub fn create(
-        &self,
-        organization_id: u64,
-        project_id: u64,
-        req: CreatePropertyRequest,
-    ) -> Result<Property> {
+    pub fn create(&self, project_id: u64, req: CreatePropertyRequest) -> Result<Property> {
         let tx = self.db.transaction();
-        let ret = self.create_(&tx, organization_id, project_id, req)?;
+        let ret = self.create_(&tx, project_id, req)?;
         tx.commit()?;
 
         Ok(ret)
     }
 
-    pub fn get_or_create(
-        &self,
-        organization_id: u64,
-        project_id: u64,
-        req: CreatePropertyRequest,
-    ) -> Result<Property> {
+    pub fn get_or_create(&self, project_id: u64, req: CreatePropertyRequest) -> Result<Property> {
         let tx = self.db.transaction();
-        match self.get_by_name_(&tx, organization_id, project_id, req.name.as_str()) {
+        match self.get_by_name_(&tx, project_id, req.name.as_str()) {
             Ok(event) => return Ok(event),
             Err(MetadataError::NotFound(_)) => {}
             Err(err) => return Err(err),
         }
-        let ret = self.create_(&tx, organization_id, project_id, req)?;
+        let ret = self.create_(&tx, project_id, req)?;
 
         tx.commit()?;
 
         Ok(ret)
     }
 
-    pub fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Property> {
+    pub fn get_by_id(&self, project_id: u64, id: u64) -> Result<Property> {
         let tx = self.db.transaction();
-        self.get_by_id_(&tx, organization_id, project_id, id)
+        self.get_by_id_(&tx, project_id, id)
     }
 
-    pub fn get_by_name(
-        &self,
-        organization_id: u64,
-        project_id: u64,
-        name: &str,
-    ) -> Result<Property> {
+    pub fn get_by_name(&self, project_id: u64, name: &str) -> Result<Property> {
         let tx = self.db.transaction();
-        self.get_by_name_(&tx, organization_id, project_id, name)
+        self.get_by_name_(&tx, project_id, name)
     }
 
-    pub fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Property>> {
+    pub fn list(&self, project_id: u64) -> Result<ListResponse<Property>> {
         let tx = self.db.transaction();
         list_data(
             &tx,
-            org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
+            project_ns(project_id, self.typ.path().as_bytes()).as_slice(),
         )
     }
 
     pub fn update(
         &self,
-        organization_id: u64,
+
         project_id: u64,
         property_id: u64,
         req: UpdatePropertyRequest,
     ) -> Result<Property> {
         let tx = self.db.transaction();
 
-        let prev_prop = self.get_by_id(organization_id, project_id, property_id)?;
+        let prev_prop = self.get_by_id(project_id, property_id)?;
         let mut prop = prev_prop.clone();
 
         let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
@@ -359,13 +322,13 @@ impl Properties {
         // name is persistent
         // if let OptionalProperty::Some(name) = &req.name {
         //     idx_keys.push(index_name_key(
-        //         organization_id,
+        //
         //         project_id,
         //         &self.typ,
         //         name.as_str(),
         //     ));
         //     idx_prev_keys.push(index_name_key(
-        //         organization_id,
+        //
         //         project_id,
         //         &self.typ,
         //         prev_prop.name.as_str(),
@@ -374,13 +337,11 @@ impl Properties {
         // }
         if let OptionalProperty::Some(display_name) = &req.display_name {
             idx_keys.push(index_display_name_key(
-                organization_id,
                 project_id,
                 &self.typ,
                 display_name.clone(),
             ));
             idx_prev_keys.push(index_display_name_key(
-                organization_id,
                 project_id,
                 &self.typ,
                 prev_prop.display_name,
@@ -424,17 +385,17 @@ impl Properties {
         }
 
         let idx_key = make_data_value_key(
-            org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
+            project_ns(project_id, self.typ.path().as_bytes()).as_slice(),
             prop.id,
         );
-        self.name_cache.write().unwrap().put(
-            (organization_id, project_id, prop.name.to_string()),
-            prop.clone(),
-        );
+        self.name_cache
+            .write()
+            .unwrap()
+            .put((project_id, prop.name.to_string()), prop.clone());
         self.id_cache
             .write()
             .unwrap()
-            .put((organization_id, project_id, prop.id), prop.clone());
+            .put((project_id, prop.id), prop.clone());
 
         let data = serialize(&prop)?;
         tx.put(idx_key, &data)?;
@@ -444,33 +405,23 @@ impl Properties {
         Ok(prop)
     }
 
-    pub fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Property> {
+    pub fn delete(&self, project_id: u64, id: u64) -> Result<Property> {
         let tx = self.db.transaction();
-        let prop = self.get_by_id_(&tx, organization_id, project_id, id)?;
+        let prop = self.get_by_id_(&tx, project_id, id)?;
         tx.delete(make_data_value_key(
-            org_proj_ns(organization_id, project_id, self.typ.path().as_bytes()).as_slice(),
+            project_ns(project_id, self.typ.path().as_bytes()).as_slice(),
             id,
         ))?;
 
         delete_index(
             &tx,
-            index_keys(
-                organization_id,
-                project_id,
-                &self.typ,
-                &prop.name,
-                prop.display_name.clone(),
-            )
-            .as_ref(),
+            index_keys(project_id, &self.typ, &prop.name, prop.display_name.clone()).as_ref(),
         )?;
         self.name_cache
             .write()
             .unwrap()
-            .pop(&(organization_id, project_id, prop.name.to_string()));
-        self.id_cache
-            .write()
-            .unwrap()
-            .pop(&(organization_id, project_id, prop.id));
+            .pop(&(project_id, prop.name.to_string()));
+        self.id_cache.write().unwrap().pop(&(project_id, prop.id));
         tx.commit()?;
         Ok(prop)
     }

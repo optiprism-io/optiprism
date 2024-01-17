@@ -217,7 +217,7 @@ pub async fn gen(args: &Test, _proj_id: u64) -> Result<(), anyhow::Error> {
     init_system(&md, &db, args.partitions.unwrap_or_else(num_cpus::get))?;
 
     info!("creating org structure and admin account...");
-    let (_org_id, proj_id) = crate::init_test_org_structure(&md)?;
+    let (_ proj_id) = crate::init_test_org_structure(&md)?;
 
     info!("project initialization...");
     init_project(1, proj_id, &md)?;

@@ -93,10 +93,10 @@ impl Organizations {
         list_data(&tx, NAMESPACE)
     }
 
-    pub fn update(&self, org_id: u64, req: UpdateOrganizationRequest) -> Result<Organization> {
+    pub fn update(&self, id: u64, req: UpdateOrganizationRequest) -> Result<Organization> {
         let tx = self.db.transaction();
 
-        let prev_org = self.get_by_id_(&tx, org_id)?;
+        let prev_org = self.get_by_id_(&tx, id)?;
 
         let mut org = prev_org.clone();
 

@@ -192,12 +192,12 @@ pub fn init_system(
     Ok(())
 }
 
-pub fn init_project(org_id: u64, project_id: u64, md: &Arc<MetadataProvider>) -> error::Result<()> {
-    create_event(md, org_id, project_id, EVENT_CLICK.to_string())?;
-    create_event(md, org_id, project_id, EVENT_PAGE.to_string())?;
-    create_event(md, org_id, project_id, EVENT_SCREEN.to_string())?;
-    create_event(md, org_id, project_id, EVENT_SESSION_BEGIN.to_string())?;
-    create_event(md, org_id, project_id, EVENT_SESSION_END.to_string())?;
+pub fn init_project(project_id: u64, md: &Arc<MetadataProvider>) -> error::Result<()> {
+    create_event(md, project_id, EVENT_CLICK.to_string())?;
+    create_event(md, project_id, EVENT_PAGE.to_string())?;
+    create_event(md, project_id, EVENT_SCREEN.to_string())?;
+    create_event(md, project_id, EVENT_SESSION_BEGIN.to_string())?;
+    create_event(md, project_id, EVENT_SESSION_END.to_string())?;
     let user_dict_props = vec![
         USER_PROPERTY_CLIENT_FAMILY,
         USER_PROPERTY_CLIENT_VERSION_MINOR,
@@ -216,7 +216,7 @@ pub fn init_project(org_id: u64, project_id: u64, md: &Arc<MetadataProvider>) ->
         USER_PROPERTY_CITY,
     ];
     for prop in user_dict_props {
-        create_property(md, org_id, project_id, CreatePropertyMainRequest {
+        create_property(md, project_id, CreatePropertyMainRequest {
             name: prop.to_string(),
             typ: Type::User,
             data_type: DType::String,
@@ -239,7 +239,7 @@ pub fn init_project(org_id: u64, project_id: u64, md: &Arc<MetadataProvider>) ->
     ];
 
     for prop in event_str_props {
-        create_property(md, org_id, project_id, CreatePropertyMainRequest {
+        create_property(md, project_id, CreatePropertyMainRequest {
             name: prop.to_string(),
             typ: Type::Event,
             data_type: DType::String,
@@ -248,7 +248,7 @@ pub fn init_project(org_id: u64, project_id: u64, md: &Arc<MetadataProvider>) ->
         })?;
     }
 
-    create_property(md, org_id, project_id, CreatePropertyMainRequest {
+    create_property(md, project_id, CreatePropertyMainRequest {
         name: EVENT_PROPERTY_SESSION_LENGTH.to_string(),
         typ: Type::Event,
         data_type: DType::Timestamp,

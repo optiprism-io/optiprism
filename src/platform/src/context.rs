@@ -68,11 +68,7 @@ impl Context {
         Err(PlatformError::Forbidden("forbidden".to_string()))
     }
 
-    pub fn check_organization_permission(
-        &self,
-        organization_id: u64,
-        permission: OrganizationPermission,
-    ) -> Result<()> {
+    pub fn check_organization_permission(&self, permission: OrganizationPermission) -> Result<()> {
         if self
             .check_permission(Permission::ManageOrganizations)
             .is_ok()
@@ -98,7 +94,7 @@ impl Context {
 
     pub fn check_project_permission(
         &self,
-        organization_id: u64,
+
         project_id: u64,
         permission: ProjectPermission,
     ) -> Result<()> {
@@ -131,9 +127,9 @@ impl Context {
         Err(PlatformError::Forbidden("forbidden".to_string()))
     }
 
-    fn get_organization_role(&self, organization_id: u64) -> Result<OrganizationRole> {
+    fn get_organization_role(&self) -> Result<OrganizationRole> {
         if let Some(organizations) = &self.organizations {
-            for (org_id, role) in organizations.iter() {
+            for (role) in organizations.iter() {
                 if *org_id == organization_id {
                     return Ok(role.to_owned());
                 }

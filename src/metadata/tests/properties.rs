@@ -12,9 +12,9 @@ fn test_properties() -> Result<()> {
     let (md, _opti_db) = init_db()?;
 
     // try to get, delete, update unexisting event prop
-    assert!(md.event_properties.get_by_id(1, 1, 1).is_err());
-    assert!(md.event_properties.get_by_name(1, 1, "test").is_err());
-    assert!(md.event_properties.delete(1, 1, 1).is_err());
+    assert!(md.event_properties.get_by_id(1, 1).is_err());
+    assert!(md.event_properties.get_by_name(1, "test").is_err());
+    assert!(md.event_properties.delete(1, 1).is_err());
 
     let update_prop_req = UpdatePropertyRequest {
         updated_by: 1,
@@ -34,7 +34,7 @@ fn test_properties() -> Result<()> {
 
     assert!(
         md.event_properties
-            .update(1, 1, 1, update_prop_req.clone())
+            .update(1, 1, update_prop_req.clone())
             .is_err()
     );
 
@@ -56,13 +56,13 @@ fn test_properties() -> Result<()> {
 
     let res = md
         .event_properties
-        .get_or_create(1, 1, create_prop_req.clone())?
+        .get_or_create(1, create_prop_req.clone())?
         .id;
 
     assert_eq!(res, 1);
     let res = md
         .event_properties
-        .get_or_create(1, 1, create_prop_req.clone())?;
+        .get_or_create(1, create_prop_req.clone())?;
     assert_eq!(res.id, 1);
 
     assert_eq!(res.column_name(), "str_0".to_string());

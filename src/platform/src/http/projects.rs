@@ -18,23 +18,21 @@ use crate::Result;
 async fn create(
     ctx: Context,
     Extension(provider): Extension<Arc<Projects>>,
-    Path((organization_id, _project_id)): Path<(u64, u64)>,
+    Path((_project_id)): Path<(u64, u64)>,
     Json(request): Json<CreateProjectRequest>,
 ) -> Result<(StatusCode, Json<Project>)> {
     Ok((
         StatusCode::CREATED,
-        Json(provider.create(ctx, organization_id, request).await?),
+        Json(provider.create(ctx, request).await?),
     ))
 }
 
 async fn get_by_id(
     ctx: Context,
     Extension(provider): Extension<Arc<Projects>>,
-    Path((organization_id, project_id)): Path<(u64, u64)>,
+    Path(project_id): Path<u64>,
 ) -> Result<Json<Project>> {
-    Ok(Json(
-        provider.get_by_id(ctx, organization_id, project_id).await?,
-    ))
+    Ok(Json(provider.get_by_id(ctx, project_id).await?))
 }
 
 async fn list(
@@ -48,29 +46,23 @@ async fn list(
 async fn update(
     ctx: Context,
     Extension(provider): Extension<Arc<Projects>>,
-    Path((organization_id, project_id)): Path<(u64, u64)>,
+    Path(project_id): Path<u64>,
     Json(request): Json<UpdateProjectRequest>,
 ) -> Result<Json<Project>> {
-    Ok(Json(
-        provider
-            .update(ctx, organization_id, project_id, request)
-            .await?,
-    ))
+    Ok(Json(provider.update(ctx, project_id, request).await?))
 }
 
 async fn delete(
     ctx: Context,
     Extension(provider): Extension<Arc<Projects>>,
-    Path((organization_id, project_id)): Path<(u64, u64)>,
+    Path(project_id): Path<u64>,
 ) -> Result<Json<Project>> {
-    Ok(Json(
-        provider.delete(ctx, organization_id, project_id).await?,
-    ))
+    Ok(Json(provider.delete(ctx, project_id).await?))
 }
 
 pub fn attach_routes(router: Router) -> Router {
     router.nest(
-        "/organizations/:organization_id/projects",
+        "/organizations/*/projects",
         Router::new()
             .route("/", routing::post(create).get(list))
             .route(

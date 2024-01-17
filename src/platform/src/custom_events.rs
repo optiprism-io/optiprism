@@ -27,11 +27,11 @@ impl CustomEvents {
     pub async fn create(
         &self,
         ctx: Context,
-        organization_id: u64,
+
         project_id: u64,
         req: CreateCustomEventRequest,
     ) -> Result<CustomEvent> {
-        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ManageSchema)?;
+        ctx.check_project_permission(project_id, ProjectPermission::ManageSchema)?;
 
         let md_req = metadata::custom_events::CreateCustomEventRequest {
             created_by: ctx.account_id.unwrap(),
@@ -47,32 +47,19 @@ impl CustomEvents {
                 .collect::<Result<_>>()?,
         };
 
-        let event = self.prov.create(organization_id, project_id, md_req)?;
+        let event = self.prov.create(project_id, md_req)?;
 
         event.try_into()
     }
 
-    pub async fn get_by_id(
-        &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
-        id: u64,
-    ) -> Result<CustomEvent> {
-        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ViewSchema)?;
-        self.prov
-            .get_by_id(organization_id, project_id, id)?
-            .try_into()
+    pub async fn get_by_id(&self, ctx: Context, project_id: u64, id: u64) -> Result<CustomEvent> {
+        ctx.check_project_permission(project_id, ProjectPermission::ViewSchema)?;
+        self.prov.get_by_id(project_id, id)?.try_into()
     }
 
-    pub async fn list(
-        &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
-    ) -> Result<ListResponse<CustomEvent>> {
-        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ViewSchema)?;
-        let resp = self.prov.list(organization_id, project_id)?;
+    pub async fn list(&self, ctx: Context, project_id: u64) -> Result<ListResponse<CustomEvent>> {
+        ctx.check_project_permission(project_id, ProjectPermission::ViewSchema)?;
+        let resp = self.prov.list(project_id)?;
 
         resp.try_into()
     }
@@ -80,12 +67,12 @@ impl CustomEvents {
     pub async fn update(
         &self,
         ctx: Context,
-        organization_id: u64,
+
         project_id: u64,
         event_id: u64,
         req: UpdateCustomEventRequest,
     ) -> Result<CustomEvent> {
-        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ManageSchema)?;
+        ctx.check_project_permission(project_id, ProjectPermission::ManageSchema)?;
         let mut md_req = metadata::custom_events::UpdateCustomEventRequest {
             updated_by: ctx.account_id.unwrap(),
             tags: req.tags,
@@ -103,25 +90,15 @@ impl CustomEvents {
                     .collect::<Result<_>>()?,
             );
         }
-        let event = self
-            .prov
-            .update(organization_id, project_id, event_id, md_req)?;
+        let event = self.prov.update(project_id, event_id, md_req)?;
 
         event.try_into()
     }
 
-    pub async fn delete(
-        &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
-        id: u64,
-    ) -> Result<CustomEvent> {
-        ctx.check_project_permission(organization_id, project_id, ProjectPermission::DeleteSchema)?;
+    pub async fn delete(&self, ctx: Context, project_id: u64, id: u64) -> Result<CustomEvent> {
+        ctx.check_project_permission(project_id, ProjectPermission::DeleteSchema)?;
 
-        self.prov
-            .delete(organization_id, project_id, id)?
-            .try_into()
+        self.prov.delete(project_id, id)?.try_into()
     }
 }
 
