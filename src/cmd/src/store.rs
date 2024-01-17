@@ -85,7 +85,6 @@ pub struct Shop {
 }
 
 pub struct Config<R> {
-    pub org_id: u64,
     pub project_id: u64,
     pub from_date: DateTime<Utc>,
     pub to_date: DateTime<Utc>,
@@ -141,10 +140,10 @@ pub async fn start(args: &Shop, _proj_id: u64) -> Result<()> {
     let from_date = to_date - duration;
 
     info!("creating org structure and admin account...");
-    let (org_id, proj_id) = crate::init_test_org_structure(&md)?;
+    let (proj_id) = crate::init_test_org_structure(&md)?;
     info!("project initialization...");
 
-    init_project(org_id, proj_id, &md)?;
+    init_project(proj_id, &md)?;
 
     info!("store initialization...");
     debug!("demo data path: {:?}", args.demo_data_path);
@@ -168,7 +167,6 @@ pub async fn start(args: &Shop, _proj_id: u64) -> Result<()> {
         let args_clone = args.clone();
         thread::spawn(move || {
             let store_cfg = Config {
-                org_id: 1,
                 project_id: proj_id,
                 from_date,
                 to_date,
@@ -194,7 +192,6 @@ pub async fn start(args: &Shop, _proj_id: u64) -> Result<()> {
 
         info!("starting future data generation...");
         let store_cfg = Config {
-            org_id: 1,
             project_id: proj_id,
             from_date: to_date,
             to_date: to_date + future_duration,
@@ -242,11 +239,10 @@ where R: io::Read {
     info!("creating entities...");
 
     info!("creating properties...");
-    create_properties(cfg.org_id, cfg.project_id, &md, &db)?;
+    create_properties(cfg.project_id, &md, &db)?;
 
     info!("loading profiles...");
     let profiles = ProfileProvider::try_new_from_csv(
-        cfg.org_id,
         cfg.project_id,
         &md.dictionaries,
         &md.user_properties,
@@ -255,7 +251,6 @@ where R: io::Read {
     )?;
     info!("loading products...");
     let products = ProductProvider::try_new_from_csv(
-        cfg.org_id,
         cfg.project_id,
         &mut rng,
         md.dictionaries.clone(),
@@ -266,11 +261,11 @@ where R: io::Read {
     for event in all::<Event>() {
         let md_event = md
             .events
-            .get_by_name(cfg.org_id, cfg.project_id, event.to_string().as_str())
+            .get_by_name(cfg.project_id, event.to_string().as_str())
             .unwrap();
         events_map.insert(event, md_event.id);
         md.dictionaries
-            .get_key_or_create(1, 1, "event_event", event.to_string().as_str())
+            .get_key_or_create(1, "event_event", event.to_string().as_str())
             .unwrap();
     }
 
@@ -315,7 +310,7 @@ where R: io::Read {
 
     let mut idx = 0;
     while let Some(event) = tx.recv()? {
-        write_event(cfg.org_id, cfg.project_id, &db, &md, event, idx)?;
+        write_event(cfg.project_id, &db, &md, event, idx)?;
         idx += 1;
         if idx % 1000000 == 0 {
             println!("{idx}");
@@ -329,7 +324,6 @@ pub fn future_gen<R>(md: Arc<MetadataProvider>, db: Arc<OptiDBImpl>, cfg: Config
 where R: io::Read {
     let mut rng = thread_rng();
     let profiles = ProfileProvider::try_new_from_csv(
-        cfg.org_id,
         cfg.project_id,
         &md.dictionaries,
         &md.user_properties,
@@ -337,7 +331,6 @@ where R: io::Read {
         cfg.device_rdr,
     )?;
     let products = ProductProvider::try_new_from_csv(
-        cfg.org_id,
         cfg.project_id,
         &mut rng,
         md.dictionaries.clone(),
@@ -348,11 +341,11 @@ where R: io::Read {
     for event in all::<Event>() {
         let md_event = md
             .events
-            .get_by_name(cfg.org_id, cfg.project_id, event.to_string().as_str())
+            .get_by_name(cfg.project_id, event.to_string().as_str())
             .unwrap();
         events_map.insert(event, md_event.id);
         md.dictionaries
-            .get_key_or_create(1, 1, "event_event", event.to_string().as_str())
+            .get_key_or_create(1, "event_event", event.to_string().as_str())
             .unwrap();
     }
 
@@ -408,7 +401,7 @@ where R: io::Read {
                     if ts > cur {
                         thread::sleep(std::time::Duration::from_secs((ts - cur) as u64));
                     }
-                    write_event(cfg.org_id, cfg.project_id, &db, &md, event, 0).unwrap();
+                    write_event(cfg.project_id, &db, &md, event, 0).unwrap();
                 }
             }
         }
@@ -417,7 +410,6 @@ where R: io::Read {
 }
 
 fn write_event(
-    org_id: u64,
     proj_id: u64,
     db: &Arc<OptiDBImpl>,
     md: &Arc<MetadataProvider>,
@@ -435,140 +427,140 @@ fn write_event(
         NamedValue::new("event".to_string(), Value::Int64(Some(event.event))),
         NamedValue::new(
             md.event_properties
-                .get_by_name(org_id, proj_id, EVENT_PROPERTY_PAGE_PATH)
+                .get_by_name(proj_id, EVENT_PROPERTY_PAGE_PATH)
                 .unwrap()
                 .column_name(),
             Value::String(Some(event.page_path)),
         ),
         NamedValue::new(
             md.event_properties
-                .get_by_name(org_id, proj_id, EVENT_PROPERTY_PAGE_TITLE)
+                .get_by_name(proj_id, EVENT_PROPERTY_PAGE_TITLE)
                 .unwrap()
                 .column_name(),
             Value::String(Some(event.page_title)),
         ),
         NamedValue::new(
             md.event_properties
-                .get_by_name(org_id, proj_id, EVENT_PROPERTY_PAGE_URL)
+                .get_by_name(proj_id, EVENT_PROPERTY_PAGE_URL)
                 .unwrap()
                 .column_name(),
             Value::String(Some(event.page_url)),
         ),
         NamedValue::new(
             md.event_properties
-                .get_by_name(org_id, proj_id, "Product Name")
+                .get_by_name(proj_id, "Product Name")
                 .unwrap()
                 .column_name(),
             Value::Int16(event.product_name),
         ),
         NamedValue::new(
             md.event_properties
-                .get_by_name(org_id, proj_id, "Product Category")
+                .get_by_name(proj_id, "Product Category")
                 .unwrap()
                 .column_name(),
             Value::Int16(event.product_category),
         ),
         NamedValue::new(
             md.event_properties
-                .get_by_name(org_id, proj_id, "Product Subcategory")
+                .get_by_name(proj_id, "Product Subcategory")
                 .unwrap()
                 .column_name(),
             Value::Int16(event.product_subcategory),
         ),
         NamedValue::new(
             md.event_properties
-                .get_by_name(org_id, proj_id, "Product Brand")
+                .get_by_name(proj_id, "Product Brand")
                 .unwrap()
                 .column_name(),
             Value::Int16(event.product_brand),
         ),
         NamedValue::new(
             md.event_properties
-                .get_by_name(org_id, proj_id, "Product Price")
+                .get_by_name(proj_id, "Product Price")
                 .unwrap()
                 .column_name(),
             Value::Decimal(event.product_price),
         ),
         NamedValue::new(
             md.event_properties
-                .get_by_name(org_id, proj_id, "Product Discount Price")
+                .get_by_name(proj_id, "Product Discount Price")
                 .unwrap()
                 .column_name(),
             Value::Decimal(event.product_discount_price),
         ),
         NamedValue::new(
             md.event_properties
-                .get_by_name(org_id, proj_id, "Revenue")
+                .get_by_name(proj_id, "Revenue")
                 .unwrap()
                 .column_name(),
             Value::Decimal(event.revenue),
         ),
         NamedValue::new(
             md.user_properties
-                .get_by_name(org_id, proj_id, "Spent Total")
+                .get_by_name(proj_id, "Spent Total")
                 .unwrap()
                 .column_name(),
             Value::Decimal(event.spent_total),
         ),
         NamedValue::new(
             md.user_properties
-                .get_by_name(org_id, proj_id, "Products Bought")
+                .get_by_name(proj_id, "Products Bought")
                 .unwrap()
                 .column_name(),
             Value::Int8(event.products_bought),
         ),
         NamedValue::new(
             md.user_properties
-                .get_by_name(org_id, proj_id, "Cart Items Number")
+                .get_by_name(proj_id, "Cart Items Number")
                 .unwrap()
                 .column_name(),
             Value::Int8(event.cart_items_number),
         ),
         NamedValue::new(
             md.user_properties
-                .get_by_name(org_id, proj_id, "Cart Amount")
+                .get_by_name(proj_id, "Cart Amount")
                 .unwrap()
                 .column_name(),
             Value::Decimal(event.cart_amount),
         ),
         NamedValue::new(
             md.user_properties
-                .get_by_name(org_id, proj_id, USER_PROPERTY_COUNTRY)
+                .get_by_name(proj_id, USER_PROPERTY_COUNTRY)
                 .unwrap()
                 .column_name(),
             Value::Int64(event.country.map(|v| v as i64)),
         ),
         NamedValue::new(
             md.user_properties
-                .get_by_name(org_id, proj_id, USER_PROPERTY_CITY)
+                .get_by_name(proj_id, USER_PROPERTY_CITY)
                 .unwrap()
                 .column_name(),
             Value::Int64(event.city.map(|v| v as i64)),
         ),
         NamedValue::new(
             md.user_properties
-                .get_by_name(org_id, proj_id, USER_PROPERTY_DEVICE_MODEL)
+                .get_by_name(proj_id, USER_PROPERTY_DEVICE_MODEL)
                 .unwrap()
                 .column_name(),
             Value::Int64(event.device.map(|v| v as i64)),
         ),
         NamedValue::new(
             md.user_properties
-                .get_by_name(org_id, proj_id, USER_PROPERTY_OS_FAMILY)
+                .get_by_name(proj_id, USER_PROPERTY_OS_FAMILY)
                 .unwrap()
                 .column_name(),
             Value::Int64(event.device_category.map(|v| v as i64)),
         ),
         NamedValue::new(
             md.user_properties
-                .get_by_name(org_id, proj_id, USER_PROPERTY_OS)
+                .get_by_name(proj_id, USER_PROPERTY_OS)
                 .unwrap()
                 .column_name(),
             Value::Int64(event.os.map(|v| v as i64)),
         ),
         NamedValue::new(
             md.user_properties
-                .get_by_name(org_id, proj_id, USER_PROPERTY_OS_VERSION_MAJOR)
+                .get_by_name(proj_id, USER_PROPERTY_OS_VERSION_MAJOR)
                 .unwrap()
                 .column_name(),
             Value::Int64(event.os_version.map(|v| v as i64)),

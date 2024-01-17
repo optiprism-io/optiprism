@@ -18,67 +18,53 @@ use crate::Result;
 async fn create(
     ctx: Context,
     Extension(provider): Extension<Arc<Reports>>,
-    Path((organization_id, project_id)): Path<(u64, u64)>,
+    Path(project_id): Path<u64>,
     Json(request): Json<CreateReportRequest>,
 ) -> Result<(StatusCode, Json<Report>)> {
     Ok((
         StatusCode::CREATED,
-        Json(
-            provider
-                .create(ctx, organization_id, project_id, request)
-                .await?,
-        ),
+        Json(provider.create(ctx, project_id, request).await?),
     ))
 }
 
 async fn get_by_id(
     ctx: Context,
     Extension(provider): Extension<Arc<Reports>>,
-    Path((organization_id, project_id, report_id)): Path<(u64, u64, u64)>,
+    Path((project_id, report_id)): Path<(u64, u64)>,
 ) -> Result<Json<Report>> {
-    Ok(Json(
-        provider
-            .get_by_id(ctx, organization_id, project_id, report_id)
-            .await?,
-    ))
+    Ok(Json(provider.get_by_id(ctx, project_id, report_id).await?))
 }
 
 async fn list(
     ctx: Context,
     Extension(provider): Extension<Arc<Reports>>,
-    Path((organization_id, project_id)): Path<(u64, u64)>,
+    Path(project_id): Path<u64>,
 ) -> Result<Json<ListResponse<Report>>> {
-    Ok(Json(provider.list(ctx, organization_id, project_id).await?))
+    Ok(Json(provider.list(ctx, project_id).await?))
 }
 
 async fn update(
     ctx: Context,
     Extension(provider): Extension<Arc<Reports>>,
-    Path((organization_id, project_id, report_id)): Path<(u64, u64, u64)>,
+    Path((project_id, report_id)): Path<(u64, u64)>,
     Json(request): Json<UpdateReportRequest>,
 ) -> Result<Json<Report>> {
     Ok(Json(
-        provider
-            .update(ctx, organization_id, project_id, report_id, request)
-            .await?,
+        provider.update(ctx, project_id, report_id, request).await?,
     ))
 }
 
 async fn delete(
     ctx: Context,
     Extension(provider): Extension<Arc<Reports>>,
-    Path((organization_id, project_id, report_id)): Path<(u64, u64, u64)>,
+    Path((project_id, report_id)): Path<(u64, u64)>,
 ) -> Result<Json<Report>> {
-    Ok(Json(
-        provider
-            .delete(ctx, organization_id, project_id, report_id)
-            .await?,
-    ))
+    Ok(Json(provider.delete(ctx, project_id, report_id).await?))
 }
 
 pub fn attach_routes(router: Router) -> Router {
     router.nest(
-        "/organizations/:organization_id/projects/:project_id/reports",
+        "/projects/:project_id/reports",
         Router::new()
             .route("/", routing::post(create).get(list))
             .route(

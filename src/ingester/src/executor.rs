@@ -59,8 +59,7 @@ fn resolve_property(
         dictionary_type,
     };
 
-    let prop =
-        properties.get_or_create(ctx.organization_id.unwrap(), ctx.project_id.unwrap(), req)?;
+    let prop = properties.get_or_create(ctx.project_id.unwrap(), req)?;
 
     Ok(PropertyAndValue {
         property: prop,
@@ -108,18 +107,15 @@ impl Executor<Track> {
     pub fn execute(&mut self, ctx: &RequestContext, mut req: Track) -> Result<()> {
         let project = self.md.projects.get_by_token(ctx.token.as_str())?;
         let mut ctx = ctx.to_owned();
-        ctx.organization_id = Some(project.organization_id);
         ctx.project_id = Some(project.id);
 
         let user_id = match (&req.user_id, &req.anonymous_id) {
             (Some(user_id), None) => self.md.dictionaries.get_key_or_create(
-                ctx.organization_id.unwrap(),
                 ctx.project_id.unwrap(),
                 DICT_USERS,
                 user_id.as_str(),
             )?,
             (None, Some(user_id)) => self.md.dictionaries.get_key_or_create(
-                ctx.organization_id.unwrap(),
                 ctx.project_id.unwrap(),
                 DICT_USERS,
                 user_id.as_str(),
@@ -167,11 +163,10 @@ impl Executor<Track> {
             custom_properties: None,
         };
 
-        let md_event = self.md.events.get_or_create(
-            ctx.organization_id.unwrap(),
-            ctx.project_id.unwrap(),
-            event_req,
-        )?;
+        let md_event = self
+            .md
+            .events
+            .get_or_create(ctx.project_id.unwrap(), event_req)?;
 
         req.resolved_event = Some(md_event);
 
@@ -206,7 +201,6 @@ impl Executor<Identify> {
         let ctx = ctx.to_owned();
         let project = self.md.projects.get_by_token(ctx.token.as_str())?;
         let mut ctx = ctx.to_owned();
-        ctx.organization_id = Some(project.organization_id);
         ctx.project_id = Some(project.id);
 
         for transformer in &mut self.transformers {

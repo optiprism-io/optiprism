@@ -33,7 +33,6 @@ async fn track(
     Json(request): Json<TrackRequest>,
 ) -> Result<StatusCode> {
     let ctx = RequestContext {
-        organization_id: None,
         project_id: None,
         client_ip: addr.ip(),
         token,
@@ -50,7 +49,6 @@ async fn click(
     Json(request): Json<TrackRequest>,
 ) -> Result<StatusCode> {
     let ctx = RequestContext {
-        organization_id: None,
         project_id: None,
         client_ip: addr.ip(),
         token,
@@ -67,7 +65,6 @@ async fn page(
     Json(request): Json<TrackRequest>,
 ) -> Result<StatusCode> {
     let ctx = RequestContext {
-        organization_id: None,
         project_id: None,
         client_ip: addr.ip(),
         token,
@@ -84,7 +81,6 @@ async fn screen(
     Json(request): Json<TrackRequest>,
 ) -> Result<StatusCode> {
     let ctx = RequestContext {
-        organization_id: None,
         project_id: None,
         client_ip: addr.ip(),
         token,
@@ -101,7 +97,6 @@ async fn identify(
     Json(request): Json<IdentifyRequest>,
 ) -> Result<StatusCode> {
     let ctx = RequestContext {
-        organization_id: None,
         project_id: None,
         client_ip: addr.ip(),
         token,

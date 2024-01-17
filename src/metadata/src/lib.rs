@@ -27,16 +27,8 @@ use crate::metadata::ListResponse;
 pub use crate::metadata::MetadataProvider;
 use crate::metadata::ResponseMetadata;
 
-pub fn org_proj_ns(organization_id: u64, project_id: u64, ns: &[u8]) -> Vec<u8> {
-    [
-        b"organizations/",
-        organization_id.to_le_bytes().as_ref(),
-        b"/projects/",
-        project_id.to_le_bytes().as_ref(),
-        b"/",
-        ns,
-    ]
-    .concat()
+pub fn project_ns(project_id: u64, ns: &[u8]) -> Vec<u8> {
+    [b"projects/", project_id.to_le_bytes().as_ref(), b"/", ns].concat()
 }
 
 pub fn org_ns(organization_id: u64, ns: &[u8]) -> Vec<u8> {

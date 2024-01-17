@@ -20,13 +20,13 @@ use crate::Result;
 async fn event_segmentation(
     ctx: Context,
     Extension(provider): Extension<Arc<Queries>>,
-    Path((organization_id, project_id)): Path<(u64, u64)>,
+    Path(project_id): Path<u64>,
     Query(query): Query<QueryParams>,
     Json(request): Json<EventSegmentation>,
 ) -> Result<Json<QueryResponse>> {
     Ok(Json(
         provider
-            .event_segmentation(ctx, organization_id, project_id, request, query)
+            .event_segmentation(ctx, project_id, request, query)
             .await?,
     ))
 }
@@ -34,19 +34,17 @@ async fn event_segmentation(
 async fn property_values(
     ctx: Context,
     Extension(provider): Extension<Arc<Queries>>,
-    Path((organization_id, project_id)): Path<(u64, u64)>,
+    Path(project_id): Path<u64>,
     Json(request): Json<ListPropertyValuesRequest>,
 ) -> Result<Json<ListResponse<Value>>> {
     Ok(Json(
-        provider
-            .property_values(ctx, organization_id, project_id, request)
-            .await?,
+        provider.property_values(ctx, project_id, request).await?,
     ))
 }
 
 pub fn attach_routes(router: Router) -> Router {
     router.nest(
-        "/organizations/:organization_id/projects/:project_id",
+        "/projects/:project_id",
         Router::new()
             .route(
                 "/queries/event-segmentation",

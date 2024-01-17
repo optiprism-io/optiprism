@@ -33,8 +33,8 @@ fn non_exist() -> Result<()> {
     let (_, custom_events) = get_providers(MAX_EVENTS_LEVEL);
 
     // try to get, delete, update unexisting event
-    assert!(custom_events.get_by_id(1, 1, 1).is_err());
-    assert!(custom_events.delete(1, 1, 1).is_err());
+    assert!(custom_events.get_by_id(1, 1).is_err());
+    assert!(custom_events.delete(1, 1).is_err());
 
     let update_event_req = UpdateCustomEventRequest {
         updated_by: 1,
@@ -48,7 +48,7 @@ fn non_exist() -> Result<()> {
 
     assert!(
         custom_events
-            .update(1, 1, 1, update_event_req.clone())
+            .update(1, 1, update_event_req.clone())
             .is_err()
     );
     Ok(())
@@ -58,7 +58,7 @@ fn non_exist() -> Result<()> {
 fn create_event() -> Result<()> {
     let (event_prov, prov) = get_providers(MAX_EVENTS_LEVEL);
 
-    let event = event_prov.create(1, 1, CreateEventRequest {
+    let event = event_prov.create(1, CreateEventRequest {
         created_by: 0,
         tags: None,
         name: "e1".to_string(),
@@ -83,8 +83,8 @@ fn create_event() -> Result<()> {
         }],
     };
 
-    let resp = prov.create(1, 1, req.clone())?;
-    let check = prov.get_by_id(1, 1, resp.id)?;
+    let resp = prov.create(1, req.clone())?;
+    let check = prov.get_by_id(1, resp.id)?;
     assert_eq!(resp, check);
     Ok(())
 }
@@ -106,7 +106,7 @@ fn create_event_not_found() -> Result<()> {
         }],
     };
 
-    let resp = prov.create(1, 1, req.clone());
+    let resp = prov.create(1, req.clone());
     assert!(resp.is_err());
     Ok(())
 }
@@ -115,7 +115,7 @@ fn create_event_not_found() -> Result<()> {
 fn create_event_duplicate_name() -> Result<()> {
     let (event_prov, prov) = get_providers(MAX_EVENTS_LEVEL);
 
-    event_prov.create(1, 1, CreateEventRequest {
+    event_prov.create(1, CreateEventRequest {
         created_by: 0,
         tags: None,
         name: "e1".to_string(),
@@ -140,9 +140,9 @@ fn create_event_duplicate_name() -> Result<()> {
         }],
     };
 
-    let resp = prov.create(1, 1, req.clone());
+    let resp = prov.create(1, req.clone());
     assert!(resp.is_ok());
-    let resp = prov.create(1, 1, req.clone());
+    let resp = prov.create(1, req.clone());
     assert!(resp.is_err());
     Ok(())
 }
@@ -151,7 +151,7 @@ fn create_event_duplicate_name() -> Result<()> {
 fn create_event_recursion_level_exceeded() -> Result<()> {
     let (event_prov, prov) = get_providers(1);
 
-    event_prov.create(1, 1, CreateEventRequest {
+    event_prov.create(1, CreateEventRequest {
         created_by: 0,
         tags: None,
         name: "e1".to_string(),
@@ -175,7 +175,7 @@ fn create_event_recursion_level_exceeded() -> Result<()> {
             filters: None,
         }],
     };
-    let _resp = prov.create(1, 1, req.clone())?;
+    let _resp = prov.create(1, req.clone())?;
 
     let req = CreateCustomEventRequest {
         created_by: 0,
@@ -189,7 +189,7 @@ fn create_event_recursion_level_exceeded() -> Result<()> {
             filters: None,
         }],
     };
-    let resp = prov.create(1, 1, req.clone())?;
+    let resp = prov.create(1, req.clone())?;
 
     let req = CreateCustomEventRequest {
         created_by: 0,
@@ -203,7 +203,7 @@ fn create_event_recursion_level_exceeded() -> Result<()> {
             filters: None,
         }],
     };
-    let resp = prov.create(1, 1, req.clone());
+    let resp = prov.create(1, req.clone());
     assert!(matches!(resp, Err(MetadataError::BadRequest(_))));
     Ok(())
 }
@@ -212,7 +212,7 @@ fn create_event_recursion_level_exceeded() -> Result<()> {
 fn test_duplicate() -> Result<()> {
     let (event_prov, prov) = get_providers(5);
 
-    event_prov.create(1, 1, CreateEventRequest {
+    event_prov.create(1, CreateEventRequest {
         created_by: 0,
         tags: None,
         name: "e1".to_string(),
@@ -236,7 +236,7 @@ fn test_duplicate() -> Result<()> {
             filters: None,
         }],
     };
-    prov.create(1, 1, req.clone())?;
+    prov.create(1, req.clone())?;
 
     let req = CreateCustomEventRequest {
         created_by: 0,
@@ -250,7 +250,7 @@ fn test_duplicate() -> Result<()> {
             filters: None,
         }],
     };
-    prov.create(1, 1, req.clone())?;
+    prov.create(1, req.clone())?;
 
     let req = UpdateCustomEventRequest {
         updated_by: 0,
@@ -264,7 +264,7 @@ fn test_duplicate() -> Result<()> {
             filters: None,
         }]),
     };
-    let resp = prov.update(1, 1, 1, req.clone());
+    let resp = prov.update(1, 1, req.clone());
     assert!(matches!(resp, Err(MetadataError::AlreadyExists(_))));
 
     // self-pointing
@@ -280,7 +280,7 @@ fn test_duplicate() -> Result<()> {
             filters: None,
         }]),
     };
-    let resp = prov.update(1, 1, 1, req.clone());
+    let resp = prov.update(1, 1, req.clone());
     assert!(matches!(resp, Err(MetadataError::AlreadyExists(_))));
     Ok(())
 }
@@ -289,7 +289,7 @@ fn test_duplicate() -> Result<()> {
 fn update_event() -> Result<()> {
     let (event_prov, prov) = get_providers(MAX_EVENTS_LEVEL);
 
-    let _event = event_prov.create(1, 1, CreateEventRequest {
+    let _event = event_prov.create(1, CreateEventRequest {
         created_by: 0,
         tags: None,
         name: "e1".to_string(),
@@ -314,7 +314,7 @@ fn update_event() -> Result<()> {
         }],
     };
 
-    let resp = prov.create(1, 1, req.clone())?;
+    let resp = prov.create(1, req.clone())?;
     assert_eq!(resp.name, req.name);
 
     let req = UpdateCustomEventRequest {
@@ -327,7 +327,7 @@ fn update_event() -> Result<()> {
         events: OptionalProperty::None,
     };
 
-    let resp = prov.update(1, 1, 1, req)?;
+    let resp = prov.update(1, 1, req)?;
     assert_eq!(resp.name, "name 2".to_string());
     Ok(())
 }

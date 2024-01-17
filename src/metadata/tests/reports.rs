@@ -68,22 +68,22 @@ fn test_reports() -> Result<()> {
     };
 
     // try to get, delete, update unexisting report
-    assert!(reports.get_by_id(1, 1, 1).is_err());
-    assert!(reports.delete(1, 1, 1).is_err());
-    assert!(reports.update(1, 1, 1, update_report_req.clone()).is_err());
+    assert!(reports.get_by_id(1, 1).is_err());
+    assert!(reports.delete(1, 1).is_err());
+    assert!(reports.update(1, 1, update_report_req.clone()).is_err());
 
-    let res = reports.create(1, 1, create_report_req.clone())?;
+    let res = reports.create(1, create_report_req.clone())?;
     assert_eq!(res.id, 1);
     // check existence by id
-    assert_eq!(reports.get_by_id(1, 1, 1)?.id, 1);
+    assert_eq!(reports.get_by_id(1, 1)?.id, 1);
 
-    reports.update(1, 1, 1, update_report_req.clone())?;
-    assert_eq!(reports.list(1, 1)?.data[0].id, 1);
+    reports.update(1, 1, update_report_req.clone())?;
+    assert_eq!(reports.list(1)?.data[0].id, 1);
 
     // delete reports
-    assert_eq!(reports.delete(1, 1, 1)?.id, 1);
+    assert_eq!(reports.delete(1, 1)?.id, 1);
 
     // reports should gone now
-    assert!(reports.get_by_id(1, 1, 1).is_err());
+    assert!(reports.get_by_id(1, 1).is_err());
     Ok(())
 }

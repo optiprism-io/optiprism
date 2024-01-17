@@ -29,16 +29,12 @@ impl Queries {
     pub async fn event_segmentation(
         &self,
         ctx: Context,
-        organization_id: u64,
+
         project_id: u64,
         req: EventSegmentation,
         query: QueryParams,
     ) -> Result<QueryResponse> {
-        ctx.check_project_permission(
-            organization_id,
-            project_id,
-            ProjectPermission::ExploreReports,
-        )?;
+        ctx.check_project_permission(ProjectPermission::ExploreReports)?;
         let lreq = req.try_into()?;
         let cur_time = match query.timestamp {
             None => Utc::now(),
@@ -48,7 +44,6 @@ impl Queries {
             ),
         };
         let ctx = query::Context {
-            organization_id,
             project_id,
             format: match &query.format {
                 None => Format::Regular,
@@ -80,20 +75,16 @@ impl Queries {
     pub async fn property_values(
         &self,
         ctx: Context,
-        organization_id: u64,
+
         project_id: u64,
         req: ListPropertyValuesRequest,
     ) -> Result<ListResponse<Value>> {
-        ctx.check_project_permission(
-            organization_id,
-            project_id,
-            ProjectPermission::ExploreReports,
-        )?;
+        ctx.check_project_permission(ProjectPermission::ExploreReports)?;
 
         let lreq = req.try_into()?;
         let result = self
             .query
-            .property_values(query::Context::new(organization_id, project_id), lreq)
+            .property_values(query::Context::new(project_id), lreq)
             .await?;
 
         result.try_into()

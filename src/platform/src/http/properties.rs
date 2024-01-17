@@ -14,12 +14,12 @@ use crate::Result;
 async fn get_event_by_id(
     ctx: Context,
     Extension(provider): Extension<PropertiesLayer>,
-    Path((organization_id, project_id, property_id)): Path<(u64, u64, u64)>,
+    Path((project_id, property_id)): Path<(u64, u64)>,
 ) -> Result<Json<Property>> {
     Ok(Json(
         provider
             .event
-            .get_by_id(ctx, organization_id, project_id, property_id)
+            .get_by_id(ctx, project_id, property_id)
             .await?,
     ))
 }
@@ -27,12 +27,12 @@ async fn get_event_by_id(
 async fn get_user_by_id(
     ctx: Context,
     Extension(provider): Extension<PropertiesLayer>,
-    Path((organization_id, project_id, property_id)): Path<(u64, u64, u64)>,
+    Path((project_id, property_id)): Path<(u64, u64)>,
 ) -> Result<Json<Property>> {
     Ok(Json(
         provider
             .user
-            .get_by_id(ctx, organization_id, project_id, property_id)
+            .get_by_id(ctx, project_id, property_id)
             .await?,
     ))
 }
@@ -40,12 +40,12 @@ async fn get_user_by_id(
 async fn get_system_by_id(
     ctx: Context,
     Extension(provider): Extension<PropertiesLayer>,
-    Path((organization_id, project_id, property_id)): Path<(u64, u64, u64)>,
+    Path((project_id, property_id)): Path<(u64, u64)>,
 ) -> Result<Json<Property>> {
     Ok(Json(
         provider
             .system
-            .get_by_id(ctx, organization_id, project_id, property_id)
+            .get_by_id(ctx, project_id, property_id)
             .await?,
     ))
 }
@@ -53,12 +53,12 @@ async fn get_system_by_id(
 async fn get_event_by_name(
     ctx: Context,
     Extension(provider): Extension<PropertiesLayer>,
-    Path((organization_id, project_id, prop_name)): Path<(u64, u64, String)>,
+    Path((project_id, prop_name)): Path<(u64, String)>,
 ) -> Result<Json<Property>> {
     Ok(Json(
         provider
             .event
-            .get_by_name(ctx, organization_id, project_id, &prop_name)
+            .get_by_name(ctx, project_id, &prop_name)
             .await?,
     ))
 }
@@ -66,12 +66,12 @@ async fn get_event_by_name(
 async fn get_user_by_name(
     ctx: Context,
     Extension(provider): Extension<PropertiesLayer>,
-    Path((organization_id, project_id, prop_name)): Path<(u64, u64, String)>,
+    Path((project_id, prop_name)): Path<(u64, String)>,
 ) -> Result<Json<Property>> {
     Ok(Json(
         provider
             .user
-            .get_by_name(ctx, organization_id, project_id, &prop_name)
+            .get_by_name(ctx, project_id, &prop_name)
             .await?,
     ))
 }
@@ -79,12 +79,12 @@ async fn get_user_by_name(
 async fn get_system_by_name(
     ctx: Context,
     Extension(provider): Extension<PropertiesLayer>,
-    Path((organization_id, project_id, prop_name)): Path<(u64, u64, String)>,
+    Path((project_id, prop_name)): Path<(u64, String)>,
 ) -> Result<Json<Property>> {
     Ok(Json(
         provider
             .system
-            .get_by_name(ctx, organization_id, project_id, &prop_name)
+            .get_by_name(ctx, project_id, &prop_name)
             .await?,
     ))
 }
@@ -92,49 +92,37 @@ async fn get_system_by_name(
 async fn list_event(
     ctx: Context,
     Extension(provider): Extension<PropertiesLayer>,
-    Path((organization_id, project_id)): Path<(u64, u64)>,
+    Path(project_id): Path<u64>,
 ) -> Result<Json<ListResponse<Property>>> {
-    Ok(Json(
-        provider
-            .event
-            .list(ctx, organization_id, project_id)
-            .await?,
-    ))
+    Ok(Json(provider.event.list(ctx, project_id).await?))
 }
 
 async fn list_user(
     ctx: Context,
     Extension(provider): Extension<PropertiesLayer>,
-    Path((organization_id, project_id)): Path<(u64, u64)>,
+    Path(project_id): Path<u64>,
 ) -> Result<Json<ListResponse<Property>>> {
-    Ok(Json(
-        provider.user.list(ctx, organization_id, project_id).await?,
-    ))
+    Ok(Json(provider.user.list(ctx, project_id).await?))
 }
 
 async fn list_system(
     ctx: Context,
     Extension(provider): Extension<PropertiesLayer>,
-    Path((organization_id, project_id)): Path<(u64, u64)>,
+    Path(project_id): Path<u64>,
 ) -> Result<Json<ListResponse<Property>>> {
-    Ok(Json(
-        provider
-            .system
-            .list(ctx, organization_id, project_id)
-            .await?,
-    ))
+    Ok(Json(provider.system.list(ctx, project_id).await?))
 }
 
 async fn update_event(
     ctx: Context,
     Extension(provider): Extension<PropertiesLayer>,
-    Path((organization_id, project_id, prop_id)): Path<(u64, u64, u64)>,
+    Path((project_id, prop_id)): Path<(u64, u64)>,
     Json(request): Json<UpdatePropertyRequest>,
 ) -> Result<Json<Property>> {
     Ok(Json(
         provider
             .event
-            .update(ctx, organization_id, project_id, prop_id, request)
+            .update(ctx, project_id, prop_id, request)
             .await?,
     ))
 }
@@ -142,13 +130,13 @@ async fn update_event(
 async fn update_user(
     ctx: Context,
     Extension(provider): Extension<PropertiesLayer>,
-    Path((organization_id, project_id, prop_id)): Path<(u64, u64, u64)>,
+    Path((project_id, prop_id)): Path<(u64, u64)>,
     Json(request): Json<UpdatePropertyRequest>,
 ) -> Result<Json<Property>> {
     Ok(Json(
         provider
             .user
-            .update(ctx, organization_id, project_id, prop_id, request)
+            .update(ctx, project_id, prop_id, request)
             .await?,
     ))
 }
@@ -156,13 +144,13 @@ async fn update_user(
 async fn update_system(
     ctx: Context,
     Extension(provider): Extension<PropertiesLayer>,
-    Path((organization_id, project_id, prop_id)): Path<(u64, u64, u64)>,
+    Path((project_id, prop_id)): Path<(u64, u64)>,
     Json(request): Json<UpdatePropertyRequest>,
 ) -> Result<Json<Property>> {
     Ok(Json(
         provider
             .system
-            .update(ctx, organization_id, project_id, prop_id, request)
+            .update(ctx, project_id, prop_id, request)
             .await?,
     ))
 }
@@ -170,45 +158,32 @@ async fn update_system(
 async fn delete_event(
     ctx: Context,
     Extension(provider): Extension<PropertiesLayer>,
-    Path((organization_id, project_id, prop_id)): Path<(u64, u64, u64)>,
+    Path((project_id, prop_id)): Path<(u64, u64)>,
 ) -> Result<Json<Property>> {
-    Ok(Json(
-        provider
-            .event
-            .delete(ctx, organization_id, project_id, prop_id)
-            .await?,
-    ))
+    Ok(Json(provider.event.delete(ctx, project_id, prop_id).await?))
 }
 
 async fn delete_user(
     ctx: Context,
     Extension(provider): Extension<PropertiesLayer>,
-    Path((organization_id, project_id, prop_id)): Path<(u64, u64, u64)>,
+    Path((project_id, prop_id)): Path<(u64, u64)>,
 ) -> Result<Json<Property>> {
-    Ok(Json(
-        provider
-            .user
-            .delete(ctx, organization_id, project_id, prop_id)
-            .await?,
-    ))
+    Ok(Json(provider.user.delete(ctx, project_id, prop_id).await?))
 }
 
 async fn delete_system(
     ctx: Context,
     Extension(provider): Extension<PropertiesLayer>,
-    Path((organization_id, project_id, prop_id)): Path<(u64, u64, u64)>,
+    Path((project_id, prop_id)): Path<(u64, u64)>,
 ) -> Result<Json<Property>> {
     Ok(Json(
-        provider
-            .system
-            .delete(ctx, organization_id, project_id, prop_id)
-            .await?,
+        provider.system.delete(ctx, project_id, prop_id).await?,
     ))
 }
 
 pub fn attach_user_routes(router: Router) -> Router {
     router.clone().nest(
-        "/organizations/:organization_id/projects/:project_id/schema/user-properties",
+        "/projects/:project_id/schema/user-properties",
         router
             .route("/", routing::get(list_user))
             .route(
@@ -223,7 +198,7 @@ pub fn attach_user_routes(router: Router) -> Router {
 
 pub fn attach_event_routes(router: Router) -> Router {
     router.nest(
-        "/organizations/:organization_id/projects/:project_id/schema/event-properties",
+        "/projects/:project_id/schema/event-properties",
         Router::new()
             .route("/", routing::get(list_event))
             .route(
@@ -238,7 +213,7 @@ pub fn attach_event_routes(router: Router) -> Router {
 
 pub fn attach_system_routes(router: Router) -> Router {
     router.clone().nest(
-        "/organizations/:organization_id/projects/:project_id/schema/system-properties",
+        "/projects/:project_id/schema/system-properties",
         router
             .route("/", routing::get(list_system))
             .route(

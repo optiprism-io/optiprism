@@ -21,7 +21,6 @@ pub fn resolve_properties(
     props_prov: &Arc<Properties>,
     city_rdr: &maxminddb::Reader<Vec<u8>>,
 ) -> Result<Vec<PropertyAndValue>> {
-    let org_id = ctx.organization_id.unwrap();
     let proj_id = ctx.project_id.unwrap();
 
     let ip = match context.ip {
@@ -32,7 +31,7 @@ pub fn resolve_properties(
     if let Some(country) = city.country {
         if let Some(names) = country.names {
             if let Some(name) = names.get("en") {
-                let prop = props_prov.get_by_name(org_id, proj_id, types::USER_PROPERTY_COUNTRY)?;
+                let prop = props_prov.get_by_name(proj_id, types::USER_PROPERTY_COUNTRY)?;
 
                 let prop = PropertyAndValue {
                     property: prop,
@@ -46,7 +45,7 @@ pub fn resolve_properties(
     if let Some(city) = city.city {
         if let Some(names) = city.names {
             if let Some(name) = names.get("en") {
-                let prop = props_prov.get_by_name(org_id, proj_id, types::USER_PROPERTY_CITY)?;
+                let prop = props_prov.get_by_name(proj_id, types::USER_PROPERTY_CITY)?;
 
                 let prop = PropertyAndValue {
                     property: prop,

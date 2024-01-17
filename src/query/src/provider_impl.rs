@@ -195,15 +195,15 @@ fn col_name(ctx: &Context, prop: &PropertyRef, md: &Arc<MetadataProvider>) -> Re
     let name = match prop {
         PropertyRef::System(v) => md
             .system_properties
-            .get_by_name(ctx.organization_id, ctx.project_id, v)?
+            .get_by_name(ctx.project_id, v)?
             .column_name(),
         PropertyRef::User(v) => md
             .user_properties
-            .get_by_name(ctx.organization_id, ctx.project_id, v)?
+            .get_by_name(ctx.project_id, v)?
             .column_name(),
         PropertyRef::Event(v) => md
             .event_properties
-            .get_by_name(ctx.organization_id, ctx.project_id, v)?
+            .get_by_name(ctx.project_id, v)?
             .column_name(),
         _ => unimplemented!(),
     };

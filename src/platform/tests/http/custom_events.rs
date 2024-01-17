@@ -37,7 +37,7 @@ async fn test_custom_events() {
 
     let event1 = md
         .events
-        .create(1, 1, metadata::events::CreateEventRequest {
+        .create(1, metadata::events::CreateEventRequest {
             created_by: 0,
             tags: None,
             name: "e1".to_string(),
@@ -52,7 +52,7 @@ async fn test_custom_events() {
 
     let event2 = md
         .events
-        .create(1, 1, metadata::events::CreateEventRequest {
+        .create(1, metadata::events::CreateEventRequest {
             created_by: 0,
             tags: None,
             name: "e2".to_string(),

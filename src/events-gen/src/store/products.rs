@@ -57,7 +57,7 @@ impl Product {
 pub struct ProductProvider {
     dicts: Arc<Dictionaries>,
     properties: Arc<metadata::properties::Properties>,
-    org_id: u64,
+
     proj_id: u64,
     pub products: Vec<Product>,
     product_weight_idx: WeightedIndex<f64>,
@@ -73,7 +73,6 @@ pub struct ProductProvider {
 
 impl ProductProvider {
     pub fn try_new_from_csv<R: io::Read>(
-        org_id: u64,
         proj_id: u64,
         rng: &mut ThreadRng,
         dicts: Arc<Dictionaries>,
@@ -94,10 +93,9 @@ impl ProductProvider {
             let product = Product {
                 id: id + 1,
                 name: dicts.get_key_or_create(
-                    org_id,
                     proj_id,
                     properties
-                        .get_by_name(org_id, proj_id, "Product Name")
+                        .get_by_name(proj_id, "Product Name")
                         .unwrap()
                         .column_name()
                         .as_str(),
@@ -105,10 +103,9 @@ impl ProductProvider {
                 )?,
                 name_str: rec.name,
                 category: dicts.get_key_or_create(
-                    org_id,
                     proj_id,
                     properties
-                        .get_by_name(org_id, proj_id, "Product Category")
+                        .get_by_name(proj_id, "Product Category")
                         .unwrap()
                         .column_name()
                         .as_str(),
@@ -120,10 +117,9 @@ impl ProductProvider {
                     .clone()
                     .map(|v| {
                         dicts.get_key_or_create(
-                            org_id,
                             proj_id,
                             properties
-                                .get_by_name(org_id, proj_id, "Product Subcategory")
+                                .get_by_name(proj_id, "Product Subcategory")
                                 .unwrap()
                                 .column_name()
                                 .as_str(),
@@ -136,10 +132,9 @@ impl ProductProvider {
                     .brand
                     .map(|v| {
                         dicts.get_key_or_create(
-                            org_id,
                             proj_id,
                             properties
-                                .get_by_name(org_id, proj_id, "Product Brand")
+                                .get_by_name(proj_id, "Product Brand")
                                 .unwrap()
                                 .column_name()
                                 .as_str(),
@@ -192,7 +187,7 @@ impl ProductProvider {
         Ok(Self {
             dicts,
             properties,
-            org_id,
+
             proj_id,
             products,
             product_weights,
@@ -232,10 +227,9 @@ impl ProductProvider {
 
     pub fn string_name(&self, key: u64) -> Result<String> {
         Ok(self.dicts.get_value(
-            self.org_id,
             self.proj_id,
             self.properties
-                .get_by_name(self.org_id, self.proj_id, "Product Name")
+                .get_by_name(self.proj_id, "Product Name")
                 .unwrap()
                 .column_name()
                 .as_str(),

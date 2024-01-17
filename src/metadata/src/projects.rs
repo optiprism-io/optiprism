@@ -28,28 +28,18 @@ use crate::make_id_seq_key;
 use crate::make_index_key;
 use crate::metadata::ListResponse;
 use crate::org_ns;
+use crate::project_ns;
 use crate::Result;
 
 const NAMESPACE: &[u8] = b"projects";
 const IDX_NAME: &[u8] = b"name";
 
-fn index_keys(organization_id: u64, name: &str, token: &str) -> Vec<Option<Vec<u8>>> {
-    [
-        index_name_key(organization_id, name),
-        index_token_key(token),
-    ]
-    .to_vec()
+fn index_keys(name: &str, token: &str) -> Vec<Option<Vec<u8>>> {
+    [index_name_key(name), index_token_key(token)].to_vec()
 }
 
-fn index_name_key(organization_id: u64, name: &str) -> Option<Vec<u8>> {
-    Some(
-        make_index_key(
-            org_ns(organization_id, NAMESPACE).as_slice(),
-            IDX_NAME,
-            name,
-        )
-        .to_vec(),
-    )
+fn index_name_key(name: &str) -> Option<Vec<u8>> {
+    Some(make_index_key(NAMESPACE, IDX_NAME, name).to_vec())
 }
 
 fn index_token_key(token: &str) -> Option<Vec<u8>> {
@@ -65,13 +55,8 @@ impl Projects {
         Projects { db }
     }
 
-    fn get_by_id_(
-        &self,
-        tx: &Transaction<TransactionDB>,
-        organization_id: u64,
-        project_id: u64,
-    ) -> Result<Project> {
-        let key = make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), project_id);
+    fn get_by_id_(&self, tx: &Transaction<TransactionDB>, project_id: u64) -> Result<Project> {
+        let key = make_data_value_key(NAMESPACE, project_id);
 
         match tx.get(key)? {
             None => Err(MetadataError::NotFound(format!("project {project_id}"))),
@@ -79,19 +64,16 @@ impl Projects {
         }
     }
 
-    pub fn create(&self, organization_id: u64, req: CreateProjectRequest) -> Result<Project> {
+    pub fn create(&self, req: CreateProjectRequest) -> Result<Project> {
         let tx = self.db.transaction();
         let token = Alphanumeric.sample_string(&mut thread_rng(), 64);
 
-        let idx_keys = index_keys(organization_id, &req.name, token.as_str());
+        let idx_keys = index_keys(&req.name, token.as_str());
 
         check_insert_constraints(&tx, idx_keys.as_ref())?;
 
         let created_at = Utc::now();
-        let id = next_seq(
-            &tx,
-            make_id_seq_key(org_ns(organization_id, NAMESPACE).as_slice()),
-        )?;
+        let id = next_seq(&tx, make_id_seq_key(NAMESPACE))?;
 
         let project = Project {
             id,
@@ -99,7 +81,7 @@ impl Projects {
             updated_at: None,
             created_by: req.created_by,
             updated_by: None,
-            organization_id,
+            organization_id: req.organization_id,
             name: req.name,
             description: req.description,
             tags: req.tags,
@@ -107,19 +89,16 @@ impl Projects {
             session_duration_seconds: req.session_duration_seconds,
         };
         let data = serialize(&project)?;
-        tx.put(
-            make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), project.id),
-            &data,
-        )?;
+        tx.put(make_data_value_key(NAMESPACE, project.id), &data)?;
 
         insert_index(&tx, idx_keys.as_ref(), &data)?;
         tx.commit()?;
         Ok(project)
     }
 
-    pub fn get_by_id(&self, organization_id: u64, project_id: u64) -> Result<Project> {
+    pub fn get_by_id(&self, project_id: u64) -> Result<Project> {
         let tx = self.db.transaction();
-        self.get_by_id_(&tx, organization_id, project_id)
+        self.get_by_id_(&tx, project_id)
     }
 
     pub fn get_by_token(&self, token: &str) -> Result<Project> {
@@ -128,28 +107,23 @@ impl Projects {
         Ok(deserialize::<Project>(&data)?)
     }
 
-    pub fn list(&self, organization_id: u64) -> Result<ListResponse<Project>> {
+    pub fn list(&self, organization_id: Option<u64>) -> Result<ListResponse<Project>> {
         let tx = self.db.transaction();
 
-        list_data(&tx, org_ns(organization_id, NAMESPACE).as_slice())
+        list_data(&tx, NAMESPACE)
     }
 
-    pub fn update(
-        &self,
-        organization_id: u64,
-        project_id: u64,
-        req: UpdateProjectRequest,
-    ) -> Result<Project> {
+    pub fn update(&self, project_id: u64, req: UpdateProjectRequest) -> Result<Project> {
         let tx = self.db.transaction();
 
-        let prev_project = self.get_by_id_(&tx, organization_id, project_id)?;
+        let prev_project = self.get_by_id_(&tx, project_id)?;
         let mut project = prev_project.clone();
 
         let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
         let mut idx_prev_keys: Vec<Option<Vec<u8>>> = Vec::new();
         if let OptionalProperty::Some(name) = &req.name {
-            idx_keys.push(index_name_key(organization_id, name.as_str()));
-            idx_prev_keys.push(index_name_key(organization_id, prev_project.name.as_str()));
+            idx_keys.push(index_name_key(name.as_str()));
+            idx_prev_keys.push(index_name_key(prev_project.name.as_str()));
             project.name = name.to_owned();
         }
 
@@ -169,26 +143,20 @@ impl Projects {
         }
 
         let data = serialize(&project)?;
-        tx.put(
-            make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), project_id),
-            &data,
-        )?;
+        tx.put(make_data_value_key(NAMESPACE, project_id), &data)?;
 
         update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)?;
         tx.commit()?;
         Ok(project)
     }
 
-    pub fn delete(&self, organization_id: u64, project_id: u64) -> Result<Project> {
+    pub fn delete(&self, project_id: u64) -> Result<Project> {
         let tx = self.db.transaction();
 
-        let project = self.get_by_id_(&tx, organization_id, project_id)?;
+        let project = self.get_by_id_(&tx, project_id)?;
         tx.delete(make_data_value_key(NAMESPACE, project_id))?;
 
-        delete_index(
-            &tx,
-            index_keys(organization_id, &project.name, &project.token).as_ref(),
-        )?;
+        delete_index(&tx, index_keys(&project.name, &project.token).as_ref())?;
         tx.commit()?;
         Ok(project)
     }
@@ -214,6 +182,7 @@ pub struct Project {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CreateProjectRequest {
     pub created_by: u64,
+    pub organization_id: u64,
     pub name: String,
     pub description: Option<String>,
     pub tags: Option<Vec<String>>,

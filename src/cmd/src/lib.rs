@@ -149,7 +149,7 @@ pub fn init_system(
         },
     }
 
-    create_property(md, 0, 0, CreatePropertyMainRequest {
+    create_property(md, 0, CreatePropertyMainRequest {
         name: COLUMN_PROJECT_ID.to_string(),
         typ: Type::System,
         data_type: DType::Int64,
@@ -157,7 +157,7 @@ pub fn init_system(
         dict: None,
     })?;
 
-    create_property(md, 0, 0, CreatePropertyMainRequest {
+    create_property(md, 0, CreatePropertyMainRequest {
         name: COLUMN_USER_ID.to_string(),
         typ: Type::System,
         data_type: DType::Int64,
@@ -165,7 +165,7 @@ pub fn init_system(
         dict: None,
     })?;
 
-    create_property(md, 0, 0, CreatePropertyMainRequest {
+    create_property(md, 0, CreatePropertyMainRequest {
         name: COLUMN_CREATED_AT.to_string(),
         typ: Type::System,
         data_type: DType::Timestamp,
@@ -173,7 +173,7 @@ pub fn init_system(
         dict: None,
     })?;
 
-    create_property(md, 0, 0, CreatePropertyMainRequest {
+    create_property(md, 0, CreatePropertyMainRequest {
         name: COLUMN_EVENT_ID.to_string(),
         typ: Type::System,
         data_type: DType::Int64,
@@ -181,7 +181,7 @@ pub fn init_system(
         dict: None,
     })?;
 
-    create_property(md, 0, 0, CreatePropertyMainRequest {
+    create_property(md, 0, CreatePropertyMainRequest {
         name: COLUMN_EVENT.to_string(),
         typ: Type::System,
         data_type: DType::String,
@@ -192,12 +192,12 @@ pub fn init_system(
     Ok(())
 }
 
-pub fn init_project(org_id: u64, project_id: u64, md: &Arc<MetadataProvider>) -> error::Result<()> {
-    create_event(md, org_id, project_id, EVENT_CLICK.to_string())?;
-    create_event(md, org_id, project_id, EVENT_PAGE.to_string())?;
-    create_event(md, org_id, project_id, EVENT_SCREEN.to_string())?;
-    create_event(md, org_id, project_id, EVENT_SESSION_BEGIN.to_string())?;
-    create_event(md, org_id, project_id, EVENT_SESSION_END.to_string())?;
+pub fn init_project(project_id: u64, md: &Arc<MetadataProvider>) -> error::Result<()> {
+    create_event(md, project_id, EVENT_CLICK.to_string())?;
+    create_event(md, project_id, EVENT_PAGE.to_string())?;
+    create_event(md, project_id, EVENT_SCREEN.to_string())?;
+    create_event(md, project_id, EVENT_SESSION_BEGIN.to_string())?;
+    create_event(md, project_id, EVENT_SESSION_END.to_string())?;
     let user_dict_props = vec![
         USER_PROPERTY_CLIENT_FAMILY,
         USER_PROPERTY_CLIENT_VERSION_MINOR,
@@ -216,7 +216,7 @@ pub fn init_project(org_id: u64, project_id: u64, md: &Arc<MetadataProvider>) ->
         USER_PROPERTY_CITY,
     ];
     for prop in user_dict_props {
-        create_property(md, org_id, project_id, CreatePropertyMainRequest {
+        create_property(md, project_id, CreatePropertyMainRequest {
             name: prop.to_string(),
             typ: Type::User,
             data_type: DType::String,
@@ -239,7 +239,7 @@ pub fn init_project(org_id: u64, project_id: u64, md: &Arc<MetadataProvider>) ->
     ];
 
     for prop in event_str_props {
-        create_property(md, org_id, project_id, CreatePropertyMainRequest {
+        create_property(md, project_id, CreatePropertyMainRequest {
             name: prop.to_string(),
             typ: Type::Event,
             data_type: DType::String,
@@ -248,7 +248,7 @@ pub fn init_project(org_id: u64, project_id: u64, md: &Arc<MetadataProvider>) ->
         })?;
     }
 
-    create_property(md, org_id, project_id, CreatePropertyMainRequest {
+    create_property(md, project_id, CreatePropertyMainRequest {
         name: EVENT_PROPERTY_SESSION_LENGTH.to_string(),
         typ: Type::Event,
         data_type: DType::Timestamp,
@@ -359,64 +359,57 @@ fn init_session_cleaner(
     thread::spawn(move || {
         loop {
             thread::sleep(std::time::Duration::from_secs(1));
-            for org in md.organizations.list().unwrap() {
-                for project in md.projects.list(org.id).unwrap() {
-                    md.sessions
-                        .check_for_deletion(org.id, project.id, |sess| {
-                            let now = Utc::now();
-                            let sess_len = now - sess.created_at;
-                            if sess_len.num_seconds() < SESSION_DURATION {
-                                return Ok(false);
-                            }
-                            let record_id =
-                                md.events.next_record_sequence(org.id, project.id).unwrap();
+            for project in md.projects.list(None).unwrap() {
+                md.sessions
+                    .check_for_deletion(project.id, |sess| {
+                        let now = Utc::now();
+                        let sess_len = now - sess.created_at;
+                        if sess_len.num_seconds() < SESSION_DURATION {
+                            return Ok(false);
+                        }
+                        let record_id = md.events.next_record_sequence(project.id).unwrap();
 
-                            let event_id = md
-                                .events
-                                .get_by_name(org.id, project.id, EVENT_SESSION_END)
-                                .unwrap()
-                                .id;
+                        let event_id = md
+                            .events
+                            .get_by_name(project.id, EVENT_SESSION_END)
+                            .unwrap()
+                            .id;
 
-                            let values = vec![
-                                NamedValue::new(
-                                    COLUMN_PROJECT_ID.to_string(),
-                                    Value::Int64(Some(project.id as i64)),
-                                ),
-                                NamedValue::new(
-                                    COLUMN_USER_ID.to_string(),
-                                    Value::Int64(Some(sess.user_id as i64)),
-                                ),
-                                NamedValue::new(
-                                    COLUMN_CREATED_AT.to_string(),
-                                    Value::Timestamp(Some(now.timestamp())),
-                                ),
-                                NamedValue::new(
-                                    COLUMN_EVENT_ID.to_string(),
-                                    Value::Int64(Some(record_id as i64)),
-                                ),
-                                NamedValue::new(
-                                    COLUMN_EVENT.to_string(),
-                                    Value::Int64(Some(event_id as i64)),
-                                ),
-                                NamedValue::new(
-                                    md.event_properties
-                                        .get_by_name(
-                                            org.id,
-                                            project.id,
-                                            EVENT_PROPERTY_SESSION_LENGTH,
-                                        )
-                                        .unwrap()
-                                        .column_name(),
-                                    Value::Timestamp(Some(sess_len.num_seconds())),
-                                ),
-                            ];
+                        let values = vec![
+                            NamedValue::new(
+                                COLUMN_PROJECT_ID.to_string(),
+                                Value::Int64(Some(project.id as i64)),
+                            ),
+                            NamedValue::new(
+                                COLUMN_USER_ID.to_string(),
+                                Value::Int64(Some(sess.user_id as i64)),
+                            ),
+                            NamedValue::new(
+                                COLUMN_CREATED_AT.to_string(),
+                                Value::Timestamp(Some(now.timestamp())),
+                            ),
+                            NamedValue::new(
+                                COLUMN_EVENT_ID.to_string(),
+                                Value::Int64(Some(record_id as i64)),
+                            ),
+                            NamedValue::new(
+                                COLUMN_EVENT.to_string(),
+                                Value::Int64(Some(event_id as i64)),
+                            ),
+                            NamedValue::new(
+                                md.event_properties
+                                    .get_by_name(project.id, EVENT_PROPERTY_SESSION_LENGTH)
+                                    .unwrap()
+                                    .column_name(),
+                                Value::Timestamp(Some(sess_len.num_seconds())),
+                            ),
+                        ];
 
-                            db.insert("events", values).unwrap();
+                        db.insert("events", values).unwrap();
 
-                            Ok(true)
-                        })
-                        .unwrap();
-                }
+                        Ok(true)
+                    })
+                    .unwrap();
             }
         }
     });
@@ -424,7 +417,7 @@ fn init_session_cleaner(
     Ok(())
 }
 
-fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<(u64, u64)> {
+fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<u64> {
     let admin = match md.accounts.create(CreateAccountRequest {
         created_by: None,
         password_hash: make_password_hash("admin")?,
@@ -446,15 +439,16 @@ fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<(
         Err(_err) => md.organizations.get_by_id(1)?,
     };
 
-    let proj = match md.projects.create(org.id, CreateProjectRequest {
+    let proj = match md.projects.create(CreateProjectRequest {
         created_by: admin.id,
+        organization_id: org.id,
         name: "Test Project".to_string(),
         description: None,
         tags: None,
         session_duration_seconds: SESSION_DURATION as u64,
     }) {
         Ok(proj) => proj,
-        Err(_err) => md.projects.get_by_id(1, 1)?,
+        Err(_err) => md.projects.get_by_id(1)?,
     };
 
     info!("token: {}", proj.token);
@@ -472,5 +466,5 @@ fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<(
         Err(_err) => md.accounts.get_by_email("user@test.com")?,
     };
 
-    Ok((org.id, proj.id))
+    Ok(proj.id)
 }

@@ -24,60 +24,35 @@ impl Reports {
     pub async fn create(
         &self,
         ctx: Context,
-        organization_id: u64,
+
         project_id: u64,
         request: CreateReportRequest,
     ) -> Result<Report> {
-        ctx.check_project_permission(
-            organization_id,
-            project_id,
-            ProjectPermission::ManageReports,
-        )?;
+        ctx.check_project_permission(ProjectPermission::ManageReports)?;
 
-        let report = self.prov.create(
-            organization_id,
-            project_id,
-            metadata::reports::CreateReportRequest {
+        let report = self
+            .prov
+            .create(project_id, metadata::reports::CreateReportRequest {
                 created_by: ctx.account_id.unwrap(),
                 tags: request.tags,
                 name: request.name,
                 description: request.description,
                 typ: request.typ.into(),
                 query: request.query.into(),
-            },
-        )?;
+            })?;
 
         Ok(report.into())
     }
 
-    pub async fn get_by_id(
-        &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
-        id: u64,
-    ) -> Result<Report> {
-        ctx.check_project_permission(
-            organization_id,
-            project_id,
-            ProjectPermission::ExploreReports,
-        )?;
+    pub async fn get_by_id(&self, ctx: Context, project_id: u64, id: u64) -> Result<Report> {
+        ctx.check_project_permission(ProjectPermission::ExploreReports)?;
 
-        Ok(self.prov.get_by_id(organization_id, project_id, id)?.into())
+        Ok(self.prov.get_by_id(project_id, id)?.into())
     }
 
-    pub async fn list(
-        &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
-    ) -> Result<ListResponse<Report>> {
-        ctx.check_project_permission(
-            organization_id,
-            project_id,
-            ProjectPermission::ExploreReports,
-        )?;
-        let resp = self.prov.list(organization_id, project_id)?;
+    pub async fn list(&self, ctx: Context, project_id: u64) -> Result<ListResponse<Report>> {
+        ctx.check_project_permission(ProjectPermission::ExploreReports)?;
+        let resp = self.prov.list(project_id)?;
         Ok(ListResponse {
             data: resp.data.into_iter().map(|v| v.into()).collect(),
             meta: resp.meta.into(),
@@ -87,16 +62,12 @@ impl Reports {
     pub async fn update(
         &self,
         ctx: Context,
-        organization_id: u64,
+
         project_id: u64,
         report_id: u64,
         req: UpdateReportRequest,
     ) -> Result<Report> {
-        ctx.check_project_permission(
-            organization_id,
-            project_id,
-            ProjectPermission::ManageReports,
-        )?;
+        ctx.check_project_permission(ProjectPermission::ManageReports)?;
 
         let md_req = metadata::reports::UpdateReportRequest {
             updated_by: ctx.account_id.unwrap(),
@@ -107,27 +78,15 @@ impl Reports {
             query: req.query.into(),
         };
 
-        let report = self
-            .prov
-            .update(organization_id, project_id, report_id, md_req)?;
+        let report = self.prov.update(project_id, report_id, md_req)?;
 
         Ok(report.into())
     }
 
-    pub async fn delete(
-        &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
-        id: u64,
-    ) -> Result<Report> {
-        ctx.check_project_permission(
-            organization_id,
-            project_id,
-            ProjectPermission::ManageReports,
-        )?;
+    pub async fn delete(&self, ctx: Context, project_id: u64, id: u64) -> Result<Report> {
+        ctx.check_project_permission(ProjectPermission::ManageReports)?;
 
-        Ok(self.prov.delete(organization_id, project_id, id)?.into())
+        Ok(self.prov.delete(project_id, id)?.into())
     }
 }
 

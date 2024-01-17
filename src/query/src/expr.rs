@@ -62,9 +62,7 @@ pub fn event_expression(
     Ok(match &event {
         // regular event
         EventRef::RegularName(name) => {
-            let e = metadata
-                .events
-                .get_by_name(ctx.organization_id, ctx.project_id, name)?;
+            let e = metadata.events.get_by_name(ctx.project_id, name)?;
             binary_expr(
                 col(COLUMN_EVENT),
                 Operator::Eq,
@@ -78,9 +76,7 @@ pub fn event_expression(
         ),
 
         EventRef::Custom(id) => {
-            let e = metadata
-                .custom_events
-                .get_by_id(ctx.organization_id, ctx.project_id, *id)?;
+            let e = metadata.custom_events.get_by_id(ctx.project_id, *id)?;
             let mut exprs: Vec<Expr> = Vec::new();
             for event in e.events.iter() {
                 let mut expr = match &event.event {
@@ -154,12 +150,7 @@ pub fn encode_property_dict_values(
     for value in values.iter() {
         if let ScalarValue::Utf8(inner) = value {
             if let Some(str_value) = inner {
-                let key = dictionaries.get_key(
-                    ctx.organization_id,
-                    ctx.project_id,
-                    col_name,
-                    str_value.as_str(),
-                )?;
+                let key = dictionaries.get_key(ctx.project_id, col_name, str_value.as_str())?;
 
                 let scalar_value = match dict_type {
                     DictionaryType::Int8 => ScalarValue::Int8(Some(key as i8)),
@@ -192,7 +183,7 @@ fn prop_expression(
     operation: &PropValueOperation,
     values: Option<Vec<ScalarValue>>,
 ) -> Result<Expr> {
-    let prop = prop.get_by_name(ctx.organization_id, ctx.project_id, prop_name)?;
+    let prop = prop.get_by_name(ctx.project_id, prop_name)?;
     let col_name = prop.column_name();
     let col = col(col_name.as_str());
 
@@ -268,21 +259,17 @@ pub fn property_col(
 ) -> Result<Expr> {
     Ok(match property {
         PropertyRef::System(prop_name) => {
-            let prop =
-                md.system_properties
-                    .get_by_name(ctx.organization_id, ctx.project_id, prop_name)?;
+            let prop = md
+                .system_properties
+                .get_by_name(ctx.project_id, prop_name)?;
             col(prop.column_name().as_str())
         }
         PropertyRef::User(prop_name) => {
-            let prop =
-                md.user_properties
-                    .get_by_name(ctx.organization_id, ctx.project_id, prop_name)?;
+            let prop = md.user_properties.get_by_name(ctx.project_id, prop_name)?;
             col(prop.column_name().as_str())
         }
         PropertyRef::Event(prop_name) => {
-            let prop =
-                md.event_properties
-                    .get_by_name(ctx.organization_id, ctx.project_id, prop_name)?;
+            let prop = md.event_properties.get_by_name(ctx.project_id, prop_name)?;
             col(prop.column_name().as_str())
         }
         PropertyRef::Custom(_prop_name) => unimplemented!(),

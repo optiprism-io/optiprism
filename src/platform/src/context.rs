@@ -43,6 +43,8 @@ pub struct AuthContext {
 #[derive(Default, Clone)]
 pub struct Context {
     pub account_id: Option<u64>,
+    pub organization_id: u64,
+    pub project_id: u64,
     pub role: Option<Role>,
     pub organizations: Option<Vec<(u64, OrganizationRole)>>,
     pub projects: Option<Vec<(u64, ProjectRole)>>,
@@ -68,18 +70,14 @@ impl Context {
         Err(PlatformError::Forbidden("forbidden".to_string()))
     }
 
-    pub fn check_organization_permission(
-        &self,
-        organization_id: u64,
-        permission: OrganizationPermission,
-    ) -> Result<()> {
+    pub fn check_organization_permission(&self, permission: OrganizationPermission) -> Result<()> {
         if self
             .check_permission(Permission::ManageOrganizations)
             .is_ok()
         {
             return Ok(());
         }
-        let role = self.get_organization_role(organization_id)?;
+        let role = self.get_organization_role()?;
         for (org_role, role_permission) in ORGANIZATION_PERMISSIONS.iter() {
             if *org_role != role {
                 continue;
@@ -96,16 +94,11 @@ impl Context {
         Err(PlatformError::Forbidden("forbidden".to_string()))
     }
 
-    pub fn check_project_permission(
-        &self,
-        organization_id: u64,
-        project_id: u64,
-        permission: ProjectPermission,
-    ) -> Result<()> {
+    pub fn check_project_permission(&self, permission: ProjectPermission) -> Result<()> {
         if self.check_permission(Permission::ManageProjects).is_ok() {
             return Ok(());
         }
-        if let Ok(role) = self.get_organization_role(organization_id) {
+        if let Ok(role) = self.get_organization_role() {
             match role {
                 OrganizationRole::Owner => return Ok(()),
                 OrganizationRole::Admin => return Ok(()),
@@ -113,7 +106,7 @@ impl Context {
             }
         }
 
-        let role = self.get_project_role(project_id)?;
+        let role = self.get_project_role()?;
 
         for (proj_role, role_permission) in PROJECT_PERMISSIONS.iter() {
             if *proj_role != role {
@@ -131,10 +124,10 @@ impl Context {
         Err(PlatformError::Forbidden("forbidden".to_string()))
     }
 
-    fn get_organization_role(&self, organization_id: u64) -> Result<OrganizationRole> {
+    fn get_organization_role(&self) -> Result<OrganizationRole> {
         if let Some(organizations) = &self.organizations {
             for (org_id, role) in organizations.iter() {
-                if *org_id == organization_id {
+                if *org_id == self.organization_id {
                     return Ok(role.to_owned());
                 }
             }
@@ -143,10 +136,10 @@ impl Context {
         Err(PlatformError::Forbidden("forbidden".to_string()))
     }
 
-    fn get_project_role(&self, project_id: u64) -> Result<ProjectRole> {
+    fn get_project_role(&self) -> Result<ProjectRole> {
         if let Some(projects) = &self.projects {
             for (proj_id, role) in projects.iter() {
-                if *proj_id == project_id {
+                if *proj_id == self.project_id {
                     return Ok(role.to_owned());
                 }
             }
@@ -185,6 +178,8 @@ where S: Send + Sync
         let acc = md_acc_prov.get_by_id(claims.account_id)?;
         let ctx = Context {
             account_id: Some(acc.id),
+            organization_id: claims.organization_id,
+            project_id: 0,
             role: acc.role,
             organizations: acc.organizations,
             projects: acc.projects,

@@ -91,18 +91,16 @@ macro_rules! breakdowns_to_dicts {
 
 macro_rules! dictionary_prop_to_col {
     ($self:expr, $md_namespace:ident, $prop_name:expr,  $decode_cols:expr) => {{
-        let prop = $self.metadata.$md_namespace.get_by_name(
-            $self.ctx.organization_id,
-            $self.ctx.project_id,
-            $prop_name.as_str(),
-        )?;
+        let prop = $self
+            .metadata
+            .$md_namespace
+            .get_by_name($self.ctx.project_id, $prop_name.as_str())?;
         if !prop.is_dictionary {
             continue;
         }
 
         let col_name = prop.column_name();
         let dict = SingleDictionaryProvider::new(
-            $self.ctx.organization_id,
             $self.ctx.project_id,
             col_name.clone(),
             $self.metadata.dictionaries.clone(),
@@ -290,25 +288,18 @@ impl LogicalPlanBuilder {
                 | PropValueOperation::Regex
                 | PropValueOperation::NotRegex => {
                     let prop = match property {
-                        PropertyRef::System(prop_ref) => {
-                            self.metadata.system_properties.get_by_name(
-                                self.ctx.organization_id,
-                                self.ctx.project_id,
-                                prop_ref.as_str(),
-                            )?
-                        }
-                        PropertyRef::User(prop_ref) => self.metadata.user_properties.get_by_name(
-                            self.ctx.organization_id,
-                            self.ctx.project_id,
-                            prop_ref.as_str(),
-                        )?,
-                        PropertyRef::Event(prop_ref) => {
-                            self.metadata.event_properties.get_by_name(
-                                self.ctx.organization_id,
-                                self.ctx.project_id,
-                                prop_ref.as_str(),
-                            )?
-                        }
+                        PropertyRef::System(prop_ref) => self
+                            .metadata
+                            .system_properties
+                            .get_by_name(self.ctx.project_id, prop_ref.as_str())?,
+                        PropertyRef::User(prop_ref) => self
+                            .metadata
+                            .user_properties
+                            .get_by_name(self.ctx.project_id, prop_ref.as_str())?,
+                        PropertyRef::Event(prop_ref) => self
+                            .metadata
+                            .event_properties
+                            .get_by_name(self.ctx.project_id, prop_ref.as_str())?,
                         PropertyRef::Custom(_) => unreachable!(),
                     };
 
@@ -318,7 +309,6 @@ impl LogicalPlanBuilder {
 
                     let col_name = prop.column_name();
                     let dict = SingleDictionaryProvider::new(
-                        self.ctx.organization_id,
                         self.ctx.project_id,
                         col_name.clone(),
                         self.metadata.dictionaries.clone(),

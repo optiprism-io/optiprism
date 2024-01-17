@@ -18,18 +18,12 @@ pub trait Provider: Sync + Send {
     async fn list(
         &self,
         ctx: Context,
-        organization_id: u64,
+
         project_id: u64,
         request: ListEventRecordsRequest,
     ) -> Result<ListResponse<EventRecord>>;
 
-    async fn get_by_id(
-        &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
-        id: u64,
-    ) -> Result<EventRecord>;
+    async fn get_by_id(&self, ctx: Context, project_id: u64, id: u64) -> Result<EventRecord>;
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
