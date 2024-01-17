@@ -42,7 +42,7 @@ async fn update(
 
 pub fn attach_routes(router: Router) -> Router {
     router.nest(
-        "/organizations/*/projects/:project_id/group-records",
+        "/projects/:project_id/group-records",
         Router::new()
             .route("/search", routing::post(list))
             .route("/:id", routing::get(get_by_id).put(update)),

@@ -64,7 +64,7 @@ async fn delete(
 
 pub fn attach_routes(router: Router) -> Router {
     router.clone().nest(
-        "/organizations/*/projects/:project_id/schema/custom-events",
+        "/projects/:project_id/schema/custom-events",
         router.route("/", routing::post(create).get(list)).route(
             "/:event_id",
             routing::get(get_by_id).delete(delete).put(update),

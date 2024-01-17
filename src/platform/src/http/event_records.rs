@@ -32,7 +32,7 @@ async fn get_by_id(
 
 pub fn attach_routes(router: Router) -> Router {
     router.nest(
-        "/organizations/*/projects/:project_id/event-records",
+        "/projects/:project_id/event-records",
         Router::new()
             .route("/search", routing::post(list))
             .route("/:id", routing::get(get_by_id)),

@@ -44,7 +44,7 @@ async fn property_values(
 
 pub fn attach_routes(router: Router) -> Router {
     router.nest(
-        "/organizations/*/projects/:project_id",
+        "/projects/:project_id",
         Router::new()
             .route(
                 "/queries/event-segmentation",
