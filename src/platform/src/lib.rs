@@ -489,6 +489,16 @@ pub struct Column {
     pub compare_values: Option<Vec<Value>>,
 }
 
+impl From<query::ColumnType> for ColumnType {
+    fn from(value: query::ColumnType) -> Self {
+        match value {
+            query::ColumnType::Dimension => ColumnType::Dimension,
+            query::ColumnType::Metric => ColumnType::Metric,
+            query::ColumnType::MetricValue => ColumnType::MetricValue,
+            query::ColumnType::FunnelMetricValue => ColumnType::FunnelMetricValue,
+        }
+    }
+}
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct JSONQueryResponse {
@@ -514,7 +524,7 @@ impl QueryResponse {
             .cloned()
             .map(|column| match array_ref_to_json_values(&column.data) {
                 Ok(data) => Ok(Column {
-                    typ: ColumnType::Dimension,
+                    typ: column.typ.into(),
                     name: column.name,
                     is_nullable: column.is_nullable,
                     data_type: column.data_type.try_into()?,

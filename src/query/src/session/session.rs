@@ -1,7 +1,0 @@
-struct SessionContext {
-
-}
-
-struct Session {
-
-}

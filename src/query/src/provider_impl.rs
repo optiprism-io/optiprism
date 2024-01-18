@@ -58,10 +58,6 @@ impl QueryProvider {
             table_source,
         })
     }
-
-    //    pub fn new_from_logical_plan(metadata: Arc<MetadataProvider>, input: LogicalPlan) -> Self {
-    // Self { metadata, input }
-    // }
 }
 
 impl QueryProvider {
@@ -142,11 +138,11 @@ impl QueryProvider {
                 let typ = match metric_cols.contains(field.name()) {
                     true => ColumnType::MetricValue,
                     false => {
-                        if field.name() == COL_AGG_NAME {
-                            ColumnType::Dimension
-                        } else {
-                            ColumnType::Metric
-                        }
+                        // if field.name() == COL_AGG_NAME {
+                        ColumnType::Dimension
+                        // } else {
+                        //     ColumnType::Metric
+                        // }
                     }
                 };
 
@@ -160,6 +156,7 @@ impl QueryProvider {
             })
             .collect();
 
+        println!("{:?}", cols);
         Ok(DataTable::new(result.schema(), cols))
     }
 }
