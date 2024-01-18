@@ -390,8 +390,12 @@ impl LogicalPlanBuilder {
         segment_inputs: Option<Vec<LogicalPlan>>,
     ) -> Result<LogicalPlan> {
         let input = self.build_filter_logical_plan(input.clone(), &self.es.events[event_id])?;
-        let (mut input, group_expr) =
-            self.build_aggregate_logical_plan(input, &self.es.events[event_id], segment_inputs)?;
+        let (mut input, group_expr) = self.build_aggregate_logical_plan(
+            input,
+            &self.es.events[event_id],
+            event_id,
+            segment_inputs,
+        )?;
 
         // unpivot aggregate values into value column
         if self.ctx.format != Format::Compact {
@@ -401,15 +405,19 @@ impl LogicalPlanBuilder {
                     .iter()
                     .enumerate()
                     .map(|(idx, q)| match q.agg {
-                        Query::CountEvents => format!("{idx}_count"),
-                        Query::CountUniqueGroups => format!("{idx}_partitioned_count"),
-                        Query::DailyActiveGroups => format!("{idx}_partitioned_count"),
+                        Query::CountEvents => format!("{event_id}_{idx}_count"),
+                        Query::CountUniqueGroups => format!("{event_id}_{idx}_partitioned_count"),
+                        Query::DailyActiveGroups => format!("{event_id}_{idx}_partitioned_count"),
                         Query::WeeklyActiveGroups => unimplemented!(),
                         Query::MonthlyActiveGroups => unimplemented!(),
-                        Query::CountPerGroup { .. } => format!("{idx}_partitioned_count"),
-                        Query::AggregatePropertyPerGroup { .. } => format!("{idx}_partitioned_agg"),
-                        Query::AggregateProperty { .. } => format!("{idx}_agg"),
-                        Query::QueryFormula { .. } => format!("{idx}_count"),
+                        Query::CountPerGroup { .. } => {
+                            format!("{event_id}_{idx}_partitioned_count")
+                        }
+                        Query::AggregatePropertyPerGroup { .. } => {
+                            format!("{event_id}_{idx}_partitioned_agg")
+                        }
+                        Query::AggregateProperty { .. } => format!("{event_id}_{idx}_agg"),
+                        Query::QueryFormula { .. } => format!("{event_id}_{idx}_count"),
                     })
                     .collect();
 
@@ -519,6 +527,7 @@ impl LogicalPlanBuilder {
         &self,
         input: LogicalPlan,
         event: &Event,
+        event_id: usize,
         segment_inputs: Option<Vec<LogicalPlan>>,
     ) -> Result<(LogicalPlan, Vec<Expr>)> {
         let mut group_expr: Vec<Expr> = vec![];
@@ -617,7 +626,7 @@ impl LogicalPlanBuilder {
                 Query::QueryFormula { .. } => unimplemented!(),
             };
 
-            aggr_expr.push((agg, idx.to_string()));
+            aggr_expr.push((agg, format!("{event_id}_{idx}")));
         }
 
         // todo check for duplicates
