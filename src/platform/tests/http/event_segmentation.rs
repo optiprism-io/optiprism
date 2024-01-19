@@ -104,9 +104,7 @@ mod tests {
         };
 
         let resp = cl
-            .post(format!(
-                "{base_url}/organizations/1/projects/1/queries/event-segmentation"
-            ))
+            .post(format!("{base_url}/projects/1/queries/event-segmentation"))
             .body(serde_json::to_string(&es).unwrap())
             .headers(admin_headers.clone())
             .send()

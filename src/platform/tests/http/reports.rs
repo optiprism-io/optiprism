@@ -32,7 +32,7 @@ fn assert(l: &Report, r: &Report) {
 #[tokio::test]
 async fn test_reports() {
     let (base_url, md, pp) = run_http_service(false).await.unwrap();
-    let report_url = format!("{base_url}/organizations/1/projects/1/reports");
+    let report_url = format!("{base_url}/projects/1/reports");
     let cl = Client::new();
     let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts)
         .await

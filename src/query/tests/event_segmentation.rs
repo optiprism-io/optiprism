@@ -160,18 +160,16 @@ mod tests {
         path.push(format!("{}.db", Uuid::new_v4()));
         let (md, db) = init_db()?;
 
-        let org_id = 1;
         let proj_id = 1;
 
         let _ctx = Context {
-            organization_id:
             project_id: proj_id,
             cur_time: Default::default(),
             format: Default::default(),
         };
 
-        create_entities(md.clone(), &db,  proj_id).await?;
-        let _input = Arc::new(events_provider(db,  proj_id).await?);
+        create_entities(md.clone(), &db, proj_id).await?;
+        let _input = Arc::new(events_provider(db, proj_id).await?);
 
         // let plan = LogicalPlanBuilder::build(ctx, md.clone(), input, es).await?;
         // let df_plan = plan.to_df_plan()?;
@@ -279,18 +277,16 @@ mod tests {
 
         let (md, db) = init_db()?;
 
-        let org_id = 1;
         let proj_id = 1;
 
         let ctx = Context {
-            organization_id:
             project_id: proj_id,
             cur_time: Default::default(),
             format: Default::default(),
         };
 
-        create_entities(md.clone(), &db,  proj_id).await?;
-        let input = events_provider(db,  proj_id).await?;
+        create_entities(md.clone(), &db, proj_id).await?;
+        let input = events_provider(db, proj_id).await?;
         let _cur_time = DateTime::parse_from_rfc3339("2021-09-16T13:49:00.000000+00:00")
             .unwrap()
             .with_timezone(&Utc);
@@ -315,10 +311,9 @@ mod tests {
     #[traced_test]
     #[tokio::test]
     async fn test_custom_events() -> Result<()> {
-        let org_id = 1;
         let proj_id = 1;
         let (md, db) = init_db()?;
-        create_entities(md.clone(), &db,  proj_id).await?;
+        create_entities(md.clone(), &db, proj_id).await?;
 
         let custom_event = md
             .custom_events
@@ -391,13 +386,12 @@ mod tests {
         };
 
         let ctx = Context {
-            organization_id:
             project_id: proj_id,
             cur_time: Default::default(),
             format: Default::default(),
         };
 
-        let input = events_provider(db,  proj_id).await?;
+        let input = events_provider(db, proj_id).await?;
         let _cur_time = DateTime::parse_from_rfc3339("2021-09-08T13:42:00.000000+00:00")
             .unwrap()
             .with_timezone(&Utc);

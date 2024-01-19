@@ -26,7 +26,7 @@ fn assert(l: &Dashboard, r: &Dashboard) {
 #[tokio::test]
 async fn test_dashboards() {
     let (base_url, md, pp) = run_http_service(false).await.unwrap();
-    let dash_url = format!("{base_url}/organizations/1/projects/1/dashboards");
+    let dash_url = format!("{base_url}/projects/1/dashboards");
     let cl = Client::new();
     let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts)
         .await

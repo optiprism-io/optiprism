@@ -29,7 +29,7 @@ fn assert(l: &CustomEvent, r: &CustomEvent) {
 #[tokio::test]
 async fn test_custom_events() {
     let (base_url, md, pp) = run_http_service(false).await.unwrap();
-    let events_url = format!("{base_url}/organizations/1/projects/1/schema/custom-events");
+    let events_url = format!("{base_url}/projects/1/schema/custom-events");
     let cl = Client::new();
     let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts)
         .await
