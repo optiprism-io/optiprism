@@ -73,9 +73,7 @@ async fn test_auth() {
 
     {
         let resp = cl
-            .get(format!(
-                "{base_addr}/organizations/1/projects/1/schema/events"
-            ))
+            .get(format!("{base_addr}/projects/1/schema/events"))
             .headers(headers.clone())
             .send()
             .await
@@ -93,9 +91,7 @@ async fn test_auth() {
         );
 
         let resp = cl
-            .get(format!(
-                "{base_addr}/organizations/1/projects/1/schema/events"
-            ))
+            .get(format!("{base_addr}/projects/1/schema/events"))
             .headers(jwt_headers.clone())
             .send()
             .await
@@ -150,9 +146,7 @@ async fn test_auth() {
     // list without accounts should be empty
     {
         let resp = cl
-            .get(format!(
-                "{base_addr}/organizations/1/projects/1/schema/events"
-            ))
+            .get(format!("{base_addr}/projects/1/schema/events"))
             .headers(new_jwt_headers.clone())
             .send()
             .await

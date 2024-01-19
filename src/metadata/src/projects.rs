@@ -27,8 +27,6 @@ use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
 use crate::metadata::ListResponse;
-use crate::org_ns;
-use crate::project_ns;
 use crate::Result;
 
 const NAMESPACE: &[u8] = b"projects";
@@ -107,7 +105,7 @@ impl Projects {
         Ok(deserialize::<Project>(&data)?)
     }
 
-    pub fn list(&self, organization_id: Option<u64>) -> Result<ListResponse<Project>> {
+    pub fn list(&self, _organization_id: Option<u64>) -> Result<ListResponse<Project>> {
         let tx = self.db.transaction();
 
         list_data(&tx, NAMESPACE)

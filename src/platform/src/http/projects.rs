@@ -18,7 +18,7 @@ use crate::Result;
 async fn create(
     ctx: Context,
     Extension(provider): Extension<Arc<Projects>>,
-    Path((_project_id)): Path<(u64, u64)>,
+    Path(_project_id): Path<(u64, u64)>,
     Json(request): Json<CreateProjectRequest>,
 ) -> Result<(StatusCode, Json<Project>)> {
     Ok((

@@ -103,7 +103,7 @@ mod tests {
         db.create_table("events".to_string(), store::table::Options::test())?;
 
         if create_test_data {
-            create_entities(md.clone(), &db, 1, 1).await?;
+            create_entities(md.clone(), &db, 1).await?;
         }
         let data_provider: Arc<dyn TableProvider> =
             Arc::new(LocalTable::try_new(db.clone(), "events".to_string())?);

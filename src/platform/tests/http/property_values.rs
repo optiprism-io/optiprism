@@ -34,9 +34,7 @@ mod tests {
         };
 
         let resp = cl
-            .post(format!(
-                "{base_url}/organizations/1/projects/1/property-values"
-            ))
+            .post(format!("{base_url}/projects/1/property-values"))
             .body(serde_json::to_string(&req).unwrap())
             .headers(headers.clone())
             .send()

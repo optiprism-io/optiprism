@@ -140,7 +140,7 @@ pub async fn start(args: &Shop, _proj_id: u64) -> Result<()> {
     let from_date = to_date - duration;
 
     info!("creating org structure and admin account...");
-    let (proj_id) = crate::init_test_org_structure(&md)?;
+    let proj_id = crate::init_test_org_structure(&md)?;
     info!("project initialization...");
 
     init_project(proj_id, &md)?;

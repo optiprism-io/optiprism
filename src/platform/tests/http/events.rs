@@ -27,7 +27,7 @@ fn assert(l: &Event, r: &Event) {
 #[tokio::test]
 async fn test_events() {
     let (base_url, md, pp) = run_http_service(false).await.unwrap();
-    let events_url = format!("{base_url}/organizations/1/projects/1/schema/events");
+    let events_url = format!("{base_url}/projects/1/schema/events");
     let cl = Client::new();
     let headers = create_admin_acc_and_login(&pp.auth, &md.accounts)
         .await

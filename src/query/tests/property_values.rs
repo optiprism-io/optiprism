@@ -29,18 +29,16 @@ mod tests {
     async fn test_bool() -> Result<()> {
         let (md, db) = init_db()?;
 
-        let org_id = 1;
         let proj_id = 1;
 
         let ctx = Context {
-            organization_id:
             project_id: proj_id,
             format: Default::default(),
             cur_time: Default::default(),
         };
 
-        create_entities(md.clone(), &db,  proj_id).await?;
-        let input = events_provider(db,  proj_id).await?;
+        create_entities(md.clone(), &db, proj_id).await?;
+        let input = events_provider(db, proj_id).await?;
 
         let req = PropertyValues {
             property: PropertyRef::User("Is Premium".to_string()),
@@ -73,18 +71,16 @@ mod tests {
     async fn test_decimal() -> Result<()> {
         let (md, db) = init_db()?;
 
-        let org_id = 1;
         let proj_id = 1;
 
         let ctx = Context {
-            organization_id:
             project_id: proj_id,
             format: Default::default(),
             cur_time: Default::default(),
         };
 
-        create_entities(md.clone(), &db,  proj_id).await?;
-        let input = events_provider(db,  proj_id).await?;
+        create_entities(md.clone(), &db, proj_id).await?;
+        let input = events_provider(db, proj_id).await?;
 
         let req = PropertyValues {
             property: PropertyRef::Event("Revenue".to_string()),
@@ -121,18 +117,16 @@ mod tests {
     async fn test_str() -> Result<()> {
         let (md, db) = init_db()?;
 
-        let org_id = 1;
         let proj_id = 1;
 
         let ctx = Context {
-            organization_id:
             project_id: proj_id,
             format: Default::default(),
             cur_time: Default::default(),
         };
 
-        create_entities(md.clone(), &db,  proj_id).await?;
-        let input = events_provider(db,  proj_id).await?;
+        create_entities(md.clone(), &db, proj_id).await?;
+        let input = events_provider(db, proj_id).await?;
 
         let req = PropertyValues {
             property: PropertyRef::Event("Product Name".to_string()),
@@ -165,18 +159,16 @@ mod tests {
     async fn test_str_dict() -> Result<()> {
         let (md, db) = init_db()?;
 
-        let org_id = 1;
         let proj_id = 1;
 
         let ctx = Context {
-            organization_id:
             project_id: proj_id,
             format: Default::default(),
             cur_time: Default::default(),
         };
 
-        create_entities(md.clone(), &db,  proj_id).await?;
-        let input = events_provider(db,  proj_id).await?;
+        create_entities(md.clone(), &db, proj_id).await?;
+        let input = events_provider(db, proj_id).await?;
 
         let req = PropertyValues {
             property: PropertyRef::User("Country".to_string()),
