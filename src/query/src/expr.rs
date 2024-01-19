@@ -3,6 +3,7 @@ use std::sync::Arc;
 use arrow::datatypes::DataType;
 use chrono::DateTime;
 use chrono::Utc;
+use common::query::event_segmentation::Breakdown;
 use common::query::EventFilter;
 use common::query::EventRef;
 use common::query::PropValueOperation;
@@ -137,6 +138,25 @@ pub fn event_filters_expression(
     }
 
     Ok(multi_and(filters_exprs))
+}
+
+// builds breakdown expression
+pub fn breakdown_expr(
+    ctx: &Context,
+    metadata: &Arc<MetadataProvider>,
+    breakdown: &Breakdown,
+) -> crate::Result<Expr> {
+    match breakdown {
+        Breakdown::Property(prop_ref) => match prop_ref {
+            PropertyRef::System(_prop_name)
+            | PropertyRef::User(_prop_name)
+            | PropertyRef::Event(_prop_name) => {
+                let prop_col = property_col(ctx, metadata, prop_ref)?;
+                Ok(prop_col)
+            }
+            PropertyRef::Custom(_) => unimplemented!(),
+        },
+    }
 }
 
 pub fn encode_property_dict_values(

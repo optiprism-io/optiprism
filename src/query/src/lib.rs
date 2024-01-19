@@ -436,7 +436,7 @@ pub mod test_util {
             is_system: false,
             nullable: false,
             is_array: false,
-            is_dictionary: false,
+            is_dictionary: true,
             dictionary_type: Some(properties::DictionaryType::Int8),
         })?;
 

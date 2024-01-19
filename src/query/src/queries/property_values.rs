@@ -89,7 +89,7 @@ impl LogicalPlanBuilder {
             PropertyRef::Custom(_id) => unimplemented!(),
         };
 
-        let expr_col = input.expressions()[0].clone();
+        // let expr_col = input.expressions()[0].clone();
 
         let input = match &req.filter {
             Some(filter) => LogicalPlan::Filter(PlanFilter::try_new(
@@ -104,15 +104,15 @@ impl LogicalPlanBuilder {
             )?),
             None => input,
         };
-        let input = LogicalPlan::Sort(Sort {
-            expr: vec![Expr::Sort(expr::Sort {
-                expr: Box::new(expr_col),
-                asc: true,
-                nulls_first: false,
-            })],
-            input: Arc::new(input),
-            fetch: None,
-        });
+        // let input = LogicalPlan::Sort(Sort {
+        //     expr: vec![Expr::Sort(expr::Sort {
+        //         expr: Box::new(expr_col),
+        //         asc: true,
+        //         nulls_first: false,
+        //     })],
+        //     input: Arc::new(input),
+        //     fetch: None,
+        // });
 
         let input = LogicalPlan::Limit(Limit {
             skip: 0,

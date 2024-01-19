@@ -27,6 +27,7 @@ use datafusion_expr::ExprSchemable;
 use datafusion_expr::Extension;
 use datafusion_expr::Filter;
 use datafusion_expr::LogicalPlan;
+use datafusion_expr::Projection;
 use datafusion_expr::ScalarFunctionDefinition;
 use datafusion_expr::Sort;
 use metadata::dictionaries::SingleDictionaryProvider;
@@ -34,7 +35,9 @@ use metadata::MetadataProvider;
 
 use crate::context::Format;
 use crate::error::Result;
+use crate::expr::breakdown_expr;
 use crate::expr::event_expression;
+use crate::expr::event_filters_expression;
 use crate::expr::property_col;
 use crate::expr::property_expression;
 use crate::expr::time_expression;
@@ -50,6 +53,7 @@ use crate::logical_plan::segment;
 use crate::logical_plan::segment::SegmentExpr;
 use crate::logical_plan::segment::SegmentNode;
 use crate::logical_plan::unpivot::UnpivotNode;
+use crate::queries::decode_filter_single_dictionary;
 use crate::Context;
 
 pub const COL_AGG_NAME: &str = "agg_name";
@@ -66,39 +70,45 @@ macro_rules! breakdowns_to_dicts {
         for breakdown in $breakdowns.iter() {
             match &breakdown {
                 Breakdown::Property(prop) => {
-                    if $cols_hash.contains_key(prop) {
+                    let p = match prop {
+                        PropertyRef::System(name) => $self
+                            .metadata
+                            .system_properties
+                            .get_by_name($self.ctx.project_id, name.as_str())?,
+                        PropertyRef::User(name) => $self
+                            .metadata
+                            .user_properties
+                            .get_by_name($self.ctx.project_id, name.as_str())?,
+                        PropertyRef::Event(name) => $self
+                            .metadata
+                            .event_properties
+                            .get_by_name($self.ctx.project_id, name.as_str())?,
+                        _ => unimplemented!(),
+                    };
+                    if !p.is_dictionary {
                         continue;
                     }
-                    $cols_hash.insert(prop.to_owned(), ());
-
-                    match prop {
-                        PropertyRef::System(name) => {
-                            dictionary_prop_to_col!($self, system_properties, name, $decode_cols)
-                        }
-                        PropertyRef::User(name) => {
-                            dictionary_prop_to_col!($self, user_properties, name, $decode_cols)
-                        }
-                        PropertyRef::Event(name) => {
-                            dictionary_prop_to_col!($self, event_properties, name, $decode_cols)
-                        }
-                        _ => {}
+                    if $cols_hash.contains_key(p.column_name().as_str()) {
+                        continue;
                     }
+
+                    let dict = SingleDictionaryProvider::new(
+                        $self.ctx.project_id,
+                        p.column_name(),
+                        $self.metadata.dictionaries.clone(),
+                    );
+                    let col = Column::from_name(p.column_name());
+
+                    $decode_cols.push((col, Arc::new(dict)));
+                    $cols_hash.insert(p.column_name(), ());
                 }
-            }
+            };
         }
     }};
 }
 
 macro_rules! dictionary_prop_to_col {
-    ($self:expr, $md_namespace:ident, $prop_name:expr,  $decode_cols:expr) => {{
-        let prop = $self
-            .metadata
-            .$md_namespace
-            .get_by_name($self.ctx.project_id, $prop_name.as_str())?;
-        if !prop.is_dictionary {
-            continue;
-        }
-
+    ($self:expr, $md_namespace:ident,   $decode_cols:expr) => {{
         let col_name = prop.column_name();
         let dict = SingleDictionaryProvider::new(
             $self.ctx.project_id,
@@ -163,7 +173,7 @@ impl LogicalPlanBuilder {
             None
         };
 
-        let mut cols_hash: HashMap<PropertyRef, ()> = HashMap::new();
+        let mut cols_hash: HashMap<String, ()> = HashMap::new();
 
         let mut input = builder.decode_filter_dictionaries(input, &mut cols_hash)?;
         // build main query
@@ -228,7 +238,10 @@ impl LogicalPlanBuilder {
                 let mut event_expr = event_expression(&self.ctx, &self.metadata, event)?;
                 // apply event filters
                 if let Some(filters) = &filters {
-                    event_expr = and(event_expr.clone(), self.event_filters_expression(filters)?)
+                    event_expr = and(
+                        event_expr.clone(),
+                        event_filters_expression(&self.ctx, &self.metadata, &filters)?,
+                    )
                 }
                 match aggregate {
                     DidEventAggregate::Count {
@@ -271,81 +284,36 @@ impl LogicalPlanBuilder {
         Ok(expr)
     }
 
-    fn decode_filter_single_dictionary(
-        &self,
-        cols_hash: &mut HashMap<PropertyRef, ()>,
-        decode_cols: &mut Vec<(Column, Arc<SingleDictionaryProvider>)>,
-        filter: &EventFilter,
-    ) -> Result<()> {
-        match filter {
-            EventFilter::Property {
-                property,
-                operation,
-                value: _,
-            } => match operation {
-                PropValueOperation::Like
-                | PropValueOperation::NotLike
-                | PropValueOperation::Regex
-                | PropValueOperation::NotRegex => {
-                    let prop = match property {
-                        PropertyRef::System(prop_ref) => self
-                            .metadata
-                            .system_properties
-                            .get_by_name(self.ctx.project_id, prop_ref.as_str())?,
-                        PropertyRef::User(prop_ref) => self
-                            .metadata
-                            .user_properties
-                            .get_by_name(self.ctx.project_id, prop_ref.as_str())?,
-                        PropertyRef::Event(prop_ref) => self
-                            .metadata
-                            .event_properties
-                            .get_by_name(self.ctx.project_id, prop_ref.as_str())?,
-                        PropertyRef::Custom(_) => unreachable!(),
-                    };
-
-                    if !prop.is_dictionary {
-                        return Ok(());
-                    }
-
-                    let col_name = prop.column_name();
-                    let dict = SingleDictionaryProvider::new(
-                        self.ctx.project_id,
-                        col_name.clone(),
-                        self.metadata.dictionaries.clone(),
-                    );
-                    let col = Column::from_name(col_name);
-
-                    decode_cols.push((col, Arc::new(dict)));
-
-                    if cols_hash.contains_key(property) {
-                        return Ok(());
-                    }
-                    cols_hash.insert(property.to_owned(), ());
-                }
-                _ => {}
-            },
-        }
-
-        Ok(())
-    }
     fn decode_filter_dictionaries(
         &self,
         input: LogicalPlan,
-        cols_hash: &mut HashMap<PropertyRef, ()>,
+        cols_hash: &mut HashMap<String, ()>,
     ) -> Result<LogicalPlan> {
         let mut decode_cols: Vec<(Column, Arc<SingleDictionaryProvider>)> = Vec::new();
 
         for event in &self.es.events {
             if let Some(filters) = &event.filters {
                 for filter in filters {
-                    self.decode_filter_single_dictionary(cols_hash, &mut decode_cols, filter)?;
+                    decode_filter_single_dictionary(
+                        &self.ctx,
+                        &self.metadata,
+                        cols_hash,
+                        &mut decode_cols,
+                        filter,
+                    )?;
                 }
             }
         }
 
         if let Some(filters) = &self.es.filters {
             for filter in filters {
-                self.decode_filter_single_dictionary(cols_hash, &mut decode_cols, filter)?;
+                decode_filter_single_dictionary(
+                    &self.ctx,
+                    &self.metadata,
+                    cols_hash,
+                    &mut decode_cols,
+                    filter,
+                )?;
             }
         }
 
@@ -361,7 +329,7 @@ impl LogicalPlanBuilder {
     fn decode_breakdowns_dictionaries(
         &self,
         input: LogicalPlan,
-        cols_hash: &mut HashMap<PropertyRef, ()>,
+        cols_hash: &mut HashMap<String, ()>,
     ) -> Result<LogicalPlan> {
         let mut decode_cols: Vec<(Column, Arc<SingleDictionaryProvider>)> = Vec::new();
         for event in &self.es.events {
@@ -468,38 +436,12 @@ impl LogicalPlanBuilder {
             };
         }
 
-        // let exprx = input.expressions();
-        // let input = LogicalPlan::Projection(Projection::try_new(exprx, Arc::new(input))?);
         Ok(input)
     }
 
     /// builds filter plan
     fn build_filter_logical_plan(&self, input: LogicalPlan, event: &Event) -> Result<LogicalPlan> {
         let cur_time = self.ctx.cur_time;
-        // let cur_time = match &self.es.interval_unit {
-        // TimeIntervalUnit::Second => self
-        // .ctx
-        // .cur_time
-        // .duration_trunc(Duration::seconds(1))
-        // .unwrap(),
-        // TimeIntervalUnit::Minute => self
-        // .ctx
-        // .cur_time
-        // .duration_trunc(Duration::minutes(1))
-        // .unwrap(),
-        // TimeIntervalUnit::Hour => self
-        // .ctx
-        // .cur_time
-        // .duration_trunc(Duration::hours(1))
-        // .unwrap(),
-        // TimeIntervalUnit::Day => self.ctx.cur_time.duration_trunc(Duration::days(1)).unwrap(),
-        // TimeIntervalUnit::Week => self.ctx.cur_time.beginning_of_week(),
-        // TimeIntervalUnit::Month => self.ctx.cur_time.beginning_of_month(),
-        // TimeIntervalUnit::Year => self.ctx.cur_time.beginning_of_year(),
-        // };
-        // let cur_time = self.cur_time.duration_trunc(trunc).unwrap();
-        // time expression
-
         // todo add project_id filtering
         let mut expr = time_expression(COLUMN_CREATED_AT, input.schema(), &self.es.time, cur_time)?;
 
@@ -510,12 +452,18 @@ impl LogicalPlanBuilder {
         );
         // apply event filters
         if let Some(filters) = &event.filters {
-            expr = and(expr.clone(), self.event_filters_expression(filters)?)
+            expr = and(
+                expr.clone(),
+                event_filters_expression(&self.ctx, &self.metadata, filters)?,
+            )
         }
 
         // global event filters
         if let Some(filters) = &self.es.filters {
-            expr = and(expr.clone(), self.event_filters_expression(filters)?);
+            expr = and(
+                expr.clone(),
+                event_filters_expression(&self.ctx, &self.metadata, filters)?,
+            );
         }
 
         // global filter
@@ -552,14 +500,14 @@ impl LogicalPlanBuilder {
         // event groups
         if let Some(breakdowns) = &event.breakdowns {
             for breakdown in breakdowns.iter() {
-                group_expr.push(self.breakdown_expr(breakdown)?);
+                group_expr.push(breakdown_expr(&self.ctx, &self.metadata, breakdown)?);
             }
         }
 
         // common groups
         if let Some(breakdowns) = &self.es.breakdowns {
             for breakdown in breakdowns.iter() {
-                group_expr.push(self.breakdown_expr(breakdown)?);
+                group_expr.push(breakdown_expr(&self.ctx, &self.metadata, breakdown)?);
             }
         }
 
@@ -644,50 +592,5 @@ impl LogicalPlanBuilder {
             }),
             group_expr.into_iter().map(|(a, _b)| a).collect::<Vec<_>>(),
         ))
-    }
-
-    /// builds event filters expression
-    fn event_filters_expression(&self, filters: &[EventFilter]) -> Result<Expr> {
-        // iterate over filters
-        let filters_exprs = filters
-            .iter()
-            .map(|filter| {
-                // match filter type
-                match filter {
-                    EventFilter::Property {
-                        property,
-                        operation,
-                        value,
-                    } => property_expression(
-                        &self.ctx,
-                        &self.metadata,
-                        property,
-                        operation,
-                        value.to_owned(),
-                    ),
-                }
-            })
-            .collect::<Result<Vec<Expr>>>()?;
-
-        if filters_exprs.len() == 1 {
-            return Ok(filters_exprs[0].clone());
-        }
-
-        Ok(multi_and(filters_exprs))
-    }
-
-    // builds breakdown expression
-    fn breakdown_expr(&self, breakdown: &Breakdown) -> Result<Expr> {
-        match breakdown {
-            Breakdown::Property(prop_ref) => match prop_ref {
-                PropertyRef::System(_prop_name)
-                | PropertyRef::User(_prop_name)
-                | PropertyRef::Event(_prop_name) => {
-                    let prop_col = property_col(&self.ctx, &self.metadata, prop_ref)?;
-                    Ok(prop_col)
-                }
-                PropertyRef::Custom(_) => unimplemented!(),
-            },
-        }
     }
 }
