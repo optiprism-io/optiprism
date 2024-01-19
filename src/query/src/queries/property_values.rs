@@ -8,11 +8,15 @@ use datafusion_common::Column;
 use datafusion_common::DFSchema;
 use datafusion_common::ScalarValue;
 use datafusion_expr::col;
+use datafusion_expr::expr;
 use datafusion_expr::utils::exprlist_to_fields;
 use datafusion_expr::Aggregate;
+use datafusion_expr::Expr;
 use datafusion_expr::Extension;
 use datafusion_expr::Filter as PlanFilter;
+use datafusion_expr::Limit;
 use datafusion_expr::LogicalPlan;
+use datafusion_expr::Sort;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
 
@@ -85,7 +89,7 @@ impl LogicalPlanBuilder {
             PropertyRef::Custom(_id) => unimplemented!(),
         };
 
-        // let expr_col = input.expressions()[0].clone();
+        let expr_col = input.expressions()[0].clone();
 
         let input = match &req.filter {
             Some(filter) => LogicalPlan::Filter(PlanFilter::try_new(
@@ -100,21 +104,21 @@ impl LogicalPlanBuilder {
             )?),
             None => input,
         };
-        // let input = LogicalPlan::Sort(Sort {
-        // expr: vec![Expr::Sort(expr::Sort {
-        // expr: Box::new(expr_col),
-        // asc: true,
-        // nulls_first: false,
-        // })],
-        // input: Arc::new(input),
-        // fetch: None,
-        // });
+        let input = LogicalPlan::Sort(Sort {
+            expr: vec![Expr::Sort(expr::Sort {
+                expr: Box::new(expr_col),
+                asc: true,
+                nulls_first: false,
+            })],
+            input: Arc::new(input),
+            fetch: None,
+        });
 
-        // let input = LogicalPlan::Limit(Limit {
-        // skip: 0,
-        // fetch: Some(1000),
-        // input: Arc::new(input),
-        // });
+        let input = LogicalPlan::Limit(Limit {
+            skip: 0,
+            fetch: Some(1000),
+            input: Arc::new(input),
+        });
 
         Ok(input)
     }
