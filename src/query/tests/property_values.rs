@@ -1,14 +1,3 @@
-use arrow::util::pretty::print_batches;
-use common::query::EventRef;
-use common::query::PropertyRef;
-use metadata::test_util::init_db;
-use query::queries::property_values::LogicalPlanBuilder;
-use query::queries::property_values::PropertyValues;
-use query::test_util::create_entities;
-use query::test_util::events_provider;
-use query::test_util::run_plan;
-use query::Context;
-
 #[cfg(test)]
 mod tests {
 
@@ -154,32 +143,32 @@ mod tests {
         print_batches(&result)?;
         Ok(())
     }
-}
 
-#[tokio::test]
-async fn test_dict() -> query::Result<()> {
-    let (md, db) = init_db()?;
+    #[tokio::test]
+    async fn test_dict() -> query::Result<()> {
+        let (md, db) = init_db()?;
 
-    let proj_id = 1;
+        let proj_id = 1;
 
-    let ctx = Context {
-        project_id: proj_id,
-        format: Default::default(),
-        cur_time: Default::default(),
-    };
+        let ctx = Context {
+            project_id: proj_id,
+            format: Default::default(),
+            cur_time: Default::default(),
+        };
 
-    create_entities(md.clone(), &db, proj_id).await?;
-    let input = events_provider(db, proj_id).await?;
+        create_entities(md.clone(), &db, proj_id).await?;
+        let input = events_provider(db, proj_id).await?;
 
-    let req = PropertyValues {
-        property: PropertyRef::User("Country".to_string()),
-        event: Some(EventRef::RegularName("View Product".to_string())),
-        filter: None,
-    };
+        let req = PropertyValues {
+            property: PropertyRef::User("Country".to_string()),
+            event: Some(EventRef::RegularName("View Product".to_string())),
+            filter: None,
+        };
 
-    let plan = LogicalPlanBuilder::build(ctx, md, input, req).await?;
-    let result = run_plan(plan).await?;
+        let plan = LogicalPlanBuilder::build(ctx, md, input, req).await?;
+        let result = run_plan(plan).await?;
 
-    print_batches(&result)?;
-    Ok(())
+        print_batches(&result)?;
+        Ok(())
+    }
 }
