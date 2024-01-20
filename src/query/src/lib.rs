@@ -317,6 +317,7 @@ pub mod test_util {
     use std::path::PathBuf;
     use std::sync::Arc;
 
+    use arrow::array::RecordBatch;
     use arrow::datatypes::DataType;
     use arrow::datatypes::Field;
     use arrow::datatypes::Schema;
@@ -332,9 +333,13 @@ pub mod test_util {
     use datafusion::datasource::listing::ListingTableConfig;
     use datafusion::datasource::listing::ListingTableUrl;
     use datafusion::datasource::provider_as_source;
+    use datafusion::execution::context::SessionState;
     use datafusion::execution::options::ReadOptions;
+    use datafusion::execution::runtime_env::RuntimeEnv;
+    use datafusion::physical_plan::collect;
     use datafusion::prelude::CsvReadOptions;
     use datafusion::prelude::SessionConfig;
+    use datafusion::prelude::SessionContext;
     use datafusion_expr::logical_plan::builder::UNNAMED_TABLE;
     use datafusion_expr::LogicalPlan;
     use datafusion_expr::LogicalPlanBuilder;
@@ -347,6 +352,7 @@ pub mod test_util {
     use store::db::OptiDBImpl;
 
     use crate::error::Result;
+    use crate::physical_plan::planner::QueryPlanner;
 
     pub async fn events_provider(db: Arc<OptiDBImpl>, _proj_id: u64) -> Result<LogicalPlan> {
         let schema = Schema::new(vec![
@@ -539,5 +545,20 @@ pub mod test_util {
         })?;
 
         Ok(())
+    }
+
+    pub async fn run_plan(plan: LogicalPlan) -> Result<Vec<RecordBatch>> {
+        println!("{:?}", plan);
+        let runtime = Arc::new(RuntimeEnv::default());
+        let config = SessionConfig::new().with_target_partitions(1);
+        #[allow(deprecated)]
+        let session_state = SessionState::with_config_rt(config, runtime)
+            .with_query_planner(Arc::new(QueryPlanner {}));
+        // .with_optimizer_rules(vec![]);
+        #[allow(deprecated)]
+        let exec_ctx = SessionContext::with_state(session_state.clone());
+        let physical_plan = session_state.create_physical_plan(&plan).await?;
+
+        Ok(collect(physical_plan, exec_ctx.task_ctx()).await?)
     }
 }

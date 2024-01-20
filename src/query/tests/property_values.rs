@@ -17,6 +17,7 @@ use query::queries::property_values::LogicalPlanBuilder;
 use query::queries::property_values::PropertyValues;
 use query::test_util::create_entities;
 use query::test_util::events_provider;
+use query::test_util::run_plan;
 use query::Context;
 
 #[cfg(test)]
@@ -44,6 +45,7 @@ mod tests {
     use query::queries::property_values::PropertyValues;
     use query::test_util::create_entities;
     use query::test_util::events_provider;
+    use query::test_util::run_plan;
     use query::Context;
 
     #[tokio::test]
@@ -71,18 +73,7 @@ mod tests {
         };
 
         let plan = LogicalPlanBuilder::build(ctx, md, input, req).await?;
-        println!("{:?}", plan);
-        let runtime = Arc::new(RuntimeEnv::default());
-        let config = SessionConfig::new().with_target_partitions(1);
-        #[allow(deprecated)]
-        let session_state = SessionState::with_config_rt(config, runtime)
-            .with_query_planner(Arc::new(QueryPlanner {}))
-            .with_optimizer_rules(vec![]);
-        #[allow(deprecated)]
-        let exec_ctx = SessionContext::with_state(session_state.clone());
-        let physical_plan = session_state.create_physical_plan(&plan).await?;
-
-        let result = collect(physical_plan, exec_ctx.task_ctx()).await?;
+        let result = run_plan(plan).await?;
 
         print_batches(&result)?;
         Ok(())
@@ -117,18 +108,7 @@ mod tests {
         };
 
         let plan = LogicalPlanBuilder::build(ctx, md, input, req).await?;
-        println!("{:?}", plan);
-        let runtime = Arc::new(RuntimeEnv::default());
-        let config = SessionConfig::new().with_target_partitions(1);
-        #[allow(deprecated)]
-        let session_state = SessionState::with_config_rt(config, runtime)
-            .with_query_planner(Arc::new(QueryPlanner {}))
-            .with_optimizer_rules(vec![]);
-        #[allow(deprecated)]
-        let exec_ctx = SessionContext::with_state(session_state.clone());
-        let physical_plan = session_state.create_physical_plan(&plan).await?;
-
-        let result = collect(physical_plan, exec_ctx.task_ctx()).await?;
+        let result = run_plan(plan).await?;
 
         print_batches(&result)?;
         Ok(())
@@ -159,19 +139,7 @@ mod tests {
         };
 
         let plan = LogicalPlanBuilder::build(ctx, md, input, req).await?;
-        println!("{:?}", plan);
-        let runtime = Arc::new(RuntimeEnv::default());
-        let config = SessionConfig::new().with_target_partitions(1);
-        #[allow(deprecated)]
-        let session_state = SessionState::with_config_rt(config, runtime)
-            .with_query_planner(Arc::new(QueryPlanner {}))
-            .with_optimizer_rules(vec![]);
-        #[allow(deprecated)]
-        let exec_ctx = SessionContext::with_state(session_state.clone());
-        let physical_plan = session_state.create_physical_plan(&plan).await?;
-
-        let result = collect(physical_plan, exec_ctx.task_ctx()).await?;
-
+        let result = run_plan(plan).await?;
         print_batches(&result)?;
         Ok(())
     }
@@ -200,18 +168,7 @@ mod tests {
             }),
         };
         let plan = LogicalPlanBuilder::build(ctx, md, input, req).await?;
-        println!("{:?}", plan);
-        let runtime = Arc::new(RuntimeEnv::default());
-        let config = SessionConfig::new().with_target_partitions(1);
-        #[allow(deprecated)]
-        let session_state = SessionState::with_config_rt(config, runtime)
-            .with_query_planner(Arc::new(QueryPlanner {}))
-            .with_optimizer_rules(vec![]);
-        #[allow(deprecated)]
-        let exec_ctx = SessionContext::with_state(session_state.clone());
-        let physical_plan = session_state.create_physical_plan(&plan).await?;
-
-        let result = collect(physical_plan, exec_ctx.task_ctx()).await?;
+        let result = run_plan(plan).await?;
 
         print_batches(&result)?;
         Ok(())
@@ -240,18 +197,7 @@ async fn test_dict() -> query::Result<()> {
     };
 
     let plan = LogicalPlanBuilder::build(ctx, md, input, req).await?;
-    println!("{:?}", plan);
-    let runtime = Arc::new(RuntimeEnv::default());
-    let config = SessionConfig::new().with_target_partitions(1);
-    #[allow(deprecated)]
-    let session_state = SessionState::with_config_rt(config, runtime)
-        .with_query_planner(Arc::new(QueryPlanner {}))
-        .with_optimizer_rules(vec![]);
-    #[allow(deprecated)]
-    let exec_ctx = SessionContext::with_state(session_state.clone());
-    let physical_plan = session_state.create_physical_plan(&plan).await?;
-
-    let result = collect(physical_plan, exec_ctx.task_ctx()).await?;
+    let result = run_plan(plan).await?;
 
     print_batches(&result)?;
     Ok(())

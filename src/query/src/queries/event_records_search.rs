@@ -75,7 +75,6 @@ impl LogicalPlanBuilder {
             input
         };
 
-        println!("{:?}", input.schema());
         // todo add project_id filtering
         // todo make obligatory
 
@@ -145,9 +144,12 @@ impl LogicalPlanBuilder {
             properties.append(&mut (l));
         }
 
+        let properties = properties
+            .iter()
+            .filter(|prop| prop.is_dictionary && !cols_hash.contains_key(&prop.column_name()))
+            .collect::<Vec<_>>();
         let decode_cols = properties
             .iter()
-            .filter(|prop| prop.is_dictionary)
             .map(|prop| {
                 let col_name = prop.column_name();
                 let dict = SingleDictionaryProvider::new(
