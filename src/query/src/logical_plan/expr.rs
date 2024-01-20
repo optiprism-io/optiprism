@@ -13,6 +13,9 @@ use crate::error::QueryError;
 use crate::Result;
 
 pub fn multi_or(exprs: Vec<Expr>) -> Expr {
+    if exprs.len() == 1 {
+        return exprs[0].clone();
+    }
     // combine multiple values with OR
     // create initial OR between two first expressions
     let mut expr = or(exprs[0].clone(), exprs[1].clone());
@@ -26,6 +29,10 @@ pub fn multi_or(exprs: Vec<Expr>) -> Expr {
 }
 
 pub fn multi_and(exprs: Vec<Expr>) -> Expr {
+    if exprs.len() == 1 {
+        return exprs[0].clone();
+    }
+
     let mut expr = and(exprs[0].clone(), exprs[1].clone());
     for fexpr in exprs.iter().skip(2) {
         expr = and(expr.clone(), fexpr.clone())

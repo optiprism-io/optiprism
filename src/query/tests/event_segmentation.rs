@@ -24,20 +24,15 @@ mod tests {
     use common::query::QueryTime;
     use common::query::TimeIntervalUnit;
     use common::types::COLUMN_USER_ID;
-    use datafusion::execution::context::SessionState;
-    use datafusion::execution::runtime_env::RuntimeEnv;
-    use datafusion::physical_plan::collect;
-    use datafusion::prelude::SessionConfig;
-    use datafusion::prelude::SessionContext;
     use datafusion_common::ScalarValue;
     use metadata::custom_events;
     use metadata::custom_events::CreateCustomEventRequest;
     use metadata::test_util::init_db;
     use query::error::Result;
-    use query::physical_plan::planner::QueryPlanner;
     use query::queries::event_segmentation::logical_plan_builder::LogicalPlanBuilder;
     use query::test_util::create_entities;
     use query::test_util::events_provider;
+    use query::test_util::run_plan;
     use query::Context;
     use tracing_test::traced_test;
     use uuid::Uuid;
@@ -291,18 +286,7 @@ mod tests {
             .unwrap()
             .with_timezone(&Utc);
         let plan = LogicalPlanBuilder::build(ctx, md.clone(), input, es)?;
-        println!("logical plan: {}", plan.display_indent_schema());
-
-        let runtime = Arc::new(RuntimeEnv::default());
-        let config = SessionConfig::new().with_target_partitions(1);
-        #[allow(deprecated)]
-        let session_state = SessionState::with_config_rt(config, runtime)
-            .with_query_planner(Arc::new(QueryPlanner {}))
-            .with_optimizer_rules(vec![]);
-        #[allow(deprecated)]
-        let exec_ctx = SessionContext::with_state(session_state.clone());
-        let physical_plan = session_state.create_physical_plan(&plan).await?;
-        let result = collect(physical_plan, exec_ctx.task_ctx()).await?;
+        let result = run_plan(plan).await?;
         print_batches(&result)?;
 
         Ok(())
@@ -311,6 +295,7 @@ mod tests {
     #[traced_test]
     #[tokio::test]
     async fn test_custom_events() -> Result<()> {
+        let _org_id = 1;
         let proj_id = 1;
         let (md, db) = init_db()?;
         create_entities(md.clone(), &db, proj_id).await?;
@@ -396,19 +381,7 @@ mod tests {
             .unwrap()
             .with_timezone(&Utc);
         let plan = LogicalPlanBuilder::build(ctx, md.clone(), input, es)?;
-        println!("logical plan: {}", plan.display_indent_schema());
-
-        let runtime = Arc::new(RuntimeEnv::default());
-        let config = SessionConfig::new().with_target_partitions(1);
-        #[allow(deprecated)]
-        let session_state = SessionState::with_config_rt(config, runtime)
-            .with_query_planner(Arc::new(QueryPlanner {}))
-            .with_optimizer_rules(vec![]);
-        #[allow(deprecated)]
-        let exec_ctx = SessionContext::with_state(session_state.clone());
-        let physical_plan = session_state.create_physical_plan(&plan).await?;
-
-        let result = collect(physical_plan, exec_ctx.task_ctx()).await?;
+        let result = run_plan(plan).await?;
         print_batches(&result)?;
 
         Ok(())

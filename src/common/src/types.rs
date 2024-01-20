@@ -161,6 +161,7 @@ impl TryFrom<DataType> for DType {
             DataType::Int64 => DType::Int64,
             DataType::Utf8 => DType::String,
             DataType::Decimal128(_, _) => DType::Decimal,
+            DataType::Timestamp(_, _) => DType::Timestamp,
             DataType::List(f) => match f.data_type() {
                 DataType::Boolean => DType::Boolean,
                 DataType::Int8 => DType::Int8,
@@ -169,6 +170,7 @@ impl TryFrom<DataType> for DType {
                 DataType::Int64 => DType::Int64,
                 DataType::Utf8 => DType::String,
                 DataType::Decimal128(_, _) => DType::Decimal,
+                DataType::Timestamp(_, _) => DType::Timestamp,
                 _ => return Err(CommonError::General("Unsupported type2".to_string())),
             },
             _ => return Err(CommonError::General(format!("Unsupported type {:?}", dt))),

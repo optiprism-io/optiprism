@@ -29,17 +29,15 @@ use crate::Context;
 pub struct LogicalPlanBuilder {}
 
 macro_rules! property_col {
-    ($ctx:expr,$md:expr,$input:expr,$prop_name:expr,$md_namespace:ident) => {{
-        let prop = $md.$md_namespace.get_by_name($ctx.project_id, $prop_name)?;
-        let col_name = prop.column_name();
-
+    ($ctx:expr,$md:expr,$input:expr,$prop:expr) => {{
+        let col_name = $prop.column_name();
         let expr = col(col_name.as_str());
         let _aggr_schema =
             DFSchema::new_with_metadata(exprlist_to_fields(vec![&expr], &$input)?, HashMap::new())?;
         let agg_fn = Aggregate::try_new(Arc::new($input.clone()), vec![expr], vec![])?;
         let input = LogicalPlan::Aggregate(agg_fn);
 
-        match prop.dictionary_type {
+        match $prop.dictionary_type {
             Some(_) => {
                 let dict = SingleDictionaryProvider::new(
                     $ctx.project_id,
@@ -76,20 +74,30 @@ impl LogicalPlanBuilder {
             None => input,
         };
 
-        let input = match &req.property {
+        let (input, col_name) = match &req.property {
             PropertyRef::System(prop_name) => {
-                property_col!(ctx, metadata, input, prop_name, system_properties)
+                let prop = metadata
+                    .system_properties
+                    .get_by_name(ctx.project_id, prop_name)?;
+                let col_name = prop.column_name();
+                (property_col!(ctx, metadata, input, prop), col_name)
             }
             PropertyRef::User(prop_name) => {
-                property_col!(ctx, metadata, input, prop_name, user_properties)
+                let prop = metadata
+                    .user_properties
+                    .get_by_name(ctx.project_id, prop_name)?;
+                let col_name = prop.column_name();
+                (property_col!(ctx, metadata, input, prop), col_name)
             }
             PropertyRef::Event(prop_name) => {
-                property_col!(ctx, metadata, input, prop_name, event_properties)
+                let prop = metadata
+                    .event_properties
+                    .get_by_name(ctx.project_id, prop_name)?;
+                let col_name = prop.column_name();
+                (property_col!(ctx, metadata, input, prop), col_name)
             }
             PropertyRef::Custom(_id) => unimplemented!(),
         };
-
-        let expr_col = input.expressions()[0].clone();
 
         let input = match &req.filter {
             Some(filter) => LogicalPlan::Filter(PlanFilter::try_new(
@@ -104,9 +112,10 @@ impl LogicalPlanBuilder {
             )?),
             None => input,
         };
+
         let input = LogicalPlan::Sort(Sort {
             expr: vec![Expr::Sort(expr::Sort {
-                expr: Box::new(expr_col),
+                expr: Box::new(col(col_name.as_str())),
                 asc: true,
                 nulls_first: false,
             })],
