@@ -4,6 +4,7 @@ use std::time::Instant;
 use arrow::array::ArrayRef;
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
+use arrow::util::pretty::print_batches;
 use chrono::Utc;
 use common::query::event_segmentation::Breakdown;
 use common::query::event_segmentation::EventSegmentation;
@@ -29,6 +30,8 @@ use store::db::OptiDBImpl;
 use tracing::debug;
 
 use crate::physical_plan::planner::QueryPlanner;
+use crate::queries::event_records_search;
+use crate::queries::event_records_search::EventRecordsSearch;
 use crate::queries::event_segmentation;
 use crate::queries::property_values;
 use crate::queries::property_values::PropertyValues;
@@ -93,6 +96,38 @@ impl QueryProvider {
         Ok(result.column(0).to_owned())
     }
 
+    pub async fn event_records_search(
+        &self,
+        ctx: Context,
+        req: EventRecordsSearch,
+    ) -> Result<DataTable> {
+        let cur_time = Utc::now();
+
+        let input =
+            datafusion_expr::LogicalPlanBuilder::scan("table", self.table_source.clone(), None)?
+                .build()?;
+        let plan = event_records_search::build(ctx, self.metadata.clone(), input, req)?;
+
+        // let plan = LogicalPlanBuilder::from(plan).explain(true, true)?.build()?;
+
+        let result = execute_plan(&plan).await?;
+        let cols = result
+            .schema()
+            .fields()
+            .iter()
+            .enumerate()
+            .map(|(idx, field)| Column {
+                name: field.name().to_owned(),
+                typ: ColumnType::Dimension,
+                is_nullable: field.is_nullable(),
+                data_type: field.data_type().to_owned(),
+                data: result.column(idx).to_owned(),
+            })
+            .collect();
+
+        Ok(DataTable::new(result.schema(), cols))
+    }
+
     pub async fn event_segmentation(
         &self,
         ctx: Context,
@@ -155,7 +190,6 @@ impl QueryProvider {
             })
             .collect();
 
-        println!("{:?}", cols);
         Ok(DataTable::new(result.schema(), cols))
     }
 }

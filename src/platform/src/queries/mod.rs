@@ -3,6 +3,7 @@ use chrono::Utc;
 
 use crate::PlatformError;
 
+pub mod event_records_search;
 pub mod event_segmentation;
 pub mod property_values;
 pub mod provider;

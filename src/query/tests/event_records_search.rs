@@ -13,7 +13,6 @@ use datafusion::prelude::SessionContext;
 use metadata::test_util::init_db;
 use query::physical_plan::planner::QueryPlanner;
 use query::queries::event_records_search::EventRecordsSearch;
-use query::queries::event_records_search::LogicalPlanBuilder;
 use query::test_util::create_entities;
 use query::test_util::events_provider;
 use query::Context;
@@ -44,8 +43,8 @@ mod tests {
     use metadata::test_util::init_db;
     use query::error::Result;
     use query::physical_plan::planner::QueryPlanner;
+    use query::queries::event_records_search::build;
     use query::queries::event_records_search::EventRecordsSearch;
-    use query::queries::event_records_search::LogicalPlanBuilder;
     use query::queries::property_values::Filter;
     use query::queries::property_values::PropertyValues;
     use query::test_util::create_entities;
@@ -81,7 +80,7 @@ mod tests {
             properties: None,
         };
 
-        let plan = LogicalPlanBuilder::build(ctx, md, input, req).await?;
+        let plan = build(ctx, md, input, req)?;
         let result = run_plan(plan).await?;
         print_batches(&result)?;
         Ok(())
@@ -123,7 +122,7 @@ mod tests {
             properties: None,
         };
 
-        let plan = LogicalPlanBuilder::build(ctx, md, input, req).await?;
+        let plan = build(ctx, md, input, req)?;
         let result = run_plan(plan).await?;
         print_batches(&result)?;
         Ok(())
@@ -161,7 +160,7 @@ mod tests {
             properties: None,
         };
 
-        let plan = LogicalPlanBuilder::build(ctx, md, input, req).await?;
+        let plan = build(ctx, md, input, req)?;
         let result = run_plan(plan).await?;
         print_batches(&result)?;
         Ok(())
@@ -195,7 +194,7 @@ mod tests {
             properties: Some(vec![PropertyRef::Event("Revenue".to_string())]),
         };
 
-        let plan = LogicalPlanBuilder::build(ctx, md, input, req).await?;
+        let plan = build(ctx, md, input, req)?;
         let result = run_plan(plan).await?;
 
         print_batches(&result)?;
