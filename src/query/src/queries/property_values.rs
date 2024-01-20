@@ -4,11 +4,15 @@ use std::sync::Arc;
 use common::query::EventRef;
 use common::query::PropValueOperation;
 use common::query::PropertyRef;
+use common::types::COLUMN_PROJECT_ID;
 use datafusion_common::Column;
 use datafusion_common::DFSchema;
 use datafusion_common::ScalarValue;
+use datafusion_expr::and;
+use datafusion_expr::binary_expr;
 use datafusion_expr::col;
 use datafusion_expr::expr;
+use datafusion_expr::lit;
 use datafusion_expr::utils::exprlist_to_fields;
 use datafusion_expr::Aggregate;
 use datafusion_expr::Expr;
@@ -16,6 +20,7 @@ use datafusion_expr::Extension;
 use datafusion_expr::Filter as PlanFilter;
 use datafusion_expr::Limit;
 use datafusion_expr::LogicalPlan;
+use datafusion_expr::Operator;
 use datafusion_expr::Sort;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
@@ -64,15 +69,17 @@ impl LogicalPlanBuilder {
         input: LogicalPlan,
         req: PropertyValues,
     ) -> Result<LogicalPlan> {
-        // todo add project_id filtering
-        // todo make obligatory
-        let input = match &req.event {
-            Some(event) => LogicalPlan::Filter(PlanFilter::try_new(
-                event_expression(&ctx, &metadata, event)?,
-                Arc::new(input),
-            )?),
-            None => input,
-        };
+        let mut expr = binary_expr(
+            col(COLUMN_PROJECT_ID),
+            Operator::Eq,
+            lit(ScalarValue::from(ctx.project_id as i64)),
+        );
+
+        if let Some(event) = &req.event {
+            expr = and(expr, event_expression(&ctx, &metadata, event)?);
+        }
+
+        let input = LogicalPlan::Filter(PlanFilter::try_new(expr, Arc::new(input))?);
 
         let (input, col_name) = match &req.property {
             PropertyRef::System(prop_name) => {

@@ -11,8 +11,11 @@ use common::query::time_columns;
 use common::query::PropertyRef;
 use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
+use common::types::COLUMN_PROJECT_ID;
 use common::types::COLUMN_USER_ID;
 use datafusion_common::Column;
+use datafusion_common::ScalarValue;
+use datafusion_expr::binary_expr;
 use datafusion_expr::col;
 use datafusion_expr::expr;
 use datafusion_expr::expr::Alias;
@@ -25,6 +28,7 @@ use datafusion_expr::ExprSchemable;
 use datafusion_expr::Extension;
 use datafusion_expr::Filter;
 use datafusion_expr::LogicalPlan;
+use datafusion_expr::Operator;
 use datafusion_expr::ScalarFunctionDefinition;
 use datafusion_expr::Sort;
 use metadata::dictionaries::SingleDictionaryProvider;
@@ -425,7 +429,15 @@ impl LogicalPlanBuilder {
     fn build_filter_logical_plan(&self, input: LogicalPlan, event: &Event) -> Result<LogicalPlan> {
         let cur_time = self.ctx.cur_time;
         // todo add project_id filtering
-        let mut expr = time_expression(COLUMN_CREATED_AT, input.schema(), &self.es.time, cur_time)?;
+        let mut expr = binary_expr(
+            col(COLUMN_PROJECT_ID),
+            Operator::Eq,
+            lit(ScalarValue::from(self.ctx.project_id as i64)),
+        );
+        expr = and(
+            expr,
+            time_expression(COLUMN_CREATED_AT, input.schema(), &self.es.time, cur_time)?,
+        );
 
         // event expression
         expr = and(

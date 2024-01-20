@@ -6,15 +6,18 @@ use common::query::EventRef;
 use common::query::PropertyRef;
 use common::query::QueryTime;
 use common::types::COLUMN_CREATED_AT;
+use common::types::COLUMN_PROJECT_ID;
 use datafusion_common::Column;
-use datafusion_common::DFSchema;
+use datafusion_common::ScalarValue;
 use datafusion_expr::and;
+use datafusion_expr::binary_expr;
 use datafusion_expr::col;
-use datafusion_expr::utils::exprlist_to_fields;
+use datafusion_expr::lit;
 use datafusion_expr::Extension;
 use datafusion_expr::Filter as PlanFilter;
 use datafusion_expr::Limit;
 use datafusion_expr::LogicalPlan;
+use datafusion_expr::Operator;
 use datafusion_expr::Projection;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
@@ -36,7 +39,10 @@ pub fn build(
 ) -> Result<LogicalPlan> {
     let mut properties = vec![];
     let input = if let Some(props) = &req.properties {
-        let mut exprs = vec![];
+        let mut exprs = vec![col(Column {
+            relation: None,
+            name: COLUMN_PROJECT_ID.to_string(),
+        })];
         for prop in props {
             let p = match prop {
                 PropertyRef::System(n) => metadata
@@ -57,8 +63,6 @@ pub fn build(
             }));
         }
 
-        let _schema =
-            DFSchema::new_with_metadata(exprlist_to_fields(&exprs, &input)?, HashMap::new());
         LogicalPlan::Projection(Projection::try_new(exprs, Arc::new(input))?)
     } else {
         input
@@ -76,6 +80,12 @@ pub fn build(
         input,
         &mut cols_hash,
     )?;
+
+    let mut expr = binary_expr(
+        col(COLUMN_PROJECT_ID),
+        Operator::Eq,
+        lit(ScalarValue::from(ctx.project_id as i64)),
+    );
 
     let mut filter_exprs = vec![];
     if let Some(events) = &req.events {
@@ -109,14 +119,10 @@ pub fn build(
         }
     }
 
-    let input = if filter_exprs.is_empty() {
-        input
-    } else {
-        LogicalPlan::Filter(PlanFilter::try_new(
-            filter_exprs[0].clone(),
-            Arc::new(input),
-        )?)
-    };
+    if !filter_exprs.is_empty() {
+        expr = and(expr, filter_exprs[0].clone());
+    }
+    let input = LogicalPlan::Filter(PlanFilter::try_new(expr, Arc::new(input))?);
 
     let input = LogicalPlan::Limit(Limit {
         skip: 0,
