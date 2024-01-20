@@ -8,8 +8,6 @@ use common::query::event_segmentation::EventSegmentation;
 use common::query::event_segmentation::Query;
 use common::query::event_segmentation::SegmentCondition;
 use common::query::time_columns;
-use common::query::EventFilter;
-use common::query::PropValueOperation;
 use common::query::PropertyRef;
 use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
@@ -27,7 +25,6 @@ use datafusion_expr::ExprSchemable;
 use datafusion_expr::Extension;
 use datafusion_expr::Filter;
 use datafusion_expr::LogicalPlan;
-use datafusion_expr::Projection;
 use datafusion_expr::ScalarFunctionDefinition;
 use datafusion_expr::Sort;
 use metadata::dictionaries::SingleDictionaryProvider;
@@ -42,7 +39,6 @@ use crate::expr::property_col;
 use crate::expr::property_expression;
 use crate::expr::time_expression;
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
-use crate::logical_plan::expr::multi_and;
 use crate::logical_plan::merge::MergeNode;
 use crate::logical_plan::partitioned_aggregate;
 use crate::logical_plan::partitioned_aggregate::AggregateExpr;
@@ -104,20 +100,6 @@ macro_rules! breakdowns_to_dicts {
                 }
             };
         }
-    }};
-}
-
-macro_rules! dictionary_prop_to_col {
-    ($self:expr, $md_namespace:ident,   $decode_cols:expr) => {{
-        let col_name = prop.column_name();
-        let dict = SingleDictionaryProvider::new(
-            $self.ctx.project_id,
-            col_name.clone(),
-            $self.metadata.dictionaries.clone(),
-        );
-        let col = Column::from_name(col_name);
-
-        $decode_cols.push((col, Arc::new(dict)));
     }};
 }
 
@@ -240,7 +222,7 @@ impl LogicalPlanBuilder {
                 if let Some(filters) = &filters {
                     event_expr = and(
                         event_expr.clone(),
-                        event_filters_expression(&self.ctx, &self.metadata, &filters)?,
+                        event_filters_expression(&self.ctx, &self.metadata, filters)?,
                     )
                 }
                 match aggregate {

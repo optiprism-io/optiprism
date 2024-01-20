@@ -1,23 +1,17 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use common::query::event_segmentation::Breakdown;
-use common::query::event_segmentation::NamedQuery;
 use common::query::EventFilter;
 use common::query::EventRef;
-use common::query::PropValueOperation;
 use common::query::PropertyRef;
 use common::query::QueryTime;
 use common::types::COLUMN_CREATED_AT;
 use datafusion_common::Column;
 use datafusion_common::DFSchema;
-use datafusion_common::ScalarValue;
 use datafusion_expr::and;
 use datafusion_expr::col;
 use datafusion_expr::utils::exprlist_to_fields;
-use datafusion_expr::Aggregate;
 use datafusion_expr::Extension;
-use datafusion_expr::Filter;
 use datafusion_expr::Filter as PlanFilter;
 use datafusion_expr::Limit;
 use datafusion_expr::LogicalPlan;
@@ -28,7 +22,6 @@ use metadata::MetadataProvider;
 use crate::error::Result;
 use crate::expr::event_expression;
 use crate::expr::event_filters_expression;
-use crate::expr::property_expression;
 use crate::expr::time_expression;
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::logical_plan::expr::multi_or;
@@ -64,7 +57,7 @@ pub fn build(
             }));
         }
 
-        let schema =
+        let _schema =
             DFSchema::new_with_metadata(exprlist_to_fields(&exprs, &input)?, HashMap::new());
         LogicalPlan::Projection(Projection::try_new(exprs, Arc::new(input))?)
     } else {
@@ -75,7 +68,7 @@ pub fn build(
     // todo make obligatory
 
     let mut cols_hash: HashMap<String, ()> = HashMap::new();
-    let mut input = decode_filter_dictionaries(
+    let input = decode_filter_dictionaries(
         &ctx,
         &metadata,
         req.events.as_ref(),
@@ -185,8 +178,8 @@ fn decode_filter_dictionaries(
             if let Some(filters) = &event.filters {
                 for filter in filters {
                     decode_filter_single_dictionary(
-                        &ctx,
-                        &metadata,
+                        ctx,
+                        metadata,
                         cols_hash,
                         &mut decode_cols,
                         filter,
@@ -198,7 +191,7 @@ fn decode_filter_dictionaries(
 
     if let Some(filters) = filters {
         for filter in filters {
-            decode_filter_single_dictionary(&ctx, &metadata, cols_hash, &mut decode_cols, filter)?;
+            decode_filter_single_dictionary(ctx, metadata, cols_hash, &mut decode_cols, filter)?;
         }
     }
 

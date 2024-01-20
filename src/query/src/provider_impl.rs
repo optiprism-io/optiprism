@@ -4,7 +4,6 @@ use std::time::Instant;
 use arrow::array::ArrayRef;
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
-use arrow::util::pretty::print_batches;
 use chrono::Utc;
 use common::query::event_segmentation::Breakdown;
 use common::query::event_segmentation::EventSegmentation;
@@ -101,7 +100,7 @@ impl QueryProvider {
         ctx: Context,
         req: EventRecordsSearch,
     ) -> Result<DataTable> {
-        let cur_time = Utc::now();
+        let _cur_time = Utc::now();
 
         let input =
             datafusion_expr::LogicalPlanBuilder::scan("table", self.table_source.clone(), None)?

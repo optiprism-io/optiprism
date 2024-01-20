@@ -26,7 +26,6 @@ use arrow2::chunk::Chunk;
 use arrow2::datatypes::DataType;
 use arrow2::datatypes::Field;
 use arrow2::datatypes::Schema;
-use arrow2::io;
 use arrow2::io::parquet;
 use arrow2::io::parquet::write::transverse;
 use bincode::deserialize;

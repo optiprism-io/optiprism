@@ -4,14 +4,8 @@ mod tests {
     use chrono::DateTime;
     use chrono::Utc;
     use platform::queries::event_records_search::EventRecordsSearchRequest;
-    use platform::queries::property_values::Filter;
-    use platform::queries::property_values::ListPropertyValuesRequest;
     use platform::queries::QueryTime;
-    use platform::EventRef;
-    use platform::PropValueOperation;
-    use platform::PropertyRef;
     use reqwest::Client;
-    use serde_json::Value;
 
     use crate::assert_response_status_eq;
     use crate::http::tests::create_admin_acc_and_login;

@@ -1,18 +1,7 @@
-use std::sync::Arc;
-
 use arrow::util::pretty::print_batches;
 use common::query::EventRef;
-use common::query::PropValueOperation;
 use common::query::PropertyRef;
-use datafusion::execution::context::SessionState;
-use datafusion::execution::runtime_env::RuntimeEnv;
-use datafusion::physical_plan::collect;
-use datafusion::prelude::SessionConfig;
-use datafusion::prelude::SessionContext;
-use datafusion_common::ScalarValue;
 use metadata::test_util::init_db;
-use query::physical_plan::planner::QueryPlanner;
-use query::queries::property_values::Filter;
 use query::queries::property_values::LogicalPlanBuilder;
 use query::queries::property_values::PropertyValues;
 use query::test_util::create_entities;
@@ -23,23 +12,15 @@ use query::Context;
 #[cfg(test)]
 mod tests {
 
-    use std::sync::Arc;
-
     use arrow::util::pretty::print_batches;
     use common::query::EventRef;
     use common::query::PropValueOperation;
     use common::query::PropertyRef;
     use common::DECIMAL_PRECISION;
     use common::DECIMAL_SCALE;
-    use datafusion::execution::context::SessionState;
-    use datafusion::execution::runtime_env::RuntimeEnv;
-    use datafusion::physical_plan::collect;
-    use datafusion::prelude::SessionConfig;
-    use datafusion::prelude::SessionContext;
     use datafusion_common::ScalarValue;
     use metadata::test_util::init_db;
     use query::error::Result;
-    use query::physical_plan::planner::QueryPlanner;
     use query::queries::property_values::Filter;
     use query::queries::property_values::LogicalPlanBuilder;
     use query::queries::property_values::PropertyValues;

@@ -1,21 +1,13 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use common::query::event_segmentation::Breakdown;
 use common::query::EventFilter;
 use common::query::PropValueOperation;
 use common::query::PropertyRef;
 use datafusion_common::Column;
-use datafusion_expr::Expr;
-use datafusion_expr::Extension;
-use datafusion_expr::LogicalPlan;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
 
-use crate::expr::property_col;
-use crate::expr::property_expression;
-use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
-use crate::logical_plan::expr::multi_and;
 use crate::Context;
 
 pub mod event_records_search;

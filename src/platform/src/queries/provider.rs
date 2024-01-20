@@ -5,7 +5,6 @@ use chrono::DateTime;
 use chrono::Utc;
 use common::rbac::ProjectPermission;
 use query::context::Format;
-use query::queries::event_records_search::EventRecordsSearch;
 use query::QueryProvider;
 use serde_json::Value;
 

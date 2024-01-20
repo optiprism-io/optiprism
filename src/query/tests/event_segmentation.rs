@@ -24,17 +24,11 @@ mod tests {
     use common::query::QueryTime;
     use common::query::TimeIntervalUnit;
     use common::types::COLUMN_USER_ID;
-    use datafusion::execution::context::SessionState;
-    use datafusion::execution::runtime_env::RuntimeEnv;
-    use datafusion::physical_plan::collect;
-    use datafusion::prelude::SessionConfig;
-    use datafusion::prelude::SessionContext;
     use datafusion_common::ScalarValue;
     use metadata::custom_events;
     use metadata::custom_events::CreateCustomEventRequest;
     use metadata::test_util::init_db;
     use query::error::Result;
-    use query::physical_plan::planner::QueryPlanner;
     use query::queries::event_segmentation::logical_plan_builder::LogicalPlanBuilder;
     use query::test_util::create_entities;
     use query::test_util::events_provider;
@@ -301,6 +295,7 @@ mod tests {
     #[traced_test]
     #[tokio::test]
     async fn test_custom_events() -> Result<()> {
+        let _org_id = 1;
         let proj_id = 1;
         let (md, db) = init_db()?;
         create_entities(md.clone(), &db, proj_id).await?;

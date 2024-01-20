@@ -6,7 +6,6 @@ use axum::extract::Query;
 use axum::routing;
 use axum::Router;
 use common::http::Json;
-use query::queries::event_records_search::EventRecordsSearch;
 use serde_json::Value;
 
 use crate::queries::event_records_search::EventRecordsSearchRequest;

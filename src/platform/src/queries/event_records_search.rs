@@ -1,19 +1,11 @@
-use arrow::array::ArrayRef;
-use datafusion::physical_plan::common::transpose;
 use serde::Deserialize;
 use serde::Serialize;
-use serde_json::Value;
 
-use crate::array_ref_to_json_values;
-use crate::json_value_to_scalar;
 use crate::queries::QueryTime;
 use crate::EventFilter;
 use crate::EventRef;
-use crate::ListResponse;
 use crate::PlatformError;
-use crate::PropValueOperation;
 use crate::PropertyRef;
-use crate::ResponseMetadata;
 use crate::Result;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

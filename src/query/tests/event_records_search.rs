@@ -1,52 +1,22 @@
-use std::sync::Arc;
-
-use arrow::util::pretty::print_batches;
-use chrono::DateTime;
-use chrono::Duration;
-use chrono::Utc;
-use common::query::QueryTime;
-use datafusion::execution::context::SessionState;
-use datafusion::execution::runtime_env::RuntimeEnv;
-use datafusion::physical_plan::collect;
-use datafusion::prelude::SessionConfig;
-use datafusion::prelude::SessionContext;
-use metadata::test_util::init_db;
-use query::physical_plan::planner::QueryPlanner;
-use query::queries::event_records_search::EventRecordsSearch;
-use query::test_util::create_entities;
-use query::test_util::events_provider;
-use query::Context;
-
 #[cfg(test)]
 mod tests {
     use std::ops::Sub;
-    use std::sync::Arc;
 
     use arrow::util::pretty::print_batches;
     use chrono::DateTime;
     use chrono::Duration;
     use chrono::Utc;
     use common::query::EventFilter;
-    use common::query::EventRef;
     use common::query::PropValueOperation;
     use common::query::PropertyRef;
     use common::query::QueryTime;
-    use common::query::TimeIntervalUnit;
     use common::DECIMAL_PRECISION;
     use common::DECIMAL_SCALE;
-    use datafusion::execution::context::SessionState;
-    use datafusion::execution::runtime_env::RuntimeEnv;
-    use datafusion::physical_plan::collect;
-    use datafusion::prelude::SessionConfig;
-    use datafusion::prelude::SessionContext;
     use datafusion_common::ScalarValue;
     use metadata::test_util::init_db;
     use query::error::Result;
-    use query::physical_plan::planner::QueryPlanner;
     use query::queries::event_records_search::build;
     use query::queries::event_records_search::EventRecordsSearch;
-    use query::queries::property_values::Filter;
-    use query::queries::property_values::PropertyValues;
     use query::test_util::create_entities;
     use query::test_util::events_provider;
     use query::test_util::run_plan;
