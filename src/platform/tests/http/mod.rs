@@ -4,6 +4,7 @@ mod dashboards;
 mod event_records_search;
 mod event_segmentation;
 mod events;
+mod projects;
 mod properties;
 mod property_values;
 mod reports;

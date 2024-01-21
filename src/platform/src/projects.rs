@@ -43,9 +43,13 @@ impl Projects {
         Ok(self.prov.get_by_id(id)?.into())
     }
 
-    pub async fn list(&self, ctx: Context, organization_id: u64) -> Result<ListResponse<Project>> {
+    pub async fn list(
+        &self,
+        ctx: Context,
+        organization_id: Option<u64>,
+    ) -> Result<ListResponse<Project>> {
         ctx.check_organization_permission(OrganizationPermission::ExploreProjects)?;
-        let resp = self.prov.list(Some(organization_id))?;
+        let resp = self.prov.list(organization_id)?;
 
         Ok(ListResponse {
             data: resp.data.into_iter().map(|v| v.into()).collect(),
@@ -92,8 +96,8 @@ pub struct Project {
     pub tags: Option<Vec<String>>,
     pub name: String,
     pub description: Option<String>,
-    // todo make Duration
     pub session_duration: u64,
+    pub events_count: usize,
 }
 
 impl From<metadata::projects::Project> for crate::projects::Project {
@@ -108,6 +112,7 @@ impl From<metadata::projects::Project> for crate::projects::Project {
             name: value.name,
             description: value.description,
             session_duration: value.session_duration_seconds,
+            events_count: value.events_count,
         }
     }
 }

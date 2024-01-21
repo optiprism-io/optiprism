@@ -178,6 +178,9 @@ impl Executor<Track> {
             dest.send(&ctx, req.clone())?;
         }
 
+        self.md
+            .projects
+            .increment_events_counter(ctx.project_id.unwrap())?;
         Ok(())
     }
 }

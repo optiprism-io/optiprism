@@ -211,7 +211,7 @@ pub async fn start(args: &Shop, _proj_id: u64) -> Result<()> {
     let router = Router::new();
     info!("initializing platform...");
     let router = init_platform(md.clone(), db.clone(), router)?;
-    info!("initializing session cleaner");
+    info!("initializing session cleaner...");
     init_session_cleaner(md.clone(), db.clone())?;
     info!("initializing ingester...");
     let router = init_ingester(&args.geo_city_path, &args.ua_db_path, &md, &db, router)?;

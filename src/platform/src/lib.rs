@@ -62,6 +62,7 @@ use crate::auth::Auth;
 use crate::custom_events::CustomEvents;
 use crate::dashboards::Dashboards;
 use crate::events::Events;
+use crate::projects::Projects;
 use crate::properties::Properties;
 use crate::queries::Queries;
 use crate::reports::Reports;
@@ -77,8 +78,8 @@ pub struct PlatformProvider {
     pub query: Arc<Queries>,
     pub dashboards: Arc<Dashboards>,
     pub reports: Arc<Reports>,
-    // pub event_records: Arc<dyn event_records::Provider>,
-    // pub group_records: Arc<dyn group_records::Provider>,
+    pub projects: Arc<Projects>, /* pub event_records: Arc<dyn event_records::Provider>,
+                                  * pub group_records: Arc<dyn group_records::Provider>, */
 }
 
 impl PlatformProvider {
@@ -104,6 +105,7 @@ impl PlatformProvider {
             reports: Arc::new(reports::Reports::new(md.reports.clone())),
             // event_records: Arc::new(stub::EventRecords {}),
             // group_records: Arc::new(stub::GroupRecords {}),
+            projects: Arc::new(Projects::new(md.projects.clone())),
         }
     }
 }

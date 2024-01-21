@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use axum::extract::Extension;
 use axum::extract::Path;
+use axum::extract::State;
 use axum::http::StatusCode;
 use axum::routing;
 use axum::Router;
@@ -13,12 +14,12 @@ use crate::projects::Projects;
 use crate::projects::UpdateProjectRequest;
 use crate::Context;
 use crate::ListResponse;
+use crate::PlatformProvider;
 use crate::Result;
 
 async fn create(
     ctx: Context,
     Extension(provider): Extension<Arc<Projects>>,
-    Path(_project_id): Path<(u64, u64)>,
     Json(request): Json<CreateProjectRequest>,
 ) -> Result<(StatusCode, Json<Project>)> {
     Ok((
@@ -38,9 +39,8 @@ async fn get_by_id(
 async fn list(
     ctx: Context,
     Extension(provider): Extension<Arc<Projects>>,
-    Path(project_id): Path<u64>,
 ) -> Result<Json<ListResponse<Project>>> {
-    Ok(Json(provider.list(ctx, project_id).await?))
+    Ok(Json(provider.list(ctx, None).await?))
 }
 
 async fn update(
@@ -63,11 +63,9 @@ async fn delete(
 pub fn attach_routes(router: Router) -> Router {
     router.nest(
         "/projects",
-        Router::new()
-            .route("/", routing::post(create).get(list))
-            .route(
-                "/:project_id",
-                routing::get(get_by_id).delete(delete).put(update),
-            ),
+        Router::new().route("/", routing::get(list)).route(
+            "/:project_id",
+            routing::get(get_by_id).delete(delete).put(update),
+        ),
     )
 }

@@ -85,6 +85,7 @@ impl Projects {
             tags: req.tags,
             token,
             session_duration_seconds: req.session_duration_seconds,
+            events_count: 0,
         };
         let data = serialize(&project)?;
         tx.put(make_data_value_key(NAMESPACE, project.id), &data)?;
@@ -148,6 +149,17 @@ impl Projects {
         Ok(project)
     }
 
+    pub fn increment_events_counter(&self, project_id: u64) -> Result<()> {
+        let tx = self.db.transaction();
+
+        let mut project = self.get_by_id_(&tx, project_id)?;
+        project.events_count += 1;
+        let data = serialize(&project)?;
+        tx.put(make_data_value_key(NAMESPACE, project_id), &data)?;
+        tx.commit()?;
+
+        Ok(())
+    }
     pub fn delete(&self, project_id: u64) -> Result<Project> {
         let tx = self.db.transaction();
 
@@ -174,6 +186,7 @@ pub struct Project {
     pub tags: Option<Vec<String>>,
     pub token: String,
     pub session_duration_seconds: u64,
+    pub events_count: usize,
 }
 
 #[serde_as]
