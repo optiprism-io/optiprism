@@ -45,7 +45,8 @@ async fn test_custom_events() {
             description: None,
             status: metadata::events::Status::Enabled,
             is_system: false,
-            properties: None,
+            event_properties: None,
+            user_properties: None,
             custom_properties: None,
         })
         .unwrap();
@@ -60,7 +61,8 @@ async fn test_custom_events() {
             description: None,
             status: metadata::events::Status::Enabled,
             is_system: false,
-            properties: None,
+            event_properties: None,
+            user_properties: None,
             custom_properties: None,
         })
         .unwrap();

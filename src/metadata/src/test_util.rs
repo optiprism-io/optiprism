@@ -44,7 +44,8 @@ pub fn create_event(
             description: None,
             status: events::Status::Enabled,
             is_system: false,
-            properties: None,
+            event_properties: None,
+            user_properties: None,
             custom_properties: None,
         })?)
 }

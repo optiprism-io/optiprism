@@ -66,7 +66,8 @@ fn create_event() -> Result<()> {
         description: None,
         status: events::Status::Enabled,
         is_system: false,
-        properties: None,
+        event_properties: None,
+        user_properties: None,
         custom_properties: None,
     })?;
 
@@ -123,7 +124,8 @@ fn create_event_duplicate_name() -> Result<()> {
         description: None,
         status: events::Status::Enabled,
         is_system: false,
-        properties: None,
+        event_properties: None,
+        user_properties: None,
         custom_properties: None,
     })?;
 
@@ -159,7 +161,8 @@ fn create_event_recursion_level_exceeded() -> Result<()> {
         description: None,
         status: events::Status::Enabled,
         is_system: false,
-        properties: None,
+        event_properties: None,
+        user_properties: None,
         custom_properties: None,
     })?;
 
@@ -220,8 +223,9 @@ fn test_duplicate() -> Result<()> {
         description: None,
         status: events::Status::Enabled,
         is_system: false,
-        properties: None,
+        event_properties: None,
         custom_properties: None,
+        user_properties: None,
     })?;
 
     let req = CreateCustomEventRequest {
@@ -297,7 +301,8 @@ fn update_event() -> Result<()> {
         description: None,
         status: events::Status::Enabled,
         is_system: false,
-        properties: None,
+        event_properties: None,
+        user_properties: None,
         custom_properties: None,
     })?;
 

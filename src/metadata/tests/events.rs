@@ -22,7 +22,8 @@ fn test_events() -> Result<()> {
         display_name: None,
         description: None,
         status: Status::Enabled,
-        properties: None,
+        event_properties: None,
+        user_properties: None,
         custom_properties: None,
         is_system: false,
     };
@@ -35,8 +36,9 @@ fn test_events() -> Result<()> {
         description: OptionalProperty::None,
         status: OptionalProperty::None,
         is_system: OptionalProperty::None,
-        properties: OptionalProperty::None,
+        event_properties: Default::default(),
         custom_properties: OptionalProperty::None,
+        user_properties: Default::default(),
     };
 
     // try to get, delete, update unexisting event
@@ -58,13 +60,24 @@ fn test_events() -> Result<()> {
     let res = events.create(1, create_event2.clone())?;
     assert_eq!(res.id, 2);
 
-    events.attach_property(1, 1, 1)?;
-    assert!(events.attach_property(1, 1, 1).is_err());
-    events.attach_property(1, 1, 2)?;
-    assert!(events.detach_property(1, 1, 3).is_err());
-    events.detach_property(1, 1, 1)?;
-    events.attach_property(1, 1, 1)?;
+    events.attach_event_property(1, 1, 1)?;
+    assert!(events.attach_event_property(1, 1, 1).is_err());
+    events.attach_event_property(1, 1, 2)?;
+    assert!(events.detach_event_property(1, 1, 3).is_err());
+    events.detach_event_property(1, 1, 1)?;
+    events.attach_event_property(1, 1, 1)?;
 
+    let mut create_event3 = create_event_req.clone();
+    create_event3.name = "event3".to_string();
+    let res = events.create(1, create_event3.clone())?;
+    assert_eq!(res.id, 3);
+    events.try_attach_properties(1, 3, None, None)?;
+    events.try_attach_properties(1, 3, Some(vec![1]), None)?;
+    events.try_attach_properties(1, 3, None, Some(vec![1]))?;
+    events.try_attach_properties(1, 3, Some(vec![1, 2]), Some(vec![1, 2]))?;
+    let e = events.get_by_id(1, 3)?;
+    assert_eq!(e.event_properties, Some(vec![1, 2]));
+    assert_eq!(e.user_properties, Some(vec![1, 2]));
     // check existence by id
     assert_eq!(events.get_by_id(1, 1)?.id, 1);
     assert_eq!(events.get_by_id(1, 2)?.id, 2);
