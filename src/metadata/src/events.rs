@@ -54,6 +54,59 @@ fn index_display_name_key(project_id: u64, display_name: Option<String>) -> Opti
     })
 }
 
+macro_rules! attach_property {
+    ($self:expr,$project_id:expr,$event_id:expr,$prop_id:expr,$prop:ident) => {{
+        let tx = $self.db.transaction();
+
+        let mut event = $self.get_by_id_(&tx, $project_id, $event_id)?;
+        event.$prop = match event.$prop {
+            None => Some(vec![$prop_id]),
+            Some(props) => match props.iter().find(|x| $prop_id == **x) {
+                None => Some([props, vec![$prop_id]].concat()),
+                Some(_) => {
+                    return Err(MetadataError::AlreadyExists(
+                        "property already exist".to_string(),
+                    ));
+                }
+            },
+        };
+
+        tx.put(
+            make_data_value_key(project_ns($project_id, NAMESPACE).as_slice(), event.id),
+            serialize(&event)?,
+        )?;
+        tx.commit()?;
+        Ok(event)
+    }};
+}
+
+macro_rules! detach_property {
+    ($self:expr,$project_id:expr,$event_id:expr,$prop_id:expr,$prop:ident) => {{
+        let tx = $self.db.transaction();
+        let mut event = $self.get_by_id_(&tx, $project_id, $event_id)?;
+        event.$prop = match event.$prop {
+            None => {
+                return Err(MetadataError::NotFound("property not found".to_string()));
+            }
+            Some(props) => match props.iter().find(|x| $prop_id == **x) {
+                None => {
+                    return Err(MetadataError::AlreadyExists(
+                        "property already exist".to_string(),
+                    ));
+                }
+                Some(_) => Some(props.into_iter().filter(|x| $prop_id != *x).collect()),
+            },
+        };
+
+        tx.put(
+            make_data_value_key(project_ns($project_id, NAMESPACE).as_slice(), event.id),
+            serialize(&event)?,
+        )?;
+        tx.commit()?;
+        Ok(event)
+    }};
+}
+
 pub struct Events {
     db: Arc<TransactionDB>,
 }
@@ -108,8 +161,9 @@ impl Events {
             description: req.description,
             status: req.status,
             is_system: req.is_system,
-            properties: req.properties,
+            event_properties: req.event_properties,
             custom_properties: req.custom_properties,
+            user_properties: req.user_properties,
         };
         let data = serialize(&event)?;
         tx.put(
@@ -206,8 +260,11 @@ impl Events {
         if let OptionalProperty::Some(is_system) = req.is_system {
             event.is_system = is_system;
         }
-        if let OptionalProperty::Some(properties) = req.properties {
-            event.properties = properties;
+        if let OptionalProperty::Some(properties) = req.event_properties {
+            event.event_properties = properties;
+        }
+        if let OptionalProperty::Some(properties) = req.user_properties {
+            event.user_properties = properties;
         }
         if let OptionalProperty::Some(custom_properties) = req.custom_properties {
             event.custom_properties = custom_properties;
@@ -224,53 +281,100 @@ impl Events {
         Ok(event)
     }
 
-    pub fn attach_property(&self, project_id: u64, event_id: u64, prop_id: u64) -> Result<Event> {
+    pub fn try_attach_properties(
+        &self,
+        project_id: u64,
+        event_id: u64,
+        event_props: Option<Vec<u64>>,
+        user_props: Option<Vec<u64>>,
+    ) -> Result<()> {
+        if event_props.is_none() && user_props.is_none() {
+            return Ok(());
+        }
+
         let tx = self.db.transaction();
 
         let mut event = self.get_by_id_(&tx, project_id, event_id)?;
-        event.properties = match event.properties {
-            None => Some(vec![prop_id]),
-            Some(props) => match props.iter().find(|x| prop_id == **x) {
-                None => Some([props, vec![prop_id]].concat()),
-                Some(_) => {
-                    return Err(MetadataError::AlreadyExists(
-                        "property already exist".to_string(),
-                    ));
+        match event_props {
+            None => {}
+            Some(props) => {
+                for prop in props {
+                    match &event.event_properties {
+                        None => {}
+                        Some(ex) => {
+                            if ex.iter().any(|x| prop == *x) {
+                                continue;
+                            }
+                        }
+                    }
+                    event.event_properties = match event.event_properties {
+                        None => Some(vec![prop]),
+                        Some(props) => Some([props, vec![prop]].concat()),
+                    };
                 }
-            },
-        };
-
+            }
+        }
+        match user_props {
+            None => {}
+            Some(props) => {
+                for prop in props {
+                    match &event.user_properties {
+                        None => {}
+                        Some(ex) => {
+                            if ex.iter().any(|x| prop == *x) {
+                                continue;
+                            }
+                        }
+                    }
+                    event.user_properties = match event.user_properties {
+                        None => Some(vec![prop]),
+                        Some(props) => Some([props, vec![prop]].concat()),
+                    };
+                }
+            }
+        }
         tx.put(
             make_data_value_key(project_ns(project_id, NAMESPACE).as_slice(), event.id),
             serialize(&event)?,
         )?;
         tx.commit()?;
-        Ok(event)
+        Ok(())
     }
 
-    pub fn detach_property(&self, project_id: u64, event_id: u64, prop_id: u64) -> Result<Event> {
-        let tx = self.db.transaction();
-        let mut event = self.get_by_id_(&tx, project_id, event_id)?;
-        event.properties = match event.properties {
-            None => {
-                return Err(MetadataError::NotFound("property not found".to_string()));
-            }
-            Some(props) => match props.iter().find(|x| prop_id == **x) {
-                None => {
-                    return Err(MetadataError::AlreadyExists(
-                        "property already exist".to_string(),
-                    ));
-                }
-                Some(_) => Some(props.into_iter().filter(|x| prop_id != *x).collect()),
-            },
-        };
+    pub fn attach_event_property(
+        &self,
+        project_id: u64,
+        event_id: u64,
+        prop_id: u64,
+    ) -> Result<Event> {
+        attach_property!(self, project_id, event_id, prop_id, event_properties)
+    }
 
-        tx.put(
-            make_data_value_key(project_ns(project_id, NAMESPACE).as_slice(), event.id),
-            serialize(&event)?,
-        )?;
-        tx.commit()?;
-        Ok(event)
+    pub fn attach_user_property(
+        &self,
+        project_id: u64,
+        event_id: u64,
+        prop_id: u64,
+    ) -> Result<Event> {
+        attach_property!(self, project_id, event_id, prop_id, user_properties)
+    }
+
+    pub fn detach_event_property(
+        &self,
+        project_id: u64,
+        event_id: u64,
+        prop_id: u64,
+    ) -> Result<Event> {
+        detach_property!(self, project_id, event_id, prop_id, event_properties)
+    }
+
+    pub fn detach_user_property(
+        &self,
+        project_id: u64,
+        event_id: u64,
+        prop_id: u64,
+    ) -> Result<Event> {
+        detach_property!(self, project_id, event_id, prop_id, user_properties)
     }
 
     pub fn delete(&self, project_id: u64, id: u64) -> Result<Event> {
@@ -323,7 +427,8 @@ pub struct Event {
     pub description: Option<String>,
     pub status: Status,
     pub is_system: bool,
-    pub properties: Option<Vec<u64>>,
+    pub event_properties: Option<Vec<u64>>,
+    pub user_properties: Option<Vec<u64>>,
     pub custom_properties: Option<Vec<u64>>,
 }
 
@@ -336,7 +441,8 @@ pub struct CreateEventRequest {
     pub description: Option<String>,
     pub status: Status,
     pub is_system: bool,
-    pub properties: Option<Vec<u64>>,
+    pub event_properties: Option<Vec<u64>>,
+    pub user_properties: Option<Vec<u64>>,
     pub custom_properties: Option<Vec<u64>>,
 }
 
@@ -349,6 +455,7 @@ pub struct UpdateEventRequest {
     pub description: OptionalProperty<Option<String>>,
     pub status: OptionalProperty<Status>,
     pub is_system: OptionalProperty<bool>,
-    pub properties: OptionalProperty<Option<Vec<u64>>>,
+    pub event_properties: OptionalProperty<Option<Vec<u64>>>,
+    pub user_properties: OptionalProperty<Option<Vec<u64>>>,
     pub custom_properties: OptionalProperty<Option<Vec<u64>>>,
 }

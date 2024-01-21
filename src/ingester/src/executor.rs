@@ -156,8 +156,12 @@ impl Executor<Track> {
             display_name: None,
             status: events::Status::Enabled,
             is_system: false,
-            properties: req
+            event_properties: req
                 .resolved_properties
+                .clone()
+                .map(|props| props.iter().map(|p| p.property.id).collect::<Vec<u64>>()),
+            user_properties: req
+                .resolved_user_properties
                 .clone()
                 .map(|props| props.iter().map(|p| p.property.id).collect::<Vec<u64>>()),
             custom_properties: None,
@@ -167,9 +171,18 @@ impl Executor<Track> {
             .md
             .events
             .get_or_create(ctx.project_id.unwrap(), event_req)?;
-
+        let event_id = md_event.id;
         req.resolved_event = Some(md_event);
-
+        self.md.events.try_attach_properties(
+            ctx.project_id.unwrap(),
+            event_id,
+            req.resolved_properties
+                .as_ref()
+                .map(|props| props.iter().map(|p| p.property.id).collect()),
+            req.resolved_user_properties
+                .as_ref()
+                .map(|props| props.iter().map(|p| p.property.id).collect()),
+        )?;
         for transformer in &mut self.transformers {
             req = transformer.process(&ctx, req)?;
         }

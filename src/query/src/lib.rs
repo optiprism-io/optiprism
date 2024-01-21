@@ -494,9 +494,10 @@ pub mod test_util {
             display_name: None,
             description: None,
             status: events::Status::Enabled,
-            properties: None,
             custom_properties: None,
             is_system: false,
+            event_properties: None,
+            user_properties: None,
         })?;
 
         md.events.create(proj_id, events::CreateEventRequest {
@@ -506,9 +507,10 @@ pub mod test_util {
             display_name: None,
             description: None,
             status: events::Status::Enabled,
-            properties: None,
             custom_properties: None,
             is_system: false,
+            event_properties: None,
+            user_properties: None,
         })?;
 
         // create event props

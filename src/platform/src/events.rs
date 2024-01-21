@@ -40,7 +40,8 @@ impl Events {
                 description: request.description,
                 status: request.status.into(),
                 is_system: request.is_system,
-                properties: None,
+                event_properties: None,
+                user_properties: None,
                 custom_properties: None,
             })?;
 
@@ -103,7 +104,7 @@ impl Events {
         ctx.check_project_permission(ProjectPermission::ManageSchema)?;
 
         self.prov
-            .attach_property(project_id, event_id, prop_id)?
+            .attach_event_property(project_id, event_id, prop_id)?
             .try_into()
     }
 
@@ -118,7 +119,7 @@ impl Events {
         ctx.check_project_permission(ProjectPermission::ManageSchema)?;
 
         self.prov
-            .detach_property(project_id, event_id, prop_id)?
+            .detach_event_property(project_id, event_id, prop_id)?
             .try_into()
     }
 
@@ -190,8 +191,9 @@ impl TryInto<metadata::events::Event> for Event {
             description: self.description,
             status: self.status.into(),
             is_system: self.is_system,
-            properties: self.event_properties,
+            event_properties: None,
             custom_properties: self.user_properties,
+            user_properties: None,
         })
     }
 }
@@ -213,7 +215,7 @@ impl TryInto<Event> for metadata::events::Event {
             description: self.description,
             status: self.status.into(),
             is_system: self.is_system,
-            event_properties: self.properties,
+            event_properties: self.event_properties,
             user_properties: self.custom_properties,
         })
     }
