@@ -155,7 +155,7 @@ impl Projects {
         let mut project = self.get_by_id_(&tx, project_id)?;
         project.events_count += 1;
         let data = serialize(&project)?;
-        tx.put(make_data_value_key(NAMESPACE, project_id), &data)?;
+        tx.put(make_data_value_key(NAMESPACE, project_id), data)?;
         tx.commit()?;
 
         Ok(())

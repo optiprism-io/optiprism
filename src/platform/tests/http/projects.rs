@@ -1,10 +1,6 @@
 #[cfg(test)]
 mod tests {
     use axum::http::StatusCode;
-    use chrono::DateTime;
-    use chrono::Utc;
-    use platform::queries::event_records_search::EventRecordsSearchRequest;
-    use platform::queries::QueryTime;
     use reqwest::Client;
 
     use crate::assert_response_status_eq;
