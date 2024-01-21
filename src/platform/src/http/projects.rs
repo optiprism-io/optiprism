@@ -18,7 +18,6 @@ use crate::Result;
 async fn create(
     ctx: Context,
     Extension(provider): Extension<Arc<Projects>>,
-    Path(_project_id): Path<(u64, u64)>,
     Json(request): Json<CreateProjectRequest>,
 ) -> Result<(StatusCode, Json<Project>)> {
     Ok((
@@ -38,9 +37,8 @@ async fn get_by_id(
 async fn list(
     ctx: Context,
     Extension(provider): Extension<Arc<Projects>>,
-    Path(project_id): Path<u64>,
 ) -> Result<Json<ListResponse<Project>>> {
-    Ok(Json(provider.list(ctx, project_id).await?))
+    Ok(Json(provider.list(ctx, None).await?))
 }
 
 async fn update(

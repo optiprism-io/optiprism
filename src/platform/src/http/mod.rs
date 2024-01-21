@@ -69,7 +69,7 @@ pub fn attach_routes(
     // fixme get rid of cloning
     router = router.clone().nest("/api/v1", router);
     router = router
-        .layer(Extension(md.projects.clone()))
+        .layer(Extension(platform.projects.clone()))
         .layer(Extension(md.accounts.clone()))
         .layer(Extension(platform.accounts.clone()))
         .layer(Extension(platform.auth.clone()))
