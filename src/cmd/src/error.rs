@@ -60,4 +60,6 @@ pub enum Error {
     Maxmind(#[from] MaxMindDBError),
     #[error("hyper: {0:?}")]
     Hyper(#[from] hyper::Error),
+    #[error("config: {0:?}")]
+    Config(#[from] config::ConfigError),
 }
