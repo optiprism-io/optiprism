@@ -1,3 +1,6 @@
+use std::net::SocketAddr;
+use std::path::PathBuf;
+
 use clap::Parser;
 use clap::Subcommand;
 use cmd::store::Shop;
@@ -8,13 +11,19 @@ extern crate parse_duration;
 
 use cmd::error::Error;
 use cmd::error::Result;
-use cmd::server::Server;
+use cmd::server;
 use cmd::test;
+
+#[derive(Parser, Clone)]
+pub struct Cfg {
+    #[arg(long)]
+    config: PathBuf,
+}
 
 #[derive(Subcommand, Clone)]
 enum Commands {
     /// Run server
-    Server(Server),
+    Server(Cfg),
     /// Run demo shop
     Shop(Shop),
     /// Run test suite
@@ -42,8 +51,13 @@ async fn main() -> Result<()> {
 
     match &args.command {
         Some(cmd) => match cmd {
-            Commands::Server(server) => {
-                cmd::server::start(server).await?;
+            Commands::Server(cfg) => {
+                let config = config::Config::builder()
+                    .add_source(config::File::from(cfg.config.clone()))
+                    .build()?;
+
+                let cfg: server::Config = config.try_deserialize()?;
+                cmd::server::start(cfg).await?;
             }
             Commands::Shop(shop) => {
                 cmd::store::start(shop).await?;

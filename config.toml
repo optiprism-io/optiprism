@@ -1,0 +1,4 @@
+host = "0.0.0.0:8080"
+path = "/tmp/db"
+ua_db_path = "data/ingester/regexes.yaml"
+geo_city_path = "data/ingester/GeoLite2-City.mmdb"

@@ -1,3 +1,5 @@
+mod config;
+
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::fs;
@@ -58,35 +60,20 @@ use crate::init_platform;
 use crate::init_project;
 use crate::init_session_cleaner;
 use crate::init_system;
+pub use crate::server::config::Config;
 
-#[derive(Parser, Clone)]
-pub struct Server {
-    #[arg(long)]
-    path: PathBuf,
-    #[arg(long, default_value = "0.0.0.0:8080")]
-    host: SocketAddr,
-    #[arg(long)]
-    ui_path: Option<PathBuf>,
-    #[arg(long)]
-    partitions: Option<usize>,
-    #[arg(long)]
-    ua_db_path: PathBuf,
-    #[arg(long)]
-    pub geo_city_path: PathBuf,
-}
+pub async fn start(cfg: Config) -> Result<()> {
+    debug!("db path: {:?}", cfg.path);
 
-pub async fn start(args: &Server) -> Result<()> {
-    debug!("db path: {:?}", args.path);
-
-    let rocks = Arc::new(metadata::rocksdb::new(args.path.join("md"))?);
-    let db = Arc::new(OptiDBImpl::open(args.path.join("store"), Options {})?);
+    let rocks = Arc::new(metadata::rocksdb::new(cfg.path.join("md"))?);
+    let db = Arc::new(OptiDBImpl::open(cfg.path.join("store"), Options {})?);
     let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
     info!("metrics initialization...");
     init_metrics();
     info!("system initialization...");
-    init_system(&md, &db, args.partitions.unwrap_or_else(num_cpus::get))?;
+    init_system(&md, &db, num_cpus::get())?;
 
-    if let Some(ui_path) = &args.ui_path {
+    if let Some(ui_path) = &cfg.ui_path {
         if !ui_path.try_exists()? {
             return Err(Error::FileNotFound(format!(
                 "ui path {ui_path:?} doesn't exist"
@@ -120,15 +107,15 @@ pub async fn start(args: &Server) -> Result<()> {
     info!("initializing session cleaner...");
     init_session_cleaner(md.clone(), db.clone())?;
     info!("initializing ingester...");
-    let router = init_ingester(&args.geo_city_path, &args.ua_db_path, &md, &db, router)?;
+    let router = init_ingester(&cfg.geo_city_path, &cfg.ua_db_path, &md, &db, router)?;
     info!("initializing platform...");
     let router = init_platform(md.clone(), db.clone(), router)?;
 
-    let server = axum::Server::bind(&args.host)
+    let server = axum::Server::bind(&cfg.host)
         .serve(router.into_make_service_with_connect_info::<SocketAddr>());
     info!(
         "Web Interface: https://{} (email: admin@admin.com, password: admin, DON'T FORGET TO CHANGE)",
-        args.host
+        cfg.host
     );
     let graceful = server.with_graceful_shutdown(async {
         let mut sig_int =
