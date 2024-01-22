@@ -8,7 +8,7 @@ use datafusion::execution::context::SessionState;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion_expr::Expr;
 use datafusion_expr::TableType;
-use store::db::OptiDBImpl;
+use storage::db::OptiDBImpl;
 
 use crate::error::Result;
 use crate::physical_plan::local::LocalExec;

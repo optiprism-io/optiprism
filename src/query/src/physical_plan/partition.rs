@@ -197,7 +197,7 @@ mod tests {
     use datafusion::physical_plan::memory::MemoryExec;
     use datafusion::physical_plan::ExecutionPlan;
     use datafusion::prelude::SessionContext;
-    use store::test_util::parse_markdown_tables;
+    use storage::test_util::parse_markdown_tables;
 
     use crate::physical_plan::partition::PartitionExec;
 

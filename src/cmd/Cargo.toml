@@ -36,7 +36,7 @@ maxminddb = "0.23.0"
 uaparser = "0.6.1"
 platform = { path = "../platform" }
 query = { path = "../query" }
-store = { path = "../store" }
+storage = { path = "../storage" }
 rand = "0.8.5"
 rust_decimal = { version = "1.27.0", features = ["serde-float"] }
 serde = { version = "1.0.149", features = ["derive"] }

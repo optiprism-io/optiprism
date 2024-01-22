@@ -33,7 +33,7 @@ tower-cookies = { version = "0.9.0", features = ["axum-core"] }
 tower-http = { version = "0.4.0", features = ["fs", "trace","cors"] }
 log = "0.4.20"
 common = { path = "../common" }
-store = { path = "../store" }
+storage = { path = "../storage" }
 futures = "0.3.25"
 clap = { version = "4.0.29", features = ["derive"] }
 service = { path = "../service" }

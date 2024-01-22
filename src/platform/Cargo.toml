@@ -9,7 +9,7 @@ path = "src/lib.rs"
 crate-type = ["lib"]
 
 [dependencies]
-store = { path = "../store" }
+storage = { path = "../storage" }
 anyhow = "1.0.66"
 argon2 = "0.5.0"
 arrow = { version = "49.0.0" }

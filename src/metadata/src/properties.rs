@@ -17,7 +17,7 @@ use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
-use store::db::OptiDBImpl;
+use storage::db::OptiDBImpl;
 
 use crate::error::MetadataError;
 use crate::index::check_insert_constraints;

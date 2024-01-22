@@ -316,7 +316,7 @@ mod tests {
     use datafusion_common::ScalarValue;
     use datafusion_expr::Operator;
     use rust_decimal::Decimal;
-    use store::test_util::parse_markdown_tables;
+    use storage::test_util::parse_markdown_tables;
 
     use crate::physical_plan::expressions::segmentation::aggregate::Aggregate;
     use crate::physical_plan::expressions::segmentation::aggregate::AggregateFunction;

@@ -13,7 +13,7 @@ members = [
     "src/platform",
     "src/query",
     "src/service",
-    "src/store",
+    "src/storage",
     "src/ingester",
     "src/test_util",
     "src/cmd",
