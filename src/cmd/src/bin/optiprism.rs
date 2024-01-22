@@ -8,10 +8,13 @@ extern crate parse_duration;
 
 use cmd::error::Error;
 use cmd::error::Result;
+use cmd::server::Server;
 use cmd::test;
 
 #[derive(Subcommand, Clone)]
 enum Commands {
+    /// Run server
+    Server(Server),
     /// Run demo shop
     Shop(Shop),
     /// Run test suite
@@ -39,11 +42,14 @@ async fn main() -> Result<()> {
 
     match &args.command {
         Some(cmd) => match cmd {
+            Commands::Server(server) => {
+                cmd::server::start(server).await?;
+            }
             Commands::Shop(shop) => {
-                cmd::store::start(shop, 1).await?;
+                cmd::store::start(shop).await?;
             }
             Commands::Test(args) => {
-                test::gen(args, 1).await?;
+                test::gen(args).await?;
             }
         },
         _ => unreachable!(),

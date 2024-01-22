@@ -82,6 +82,16 @@ pub struct ListResponse<T> {
     pub meta: ResponseMetadata,
 }
 
+impl<T> ListResponse<T> {
+    pub fn len(&self) -> usize {
+        self.data.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+}
+
 impl<T> IntoIterator for ListResponse<T> {
     type Item = T;
     type IntoIter = std::vec::IntoIter<Self::Item>;
