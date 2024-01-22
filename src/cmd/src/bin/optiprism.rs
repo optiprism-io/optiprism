@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use clap::Subcommand;
-use cmd::store::Shop;
+use cmd::store::Store;
 use cmd::test::Test;
 use service::tracing::TracingCliArgs;
 
@@ -24,8 +24,8 @@ pub struct Cfg {
 enum Commands {
     /// Run server
     Server(Cfg),
-    /// Run demo shop
-    Shop(Shop),
+    /// Run demo store
+    Store(Store),
     /// Run test suite
     Test(Test),
 }
@@ -59,8 +59,8 @@ async fn main() -> Result<()> {
                 let cfg: server::Config = config.try_deserialize()?;
                 cmd::server::start(cfg).await?;
             }
-            Commands::Shop(shop) => {
-                cmd::store::start(shop).await?;
+            Commands::Store(store) => {
+                cmd::store::start(store).await?;
             }
             Commands::Test(args) => {
                 test::gen(args).await?;
