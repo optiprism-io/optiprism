@@ -162,7 +162,7 @@ async fn test_events() {
         assert_response_status_eq!(resp, StatusCode::OK);
         let resp: ListResponse<Event> =
             serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
-        assert_eq!(resp.data.len(), 1);
+        assert_eq!(resp.len(), 1);
         assert(&resp.data[0], &event1);
     }
 

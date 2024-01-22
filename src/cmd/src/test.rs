@@ -206,7 +206,7 @@ pub fn gen_mem(
     Ok(res)
 }
 
-pub async fn gen(args: &Test, _proj_id: u64) -> Result<(), anyhow::Error> {
+pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
     fs::remove_dir_all(&args.path).unwrap();
     let rocks = Arc::new(metadata::rocksdb::new(args.path.join("md"))?);
     let db = Arc::new(OptiDBImpl::open(args.path.join("store"), Options {})?);

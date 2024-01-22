@@ -96,7 +96,7 @@ pub struct Config<R> {
     pub partitions: usize,
 }
 
-pub async fn start(args: &Shop, _proj_id: u64) -> Result<()> {
+pub async fn start(args: &Shop) -> Result<()> {
     debug!("db path: {:?}", args.path);
 
     if args.generate {

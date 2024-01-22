@@ -84,6 +84,7 @@ use uaparser::UserAgentParser;
 use crate::error::Error;
 
 pub mod error;
+pub mod server;
 pub mod store;
 pub mod test;
 
@@ -421,7 +422,7 @@ fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<u
     let admin = match md.accounts.create(CreateAccountRequest {
         created_by: None,
         password_hash: make_password_hash("admin")?,
-        email: "admin@email.com".to_string(),
+        email: "admin@admin.com".to_string(),
         name: Some("admin".to_string()),
         role: Some(Role::Admin),
         organizations: None,
@@ -429,11 +430,11 @@ fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<u
         teams: None,
     }) {
         Ok(acc) => acc,
-        Err(_err) => md.accounts.get_by_email("admin@email.com")?,
+        Err(_err) => md.accounts.get_by_email("admin@admin.com")?,
     };
     let org = match md.organizations.create(CreateOrganizationRequest {
         created_by: admin.id,
-        name: "Test Organization".to_string(),
+        name: "My Organization".to_string(),
     }) {
         Ok(org) => org,
         Err(_err) => md.organizations.get_by_id(1)?,
@@ -442,7 +443,7 @@ fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<u
     let proj = match md.projects.create(CreateProjectRequest {
         created_by: admin.id,
         organization_id: org.id,
-        name: "Test Project".to_string(),
+        name: "My Project".to_string(),
         description: None,
         tags: None,
         session_duration_seconds: SESSION_DURATION as u64,
