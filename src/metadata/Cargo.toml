@@ -13,7 +13,7 @@ byteorder = "1.4.3"
 chrono = { version = "0.4.23", features = ["serde"] }
 chronoutil = "0.2.3"
 common = { path = "../common" }
-store = { path = "../store" }
+storage = { path = "../storage" }
 convert_case = "0.6.0"
 lru = "0.12.1"
 datafusion = "34.0.0"

@@ -38,8 +38,8 @@ mod tests {
     use query::test_util::create_entities;
     use query::QueryProvider;
     use serde_json::json;
-    use store::db::OptiDBImpl;
-    use store::db::Options;
+    use storage::db::OptiDBImpl;
+    use storage::db::Options;
     use tokio::time::sleep;
     use uuid::Uuid;
 
@@ -102,7 +102,7 @@ mod tests {
         let rocks = Arc::new(metadata::rocksdb::new(path.join("md"))?);
         let db = Arc::new(OptiDBImpl::open(path.join("store"), Options {})?);
         let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
-        db.create_table("events".to_string(), store::table::Options::test())?;
+        db.create_table("events".to_string(), storage::table::Options::test())?;
 
         if create_test_data {
             create_entities(md.clone(), &db, 1).await?;

@@ -18,7 +18,7 @@ pub enum MetadataError {
     #[error("forbidden: {0:?}")]
     Internal(String),
     #[error("store {0:?}")]
-    Store(#[from] store::error::StoreError),
+    Store(#[from] storage::error::StoreError),
     #[error("rocksdb: {0:?}")]
     RocksDb(#[from] rocksdb::Error),
     #[error("from utf {0:?}")]

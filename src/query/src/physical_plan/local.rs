@@ -22,8 +22,8 @@ use datafusion_common::Result as DFResult;
 use datafusion_common::Statistics;
 use futures::Stream;
 use futures::StreamExt;
-use store::arrow_conversion::arrow2_to_arrow1;
-use store::db::OptiDBImpl;
+use storage::arrow_conversion::arrow2_to_arrow1;
+use storage::db::OptiDBImpl;
 
 use crate::error::Result;
 
@@ -53,7 +53,7 @@ impl LocalExec {
 }
 
 type SendableChunkStream =
-    Pin<Box<dyn Stream<Item = store::error::Result<Chunk<Box<dyn Array>>>> + Send>>;
+    Pin<Box<dyn Stream<Item = storage::error::Result<Chunk<Box<dyn Array>>>> + Send>>;
 struct PartitionStream {
     local_stream: SendableChunkStream,
     schema: SchemaRef,
@@ -75,7 +75,7 @@ impl Stream for PartitionStream {
                     .into_arrays()
                     .into_iter()
                     .map(arrow2_to_arrow1::convert)
-                    .collect::<store::error::Result<Vec<_>>>()
+                    .collect::<storage::error::Result<Vec<_>>>()
                     .map_err(|e| DataFusionError::Execution(e.to_string()))?;
                 let _vv = RecordBatch::try_new(self.schema.clone(), arrs.clone());
                 Poll::Ready(Some(Ok(RecordBatch::try_new(self.schema.clone(), arrs)?)))
@@ -172,12 +172,12 @@ mod tests {
     use datafusion::physical_plan::displayable;
     use datafusion::prelude::SessionConfig;
     use datafusion::prelude::SessionContext;
-    use store::arrow_conversion::schema2_to_schema1;
-    use store::db::OptiDBImpl;
-    use store::db::Options;
-    use store::table::Options as TableOptions;
-    use store::NamedValue;
-    use store::Value;
+    use storage::arrow_conversion::schema2_to_schema1;
+    use storage::db::OptiDBImpl;
+    use storage::db::Options;
+    use storage::table::Options as TableOptions;
+    use storage::NamedValue;
+    use storage::Value;
     use tracing::debug;
 
     use crate::datasources::local::LocalTable;

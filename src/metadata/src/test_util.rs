@@ -2,9 +2,9 @@ use std::env::temp_dir;
 use std::sync::Arc;
 
 use common::types::DType;
-use store::db::OptiDBImpl;
-use store::db::Options;
-use store::table::Options as TableOptions;
+use storage::db::OptiDBImpl;
+use storage::db::Options;
+use storage::table::Options as TableOptions;
 use uuid::Uuid;
 
 use crate::events;

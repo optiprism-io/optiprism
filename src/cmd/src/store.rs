@@ -38,10 +38,10 @@ use events_gen::store::scenario::Scenario;
 use events_gen::store::schema::create_properties;
 use metadata::MetadataProvider;
 use rand::thread_rng;
-use store::db::OptiDBImpl;
-use store::db::Options;
-use store::NamedValue;
-use store::Value;
+use storage::db::OptiDBImpl;
+use storage::db::Options;
+use storage::NamedValue;
+use storage::Value;
 use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tracing::debug;
@@ -57,7 +57,7 @@ use crate::init_session_cleaner;
 use crate::init_system;
 
 #[derive(Parser, Clone)]
-pub struct Shop {
+pub struct Store {
     #[arg(long)]
     path: PathBuf,
     #[arg(long, default_value = "0.0.0.0:8080")]
@@ -96,7 +96,7 @@ pub struct Config<R> {
     pub partitions: usize,
 }
 
-pub async fn start(args: &Shop) -> Result<()> {
+pub async fn start(args: &Store) -> Result<()> {
     debug!("db path: {:?}", args.path);
 
     if args.generate {

@@ -812,7 +812,7 @@ mod tests {
     use datafusion::physical_expr::PhysicalExprRef;
     use datafusion_common::ScalarValue;
     use datafusion_expr::Operator;
-    use store::test_util::parse_markdown_tables;
+    use storage::test_util::parse_markdown_tables;
     use tracing_test::traced_test;
 
     use crate::event_eq;

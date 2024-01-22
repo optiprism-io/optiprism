@@ -11,7 +11,7 @@ use maxminddb::MaxMindDBError;
 use metadata::error::MetadataError;
 use platform::PlatformError;
 use query::error::QueryError;
-use store::error::StoreError;
+use storage::error::StoreError;
 use thiserror::Error;
 
 pub type Result<T> = result::Result<T, Error>;

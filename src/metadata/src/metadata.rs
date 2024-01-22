@@ -3,7 +3,7 @@ use std::sync::Arc;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
-use store::db::OptiDBImpl;
+use storage::db::OptiDBImpl;
 
 use crate::accounts;
 use crate::accounts::Accounts;

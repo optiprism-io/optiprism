@@ -295,7 +295,7 @@ mod tests {
     use arrow::row::SortField;
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_expr::PhysicalExprRef;
-    use store::test_util::parse_markdown_tables;
+    use storage::test_util::parse_markdown_tables;
 
     use crate::physical_plan::expressions::aggregate::count::Count;
     use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;

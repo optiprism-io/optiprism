@@ -4,7 +4,7 @@ use arrow::error::ArrowError;
 use common::error::CommonError;
 use datafusion::error::DataFusionError;
 use metadata::error::MetadataError;
-use store::error::StoreError;
+use storage::error::StoreError;
 use thiserror::Error;
 
 pub type Result<T> = result::Result<T, QueryError>;

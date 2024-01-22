@@ -25,7 +25,7 @@ use datafusion::prelude::SessionConfig;
 use datafusion::prelude::SessionContext;
 use datafusion_expr::LogicalPlan;
 use metadata::MetadataProvider;
-use store::db::OptiDBImpl;
+use storage::db::OptiDBImpl;
 use tracing::debug;
 
 use crate::physical_plan::planner::QueryPlanner;

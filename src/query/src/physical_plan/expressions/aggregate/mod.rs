@@ -529,7 +529,7 @@ mod tests {
     use arrow::util::pretty::print_batches;
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_expr::PhysicalExprRef;
-    use store::test_util::parse_markdown_tables;
+    use storage::test_util::parse_markdown_tables;
 
     use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
     use crate::physical_plan::expressions::segmentation::aggregate::AggregateFunction;

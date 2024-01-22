@@ -8,7 +8,7 @@ use metadata::test_util::create_event;
 use metadata::test_util::create_property;
 use metadata::test_util::CreatePropertyMainRequest;
 use metadata::MetadataProvider;
-use store::db::OptiDBImpl;
+use storage::db::OptiDBImpl;
 
 use crate::error::Result;
 use crate::store::events::Event;

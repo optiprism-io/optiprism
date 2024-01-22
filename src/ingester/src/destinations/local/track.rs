@@ -12,9 +12,9 @@ use metadata::dictionaries::Dictionaries;
 use metadata::properties::DictionaryType;
 use metadata::MetadataProvider;
 use rust_decimal::prelude::ToPrimitive;
-use store::db::OptiDBImpl;
-use store::NamedValue;
-use store::Value;
+use storage::db::OptiDBImpl;
+use storage::NamedValue;
+use storage::Value;
 
 use crate::error::IngesterError;
 use crate::error::Result;

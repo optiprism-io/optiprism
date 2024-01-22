@@ -11,7 +11,7 @@ use metadata::properties::DictionaryType;
 use metadata::properties::Properties;
 use metadata::properties::Status;
 use metadata::MetadataProvider;
-use store::db::OptiDBImpl;
+use storage::db::OptiDBImpl;
 
 use crate::error::IngesterError;
 use crate::error::Result;
