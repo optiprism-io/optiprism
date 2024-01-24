@@ -31,6 +31,7 @@ use metadata::MetadataProvider;
 use storage::db::OptiDBImpl;
 use tracing::debug;
 
+use crate::col_name;
 use crate::physical_plan::planner::QueryPlanner;
 use crate::queries::event_records_search;
 use crate::queries::event_records_search::EventRecordsSearch;
@@ -164,6 +165,7 @@ impl QueryProvider {
             req.clone(),
         )?;
 
+        println!("{plan:?}");
         let result = self.execute(session_ctx, state, plan).await?;
         let duration = start.elapsed();
         debug!("elapsed: {:?}", duration);
@@ -199,63 +201,6 @@ impl QueryProvider {
         Ok(DataTable::new(result.schema(), cols))
     }
 }
-// async fn execute_plan(ctx:Context,md:Arc<MetadataProvider>,path: Vec<PathBuf>) -> Result<RecordBatch> {
-// let start = Instant::now();
-// let runtime = Arc::new(RuntimeEnv::default());
-// #[allow(deprecated)]
-// let state = SessionState::with_config_rt(
-// SessionConfig::new()
-// .with_collect_statistics(true)
-// .with_target_partitions(1),
-// runtime,
-// )
-// .with_query_planner(Arc::new(QueryPlanner {}));
-// let exec_ctx = SessionContext::new_with_state(state.clone());
-// let opts = ParquetReadOptions::default();
-// let plan = exec_ctx
-// .read_parquet(path, opts)
-// .await?
-// .into_optimized_plan()?;
-// debug!("logical plan: {:?}", plan);
-// let plan = property_values::LogicalPlanBuilder::build(
-// ctx,
-// md.clone(),
-// plan,
-// req.clone(),
-// )
-// .await?;
-//
-// let physical_plan = state.create_physical_plan(&plan).await?;
-// let displayable_plan = DisplayableExecutionPlan::with_full_metrics(physical_plan.as_ref());
-// debug!("physical plan: {}", displayable_plan.indent(true));
-// let batches = collect(physical_plan, exec_ctx.task_ctx()).await?;
-// let duration = start.elapsed();
-// debug!("elapsed: {:?}", duration);
-// let schema: Arc<Schema> = Arc::new(plan.schema().as_ref().into());
-// let rows_count = batches.iter().fold(0, |acc, x| acc + x.num_rows());
-// let res = concat_batches(&schema, &batches, rows_count)?;
-// Ok(res)
-// }
-fn col_name(ctx: &Context, prop: &PropertyRef, md: &Arc<MetadataProvider>) -> Result<String> {
-    let name = match prop {
-        PropertyRef::System(v) => md
-            .system_properties
-            .get_by_name(ctx.project_id, v)?
-            .column_name(),
-        PropertyRef::User(v) => md
-            .user_properties
-            .get_by_name(ctx.project_id, v)?
-            .column_name(),
-        PropertyRef::Event(v) => md
-            .event_properties
-            .get_by_name(ctx.project_id, v)?
-            .column_name(),
-        _ => unimplemented!(),
-    };
-
-    Ok(name)
-}
-
 fn prop_val_fields(
     ctx: &Context,
     req: &PropertyValues,
@@ -268,78 +213,6 @@ fn prop_val_fields(
         COLUMN_EVENT.to_string(),
         col_name(ctx, &req.property, &md)?,
     ];
-
-    Ok(fields)
-}
-fn es_fields(
-    ctx: &Context,
-    req: &EventSegmentation,
-    md: Arc<MetadataProvider>,
-) -> Result<Vec<String>> {
-    let mut fields = vec![
-        COLUMN_PROJECT_ID.to_string(),
-        COLUMN_USER_ID.to_string(),
-        COLUMN_CREATED_AT.to_string(),
-        COLUMN_EVENT.to_string(),
-    ];
-
-    for event in &req.events {
-        if let Some(filters) = &event.filters {
-            for filter in filters {
-                match filter {
-                    EventFilter::Property { property, .. } => {
-                        fields.push(col_name(ctx, property, &md)?)
-                    }
-                }
-            }
-        }
-
-        for query in &event.queries {
-            match &query.agg {
-                Query::CountEvents => {}
-                Query::CountUniqueGroups => {}
-                Query::DailyActiveGroups => {}
-                Query::WeeklyActiveGroups => {}
-                Query::MonthlyActiveGroups => {}
-                Query::CountPerGroup { .. } => {}
-                Query::AggregatePropertyPerGroup { property, .. } => {
-                    fields.push(col_name(ctx, property, &md)?)
-                }
-                Query::AggregateProperty { property, .. } => {
-                    fields.push(col_name(ctx, property, &md)?)
-                }
-                Query::QueryFormula { .. } => {}
-            }
-        }
-
-        if let Some(breakdowns) = &event.breakdowns {
-            for breakdown in breakdowns {
-                match breakdown {
-                    Breakdown::Property(property) => fields.push(col_name(ctx, property, &md)?),
-                }
-            }
-        }
-    }
-
-    if let Some(filters) = &req.filters {
-        for filter in filters {
-            match filter {
-                EventFilter::Property { property, .. } => {
-                    fields.push(col_name(ctx, property, &md)?)
-                }
-            }
-        }
-    }
-
-    if let Some(breakdowns) = &req.breakdowns {
-        for breakdown in breakdowns {
-            match breakdown {
-                Breakdown::Property(property) => fields.push(col_name(ctx, property, &md)?),
-            }
-        }
-    }
-
-    fields.dedup();
 
     Ok(fields)
 }

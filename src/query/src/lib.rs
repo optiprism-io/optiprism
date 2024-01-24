@@ -5,6 +5,7 @@
 extern crate core;
 
 pub use std::cmp::Ordering;
+use std::sync::Arc;
 
 use arrow::array::Array;
 use arrow::array::ArrayRef;
@@ -49,8 +50,10 @@ use arrow::datatypes::IntervalUnit;
 use arrow::datatypes::SchemaRef;
 use arrow::datatypes::TimeUnit;
 use arrow2::array::Int128Array;
+use common::query::PropertyRef;
 pub use context::Context;
 pub use error::Result;
+use metadata::MetadataProvider;
 pub use provider_impl::QueryProvider;
 
 pub mod context;
@@ -563,4 +566,24 @@ pub mod test_util {
 
         Ok(collect(physical_plan, exec_ctx.task_ctx()).await?)
     }
+}
+
+pub fn col_name(ctx: &Context, prop: &PropertyRef, md: &Arc<MetadataProvider>) -> Result<String> {
+    let name = match prop {
+        PropertyRef::System(v) => md
+            .system_properties
+            .get_by_name(ctx.project_id, v)?
+            .column_name(),
+        PropertyRef::User(v) => md
+            .user_properties
+            .get_by_name(ctx.project_id, v)?
+            .column_name(),
+        PropertyRef::Event(v) => md
+            .event_properties
+            .get_by_name(ctx.project_id, v)?
+            .column_name(),
+        _ => unimplemented!(),
+    };
+
+    Ok(name)
 }

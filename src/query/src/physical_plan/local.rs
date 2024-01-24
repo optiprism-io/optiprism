@@ -109,7 +109,7 @@ impl ExecutionPlan for LocalExec {
             self.db
                 .table_options(self.tbl_name.as_str())
                 .unwrap()
-                .partitions,
+                .parallelism,
         )
     }
 
@@ -138,17 +138,18 @@ impl ExecutionPlan for LocalExec {
         partition: usize,
         _cx: Arc<TaskContext>,
     ) -> datafusion_common::Result<SendableRecordBatchStream> {
-        let stream = self
-            .db
-            .scan_partition(self.tbl_name.as_str(), partition, self.fields.clone())
-            .map_err(|e| {
-                DataFusionError::Execution(format!("Error executing local plan: {:?}", e))
-            })?;
-
-        Ok(Box::pin(PartitionStream {
-            local_stream: Box::pin(stream),
-            schema: self.schema.clone(),
-        }))
+        unimplemented!();
+        // let stream = self
+        // .db
+        // .scan_partition(self.tbl_name.as_str(), partition, self.fields.clone())
+        // .map_err(|e| {
+        // DataFusionError::Execution(format!("Error executing local plan: {:?}", e))
+        // })?;
+        //
+        // Ok(Box::pin(PartitionStream {
+        // local_stream: Box::pin(stream),
+        // schema: self.schema.clone(),
+        // }))
     }
 
     fn statistics(&self) -> DFResult<Statistics> {
@@ -190,7 +191,7 @@ mod tests {
         // fs::create_dir_all(&path).unwrap();
 
         let opts = TableOptions {
-            partitions: 2,
+            parallelism: 2,
             index_cols: 2,
             l1_max_size_bytes: 1024 * 1024 * 10,
             level_size_multiplier: 10,

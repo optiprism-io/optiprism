@@ -122,11 +122,11 @@ pub struct Stats {
 }
 
 #[derive(Debug)]
-pub(crate) struct Vfs {
+pub(crate) struct Fs {
     lock: Mutex<()>,
 }
 
-impl Vfs {
+impl Fs {
     pub fn new() -> Self {
         Self {
             lock: Default::default(),

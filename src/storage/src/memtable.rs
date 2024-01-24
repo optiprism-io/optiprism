@@ -113,22 +113,10 @@ impl Column {
     }
 }
 
-#[derive(Debug, Clone)]
-pub(crate) struct Partition {
-    cols: Vec<Column>,
-}
-
-impl Partition {
+impl Memtable {
     pub(crate) fn new() -> Self {
-        Partition { cols: vec![] }
+        Self { cols: vec![] }
     }
-    pub(crate) fn len(&self) -> usize {
-        if self.cols.is_empty() {
-            return 0;
-        }
-        self.cols[0].len()
-    }
-
     pub(crate) fn chunk(
         &self,
         cols: Option<Vec<usize>>,
@@ -178,42 +166,32 @@ impl Partition {
         self.cols[col].values.push(val);
     }
 
-    fn add_column(&mut self, dt: DType) {
+    pub(crate) fn len(&self) -> usize {
+        if self.cols_len() == 0 {
+            return 0;
+        }
+        self.cols[0].len()
+    }
+
+    pub(crate) fn cols_len(&self) -> usize {
+        self.cols.len()
+    }
+
+    pub(crate) fn add_column(&mut self, dt: DType) {
         self.cols.push(Column::new_null(self.len(), dt));
+    }
+
+    pub(crate) fn create_empty(&self) -> Self {
+        Self {
+            cols: self
+                .cols
+                .iter()
+                .map(|c| Column::new_null(0, c.dt.clone()))
+                .collect::<Vec<_>>(),
+        }
     }
 }
 #[derive(Debug, Clone)]
 pub(crate) struct Memtable {
-    pub(crate) partitions: Vec<Partition>,
-}
-
-impl Memtable {
-    pub(crate) fn new(partitions: usize) -> Self {
-        Self {
-            partitions: vec![Partition::new(); partitions],
-        }
-    }
-    pub(crate) fn cols_len(&self) -> usize {
-        self.partitions[0].cols.len()
-    }
-
-    pub(crate) fn add_column(&mut self, dt: DType) {
-        for partition in &mut self.partitions {
-            partition.add_column(dt.clone());
-        }
-    }
-    pub(crate) fn create_empty(&self) -> Self {
-        let partitions = self
-            .partitions
-            .iter()
-            .map(|p| Partition {
-                cols: p
-                    .cols
-                    .iter()
-                    .map(|c| Column::new_null(0, c.dt.clone()))
-                    .collect::<Vec<_>>(),
-            })
-            .collect::<Vec<_>>();
-        Memtable { partitions }
-    }
+    pub(crate) cols: Vec<Column>,
 }

@@ -128,7 +128,7 @@ pub fn init_system(
     let topts = TableOptions {
         levels: 7,
         merge_array_size: 10000,
-        partitions,
+        parallelism: partitions,
         index_cols: 2,
         l1_max_size_bytes: 1024 * 1024 * 10,
         level_size_multiplier: 10,

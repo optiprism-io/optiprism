@@ -8,6 +8,7 @@ use common::query::event_segmentation::EventSegmentation;
 use common::query::event_segmentation::Query;
 use common::query::event_segmentation::SegmentCondition;
 use common::query::time_columns;
+use common::query::EventFilter;
 use common::query::PropertyRef;
 use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
@@ -29,11 +30,15 @@ use datafusion_expr::Extension;
 use datafusion_expr::Filter;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::Operator;
+use datafusion_expr::Partitioning;
+use datafusion_expr::Projection;
+use datafusion_expr::Repartition;
 use datafusion_expr::ScalarFunctionDefinition;
 use datafusion_expr::Sort;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
 
+use crate::col_name;
 use crate::context::Format;
 use crate::error::Result;
 use crate::expr::breakdown_expr;
@@ -107,6 +112,79 @@ macro_rules! breakdowns_to_dicts {
     }};
 }
 
+fn projection_cols(
+    ctx: &Context,
+    req: &EventSegmentation,
+    md: Arc<MetadataProvider>,
+) -> Result<Vec<String>> {
+    let mut fields = vec![
+        COLUMN_PROJECT_ID.to_string(),
+        COLUMN_USER_ID.to_string(),
+        COLUMN_CREATED_AT.to_string(),
+        COLUMN_EVENT.to_string(),
+    ];
+
+    for event in &req.events {
+        if let Some(filters) = &event.filters {
+            for filter in filters {
+                match filter {
+                    EventFilter::Property { property, .. } => {
+                        fields.push(col_name(ctx, property, &md)?)
+                    }
+                }
+            }
+        }
+
+        for query in &event.queries {
+            match &query.agg {
+                Query::CountEvents => {}
+                Query::CountUniqueGroups => {}
+                Query::DailyActiveGroups => {}
+                Query::WeeklyActiveGroups => {}
+                Query::MonthlyActiveGroups => {}
+                Query::CountPerGroup { .. } => {}
+                Query::AggregatePropertyPerGroup { property, .. } => {
+                    fields.push(col_name(ctx, property, &md)?)
+                }
+                Query::AggregateProperty { property, .. } => {
+                    fields.push(col_name(ctx, property, &md)?)
+                }
+                Query::QueryFormula { .. } => {}
+            }
+        }
+
+        if let Some(breakdowns) = &event.breakdowns {
+            for breakdown in breakdowns {
+                match breakdown {
+                    Breakdown::Property(property) => fields.push(col_name(ctx, property, &md)?),
+                }
+            }
+        }
+    }
+
+    if let Some(filters) = &req.filters {
+        for filter in filters {
+            match filter {
+                EventFilter::Property { property, .. } => {
+                    fields.push(col_name(ctx, property, &md)?)
+                }
+            }
+        }
+    }
+
+    if let Some(breakdowns) = &req.breakdowns {
+        for breakdown in breakdowns {
+            match breakdown {
+                Breakdown::Property(property) => fields.push(col_name(ctx, property, &md)?),
+            }
+        }
+    }
+
+    fields.dedup();
+
+    Ok(fields)
+}
+
 impl LogicalPlanBuilder {
     /// creates logical plan for event segmentation
     pub fn build(
@@ -159,6 +237,13 @@ impl LogicalPlanBuilder {
             None
         };
 
+        let proj_cols = projection_cols(&ctx, &es, builder.metadata.clone())?
+            .iter()
+            .map(|s| Expr::Column(Column::from_qualified_name(s.as_str())))
+            .collect::<Vec<_>>();
+
+        let input = LogicalPlan::Projection(Projection::try_new(proj_cols, Arc::new(input))?);
+        return Ok(input);
         let mut cols_hash: HashMap<String, ()> = HashMap::new();
 
         let mut input = builder.decode_filter_dictionaries(input, &mut cols_hash)?;
@@ -344,6 +429,19 @@ impl LogicalPlanBuilder {
         segment_inputs: Option<Vec<LogicalPlan>>,
     ) -> Result<LogicalPlan> {
         let input = self.build_filter_logical_plan(input.clone(), &self.es.events[event_id])?;
+        let input = LogicalPlan::Repartition(Repartition {
+            input: Arc::new(input),
+            partitioning_scheme: Partitioning::Hash(
+                vec![col(COLUMN_PROJECT_ID), col(COLUMN_USER_ID)],
+                12,
+            ), // with_target
+        });
+
+        // let input = LogicalPlan::Sort(Sort {
+        // expr: vec![col(COLUMN_PROJECT_ID), col(COLUMN_USER_ID)],
+        // input: Arc::new(input),
+        // fetch: None,
+        // });
         let (mut input, group_expr) = self.build_aggregate_logical_plan(
             input,
             &self.es.events[event_id],
