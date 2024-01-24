@@ -53,6 +53,7 @@ use common::types::USER_PROPERTY_OS_VERSION_MINOR;
 use common::types::USER_PROPERTY_OS_VERSION_PATCH;
 use common::types::USER_PROPERTY_OS_VERSION_PATCH_MINOR;
 use datafusion::datasource::TableProvider;
+use datafusion::logical_expr::LogicalPlan;
 use ingester::error::IngesterError;
 use ingester::executor::Executor;
 use ingester::transformers::geo;
@@ -253,7 +254,7 @@ pub fn init_project(project_id: u64, md: &Arc<MetadataProvider>) -> error::Resul
         name: EVENT_PROPERTY_SESSION_LENGTH.to_string(),
         typ: Type::Event,
         data_type: DType::Timestamp,
-        nullable: false,
+        nullable: true,
         dict: None,
     })?;
 

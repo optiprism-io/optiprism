@@ -218,7 +218,7 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
     info!("metrics initialization...");
     init_metrics();
     info!("system initialization...");
-    init_system(&md, &db, args.partitions.unwrap_or_else(num_cpus::get))?;
+    init_system(&md, &db, 1)?;
 
     info!("creating org structure and admin account...");
     let proj_id = crate::init_test_org_structure(&md)?;
@@ -272,7 +272,7 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
         .unwrap()
         .duration_trunc(Duration::days(1))?;
 
-    let users = 10;
+    let users = 100;
     let days = 365;
     let events = 20;
     let total = (users * days * events) as u64;

@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -21,9 +22,11 @@ use datafusion::execution::runtime_env::RuntimeEnv;
 use datafusion::physical_plan::coalesce_batches::concat_batches;
 use datafusion::physical_plan::collect;
 use datafusion::physical_plan::display::DisplayableExecutionPlan;
+use datafusion::prelude::ParquetReadOptions;
 use datafusion::prelude::SessionConfig;
 use datafusion::prelude::SessionContext;
 use datafusion_expr::LogicalPlan;
+use datafusion_expr::LogicalPlanBuilder;
 use metadata::MetadataProvider;
 use storage::db::OptiDBImpl;
 use tracing::debug;
@@ -32,6 +35,7 @@ use crate::physical_plan::planner::QueryPlanner;
 use crate::queries::event_records_search;
 use crate::queries::event_records_search::EventRecordsSearch;
 use crate::queries::event_segmentation;
+use crate::queries::event_segmentation::logical_plan_builder::COL_AGG_NAME;
 use crate::queries::property_values;
 use crate::queries::property_values::PropertyValues;
 use crate::Column;
@@ -62,37 +66,58 @@ impl QueryProvider {
 }
 
 impl QueryProvider {
-    pub async fn property_values(&self, ctx: Context, req: PropertyValues) -> Result<ArrayRef> {
-        let fields = prop_val_fields(&ctx, &req, self.metadata.clone())?;
-        let schema = self.db.schema1("events")?;
-        let projection = fields
-            .iter()
-            .enumerate()
-            .map(|(_idx, field)| {
-                let idx = schema.index_of(field)?;
-                Ok(idx)
-            })
-            .collect::<Result<Vec<_>>>()?;
-        let input = datafusion_expr::LogicalPlanBuilder::scan(
-            "table",
-            self.table_source.clone(),
-            Some(projection),
-        )?
-        .build()?;
+    pub async fn logical_plan(&self) -> Result<(SessionContext, SessionState, LogicalPlan)> {
+        let runtime = Arc::new(RuntimeEnv::default());
+        let state = SessionState::new_with_config_rt(
+            SessionConfig::new()
+                .with_collect_statistics(true)
+                .with_target_partitions(12),
+            runtime,
+        )
+        .with_query_planner(Arc::new(QueryPlanner {}));
+        let exec_ctx = SessionContext::new_with_state(state.clone());
+        let opts = ParquetReadOptions::default();
+        let plan = exec_ctx
+            .read_parquet(self.db.parts_path("events")?, opts)
+            .await?
+            .into_optimized_plan()?;
+        debug!("logical plan: {:?}", plan);
 
+        Ok((exec_ctx, state, plan))
+    }
+
+    pub async fn execute(
+        &self,
+        ctx: SessionContext,
+        state: SessionState,
+        plan: LogicalPlan,
+    ) -> Result<RecordBatch> {
+        let physical_plan = state.create_physical_plan(&plan).await?;
+        let displayable_plan = DisplayableExecutionPlan::with_full_metrics(physical_plan.as_ref());
+        debug!("physical plan: {}", displayable_plan.indent(true));
+        let batches = collect(physical_plan, ctx.task_ctx()).await?;
+        let schema: Arc<Schema> = Arc::new(plan.schema().as_ref().into());
+        let rows_count = batches.iter().fold(0, |acc, x| acc + x.num_rows());
+        let res = concat_batches(&schema, &batches, rows_count)?;
+
+        Ok(res)
+    }
+
+    pub async fn property_values(&self, ctx: Context, req: PropertyValues) -> Result<ArrayRef> {
+        let start = Instant::now();
+        let (session_ctx, state, plan) = self.logical_plan().await?;
         let plan = property_values::LogicalPlanBuilder::build(
             ctx,
             self.metadata.clone(),
-            input,
+            plan,
             req.clone(),
-        )
-        .await?;
+        )?;
 
-        // let plan = LogicalPlanBuilder::from(plan).explain(true, true)?.build()?;
+        let res = self.execute(session_ctx, state, plan).await?;
+        let duration = start.elapsed();
+        debug!("elapsed: {:?}", duration);
 
-        let result = execute_plan(&plan).await?;
-        // print_batches(&[result.clone()]);
-        Ok(result.column(0).to_owned())
+        Ok(res.column(0).to_owned())
     }
 
     pub async fn event_records_search(
@@ -100,16 +125,14 @@ impl QueryProvider {
         ctx: Context,
         req: EventRecordsSearch,
     ) -> Result<DataTable> {
-        let _cur_time = Utc::now();
+        let start = Instant::now();
+        let (session_ctx, state, plan) = self.logical_plan().await?;
+        let plan = event_records_search::build(ctx, self.metadata.clone(), plan, req.clone())?;
 
-        let input =
-            datafusion_expr::LogicalPlanBuilder::scan("table", self.table_source.clone(), None)?
-                .build()?;
-        let plan = event_records_search::build(ctx, self.metadata.clone(), input, req)?;
+        let result = self.execute(session_ctx, state, plan).await?;
+        let duration = start.elapsed();
+        debug!("elapsed: {:?}", duration);
 
-        // let plan = LogicalPlanBuilder::from(plan).explain(true, true)?.build()?;
-
-        let result = execute_plan(&plan).await?;
         let cols = result
             .schema()
             .fields()
@@ -130,38 +153,22 @@ impl QueryProvider {
     pub async fn event_segmentation(
         &self,
         ctx: Context,
-        es: EventSegmentation,
+        req: EventSegmentation,
     ) -> Result<DataTable> {
-        let cur_time = Utc::now();
-        let schema = self.db.schema1("events")?;
-        let fields = es_fields(&ctx, &es, self.metadata.clone())?;
-
-        let projection = fields
-            .iter()
-            .enumerate()
-            .map(|(_idx, field)| {
-                let idx = schema.index_of(field)?;
-                Ok(idx)
-            })
-            .collect::<Result<Vec<_>>>()?;
-
-        let input = datafusion_expr::LogicalPlanBuilder::scan(
-            "table",
-            self.table_source.clone(),
-            Some(projection),
-        )?
-        .build()?;
+        let start = Instant::now();
+        let (session_ctx, state, plan) = self.logical_plan().await?;
         let plan = event_segmentation::logical_plan_builder::LogicalPlanBuilder::build(
-            ctx,
+            ctx.clone(),
             self.metadata.clone(),
-            input,
-            es.clone(),
+            plan,
+            req.clone(),
         )?;
 
-        // let plan = LogicalPlanBuilder::from(plan).explain(true, true)?.build()?;
+        let result = self.execute(session_ctx, state, plan).await?;
+        let duration = start.elapsed();
+        debug!("elapsed: {:?}", duration);
 
-        let result = execute_plan(&plan).await?;
-        let metric_cols = es.time_columns(cur_time);
+        let metric_cols = req.time_columns(ctx.cur_time.clone());
         let cols = result
             .schema()
             .fields()
@@ -171,11 +178,11 @@ impl QueryProvider {
                 let typ = match metric_cols.contains(field.name()) {
                     true => ColumnType::MetricValue,
                     false => {
-                        // if field.name() == COL_AGG_NAME {
-                        ColumnType::Dimension
-                        // } else {
-                        //     ColumnType::Metric
-                        // }
+                        if field.name() == COL_AGG_NAME {
+                            ColumnType::Dimension
+                        } else {
+                            ColumnType::Metric
+                        }
                     }
                 };
 
@@ -192,34 +199,43 @@ impl QueryProvider {
         Ok(DataTable::new(result.schema(), cols))
     }
 }
-
-async fn execute_plan(plan: &LogicalPlan) -> Result<RecordBatch> {
-    let start = Instant::now();
-    let runtime = Arc::new(RuntimeEnv::default());
-    #[allow(deprecated)]
-    let state = SessionState::with_config_rt(
-        SessionConfig::new()
-            .with_collect_statistics(true)
-            .with_target_partitions(12),
-        runtime,
-    )
-    .with_query_planner(Arc::new(QueryPlanner {}))
-    .with_optimizer_rules(vec![]);
-    #[allow(deprecated)]
-    let exec_ctx = SessionContext::with_state(state.clone());
-    debug!("logical plan: {:?}", plan);
-    let physical_plan = state.create_physical_plan(plan).await?;
-    let displayable_plan = DisplayableExecutionPlan::with_full_metrics(physical_plan.as_ref());
-    debug!("physical plan: {}", displayable_plan.indent(true));
-    let batches = collect(physical_plan, exec_ctx.task_ctx()).await?;
-    let duration = start.elapsed();
-    debug!("elapsed: {:?}", duration);
-    let schema: Arc<Schema> = Arc::new(plan.schema().as_ref().into());
-    let rows_count = batches.iter().fold(0, |acc, x| acc + x.num_rows());
-    let res = concat_batches(&schema, &batches, rows_count)?;
-    Ok(res)
-}
-
+// async fn execute_plan(ctx:Context,md:Arc<MetadataProvider>,path: Vec<PathBuf>) -> Result<RecordBatch> {
+// let start = Instant::now();
+// let runtime = Arc::new(RuntimeEnv::default());
+// #[allow(deprecated)]
+// let state = SessionState::with_config_rt(
+// SessionConfig::new()
+// .with_collect_statistics(true)
+// .with_target_partitions(1),
+// runtime,
+// )
+// .with_query_planner(Arc::new(QueryPlanner {}));
+// let exec_ctx = SessionContext::new_with_state(state.clone());
+// let opts = ParquetReadOptions::default();
+// let plan = exec_ctx
+// .read_parquet(path, opts)
+// .await?
+// .into_optimized_plan()?;
+// debug!("logical plan: {:?}", plan);
+// let plan = property_values::LogicalPlanBuilder::build(
+// ctx,
+// md.clone(),
+// plan,
+// req.clone(),
+// )
+// .await?;
+//
+// let physical_plan = state.create_physical_plan(&plan).await?;
+// let displayable_plan = DisplayableExecutionPlan::with_full_metrics(physical_plan.as_ref());
+// debug!("physical plan: {}", displayable_plan.indent(true));
+// let batches = collect(physical_plan, exec_ctx.task_ctx()).await?;
+// let duration = start.elapsed();
+// debug!("elapsed: {:?}", duration);
+// let schema: Arc<Schema> = Arc::new(plan.schema().as_ref().into());
+// let rows_count = batches.iter().fold(0, |acc, x| acc + x.num_rows());
+// let res = concat_batches(&schema, &batches, rows_count)?;
+// Ok(res)
+// }
 fn col_name(ctx: &Context, prop: &PropertyRef, md: &Arc<MetadataProvider>) -> Result<String> {
     let name = match prop {
         PropertyRef::System(v) => md

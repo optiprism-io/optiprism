@@ -63,7 +63,7 @@ macro_rules! property_col {
 }
 
 impl LogicalPlanBuilder {
-    pub async fn build(
+    pub fn build(
         ctx: Context,
         metadata: Arc<MetadataProvider>,
         input: LogicalPlan,

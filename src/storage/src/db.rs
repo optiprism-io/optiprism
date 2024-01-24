@@ -326,7 +326,7 @@ fn recover(path: PathBuf, opts: Options) -> Result<OptiDBImpl> {
     let tables = Arc::new(RwLock::new(tables));
 
     let compactor = Compactor::new(tables.clone(), path.clone(), rx);
-    thread::spawn(move || compactor.run());
+    // thread::spawn(move || compactor.run());
     let tables_cloned = tables.clone();
     thread::spawn(move || collect_metrics(tables_cloned));
     Ok(OptiDBImpl {
@@ -625,6 +625,24 @@ impl OptiDBImpl {
         Ok(())
     }
 
+    pub fn parts_path(&self, tbl_name: &str) -> Result<Vec<String>> {
+        let tables = self.tables.read();
+        let tbl = tables.iter().find(|t| t.name == tbl_name).cloned().unwrap();
+        drop(tables);
+
+        let mut ret = vec![];
+        let md = tbl.metadata.lock();
+        for partition in &md.partitions {
+            for (level_id, level) in partition.levels.iter().enumerate() {
+                for part in &level.parts {
+                    let path = part_path(&self.path, tbl_name, partition.id, level_id, part.id);
+                    ret.push(path.into_os_string().into_string().unwrap());
+                }
+            }
+        }
+
+        Ok(ret)
+    }
     pub fn compact(&self) {
         self.compactor_outbox
             .send(CompactorMessage::Compact)
