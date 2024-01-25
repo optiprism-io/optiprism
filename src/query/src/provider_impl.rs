@@ -67,7 +67,7 @@ impl QueryProvider {
 }
 
 impl QueryProvider {
-    pub async fn logical_plan(&self) -> Result<(SessionContext, SessionState, LogicalPlan)> {
+    pub async fn initial_plan(&self) -> Result<(SessionContext, SessionState, LogicalPlan)> {
         let runtime = Arc::new(RuntimeEnv::default());
         let state = SessionState::new_with_config_rt(
             SessionConfig::new()
@@ -106,7 +106,7 @@ impl QueryProvider {
 
     pub async fn property_values(&self, ctx: Context, req: PropertyValues) -> Result<ArrayRef> {
         let start = Instant::now();
-        let (session_ctx, state, plan) = self.logical_plan().await?;
+        let (session_ctx, state, plan) = self.initial_plan().await?;
         let plan = property_values::LogicalPlanBuilder::build(
             ctx,
             self.metadata.clone(),
@@ -127,7 +127,7 @@ impl QueryProvider {
         req: EventRecordsSearch,
     ) -> Result<DataTable> {
         let start = Instant::now();
-        let (session_ctx, state, plan) = self.logical_plan().await?;
+        let (session_ctx, state, plan) = self.initial_plan().await?;
         let plan = event_records_search::build(ctx, self.metadata.clone(), plan, req.clone())?;
 
         let result = self.execute(session_ctx, state, plan).await?;
@@ -157,7 +157,7 @@ impl QueryProvider {
         req: EventSegmentation,
     ) -> Result<DataTable> {
         let start = Instant::now();
-        let (session_ctx, state, plan) = self.logical_plan().await?;
+        let (session_ctx, state, plan) = self.initial_plan().await?;
         let plan = event_segmentation::logical_plan_builder::LogicalPlanBuilder::build(
             ctx.clone(),
             self.metadata.clone(),

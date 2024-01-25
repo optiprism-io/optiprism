@@ -408,9 +408,7 @@ impl ExecutionPlan for SegmentedAggregateExec {
         } else {
             None
         };
-
         let partition_count = self.input.output_partitioning().partition_count();
-
         let runners = (0..partition_count)
             .map(|partition| {
                 let agg_expr = if let Some(inputs) = &self.partition_inputs {
@@ -459,7 +457,6 @@ impl ExecutionPlan for SegmentedAggregateExec {
                 break;
             }
         }
-
         let groups = self
             .group_fields
             .iter()

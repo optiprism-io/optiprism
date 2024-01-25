@@ -238,8 +238,7 @@ mod tests {
         #[allow(deprecated)]
         let state =
             SessionState::with_config_rt(SessionConfig::new().with_target_partitions(1), runtime)
-                .with_query_planner(Arc::new(QueryPlanner {}))
-                .with_optimizer_rules(vec![]);
+                .with_query_planner(Arc::new(QueryPlanner {}));
         #[allow(deprecated)]
         let exec_ctx = SessionContext::with_state(state.clone());
         let physical_plan = state.create_physical_plan(&input).await.unwrap();
