@@ -28,7 +28,7 @@ impl Projects {
             tags: request.tags,
             name: request.name,
             description: request.description,
-            session_duration_seconds: request.session_duration,
+            session_duration_seconds: request.session_duration_seconds,
             organization_id: ctx.organization_id,
         };
 
@@ -70,7 +70,7 @@ impl Projects {
             tags: req.tags,
             name: req.name,
             description: req.description,
-            session_duration_seconds: req.session_duration,
+            session_duration_seconds: req.session_duration_seconds,
         };
 
         let project = self.prov.update(project_id, md_req)?;
@@ -96,7 +96,7 @@ pub struct Project {
     pub tags: Option<Vec<String>>,
     pub name: String,
     pub description: Option<String>,
-    pub session_duration: u64,
+    pub session_duration_seconds: u64,
     pub events_count: usize,
 }
 
@@ -111,7 +111,7 @@ impl From<metadata::projects::Project> for crate::projects::Project {
             tags: value.tags,
             name: value.name,
             description: value.description,
-            session_duration: value.session_duration_seconds,
+            session_duration_seconds: value.session_duration_seconds,
             events_count: value.events_count,
         }
     }
@@ -123,7 +123,7 @@ pub struct CreateProjectRequest {
     pub tags: Option<Vec<String>>,
     pub name: String,
     pub description: Option<String>,
-    pub session_duration: u64,
+    pub session_duration_seconds: u64,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -136,5 +136,5 @@ pub struct UpdateProjectRequest {
     #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
     pub description: OptionalProperty<Option<String>>,
     #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
-    pub session_duration: OptionalProperty<u64>,
+    pub session_duration_seconds: OptionalProperty<u64>,
 }

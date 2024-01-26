@@ -1,11 +1,4 @@
 #V2
-select * from taxi;
-CREATE EXTERNAL TABLE taxi\nSTORED AS PARQUET\nLOCATION '/Users/maximbogdanov/user_files/store/tables/events/0/0/5.parquet';
-select * from taxi;
-select str0 from taxi;
-select event from taxi;
-CREATE EXTERNAL TABLE taxi\nSTORED AS PARQUET\nLOCATION '/Users/maximbogdanov/user_files/store/tables/events/*.parquet';
-select event from taxi;
 select str0 from taxi;
 select str_0 from taxi;
 select str_1 from taxi;
@@ -99,3 +92,10 @@ select c2 from taxi;
 CREATE EXTERNAL TABLE taxi\nSTORED AS PARQUET\nLOCATION '/Users/maximbogdanov/user_files/store/tables/events/*.parquet';
 select c1 from taxi;
 select * from taxi;
+CREATE EXTERNAL TABLE taxi\nSTORED AS PARQUET\nLOCATION '/Users/maximbogdanov/user_files/store/tables/events/*.parquet';
+select * from taxi;
+explain analyze select * from taxi;
+explain select * from taxi;
+explain select event from taxi;
+explain select event from taxi where event=1;;
+explain verbose select event from taxi where event=1;;

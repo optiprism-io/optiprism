@@ -81,6 +81,8 @@ where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
         partition_col: Column,
         distinct: bool,
     ) -> Result<Self> {
+        println!("2");
+
         Ok(Self {
             filter,
             outer_fn: outer_fn.make_new(),

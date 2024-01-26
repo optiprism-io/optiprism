@@ -23,6 +23,7 @@ use datafusion_expr::expr::Alias;
 use datafusion_expr::expr::ScalarFunction;
 use datafusion_expr::expr_fn::and;
 use datafusion_expr::lit;
+use datafusion_expr::Aggregate;
 use datafusion_expr::BuiltinScalarFunction;
 use datafusion_expr::Expr;
 use datafusion_expr::ExprSchemable;
@@ -250,26 +251,25 @@ impl LogicalPlanBuilder {
                 12,
             ), // with_target
         });
-        let input = {
-            let c1 = Expr::Sort(expr::Sort {
-                expr: Box::new(col(COLUMN_PROJECT_ID)),
-                asc: true,
-                nulls_first: false,
-            });
-
-            let c2 = Expr::Sort(expr::Sort {
-                expr: Box::new(col(COLUMN_USER_ID)),
-                asc: true,
-                nulls_first: false,
-            });
-
-            LogicalPlan::Sort(Sort {
-                expr: vec![c1, c2],
-                input: Arc::new(input),
-                fetch: None,
-            })
-        };
-
+        // let input = {
+        // let c1 = Expr::Sort(expr::Sort {
+        // expr: Box::new(col(COLUMN_PROJECT_ID)),
+        // asc: true,
+        // nulls_first: false,
+        // });
+        //
+        // let c2 = Expr::Sort(expr::Sort {
+        // expr: Box::new(col(COLUMN_USER_ID)),
+        // asc: true,
+        // nulls_first: false,
+        // });
+        //
+        // LogicalPlan::Sort(Sort {
+        // expr: vec![c1, c2],
+        // input: Arc::new(input),
+        // fetch: None,
+        // })
+        // };
         let mut cols_hash: HashMap<String, ()> = HashMap::new();
 
         let mut input = builder.decode_filter_dictionaries(input, &mut cols_hash)?;
@@ -454,16 +454,15 @@ impl LogicalPlanBuilder {
         event_id: usize,
         segment_inputs: Option<Vec<LogicalPlan>>,
     ) -> Result<LogicalPlan> {
-        let input = self.build_filter_logical_plan(input.clone(), &self.es.events[event_id])?;
+        // let mut input = self.build_filter_logical_plan(input.clone(), &self.es.events[event_id])?;
+        let (mut input, group_expr) = self.build_aggregate_logical_plan(
+            input,
+            &self.es.events[event_id],
+            event_id,
+            segment_inputs,
+        )?;
 
-        // let (mut input, group_expr) = self.build_aggregate_logical_plan(
-        // input,
-        // &self.es.events[event_id],
-        // event_id,
-        // segment_inputs,
-        // )?;
-
-        // unpivot aggregate values into value column
+        // // unpivot aggregate values into value column
         // if self.ctx.format != Format::Compact {
         // input = {
         // let agg_cols = self.es.events[event_id]
@@ -497,7 +496,7 @@ impl LogicalPlanBuilder {
         // })
         // };
         // }
-
+        //
         // input = {
         // let sort_expr = group_expr
         // .into_iter()
@@ -518,7 +517,6 @@ impl LogicalPlanBuilder {
         // LogicalPlan::Sort(sort)
         // };
         // if self.ctx.format != Format::Compact {
-        // pivot date
         // input = {
         // let (from_time, to_time) = self.es.time.range(self.ctx.cur_time);
         // let result_cols = time_columns(from_time, to_time, &self.es.interval_unit);

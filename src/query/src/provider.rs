@@ -3,7 +3,12 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use arrow::array::ArrayRef;
+use arrow::array::Int64Array;
+use arrow::array::TimestampNanosecondArray;
+use arrow::datatypes::DataType;
+use arrow::datatypes::Field;
 use arrow::datatypes::Schema;
+use arrow::datatypes::TimeUnit;
 use arrow::record_batch::RecordBatch;
 use chrono::Utc;
 use common::query::event_segmentation::Breakdown;
@@ -19,6 +24,11 @@ use datafusion::datasource::DefaultTableSource;
 use datafusion::datasource::TableProvider;
 use datafusion::execution::context::SessionState;
 use datafusion::execution::runtime_env::RuntimeEnv;
+use datafusion::physical_optimizer::coalesce_batches::CoalesceBatches;
+use datafusion::physical_optimizer::enforce_distribution::EnforceDistribution;
+use datafusion::physical_optimizer::enforce_sorting::EnforceSorting;
+use datafusion::physical_optimizer::join_selection::JoinSelection;
+use datafusion::physical_optimizer::projection_pushdown::ProjectionPushdown;
 use datafusion::physical_plan::coalesce_batches::concat_batches;
 use datafusion::physical_plan::collect;
 use datafusion::physical_plan::display::DisplayableExecutionPlan;
@@ -27,6 +37,7 @@ use datafusion::prelude::SessionConfig;
 use datafusion::prelude::SessionContext;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::LogicalPlanBuilder;
+use datafusion_expr::Partitioning;
 use metadata::MetadataProvider;
 use storage::db::OptiDBImpl;
 use tracing::debug;
@@ -75,14 +86,38 @@ impl QueryProvider {
                 .with_target_partitions(12),
             runtime,
         )
-        .with_query_planner(Arc::new(QueryPlanner {}));
+        .with_query_planner(Arc::new(QueryPlanner {}))
+        .with_physical_optimizer_rules(vec![]);
         let exec_ctx = SessionContext::new_with_state(state.clone());
         let opts = ParquetReadOptions::default();
-        let plan = exec_ctx
-            .read_parquet(self.db.parts_path("events")?, opts)
-            .await?
-            .into_optimized_plan()?;
-        debug!("logical plan: {:?}", plan);
+
+        let schema = Schema::new(vec![
+            Field::new(COLUMN_PROJECT_ID, DataType::Int64, false),
+            Field::new(COLUMN_USER_ID, DataType::Int64, false),
+            Field::new(
+                COLUMN_CREATED_AT,
+                DataType::Timestamp(TimeUnit::Nanosecond, None),
+                false,
+            ),
+            Field::new(COLUMN_EVENT, DataType::Int64, false),
+            Field::new("str_20", DataType::Int64, false),
+        ]);
+
+        let batch = RecordBatch::try_new(Arc::new(schema), vec![
+            Arc::new(Int64Array::from(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10])),
+            Arc::new(Int64Array::from(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10])),
+            Arc::new(TimestampNanosecondArray::from(vec![
+                1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+            ])),
+            Arc::new(Int64Array::from(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10])),
+            Arc::new(Int64Array::from(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10])),
+        ])?;
+        let plan = exec_ctx.read_batch(batch)?.into_optimized_plan()?;
+        // let plan = exec_ctx
+        // .read_parquet(self.db.parts_path("events")?, opts)
+        // .await?
+        // .into_optimized_plan()?;
+        // debug!("logical plan: {}", plan.display_indent());
 
         Ok((exec_ctx, state, plan))
     }

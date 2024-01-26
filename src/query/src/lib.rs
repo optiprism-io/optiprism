@@ -54,7 +54,7 @@ use common::query::PropertyRef;
 pub use context::Context;
 pub use error::Result;
 use metadata::MetadataProvider;
-pub use provider_impl::QueryProvider;
+pub use provider::QueryProvider;
 
 pub mod context;
 pub mod datasources;
@@ -62,7 +62,7 @@ pub mod error;
 pub mod expr;
 pub mod logical_plan;
 pub mod physical_plan;
-pub mod provider_impl;
+pub mod provider;
 pub mod queries;
 
 pub const DEFAULT_BATCH_SIZE: usize = 4096;

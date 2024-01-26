@@ -30,6 +30,7 @@ use datafusion::execution::context::TaskContext;
 use datafusion::physical_expr::expressions::col;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::expressions::Max;
+use datafusion::physical_expr::Distribution;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_plan::aggregates::AggregateExec as DFAggregateExec;
 use datafusion::physical_plan::aggregates::AggregateMode;
@@ -264,15 +265,17 @@ impl Runner {
 
     fn run(&mut self, tx: Sender<RecordBatch>) -> Result<()> {
         let start_time = Instant::now();
+        println!("sss");
         let segments_count = if let Some(streams) = &self.partitions {
             streams.len()
         } else {
             1
         };
-
+        println!("run2");
         loop {
             match block_on(self.input.next()) {
                 Some(Ok(batch)) => {
+                    println!("!");
                     for segment in 0..segments_count {
                         for aggm in self.agg_expr[segment].iter() {
                             let mut agg = aggm.lock().unwrap();
@@ -286,6 +289,7 @@ impl Runner {
                     }
                 }
                 None => {
+                    println!("?");
                     break;
                 }
                 Some(Err(er)) => {
@@ -342,7 +346,9 @@ impl Runner {
 }
 
 fn run(runners: Vec<Runner>, tx: Sender<RecordBatch>) {
+    println!("run");
     for mut runner in runners.into_iter() {
+        println!("run1");
         let tx = tx.clone();
         spawn(move || runner.run(tx).unwrap());
     }
@@ -370,6 +376,13 @@ impl ExecutionPlan for SegmentedAggregateExec {
 
     fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {
         None
+    }
+
+    fn required_input_distribution(&self) -> Vec<Distribution> {
+        vec![Distribution::HashPartitioned(vec![
+            Arc::new(Column::new_with_schema("project_id", &self.input.schema()).unwrap()),
+            Arc::new(Column::new_with_schema("user_id", &self.input.schema()).unwrap()),
+        ])]
     }
 
     fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
@@ -408,7 +421,22 @@ impl ExecutionPlan for SegmentedAggregateExec {
         } else {
             None
         };
+
         let partition_count = self.input.output_partitioning().partition_count();
+        for i in 1..partition_count {
+            println!("{i}");
+            let mut s = self.input.execute(i, context.clone())?;
+            println!("?");
+            loop {
+                match block_on(s.next()) {
+                    None => break,
+                    Some(_) => {
+                        println!(".");
+                    }
+                }
+            }
+        }
+
         let runners = (0..partition_count)
             .map(|partition| {
                 let agg_expr = if let Some(inputs) = &self.partition_inputs {
@@ -445,8 +473,7 @@ impl ExecutionPlan for SegmentedAggregateExec {
                 Runner::new(opts, partition, context.clone())
             })
             .collect::<DFResult<Vec<_>>>()?;
-        let (tx, rx) = bounded(5); // todo why 5?
-        // let (tx, rx) = mpsc::channel();
+        let (tx, rx) = bounded(partition_count);
         run(runners, tx);
         let mut completed = partition_count;
         let mut batches: Vec<RecordBatch> = Vec::with_capacity(partition_count);
@@ -647,7 +674,6 @@ impl ExecutionPlan for SegmentedAggregateExec {
             group_by,
             aggs,
             vec![None],
-            vec![None],
             input,
             self.schema.clone(),
         )?);
@@ -724,7 +750,9 @@ mod tests {
     use datafusion::prelude::SessionContext;
     use datafusion_common::ScalarValue;
     use datafusion_expr::Operator;
+    use hyperlog_simd::HyperLogLog;
     use storage::test_util::parse_markdown_tables;
+    use tracing_test::traced_test;
 
     use crate::physical_plan::expressions::aggregate;
     use crate::physical_plan::expressions::aggregate::partitioned::count;
@@ -1096,7 +1124,7 @@ mod tests {
         print_batches(&result).unwrap();
         Ok(())
     }
-
+    #[traced_test]
     #[tokio::test]
     async fn test_no_segments() -> anyhow::Result<()> {
         let data = r#"
@@ -1135,6 +1163,7 @@ mod tests {
         let batches = parse_markdown_tables(data).unwrap();
         let schema = batches[0].schema();
         let input = MemoryExec::try_new(&[batches], schema.clone(), None)?;
+        println!("1");
 
         let agg1 = {
             let count = count::PartitionedCount::<i64>::try_new(
@@ -1150,7 +1179,6 @@ mod tests {
                 Box::new(count) as Box<dyn PartitionedAggregateExpr>
             ))
         };
-
         let agg2 = {
             let groups = vec![
                 (
