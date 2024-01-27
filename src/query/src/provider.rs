@@ -104,13 +104,21 @@ impl QueryProvider {
         ]);
 
         let batch = RecordBatch::try_new(Arc::new(schema), vec![
-            Arc::new(Int64Array::from(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10])),
-            Arc::new(Int64Array::from(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10])),
-            Arc::new(TimestampNanosecondArray::from(vec![
-                1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+            Arc::new(Int64Array::from(vec![
+                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
             ])),
-            Arc::new(Int64Array::from(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10])),
-            Arc::new(Int64Array::from(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10])),
+            Arc::new(Int64Array::from(vec![
+                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+            ])),
+            Arc::new(TimestampNanosecondArray::from(vec![
+                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+            ])),
+            Arc::new(Int64Array::from(vec![
+                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+            ])),
+            Arc::new(Int64Array::from(vec![
+                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+            ])),
         ])?;
         let plan = exec_ctx.read_batch(batch)?.into_optimized_plan()?;
         // let plan = exec_ctx

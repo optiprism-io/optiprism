@@ -27,6 +27,7 @@ use datafusion_common::Result as DFResult;
 use crate::error::Result;
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::logical_plan::merge::MergeNode;
+use crate::logical_plan::partitioned_aggregate::Mode;
 use crate::logical_plan::partitioned_aggregate::PartitionedAggregateNode;
 use crate::logical_plan::pivot::PivotNode;
 use crate::logical_plan::segment::SegmentNode;
@@ -37,6 +38,7 @@ use crate::physical_plan::pivot::PivotExec;
 use crate::physical_plan::planner::partitioned_aggregate::build_partitioned_aggregate_expr;
 use crate::physical_plan::planner::segment::build_segment_expr;
 use crate::physical_plan::segment::SegmentExec;
+use crate::physical_plan::segmented_aggregate;
 use crate::physical_plan::segmented_aggregate::SegmentedAggregateExec;
 use crate::physical_plan::unpivot::UnpivotExec;
 
@@ -165,7 +167,12 @@ impl DFExtensionPlanner for ExtensionPlanner {
                 })
                 .collect::<Result<Vec<_>>>()
                 .map_err(|err| DataFusionError::Plan(err.to_string()))?;
+            let mode = match node.mode {
+                Mode::Partial => segmented_aggregate::Mode::Partial,
+                Mode::Final => segmented_aggregate::Mode::Final,
+            };
             let exec = SegmentedAggregateExec::try_new(
+                mode,
                 physical_inputs[0].clone(),
                 partition_inputs,
                 partition_col,

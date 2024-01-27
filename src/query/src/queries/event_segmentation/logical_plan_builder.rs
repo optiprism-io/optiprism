@@ -682,17 +682,30 @@ impl LogicalPlanBuilder {
 
         // todo check for duplicates
 
-        let agg_node = PartitionedAggregateNode::try_new(
+        let partial = PartitionedAggregateNode::try_new(
             input,
-            segment_inputs,
+            segment_inputs.clone(),
+            partitioned_aggregate::Mode::Partial,
             Column::from_qualified_name(COLUMN_USER_ID),
-            aggr_expr,
+            aggr_expr.clone(),
         )?;
 
+        let input = LogicalPlan::Extension(Extension {
+            node: Arc::new(partial),
+        });
+
+        // let finalized = PartitionedAggregateNode::try_new(
+        // input,
+        // segment_inputs,
+        // partitioned_aggregate::Mode::Final,
+        // Column::from_qualified_name(COLUMN_USER_ID),
+        // aggr_expr,
+        // )?;
+        // let input = LogicalPlan::Extension(Extension {
+        // node: Arc::new(finalized),
+        // });
         Ok((
-            LogicalPlan::Extension(Extension {
-                node: Arc::new(agg_node),
-            }),
+            input,
             group_expr.into_iter().map(|(a, _b)| a).collect::<Vec<_>>(),
         ))
     }

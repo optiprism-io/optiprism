@@ -294,10 +294,16 @@ impl AggregateExpr {
     }
 }
 
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Mode {
+    Partial,
+    Final,
+}
 #[derive(Hash, Eq, PartialEq)]
 pub struct PartitionedAggregateNode {
     pub input: LogicalPlan,
     pub partition_inputs: Option<Vec<LogicalPlan>>,
+    pub mode: Mode,
     pub partition_col: Column,
     pub agg_expr: Vec<(AggregateExpr, String)>,
     pub schema: DFSchemaRef,
@@ -307,6 +313,7 @@ impl PartitionedAggregateNode {
     pub fn try_new(
         input: LogicalPlan,
         partition_inputs: Option<Vec<LogicalPlan>>,
+        mode: Mode,
         partition_col: Column,
         agg_expr: Vec<(AggregateExpr, String)>,
     ) -> Result<Self> {
@@ -343,6 +350,7 @@ impl PartitionedAggregateNode {
         let ret = Self {
             input,
             partition_inputs,
+            mode,
             partition_col,
             agg_expr,
             schema: Arc::new(schema),
@@ -397,6 +405,7 @@ impl UserDefinedLogicalNode for PartitionedAggregateNode {
         let node = PartitionedAggregateNode::try_new(
             inputs[0].clone(),
             self.partition_inputs.clone(),
+            self.mode.clone(),
             self.partition_col.clone(),
             self.agg_expr.clone(),
         )
