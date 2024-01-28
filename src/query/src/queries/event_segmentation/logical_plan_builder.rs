@@ -694,16 +694,16 @@ impl LogicalPlanBuilder {
             node: Arc::new(partial),
         });
 
-        // let finalized = PartitionedAggregateNode::try_new(
-        // input,
-        // segment_inputs,
-        // partitioned_aggregate::Mode::Final,
-        // Column::from_qualified_name(COLUMN_USER_ID),
-        // aggr_expr,
-        // )?;
-        // let input = LogicalPlan::Extension(Extension {
-        // node: Arc::new(finalized),
-        // });
+        let finalized = PartitionedAggregateNode::try_new(
+            input,
+            segment_inputs,
+            partitioned_aggregate::Mode::Final,
+            Column::from_qualified_name(COLUMN_USER_ID),
+            aggr_expr,
+        )?;
+        let input = LogicalPlan::Extension(Extension {
+            node: Arc::new(finalized),
+        });
         Ok((
             input,
             group_expr.into_iter().map(|(a, _b)| a).collect::<Vec<_>>(),

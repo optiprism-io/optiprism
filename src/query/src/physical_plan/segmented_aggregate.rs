@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Debug;
@@ -211,124 +212,6 @@ struct RunnerOptions {
 
 type AggExpr = Arc<Mutex<Box<dyn PartitionedAggregateExpr>>>;
 
-struct Runner {
-    partitions: Option<Arc<Vec<HashMap<i64, (), RandomState>>>>,
-    agg_expr: Vec<Vec<AggExpr>>,
-    input: SendableRecordBatchStream,
-    schema: SchemaRef,
-    agg_schemas: Vec<SchemaRef>,
-}
-
-impl Runner {
-    fn new(
-        opts: RunnerOptions,
-        partition: usize,
-        // tx: Sender<RecordBatch>,
-        ctx: Arc<TaskContext>,
-    ) -> DFResult<Self> {
-        let res = Self {
-            // tx,
-            partitions: opts.partitions,
-            agg_expr: opts.agg_expr,
-            input: opts.input.execute(partition, ctx)?,
-            schema: opts.schema.clone(),
-            agg_schemas: opts.agg_schemas.clone(),
-        };
-
-        Ok(res)
-    }
-
-    fn run(&mut self, tx: Sender<RecordBatch>) -> Result<()> {
-        let start_time = Instant::now();
-        println!("sss");
-        let segments_count = if let Some(streams) = &self.partitions {
-            streams.len()
-        } else {
-            1
-        };
-        println!("run2");
-        loop {
-            match block_on(self.input.next()) {
-                Some(Ok(batch)) => {
-                    println!("!");
-                    for segment in 0..segments_count {
-                        for aggm in self.agg_expr[segment].iter() {
-                            let mut agg = aggm.lock().unwrap();
-
-                            if let Some(exist) = &self.partitions {
-                                agg.evaluate(&batch, Some(&exist[segment]))?;
-                            } else {
-                                agg.evaluate(&batch, None)?;
-                            }
-                        }
-                    }
-                }
-                None => {
-                    println!("?");
-                    break;
-                }
-                Some(Err(er)) => {
-                    return Err(QueryError::from(er));
-                }
-            };
-        }
-        let mut batches: Vec<RecordBatch> = Vec::with_capacity(10); // todo why 10?
-        for segment in 0..segments_count {
-            for (agg_idx, aggrm) in self.agg_expr[segment].iter().enumerate() {
-                let mut aggr = aggrm.lock().unwrap();
-                let agg_cols = aggr
-                    .finalize()
-                    .map_err(QueryError::into_datafusion_execution_error)?;
-                let seg_col =
-                    ScalarValue::Int64(Some(segment as i64)).to_array_of_size(agg_cols[0].len())?;
-                let cols = [vec![seg_col], agg_cols].concat();
-                let schema = self.agg_schemas[agg_idx].clone();
-                let schema = Arc::new(Schema::new(
-                    [
-                        vec![Arc::new(Field::new("segment", DataType::Int64, false))],
-                        schema.fields().to_vec(),
-                    ]
-                    .concat(),
-                ));
-                let batch = RecordBatch::try_new(schema, cols)?;
-                let cols = self
-                    .schema
-                    .fields()
-                    .iter()
-                    .map(
-                        |field| match batch.schema().index_of(field.name().as_str()) {
-                            Ok(col_idx) => Ok(batch.column(col_idx).clone()),
-                            Err(_) => {
-                                let v = ScalarValue::try_from(field.data_type())?;
-                                Ok(v.to_array_of_size(batch.column(0).len())?)
-                            }
-                        },
-                    )
-                    .collect::<DFResult<Vec<ArrayRef>>>()?;
-
-                let result = RecordBatch::try_new(self.schema.clone(), cols)?;
-                batches.push(result);
-            }
-        }
-        let batch = concat_batches(&self.schema, batches.iter().collect::<Vec<_>>())?;
-
-        tx.send(batch)
-            .map_err(|err| QueryError::Internal(err.to_string()))?;
-
-        histogram!("query.segmented_aggregate_run_seconds").record(start_time.elapsed());
-        Ok(())
-    }
-}
-
-fn run(runners: Vec<Runner>, tx: Sender<RecordBatch>) {
-    println!("run");
-    for mut runner in runners.into_iter() {
-        println!("run1");
-        let tx = tx.clone();
-        spawn(move || runner.run(tx).unwrap());
-    }
-}
-
 impl DisplayAs for SegmentedAggregateExec {
     fn fmt_as(&self, _t: DisplayFormatType, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "SegmentedAggregateExec")
@@ -388,26 +271,29 @@ impl ExecutionPlan for SegmentedAggregateExec {
         partition: usize,
         context: Arc<TaskContext>,
     ) -> DFResult<SendableRecordBatchStream> {
-        let segment_streams = if let Some(inputs) = &self.segment_inputs {
-            Some(
+        let segment_streams: Vec<SendableRecordBatchStream> =
+            if let Some(inputs) = &self.segment_inputs {
                 inputs
                     .iter()
                     .map(|input| input.execute(partition, context.clone()))
-                    .collect::<DFResult<_>>()?,
-            )
-        } else {
-            None
-        };
+                    .collect::<DFResult<_>>()?
+            } else {
+                vec![]
+            };
 
+        let segment_partitions = vec![HashMap::default(); segment_streams.len()];
         return match self.mode {
             Mode::Partial => Ok(Box::pin(PartialStream {
                 stream: self.input.execute(partition, context.clone())?,
-                segment_streams,
+                segment_streams: RefCell::new(segment_streams),
                 schema: self.schema.clone(),
                 partition_col: self.partition_col.clone(),
-                agg_expr: self.agg_expr.clone(),
+                named_agg_expr: self.agg_expr.clone(),
+                agg_expr: vec![],
                 agg_schemas: self.agg_schemas.clone(),
                 finished: false,
+                segment_partitions: RefCell::new(segment_partitions),
+                stage: 0,
             })),
             Mode::Final => {
                 let partition_count = self.input.output_partitioning().partition_count();
@@ -436,13 +322,16 @@ impl ExecutionPlan for SegmentedAggregateExec {
 
 struct PartialStream {
     stream: SendableRecordBatchStream,
-    segment_streams: Option<Vec<SendableRecordBatchStream>>,
+    segment_streams: RefCell<Vec<SendableRecordBatchStream>>,
     schema: SchemaRef,
     partition_col: Column,
-    agg_expr: Vec<NamedAggExpr>,
+    named_agg_expr: Vec<NamedAggExpr>,
+    agg_expr: Vec<Vec<Arc<Mutex<Box<dyn PartitionedAggregateExpr>>>>>,
     // single partition input
     agg_schemas: Vec<SchemaRef>,
     finished: bool,
+    segment_partitions: RefCell<Vec<HashMap<i64, (), RandomState>>>,
+    stage: usize,
 }
 
 impl RecordBatchStream for PartialStream {
@@ -460,92 +349,104 @@ impl Stream for PartialStream {
             return Poll::Ready(None);
         }
 
-        let mut segment_partitions: Vec<HashMap<i64, (), RandomState>> = Vec::new();
-        let partition_col = self.partition_col.clone();
-        // collect segments
-        if let Some(streams) = &mut self.segment_streams {
-            segment_partitions.resize(streams.len(), HashMap::default());
-            for (id, stream) in streams.iter_mut().enumerate() {
-                loop {
-                    println!("1");
-                    match stream.poll_next_unpin(cx) {
-                        Poll::Ready(Some(Ok(batch))) => {
-                            let vals = partition_col
-                                .evaluate(&batch)?
-                                .into_array(batch.num_rows())?
-                                .as_any()
-                                .downcast_ref::<Int64Array>()
-                                .unwrap()
-                                .clone();
+        if self.stage == 0 {
+            let partition_col = self.partition_col.clone();
+            // collect segments
+            {
+                let mut streams = self.segment_streams.borrow_mut();
+                for (id, stream) in streams.iter_mut().enumerate() {
+                    loop {
+                        match stream.poll_next_unpin(cx) {
+                            Poll::Ready(Some(Ok(batch))) => {
+                                let vals = partition_col
+                                    .evaluate(&batch)?
+                                    .into_array(batch.num_rows())?
+                                    .as_any()
+                                    .downcast_ref::<Int64Array>()
+                                    .unwrap()
+                                    .clone();
 
-                            for val in vals.iter() {
-                                segment_partitions[id].insert(val.unwrap(), ());
+                                for val in vals.iter() {
+                                    self.segment_partitions.borrow_mut()[id]
+                                        .insert(val.unwrap(), ());
+                                }
                             }
+                            Poll::Ready(None) => break,
+                            other => return other,
                         }
-                        Poll::Ready(None) => break,
-                        Poll::Ready(other) => return Poll::Ready(other),
-                        Poll::Pending => return Poll::Pending,
                     }
                 }
             }
-        };
-        let segments_count = if segment_partitions.is_empty() {
+            self.stage = 1;
+        }
+        let segments_count = if self.segment_partitions.borrow().is_empty() {
             1
         } else {
-            segment_partitions.len()
+            self.segment_partitions.borrow().len()
         };
 
-        let agg_expr = if let Some(streams) = &self.segment_streams {
-            (0..streams.len())
-                .map(|_| {
-                    self.agg_expr
-                        .iter()
-                        .map(|(e, _name)| {
-                            let agg = e.lock().unwrap();
-                            Arc::new(Mutex::new(agg.make_new().unwrap()))
+        if self.stage == 1 {
+            let agg_expr = {
+                let streams = self.segment_streams.borrow();
+                if !streams.is_empty() {
+                    (0..streams.len())
+                        .map(|_| {
+                            self.named_agg_expr
+                                .iter()
+                                .map(|(e, _name)| {
+                                    let agg = e.lock().unwrap();
+                                    Arc::new(Mutex::new(agg.make_new().unwrap()))
+                                })
+                                .collect::<Vec<_>>()
                         })
                         .collect::<Vec<_>>()
-                })
-                .collect::<Vec<_>>()
-        } else {
-            vec![
-                self.agg_expr
-                    .iter()
-                    .map(|(e, _name)| {
-                        let agg = e.lock().unwrap();
-                        Arc::new(Mutex::new(agg.make_new().unwrap()))
-                    })
-                    .collect::<Vec<_>>(),
-            ]
-        };
+                } else {
+                    vec![
+                        self.named_agg_expr
+                            .iter()
+                            .map(|(e, _name)| {
+                                let agg = e.lock().unwrap();
+                                Arc::new(Mutex::new(agg.make_new().unwrap()))
+                            })
+                            .collect::<Vec<_>>(),
+                    ]
+                }
+            };
+            self.agg_expr = agg_expr;
+            self.stage = 2;
+        }
 
-        loop {
-            match self.stream.poll_next_unpin(cx) {
-                Poll::Ready(Some(Ok(batch))) => {
-                    println!("2.1");
-
-                    for segment in 0..segments_count {
-                        for aggm in agg_expr[segment].iter() {
-                            let mut agg = aggm.lock().unwrap();
-                            if segment_partitions.len() > 0 {
-                                agg.evaluate(&batch, Some(&segment_partitions[segment]))
+        if self.stage == 2 {
+            loop {
+                match self.stream.poll_next_unpin(cx) {
+                    Poll::Ready(Some(Ok(batch))) => {
+                        for segment in 0..segments_count {
+                            for aggm in self.agg_expr[segment].iter() {
+                                let mut agg = aggm.lock().unwrap();
+                                if self.segment_partitions.borrow().len() > 0 {
+                                    agg.evaluate(
+                                        &batch,
+                                        Some(&self.segment_partitions.borrow()[segment]),
+                                    )
                                     .map_err(QueryError::into_datafusion_execution_error)?;
-                            } else {
-                                agg.evaluate(&batch, None)
-                                    .map_err(QueryError::into_datafusion_execution_error)?;
+                                } else {
+                                    agg.evaluate(&batch, None)
+                                        .map_err(QueryError::into_datafusion_execution_error)?;
+                                }
                             }
                         }
                     }
+                    Poll::Ready(None) => break,
+                    Poll::Ready(other) => return Poll::Ready(other),
+                    Poll::Pending => return Poll::Pending,
                 }
-                Poll::Ready(None) => break,
-                Poll::Ready(other) => return Poll::Ready(other),
-                Poll::Pending => {}
             }
+            self.stage = 3;
         }
 
         let mut batches: Vec<RecordBatch> = Vec::with_capacity(10); // todo why 10?
         for segment in 0..segments_count {
-            for (agg_idx, aggrm) in agg_expr[segment].iter().enumerate() {
+            for (agg_idx, aggrm) in self.agg_expr[segment].iter().enumerate() {
                 let mut aggr = aggrm.lock().unwrap();
                 let agg_cols = aggr
                     .finalize()
