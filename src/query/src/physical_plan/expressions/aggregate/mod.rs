@@ -204,7 +204,6 @@ macro_rules! agg {
                 } else {
                     None
                 };
-
                 let predicate = self
                     .predicate
                     .evaluate(batch)?
@@ -213,7 +212,6 @@ macro_rules! agg {
                     .downcast_ref::<$array_ty>()
                     .unwrap()
                     .clone();
-
                 let rows = if let Some(groups) = &mut self.groups {
                     let arrs = groups
                         .exprs
@@ -228,7 +226,6 @@ macro_rules! agg {
                 } else {
                     None
                 };
-
                 let partitions = self
                     .partition_col
                     .evaluate(batch)?
@@ -237,7 +234,6 @@ macro_rules! agg {
                     .downcast_ref::<Int64Array>()
                     .unwrap()
                     .clone();
-
                 let mut skip_partition = 0;
                 let mut skip = false;
                 for (row_id, val) in predicate.into_iter().enumerate() {

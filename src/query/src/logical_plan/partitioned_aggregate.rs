@@ -116,6 +116,10 @@ pub struct SortField {
     pub data_type: DataType,
 }
 
+pub struct FinalAggregateExpr {
+    groups: Option<Vec<(Expr, SortField)>>,
+}
+
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum AggregateExpr {
     Count {
@@ -164,8 +168,97 @@ pub enum AggregateExpr {
     },
 }
 
+impl AggregateExpr {
+    pub fn change_predicate(self, partition_col: Column, predicate: Column) -> Self {
+        match self {
+            AggregateExpr::Count {
+                filter,
+                groups,
+                predicate: _,
+                partition_col: _,
+                distinct,
+            } => AggregateExpr::Count {
+                filter,
+                groups,
+                predicate,
+                partition_col,
+                distinct,
+            },
+            AggregateExpr::Aggregate {
+                filter,
+                groups,
+                partition_col: _,
+                predicate: _,
+                agg,
+            } => AggregateExpr::Aggregate {
+                filter,
+                groups,
+                partition_col,
+                predicate,
+                agg,
+            },
+            AggregateExpr::PartitionedCount {
+                filter,
+                outer_fn,
+                groups,
+                partition_col: _,
+                distinct,
+            } => AggregateExpr::PartitionedCount {
+                filter,
+                outer_fn,
+                groups,
+                partition_col,
+                distinct,
+            },
+            AggregateExpr::PartitionedAggregate {
+                filter,
+                inner_fn,
+                outer_fn,
+                predicate: _,
+                groups,
+                partition_col: _,
+            } => AggregateExpr::PartitionedAggregate {
+                filter,
+                inner_fn,
+                outer_fn,
+                predicate,
+                groups,
+                partition_col,
+            },
+            AggregateExpr::Funnel {
+                ts_col,
+                from,
+                to,
+                window,
+                steps,
+                exclude,
+                constants,
+                count,
+                filter,
+                touch,
+                partition_col: _,
+                bucket_size,
+                groups,
+            } => AggregateExpr::Funnel {
+                ts_col,
+                from,
+                to,
+                window,
+                steps,
+                exclude,
+                constants,
+                count,
+                filter,
+                touch,
+                partition_col,
+                bucket_size,
+                groups,
+            },
+        }
+    }
+}
 fn return_type(dt: DataType, agg: &AggregateFunction, _schema: &DFSchema) -> DataType {
-    match agg {
+    let r = match agg {
         AggregateFunction::Avg => DataType::Float64,
         AggregateFunction::Count => DataType::Int64,
         AggregateFunction::Min | AggregateFunction::Max => dt,
@@ -178,7 +271,8 @@ fn return_type(dt: DataType, agg: &AggregateFunction, _schema: &DFSchema) -> Dat
             }
             _ => unimplemented!("{dt:?}"),
         },
-    }
+    };
+    r
 }
 
 impl AggregateExpr {
@@ -198,21 +292,38 @@ impl AggregateExpr {
         }
     }
 
-    pub fn fields(&self, schema: &DFSchema) -> Result<Vec<DFField>> {
+    pub fn field_names(&self) -> Vec<String> {
+        match self {
+            AggregateExpr::Count { .. } => vec!["count".to_string()],
+            AggregateExpr::Aggregate { .. } => vec!["agg".to_string()],
+            AggregateExpr::PartitionedCount { .. } => vec!["partitioned_count".to_string()],
+            AggregateExpr::PartitionedAggregate { .. } => vec!["partitioned_agg".to_string()],
+            AggregateExpr::Funnel { .. } => unimplemented!(),
+        }
+    }
+    pub fn fields(&self, schema: &DFSchema, final_: bool) -> Result<Vec<DFField>> {
         let fields = match self {
             AggregateExpr::Count { .. } => {
                 vec![DFField::new_unqualified("count", DataType::Int64, true)]
             }
             AggregateExpr::Aggregate { predicate, agg, .. } => {
-                vec![DFField::new_unqualified(
-                    "agg",
-                    return_type(
+                if final_ {
+                    vec![DFField::new_unqualified(
+                        "agg",
                         schema.field_from_column(predicate)?.data_type().to_owned(),
-                        agg,
-                        schema,
-                    ),
-                    true,
-                )]
+                        true,
+                    )]
+                } else {
+                    vec![DFField::new_unqualified(
+                        "agg",
+                        return_type(
+                            schema.field_from_column(predicate)?.data_type().to_owned(),
+                            agg,
+                            schema,
+                        ),
+                        true,
+                    )]
+                }
             }
             AggregateExpr::PartitionedCount { outer_fn, .. } => {
                 let dt = match outer_fn {
@@ -232,8 +343,17 @@ impl AggregateExpr {
             } => {
                 let dt = schema.field_from_column(predicate)?.data_type();
                 let rt1 = return_type(dt.to_owned(), inner_fn, schema);
-                let rt2 = return_type(rt1, outer_fn, schema);
-                vec![DFField::new_unqualified("partitioned_agg", rt2, true)]
+                if final_ {
+                    vec![DFField::new_unqualified(
+                        "partitioned_agg",
+                        dt.to_owned(),
+                        true,
+                    )]
+                } else {
+                    let rt2 = return_type(rt1, outer_fn, schema);
+
+                    vec![DFField::new_unqualified("partitioned_agg", rt2, true)]
+                }
             }
             AggregateExpr::Funnel { groups, steps, .. } => {
                 let mut fields = vec![
@@ -294,26 +414,19 @@ impl AggregateExpr {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub enum Mode {
-    Partial,
-    Final,
-}
 #[derive(Hash, Eq, PartialEq)]
-pub struct PartitionedAggregateNode {
+pub struct PartitionedAggregatePartialNode {
     pub input: LogicalPlan,
     pub partition_inputs: Option<Vec<LogicalPlan>>,
-    pub mode: Mode,
     pub partition_col: Column,
     pub agg_expr: Vec<(AggregateExpr, String)>,
     pub schema: DFSchemaRef,
 }
 
-impl PartitionedAggregateNode {
+impl PartitionedAggregatePartialNode {
     pub fn try_new(
         input: LogicalPlan,
         partition_inputs: Option<Vec<LogicalPlan>>,
-        mode: Mode,
         partition_col: Column,
         agg_expr: Vec<(AggregateExpr, String)>,
     ) -> Result<Self> {
@@ -326,7 +439,7 @@ impl PartitionedAggregateNode {
                 group_cols.insert(group_expr.display_name()?, ());
             }
 
-            for f in agg.fields(input_schema)?.iter() {
+            for f in agg.fields(input_schema, false)?.iter() {
                 let f = DFField::new_unqualified(
                     format!("{}_{}", name, f.name()).as_str(),
                     f.data_type().to_owned(),
@@ -350,7 +463,6 @@ impl PartitionedAggregateNode {
         let ret = Self {
             input,
             partition_inputs,
-            mode,
             partition_col,
             agg_expr,
             schema: Arc::new(schema),
@@ -359,19 +471,19 @@ impl PartitionedAggregateNode {
     }
 }
 
-impl Debug for PartitionedAggregateNode {
+impl Debug for PartitionedAggregatePartialNode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         self.fmt_for_explain(f)
     }
 }
 
-impl UserDefinedLogicalNode for PartitionedAggregateNode {
+impl UserDefinedLogicalNode for PartitionedAggregatePartialNode {
     fn as_any(&self) -> &dyn Any {
         self
     }
 
     fn name(&self) -> &str {
-        "PartitionedAggregate"
+        "PartitionedAggregateFinal"
     }
 
     fn inputs(&self) -> Vec<&LogicalPlan> {
@@ -393,7 +505,7 @@ impl UserDefinedLogicalNode for PartitionedAggregateNode {
     }
 
     fn fmt_for_explain(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "PartitionedAggregate: ")?;
+        write!(f, "PartitionedAggregatePartial: ")?;
         for (expr, name) in &self.agg_expr {
             write!(f, ", agg: {:?} as {:?}", expr, name)?;
         }
@@ -402,15 +514,129 @@ impl UserDefinedLogicalNode for PartitionedAggregateNode {
     }
 
     fn from_template(&self, _: &[Expr], inputs: &[LogicalPlan]) -> Arc<dyn UserDefinedLogicalNode> {
-        let node = PartitionedAggregateNode::try_new(
+        let node = PartitionedAggregatePartialNode::try_new(
             inputs[0].clone(),
             self.partition_inputs.clone(),
-            self.mode.clone(),
             self.partition_col.clone(),
             self.agg_expr.clone(),
         )
         .map_err(QueryError::into_datafusion_plan_error)
         .unwrap();
+
+        Arc::new(node)
+    }
+
+    fn dyn_hash(&self, state: &mut dyn Hasher) {
+        use std::hash::Hash;
+        let mut s = state;
+        self.hash(&mut s);
+    }
+
+    fn dyn_eq(&self, other: &dyn UserDefinedLogicalNode) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            Some(o) => self == o,
+
+            None => false,
+        }
+    }
+}
+
+#[derive(Hash, Eq, PartialEq)]
+pub struct PartitionedAggregateFinalNode {
+    pub input: LogicalPlan,
+    pub agg_expr: Vec<(AggregateExpr, String)>,
+    pub schema: DFSchemaRef,
+}
+
+impl crate::logical_plan::partitioned_aggregate::PartitionedAggregateFinalNode {
+    pub fn try_new(input: LogicalPlan, agg_expr: Vec<(AggregateExpr, String)>) -> Result<Self> {
+        let mut group_cols: HashMap<String, ()> = Default::default();
+        let mut agg_result_fields: Vec<DFField> = Vec::new();
+        let input_schema = input.schema();
+        for (agg, name) in agg_expr.iter() {
+            for group_expr in agg.group_exprs() {
+                group_cols.insert(group_expr.display_name()?, ());
+            }
+
+            for f in agg.fields(input_schema, true)?.iter() {
+                let f = DFField::new_unqualified(
+                    format!("{}_{}", name, f.name()).as_str(),
+                    f.data_type().to_owned(),
+                    f.is_nullable(),
+                );
+                agg_result_fields.push(f.clone());
+            }
+        }
+        let segment_field = DFField::new_unqualified("segment", DataType::Int64, false);
+
+        let group_fields = input_schema
+            .fields()
+            .iter()
+            .filter(|f| group_cols.contains_key(f.name()))
+            .cloned()
+            .collect::<Vec<_>>();
+        let group_fields = [vec![segment_field], group_fields].concat();
+        let fields: Vec<DFField> = [group_fields, agg_result_fields].concat();
+        let schema = DFSchema::new_with_metadata(fields, Default::default())?;
+        let ret = Self {
+            input,
+            agg_expr,
+            schema: Arc::new(schema),
+        };
+
+        Ok(ret)
+    }
+}
+
+impl Debug for crate::logical_plan::partitioned_aggregate::PartitionedAggregateFinalNode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.fmt_for_explain(f)
+    }
+}
+
+impl UserDefinedLogicalNode
+    for crate::logical_plan::partitioned_aggregate::PartitionedAggregateFinalNode
+{
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn name(&self) -> &str {
+        "PartitionedAggregateFinal"
+    }
+
+    fn inputs(&self) -> Vec<&LogicalPlan> {
+        let mut inputs = vec![];
+        inputs.push(&self.input);
+
+        inputs
+    }
+
+    fn schema(&self) -> &DFSchemaRef {
+        &self.schema
+    }
+
+    fn expressions(&self) -> Vec<Expr> {
+        vec![]
+    }
+
+    fn fmt_for_explain(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "PartitionedAggregateFinal: ")?;
+        for (expr, name) in &self.agg_expr {
+            write!(f, ", agg: {:?} as {:?}", expr, name)?;
+        }
+
+        Ok(())
+    }
+
+    fn from_template(&self, _: &[Expr], inputs: &[LogicalPlan]) -> Arc<dyn UserDefinedLogicalNode> {
+        let node =
+            crate::logical_plan::partitioned_aggregate::PartitionedAggregateFinalNode::try_new(
+                inputs[0].clone(),
+                self.agg_expr.clone(),
+            )
+            .map_err(QueryError::into_datafusion_plan_error)
+            .unwrap();
 
         Arc::new(node)
     }

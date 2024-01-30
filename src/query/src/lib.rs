@@ -353,6 +353,7 @@ pub mod test_util {
     use metadata::properties::Type;
     use metadata::MetadataProvider;
     use storage::db::OptiDBImpl;
+    use storage::NamedValue;
 
     use crate::error::Result;
     use crate::physical_plan::planner::QueryPlanner;
@@ -553,9 +554,8 @@ pub mod test_util {
     }
 
     pub async fn run_plan(plan: LogicalPlan) -> Result<Vec<RecordBatch>> {
-        println!("{:?}", plan);
         let runtime = Arc::new(RuntimeEnv::default());
-        let config = SessionConfig::new().with_target_partitions(1);
+        let config = SessionConfig::new().with_target_partitions(12);
         #[allow(deprecated)]
         let session_state = SessionState::with_config_rt(config, runtime)
             .with_query_planner(Arc::new(QueryPlanner {}));

@@ -27,19 +27,21 @@ use datafusion_common::Result as DFResult;
 use crate::error::Result;
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::logical_plan::merge::MergeNode;
-use crate::logical_plan::partitioned_aggregate::Mode;
-use crate::logical_plan::partitioned_aggregate::PartitionedAggregateNode;
+use crate::logical_plan::partitioned_aggregate::PartitionedAggregateFinalNode;
+use crate::logical_plan::partitioned_aggregate::PartitionedAggregatePartialNode;
 use crate::logical_plan::pivot::PivotNode;
 use crate::logical_plan::segment::SegmentNode;
 use crate::logical_plan::unpivot::UnpivotNode;
 use crate::physical_plan::dictionary_decode::DictionaryDecodeExec;
 use crate::physical_plan::merge::MergeExec;
 use crate::physical_plan::pivot::PivotExec;
-use crate::physical_plan::planner::partitioned_aggregate::build_partitioned_aggregate_expr;
+use crate::physical_plan::planner::partitioned_aggregate::build_partitioned_aggregate_final_expr;
+use crate::physical_plan::planner::partitioned_aggregate::build_partitioned_aggregate_partial_expr;
 use crate::physical_plan::planner::segment::build_segment_expr;
 use crate::physical_plan::segment::SegmentExec;
 use crate::physical_plan::segmented_aggregate;
-use crate::physical_plan::segmented_aggregate::SegmentedAggregateExec;
+use crate::physical_plan::segmented_aggregate::SegmentedAggregateFinalExec;
+use crate::physical_plan::segmented_aggregate::SegmentedAggregatePartialExec;
 use crate::physical_plan::unpivot::UnpivotExec;
 
 // use crate::logical_plan::_segmentation::AggregateFunction;
@@ -145,7 +147,7 @@ impl DFExtensionPlanner for ExtensionPlanner {
                 .collect();
             let exec = DictionaryDecodeExec::new(physical_inputs[0].clone(), decode_cols);
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
-        } else if let Some(node) = any.downcast_ref::<PartitionedAggregateNode>() {
+        } else if let Some(node) = any.downcast_ref::<PartitionedAggregatePartialNode>() {
             let partition_inputs = node
                 .partition_inputs
                 .clone()
@@ -162,23 +164,36 @@ impl DFExtensionPlanner for ExtensionPlanner {
                 .clone()
                 .into_iter()
                 .map(|(expr, name)| {
-                    build_partitioned_aggregate_expr(expr, &physical_inputs[0].schema())
+                    build_partitioned_aggregate_partial_expr(expr, &physical_inputs[0].schema())
                         .map(|expr| (Arc::new(Mutex::new(expr)), name))
                 })
                 .collect::<Result<Vec<_>>>()
                 .map_err(|err| DataFusionError::Plan(err.to_string()))?;
-            let mode = match node.mode {
-                Mode::Partial => segmented_aggregate::Mode::Partial,
-                Mode::Final => segmented_aggregate::Mode::Final,
-            };
-            let exec = SegmentedAggregateExec::try_new(
-                mode,
+            let exec = SegmentedAggregatePartialExec::try_new(
                 physical_inputs[0].clone(),
                 partition_inputs,
                 partition_col,
                 agg_expr,
             )
             .map_err(|err| DataFusionError::Plan(err.to_string()))?;
+            Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
+        } else if let Some(node) = any.downcast_ref::<PartitionedAggregateFinalNode>() {
+            let agg_expr = node
+                .agg_expr
+                .clone()
+                .into_iter()
+                .map(|(expr, name)| {
+                    println!(
+                        "build_partitioned_aggregate_expr schema {:?}",
+                        &physical_inputs[0].schema()
+                    );
+                    build_partitioned_aggregate_final_expr(expr, &physical_inputs[0].schema())
+                        .map(|expr| (Arc::new(Mutex::new(expr)), name))
+                })
+                .collect::<Result<Vec<_>>>()
+                .map_err(|err| DataFusionError::Plan(err.to_string()))?;
+            let exec = SegmentedAggregateFinalExec::try_new(physical_inputs[0].clone(), agg_expr)
+                .map_err(|err| DataFusionError::Plan(err.to_string()))?;
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<SegmentNode>() {
             let partition_col = Column::new(

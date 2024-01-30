@@ -13,7 +13,7 @@ def aggregate_property_query(agg, field, group=None, distinct=False, interval="d
         d = "distinct "
 
     q = """select toUnixTimestamp(date_trunc('{interval}',created_at, 'UTC')) as {group}, {agg}({distinct}{field}) as sums
-        from file('store/tables/*/*/*/*.parquet', Parquet) as b
+        from file('store/tables/*/*/*.parquet', Parquet) as b
         where b.event = 6
           and created_at >=
               now() - INTERVAL {period} {period_interval}
@@ -63,7 +63,7 @@ def partitioned_aggregate_property_query(agg, outer_agg, field, group=None, inte
     q = """select c, {group} {outer_agg}(counts)
         from (
                  select toUnixTimestamp(date_trunc('{interval}',created_at, 'UTC')) as c, {group} {inner_agg}({field}) as counts
-                 from file('store/tables/*/*/*/*.parquet', Parquet) as b
+                 from file('store/tables/*/*/*.parquet', Parquet) as b
                  where b.event = 6
                    and created_at >=
                        now() - INTERVAL {period} {period_interval}
@@ -98,7 +98,7 @@ def all_aggregates_query(field, group=None, interval="day", period=2, period_int
 
     q = """select toUnixTimestamp(date_trunc('{interval}',created_at, 'UTC')) as {group}, 
         count({field}), min({field}), max({field}), avg({field}), sum({field})
-        from file('store/tables/*/*/*/*.parquet', Parquet) as b
+        from file('store/tables/*/*/*.parquet', Parquet) as b
         where b.event = 6
           and created_at >=
               now() - INTERVAL {period} {period_interval}
@@ -128,7 +128,7 @@ def all_aggregates_query(field, group=None, interval="day", period=2, period_int
 
 def string_filter_query(query, interval="day", period=2, period_interval="day"):
     q = """select toUnixTimestamp(date_trunc('{interval}',created_at, 'UTC')) as t, count(1)
-        from file('store/tables/*/*/*/*.parquet', Parquet) as b
+        from file('store/tables/*/*/*.parquet', Parquet) as b
         where b.event = 6
           and created_at >=
               now() - INTERVAL {period} {period_interval}
@@ -151,7 +151,7 @@ def string_filter_query(query, interval="day", period=2, period_interval="day"):
 
 def bool_filter_query(query, interval="day", period=2, period_interval="day"):
     q = """select toUnixTimestamp(date_trunc('{interval}',created_at, 'UTC')) as t, count(1)
-        from file('store/tables/*/*/*/*.parquet', Parquet) as b
+        from file('store/tables/*/*/*.parquet', Parquet) as b
         where b.event = 6
           and created_at >=
               now() - INTERVAL {period} {period_interval}

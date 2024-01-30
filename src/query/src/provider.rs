@@ -86,46 +86,15 @@ impl QueryProvider {
                 .with_target_partitions(12),
             runtime,
         )
-        .with_query_planner(Arc::new(QueryPlanner {}))
-        .with_physical_optimizer_rules(vec![]);
+        .with_query_planner(Arc::new(QueryPlanner {}));
         let exec_ctx = SessionContext::new_with_state(state.clone());
         let opts = ParquetReadOptions::default();
 
-        let schema = Schema::new(vec![
-            Field::new(COLUMN_PROJECT_ID, DataType::Int64, false),
-            Field::new(COLUMN_USER_ID, DataType::Int64, false),
-            Field::new(
-                COLUMN_CREATED_AT,
-                DataType::Timestamp(TimeUnit::Nanosecond, None),
-                false,
-            ),
-            Field::new(COLUMN_EVENT, DataType::Int64, false),
-            Field::new("str_20", DataType::Int64, false),
-        ]);
-
-        let batch = RecordBatch::try_new(Arc::new(schema), vec![
-            Arc::new(Int64Array::from(vec![
-                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
-            ])),
-            Arc::new(Int64Array::from(vec![
-                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
-            ])),
-            Arc::new(TimestampNanosecondArray::from(vec![
-                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
-            ])),
-            Arc::new(Int64Array::from(vec![
-                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
-            ])),
-            Arc::new(Int64Array::from(vec![
-                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
-            ])),
-        ])?;
-        let plan = exec_ctx.read_batch(batch)?.into_optimized_plan()?;
-        // let plan = exec_ctx
-        // .read_parquet(self.db.parts_path("events")?, opts)
-        // .await?
-        // .into_optimized_plan()?;
-        // debug!("logical plan: {}", plan.display_indent());
+        let plan = exec_ctx
+            .read_parquet(self.db.parts_path("events")?, opts)
+            .await?
+            .into_optimized_plan()?;
+        debug!("logical plan: {}", plan.display_indent());
 
         Ok((exec_ctx, state, plan))
     }

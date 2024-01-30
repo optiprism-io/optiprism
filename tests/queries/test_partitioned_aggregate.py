@@ -7,6 +7,9 @@ def test_types():
     for field in main.fields:
         for outer_agg in main.aggs:
             for inner_agg in main.aggs:
+                # outer_agg = "min"
+                # inner_agg = "avg"
+                # field="i_64"
                 print("Test Partitioned Aggregate Property {outer}({inner}({field}))".format(outer=outer_agg,
                                                                                              inner=inner_agg,
                                                                                              field=field))
@@ -16,7 +19,8 @@ def test_types():
                 if t2 == "f64" or t2 == "i128" or t2 == "decimal":
                     ch = clickhouse.partitioned_aggregate_property_query(inner_agg, outer_agg, field)
                     op = optiprism.partitioned_aggregate_property_query(inner_agg, outer_agg, field)
-
+                    print(ch)
+                    print(op)
                     for idx, v in enumerate(ch[1]):
                         assert math.isclose(op[1][idx], v, rel_tol=0.0000001)
 
