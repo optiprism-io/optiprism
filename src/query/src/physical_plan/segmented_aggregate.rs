@@ -27,6 +27,8 @@ use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use arrow_row::SortField;
 use axum::async_trait;
+use common::types::COLUMN_PROJECT_ID;
+use common::types::COLUMN_USER_ID;
 use crossbeam::channel::bounded;
 use crossbeam::channel::Sender;
 use datafusion::execution::context::TaskContext;
@@ -35,6 +37,7 @@ use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::expressions::Max;
 use datafusion::physical_expr::Distribution;
 use datafusion::physical_expr::PhysicalExpr;
+use datafusion::physical_expr::PhysicalSortRequirement;
 use datafusion::physical_plan::aggregates::AggregateExec as DFAggregateExec;
 use datafusion::physical_plan::aggregates::AggregateMode;
 use datafusion::physical_plan::aggregates::PhysicalGroupBy;
@@ -211,8 +214,22 @@ impl ExecutionPlan for SegmentedAggregatePartialExec {
         self.schema.clone()
     }
 
+    fn required_input_ordering(&self) -> Vec<Option<Vec<PhysicalSortRequirement>>> {
+        let sort = vec![
+            PhysicalSortRequirement {
+                expr: col(COLUMN_PROJECT_ID, &self.input.schema()).unwrap(),
+                options: None,
+            },
+            PhysicalSortRequirement {
+                expr: col(COLUMN_USER_ID, &self.input.schema()).unwrap(),
+                options: None,
+            },
+        ];
+        vec![Some(sort); self.children().len()]
+    }
+
     fn output_partitioning(&self) -> Partitioning {
-        Partitioning::UnknownPartitioning(12) //with_target
+        Partitioning::UnknownPartitioning(self.input.output_partitioning().partition_count()) //with_target
     }
 
     fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {

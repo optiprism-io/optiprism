@@ -195,7 +195,7 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
         .unwrap()
         .duration_trunc(Duration::days(1))?;
 
-    let users = 100;
+    let users = 10;
     let days = 365;
     let events = 20;
     let total = (users * days * events) as u64;

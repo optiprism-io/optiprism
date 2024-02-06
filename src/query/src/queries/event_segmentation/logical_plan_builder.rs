@@ -245,34 +245,15 @@ impl LogicalPlanBuilder {
             .iter()
             .map(|s| Expr::Column(Column::from_qualified_name(s.as_str())))
             .collect::<Vec<_>>();
-
-        let input = LogicalPlan::Projection(Projection::try_new(proj_cols, Arc::new(input))?);
-        // let mut input = LogicalPlan::Repartition(Repartition {
+        // let input = LogicalPlan::Repartition(Repartition {
         //     input: Arc::new(input),
         //     partitioning_scheme: Partitioning::Hash(
         //         vec![col(COLUMN_PROJECT_ID), col(COLUMN_USER_ID)],
         //         12,
-        //     ), // with_target
+        //     ), // with_target_partitions
         // });
-        let input = {
-            let c1 = Expr::Sort(expr::Sort {
-                expr: Box::new(col(COLUMN_PROJECT_ID)),
-                asc: true,
-                nulls_first: false,
-            });
+        // let input = LogicalPlan::Projection(Projection::try_new(proj_cols, Arc::new(input))?);
 
-            let c2 = Expr::Sort(expr::Sort {
-                expr: Box::new(col(COLUMN_USER_ID)),
-                asc: true,
-                nulls_first: false,
-            });
-
-            LogicalPlan::Sort(Sort {
-                expr: vec![c1, c2],
-                input: Arc::new(input),
-                fetch: None,
-            })
-        };
         let mut cols_hash: HashMap<String, ()> = HashMap::new();
 
         let mut input = builder.decode_filter_dictionaries(input, &mut cols_hash)?;
@@ -457,14 +438,33 @@ impl LogicalPlanBuilder {
         event_id: usize,
         segment_inputs: Option<Vec<LogicalPlan>>,
     ) -> Result<LogicalPlan> {
-        let mut input = self.build_filter_logical_plan(input.clone(), &self.es.events[event_id])?;
+        let input = self.build_filter_logical_plan(input.clone(), &self.es.events[event_id])?;
+
+        let input = {
+            let c1 = Expr::Sort(expr::Sort {
+                expr: Box::new(col(COLUMN_PROJECT_ID)),
+                asc: true,
+                nulls_first: false,
+            });
+
+            let c2 = Expr::Sort(expr::Sort {
+                expr: Box::new(col(COLUMN_USER_ID)),
+                asc: true,
+                nulls_first: false,
+            });
+
+            LogicalPlan::Sort(Sort {
+                expr: vec![c1, c2],
+                input: Arc::new(input),
+                fetch: None,
+            })
+        };
         let (mut input, group_expr) = self.build_aggregate_logical_plan(
             input,
             &self.es.events[event_id],
             event_id,
             segment_inputs,
         )?;
-
         // unpivot aggregate values into value column
         if self.ctx.format != Format::Compact {
             input = {
@@ -533,7 +533,6 @@ impl LogicalPlanBuilder {
                 })
             };
         }
-
         Ok(input)
     }
 

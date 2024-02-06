@@ -24,6 +24,8 @@ use datafusion::datasource::DefaultTableSource;
 use datafusion::datasource::TableProvider;
 use datafusion::execution::context::SessionState;
 use datafusion::execution::runtime_env::RuntimeEnv;
+use datafusion::optimizer::optimize_projections::OptimizeProjections;
+use datafusion::optimizer::push_down_filter::PushDownFilter;
 use datafusion::physical_optimizer::coalesce_batches::CoalesceBatches;
 use datafusion::physical_optimizer::enforce_distribution::EnforceDistribution;
 use datafusion::physical_optimizer::enforce_sorting::EnforceSorting;
@@ -35,6 +37,9 @@ use datafusion::physical_plan::display::DisplayableExecutionPlan;
 use datafusion::prelude::ParquetReadOptions;
 use datafusion::prelude::SessionConfig;
 use datafusion::prelude::SessionContext;
+use datafusion_expr::col;
+use datafusion_expr::expr::Sort;
+use datafusion_expr::Expr;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::LogicalPlanBuilder;
 use datafusion_expr::Partitioning;
@@ -86,9 +91,25 @@ impl QueryProvider {
                 .with_target_partitions(12),
             runtime,
         )
-        .with_query_planner(Arc::new(QueryPlanner {}));
+        .with_query_planner(Arc::new(QueryPlanner {}))
+        /*.with_optimizer_rules(vec![
+            // Arc::new(OptimizeProjections::new()),
+            // Arc::new(PushDownFilter::new()),
+        ])
+        .with_physical_optimizer_rules(vec![Arc::new(ProjectionPushdown::new())])*/;
         let exec_ctx = SessionContext::new_with_state(state.clone());
-        let opts = ParquetReadOptions::default();
+        let c1 = Sort {
+            expr: Box::new(col(COLUMN_PROJECT_ID)),
+            asc: false,
+            nulls_first: false,
+        };
+        let c2 = Sort {
+            expr: Box::new(col(COLUMN_USER_ID)),
+            asc: false,
+            nulls_first: false,
+        };
+        let opts = ParquetReadOptions::default()
+            .file_sort_order(vec![vec![Expr::Sort(c1)], vec![Expr::Sort(c2)]]);
 
         let plan = exec_ctx
             .read_parquet(self.db.parts_path("events")?, opts)

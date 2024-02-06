@@ -15,6 +15,8 @@ use common::query;
 use common::query::PartitionedAggregateFunction;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
+use datafusion::optimizer::OptimizerConfig;
+use datafusion::optimizer::OptimizerRule;
 use datafusion_common::Column;
 use datafusion_common::DFField;
 use datafusion_common::DFSchema;
@@ -22,6 +24,7 @@ use datafusion_common::DFSchemaRef;
 use datafusion_expr::Expr;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::UserDefinedLogicalNode;
+use datafusion_expr::UserDefinedLogicalNodeCore;
 
 use crate::error::QueryError;
 use crate::Result;
@@ -423,6 +426,12 @@ pub struct PartitionedAggregatePartialNode {
     pub schema: DFSchemaRef,
 }
 
+impl Debug for PartitionedAggregatePartialNode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Eq")
+    }
+}
+
 impl PartitionedAggregatePartialNode {
     pub fn try_new(
         input: LogicalPlan,
@@ -471,19 +480,14 @@ impl PartitionedAggregatePartialNode {
     }
 }
 
-impl Debug for PartitionedAggregatePartialNode {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        self.fmt_for_explain(f)
-    }
-}
-
-impl UserDefinedLogicalNode for PartitionedAggregatePartialNode {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
+// impl Debug for PartitionedAggregatePartialNode {
+// fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+// self.fmt_for_explain(f)
+// }
+// }
+impl UserDefinedLogicalNodeCore for PartitionedAggregatePartialNode {
     fn name(&self) -> &str {
-        "PartitionedAggregateFinal"
+        "sdf"
     }
 
     fn inputs(&self) -> Vec<&LogicalPlan> {
@@ -501,7 +505,10 @@ impl UserDefinedLogicalNode for PartitionedAggregatePartialNode {
     }
 
     fn expressions(&self) -> Vec<Expr> {
-        vec![]
+        vec![Expr::Column(Column {
+            relation: None,
+            name: "project_id".to_string(),
+        })]
     }
 
     fn fmt_for_explain(&self, f: &mut Formatter) -> std::fmt::Result {
@@ -513,7 +520,7 @@ impl UserDefinedLogicalNode for PartitionedAggregatePartialNode {
         Ok(())
     }
 
-    fn from_template(&self, _: &[Expr], inputs: &[LogicalPlan]) -> Arc<dyn UserDefinedLogicalNode> {
+    fn from_template(&self, exprs: &[Expr], inputs: &[LogicalPlan]) -> Self {
         let node = PartitionedAggregatePartialNode::try_new(
             inputs[0].clone(),
             self.partition_inputs.clone(),
@@ -523,24 +530,75 @@ impl UserDefinedLogicalNode for PartitionedAggregatePartialNode {
         .map_err(QueryError::into_datafusion_plan_error)
         .unwrap();
 
-        Arc::new(node)
-    }
-
-    fn dyn_hash(&self, state: &mut dyn Hasher) {
-        use std::hash::Hash;
-        let mut s = state;
-        self.hash(&mut s);
-    }
-
-    fn dyn_eq(&self, other: &dyn UserDefinedLogicalNode) -> bool {
-        match other.as_any().downcast_ref::<Self>() {
-            Some(o) => self == o,
-
-            None => false,
-        }
+        node
     }
 }
-
+// impl UserDefinedLogicalNode for PartitionedAggregatePartialNode {
+// fn as_any(&self) -> &dyn Any {
+// self
+// }
+//
+// fn name(&self) -> &str {
+// "PartitionedAggregatePartial"
+// }
+//
+// fn inputs(&self) -> Vec<&LogicalPlan> {
+// let mut inputs = vec![];
+// inputs.push(&self.input);
+// if let Some(pi) = &self.partition_inputs {
+// inputs.extend(pi.iter());
+// }
+//
+// inputs
+// }
+//
+// fn schema(&self) -> &DFSchemaRef {
+// &self.schema
+// }
+//
+// fn expressions(&self) -> Vec<Expr> {
+// vec![Expr::Column(Column {
+// relation: None,
+// name: "project_id".to_string(),
+// })]
+// }
+//
+// fn fmt_for_explain(&self, f: &mut Formatter) -> std::fmt::Result {
+// write!(f, "PartitionedAggregatePartial: ")?;
+// for (expr, name) in &self.agg_expr {
+// write!(f, ", agg: {:?} as {:?}", expr, name)?;
+// }
+//
+// Ok(())
+// }
+//
+// fn from_template(&self, _: &[Expr], inputs: &[LogicalPlan]) -> Arc<dyn UserDefinedLogicalNode> {
+// let node = PartitionedAggregatePartialNode::try_new(
+// inputs[0].clone(),
+// self.partition_inputs.clone(),
+// self.partition_col.clone(),
+// self.agg_expr.clone(),
+// )
+// .map_err(QueryError::into_datafusion_plan_error)
+// .unwrap();
+//
+// Arc::new(node)
+// }
+//
+// fn dyn_hash(&self, state: &mut dyn Hasher) {
+// use std::hash::Hash;
+// let mut s = state;
+// self.hash(&mut s);
+// }
+//
+// fn dyn_eq(&self, other: &dyn UserDefinedLogicalNode) -> bool {
+// match other.as_any().downcast_ref::<Self>() {
+// Some(o) => self == o,
+//
+// None => false,
+// }
+// }
+// }
 #[derive(Hash, Eq, PartialEq)]
 pub struct PartitionedAggregateFinalNode {
     pub input: LogicalPlan,
