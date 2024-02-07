@@ -25,6 +25,7 @@ use datafusion::physical_planner::ExtensionPlanner as DFExtensionPlanner;
 use datafusion_common::Result as DFResult;
 
 use crate::error::Result;
+use crate::logical_plan::add_string_column::AddStringColumnNode;
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::logical_plan::merge::MergeNode;
 use crate::logical_plan::partitioned_aggregate::PartitionedAggregateFinalNode;
@@ -32,6 +33,7 @@ use crate::logical_plan::partitioned_aggregate::PartitionedAggregatePartialNode;
 use crate::logical_plan::pivot::PivotNode;
 use crate::logical_plan::segment::SegmentNode;
 use crate::logical_plan::unpivot::UnpivotNode;
+use crate::physical_plan::add_string_column::AddStringColumnExec;
 use crate::physical_plan::dictionary_decode::DictionaryDecodeExec;
 use crate::physical_plan::merge::MergeExec;
 use crate::physical_plan::pivot::PivotExec;
@@ -101,9 +103,12 @@ impl DFExtensionPlanner for ExtensionPlanner {
         _ctx_state: &SessionState,
     ) -> DFResult<Option<Arc<dyn ExecutionPlan>>> {
         let any = node.as_any();
-        let plan = if any.downcast_ref::<MergeNode>().is_some() {
-            let exec = MergeExec::try_new(physical_inputs.to_vec())
+        let plan = if let Some(node) = any.downcast_ref::<MergeNode>() {
+            let exec = MergeExec::try_new(physical_inputs.to_vec(), node.names.clone())
                 .map_err(|err| DataFusionError::Plan(err.to_string()))?;
+            Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
+        } else if let Some(node) = any.downcast_ref::<AddStringColumnNode>() {
+            let exec = AddStringColumnExec::new(physical_inputs[0].clone(), node.col.clone());
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<UnpivotNode>() {
             let exec = UnpivotExec::try_new(
@@ -183,10 +188,6 @@ impl DFExtensionPlanner for ExtensionPlanner {
                 .clone()
                 .into_iter()
                 .map(|(expr, name)| {
-                    println!(
-                        "build_partitioned_aggregate_expr schema {:?}",
-                        &physical_inputs[0].schema()
-                    );
                     build_partitioned_aggregate_final_expr(expr, &physical_inputs[0].schema())
                         .map(|expr| (Arc::new(Mutex::new(expr)), name))
                 })

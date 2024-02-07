@@ -6,6 +6,9 @@ use std::hash::Hash;
 use std::hash::Hasher;
 use std::sync::Arc;
 
+use arrow::datatypes::DataType;
+use arrow::datatypes::Schema;
+use datafusion_common::DFField;
 use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;
 use datafusion_expr::Expr;
@@ -18,17 +21,32 @@ use crate::Result;
 #[derive(Hash, Eq, PartialEq)]
 pub struct MergeNode {
     inputs: Vec<LogicalPlan>,
+    pub names: Option<(String, Vec<String>)>,
     schema: DFSchemaRef,
 }
 
 impl MergeNode {
-    pub fn try_new(inputs: Vec<LogicalPlan>) -> Result<Self> {
+    pub fn try_new(inputs: Vec<LogicalPlan>, names: Option<(String, Vec<String>)>) -> Result<Self> {
         let mut schema = DFSchema::new_with_metadata(vec![], HashMap::new())?;
         for input in inputs.iter() {
             schema.merge(input.schema());
         }
+
+        schema = if let Some((col_name, _)) = names.clone() {
+            DFSchema::new_with_metadata(
+                vec![
+                    vec![DFField::new_unqualified(&col_name, DataType::Utf8, false)],
+                    schema.fields().to_vec(),
+                ]
+                .concat(),
+                HashMap::default(),
+            )?
+        } else {
+            schema
+        };
         Ok(Self {
             inputs,
+            names,
             schema: Arc::new(schema),
         })
     }
@@ -67,7 +85,7 @@ impl UserDefinedLogicalNode for MergeNode {
 
     fn from_template(&self, _: &[Expr], inputs: &[LogicalPlan]) -> Arc<dyn UserDefinedLogicalNode> {
         Arc::new(
-            MergeNode::try_new(inputs.to_vec())
+            MergeNode::try_new(inputs.to_vec(), self.names.clone())
                 .map_err(QueryError::into_datafusion_plan_error)
                 .unwrap(),
         )

@@ -7,12 +7,16 @@ use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
 
+use arrow::array::new_null_array;
 use arrow::array::ArrayRef;
+use arrow::datatypes::DataType;
+use arrow::datatypes::Field;
 use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use axum::async_trait;
 use datafusion::execution::context::TaskContext;
+use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_plan::expressions::PhysicalSortExpr;
 use datafusion::physical_plan::metrics::BaselineMetrics;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
@@ -35,17 +39,33 @@ use crate::Result;
 #[derive(Debug)]
 pub struct MergeExec {
     inputs: Vec<Arc<dyn ExecutionPlan>>,
+    names: Option<(String, Vec<String>)>,
     schema: SchemaRef,
     metrics: ExecutionPlanMetricsSet,
 }
 
 impl MergeExec {
-    pub fn try_new(inputs: Vec<Arc<dyn ExecutionPlan>>) -> Result<Self> {
+    pub fn try_new(
+        inputs: Vec<Arc<dyn ExecutionPlan>>,
+        names: Option<(String, Vec<String>)>,
+    ) -> Result<Self> {
         let schemas: Vec<Schema> = inputs.iter().map(|i| i.schema().deref().clone()).collect();
         let schema = Schema::try_merge(schemas)?;
+        let schema = if let Some((col, names)) = &names {
+            let fields = vec![
+                vec![Field::new(col, DataType::Utf8, false)],
+                schema.fields.iter().map(|f| f.deref().to_owned()).collect(),
+            ]
+            .concat();
+
+            Schema::new(fields)
+        } else {
+            schema
+        };
 
         Ok(Self {
             inputs,
+            names,
             schema: Arc::new(schema),
             metrics: ExecutionPlanMetricsSet::new(),
         })
@@ -85,7 +105,8 @@ impl ExecutionPlan for MergeExec {
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
         Ok(Arc::new(
-            MergeExec::try_new(children).map_err(QueryError::into_datafusion_execution_error)?,
+            MergeExec::try_new(children, self.names.clone())
+                .map_err(QueryError::into_datafusion_execution_error)?,
         ))
     }
 
@@ -103,6 +124,7 @@ impl ExecutionPlan for MergeExec {
         let _baseline_metrics = BaselineMetrics::new(&self.metrics, partition);
         Ok(Box::pin(MergeStream {
             streams,
+            names: self.names.clone().map(|(_, names)| names),
             stream_idx: 0,
             schema: self.schema.clone(),
             baseline_metrics: BaselineMetrics::new(&self.metrics, partition),
@@ -120,6 +142,7 @@ impl ExecutionPlan for MergeExec {
 
 struct MergeStream {
     streams: Vec<SendableRecordBatchStream>,
+    names: Option<Vec<String>>,
     stream_idx: usize,
     schema: SchemaRef,
     baseline_metrics: BaselineMetrics,
@@ -141,12 +164,19 @@ impl MergeStream {
                         .schema
                         .fields()
                         .iter()
+                        .enumerate()
                         .map(
-                            |field| match batch.schema().index_of(field.name().as_str()) {
+                            |(idx, field)| match batch.schema().index_of(field.name().as_str()) {
                                 Ok(col_idx) => Ok(batch.column(col_idx).clone()),
                                 Err(_) => {
-                                    let v = ScalarValue::try_from(field.data_type())?;
-                                    Ok(v.to_array_of_size(batch.column(0).len())?)
+                                    if idx == 0
+                                        && let Some(names) = &self.names
+                                    {
+                                        let sv = ScalarValue::from(names[self.stream_idx].clone());
+                                        sv.to_array_of_size(batch.column(0).len())
+                                    } else {
+                                        Ok(new_null_array(field.data_type(), batch.column(0).len()))
+                                    }
                                 }
                             },
                         )
@@ -291,7 +321,15 @@ mod tests {
             Arc::new(MemoryExec::try_new(&[batches], schema, None).unwrap())
         };
 
-        let mux = MergeExec::try_new(vec![input1, input2, input3]).unwrap();
+        let mux = MergeExec::try_new(
+            vec![input1, input2, input3],
+            Some(("test".to_string(), vec![
+                "f1".to_string(),
+                "f2".to_string(),
+                "f3".to_string(),
+            ])),
+        )
+        .unwrap();
         let session_ctx = SessionContext::new();
         let task_ctx = session_ctx.task_ctx();
         let stream = mux.execute(0, task_ctx)?;

@@ -50,6 +50,7 @@ use crate::expr::event_filters_expression;
 use crate::expr::property_col;
 use crate::expr::property_expression;
 use crate::expr::time_expression;
+use crate::logical_plan::add_string_column::AddStringColumnNode;
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::logical_plan::merge::MergeNode;
 use crate::logical_plan::partitioned_aggregate;
@@ -259,7 +260,15 @@ impl LogicalPlanBuilder {
         let mut input = builder.decode_filter_dictionaries(input, &mut cols_hash)?;
         // build main query
         input = match events.len() {
-            1 => builder.build_event_logical_plan(input.clone(), 0, segment_inputs)?,
+            1 => {
+                let input = builder.build_event_logical_plan(input.clone(), 0, segment_inputs)?;
+                LogicalPlan::Extension(Extension {
+                    node: Arc::new(AddStringColumnNode::try_new(
+                        input,
+                        ("event".to_string(), events[0].event.name()),
+                    )?),
+                })
+            }
             _ => {
                 let mut inputs: Vec<LogicalPlan> = vec![];
                 for idx in 0..events.len() {
@@ -271,10 +280,16 @@ impl LogicalPlanBuilder {
 
                     inputs.push(input);
                 }
-
+                let event_names = events
+                    .iter()
+                    .map(|event| event.event.name())
+                    .collect::<Vec<_>>();
                 // merge multiple results into one schema
                 LogicalPlan::Extension(Extension {
-                    node: Arc::new(MergeNode::try_new(inputs)?),
+                    node: Arc::new(MergeNode::try_new(
+                        inputs,
+                        Some(("event".to_string(), event_names)),
+                    )?),
                 })
             }
         };
