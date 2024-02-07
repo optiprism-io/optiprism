@@ -4,6 +4,8 @@ use std::time::Instant;
 
 use arrow::array::ArrayRef;
 use arrow::array::Int64Array;
+use arrow::array::StringArray;
+use arrow::array::StringBuilder;
 use arrow::array::TimestampNanosecondArray;
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
@@ -212,13 +214,22 @@ impl QueryProvider {
             .map(|(idx, field)| {
                 let typ = match metric_cols.contains(field.name()) {
                     true => ColumnType::MetricValue,
-                    false => {
-                        if field.name() == COL_AGG_NAME {
-                            ColumnType::Dimension
-                        } else {
-                            ColumnType::Metric
-                        }
+                    false => ColumnType::Dimension,
+                };
+
+                let arr = if field.name() == COL_AGG_NAME {
+                    let mut res = StringBuilder::new();
+                    let col = result.column(idx);
+                    for v in col.as_any().downcast_ref::<StringArray>().unwrap().iter() {
+                        let v = v.unwrap();
+                        let parts = v.split('_').collect::<Vec<&str>>();
+                        let event_id = parts[0].parse::<usize>().unwrap();
+                        let query_id = parts[1].parse::<usize>().unwrap();
+                        res.append_value(req.events[event_id].queries[query_id].agg.name());
                     }
+                    Arc::new(res.finish())
+                } else {
+                    result.column(idx).to_owned()
                 };
 
                 Column {
@@ -226,7 +237,7 @@ impl QueryProvider {
                     typ,
                     is_nullable: field.is_nullable(),
                     data_type: field.data_type().to_owned(),
-                    data: result.column(idx).to_owned(),
+                    data: arr,
                 }
             })
             .collect();
