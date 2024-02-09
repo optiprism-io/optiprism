@@ -61,6 +61,7 @@ pub mod datasources;
 pub mod error;
 pub mod expr;
 pub mod logical_plan;
+pub mod physical_optimizer;
 pub mod physical_plan;
 pub mod provider;
 pub mod queries;
@@ -558,8 +559,9 @@ pub mod test_util {
         let config = SessionConfig::new().with_target_partitions(12);
         #[allow(deprecated)]
         let session_state = SessionState::with_config_rt(config, runtime)
-            .with_query_planner(Arc::new(QueryPlanner {}));
-        // .with_optimizer_rules(vec![]);
+            .with_query_planner(Arc::new(QueryPlanner {}))
+            .with_optimizer_rules(vec![])
+            .with_physical_optimizer_rules(vec![]);
         #[allow(deprecated)]
         let exec_ctx = SessionContext::with_state(session_state.clone());
         let physical_plan = session_state.create_physical_plan(&plan).await?;

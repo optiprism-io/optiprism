@@ -15,6 +15,7 @@ mod segment;
 mod segmented_aggregate;
 // mod sf;
 mod add_string_column;
+mod db_parquet;
 mod unpivot;
 // pub mod merge;
 // pub mod planner;

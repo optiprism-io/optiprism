@@ -451,10 +451,120 @@ fn flush(
     Ok(log)
 }
 
+pub struct ScanStream {
+    iter: Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>,
+    start_time: Instant,
+    table_name: String, // for metrics
+}
+
+impl ScanStream {
+    pub fn new(
+        iter: Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>,
+        table_name: String,
+    ) -> Self {
+        Self {
+            iter,
+            start_time: Instant::now(),
+            table_name,
+        }
+    }
+}
+
+impl Stream for ScanStream {
+    type Item = Result<Chunk<Box<dyn Array>>>;
+
+    fn poll_next(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        match self.iter.next() {
+            None => {
+                histogram!("store.scan_time_seconds","table"=>self.table_name.to_string())
+                    .record(self.start_time.elapsed());
+                Poll::Ready(None)
+            }
+            Some(chunk) => {
+                let chunk = chunk?;
+                Poll::Ready(Some(Ok(chunk)))
+            }
+        }
+    }
+}
+
 impl OptiDBImpl {
     // #[instrument(level = "trace")]
     pub fn open(path: PathBuf, opts: Options) -> Result<Self> {
         recover(path, opts)
+    }
+
+    pub fn scan(&self, tbl_name: &str, projection: Vec<usize>) -> Result<ScanStream> {
+        let tables = self.tables.read();
+        let tbl = tables.iter().find(|t| t.name == tbl_name);
+        let tbl = match tbl {
+            None => return Err(StoreError::Internal("table not found".to_string())),
+            Some(tbl) => tbl.to_owned(),
+        };
+
+        drop(tables);
+        // locking compactor file operations (deleting/moving) to prevent parts deletion during scanning
+        let _vfs = tbl.vfs.lock.lock();
+        let md = tbl.metadata.lock();
+        let metadata = md.clone();
+        drop(md);
+
+        let start_time = Instant::now();
+        let memtable = tbl.memtable.lock();
+
+        let projected_fields = metadata
+            .schema
+            .fields
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, f)| {
+                if projection.contains(&idx) {
+                    Some(f.clone())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let maybe_chunk = memtable.chunk(Some(projection), metadata.opts.index_cols)?;
+        histogram!("store.scan_memtable_seconds","table"=>tbl_name.to_string())
+            .record(start_time.elapsed());
+        let mut rdrs = vec![];
+        // todo remove?
+
+        for (level_id, level) in metadata.levels.into_iter().enumerate() {
+            for part in level.parts {
+                let path = part_path(&self.path, tbl_name, level_id, part.id);
+                let rdr = BufReader::new(File::open(path)?);
+                rdrs.push(rdr);
+            }
+        }
+        counter!("store.scan_parts_total", "table"=>tbl_name.to_string())
+            .increment(rdrs.len() as u64);
+        let iter = if rdrs.is_empty() {
+            Box::new(MemChunkIterator::new(maybe_chunk))
+                as Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>
+        } else {
+            let opts = arrow_merger::Options {
+                index_cols: metadata.opts.merge_index_cols,
+                array_size: metadata.opts.merge_array_size,
+                chunk_size: metadata.opts.merge_chunk_size,
+                fields: projected_fields
+                    .iter()
+                    .map(|f| f.name.clone())
+                    .collect::<Vec<_>>(),
+            };
+            // todo fix
+            Box::new(MergingIterator::new(
+                rdrs,
+                maybe_chunk,
+                Schema::from(projected_fields),
+                opts,
+            )?) as Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>
+        };
+
+        counter!("store.scans_total", "table"=>tbl_name.to_string()).increment(1);
+        Ok(ScanStream::new(iter, tbl_name.to_string()))
     }
 
     // #[instrument(level = "trace", skip(self))]

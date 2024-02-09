@@ -38,6 +38,7 @@ use datafusion::physical_expr::expressions::Max;
 use datafusion::physical_expr::Distribution;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalSortRequirement;
+use datafusion::physical_optimizer::PhysicalOptimizerRule;
 use datafusion::physical_plan::aggregates::AggregateExec as DFAggregateExec;
 use datafusion::physical_plan::aggregates::AggregateMode;
 use datafusion::physical_plan::aggregates::PhysicalGroupBy;
@@ -55,6 +56,7 @@ use datafusion::physical_plan::RecordBatchStream;
 use datafusion::physical_plan::SendableRecordBatchStream;
 use datafusion::physical_plan::Statistics;
 use datafusion::prelude::SessionContext;
+use datafusion_common::config::ConfigOptions;
 use datafusion_common::Result as DFResult;
 use datafusion_common::ScalarValue;
 use futures::executor::block_on;
@@ -123,7 +125,25 @@ macro_rules! combine_results {
         $res_batches.push(result);
     }};
 }
+struct SegmentedAggregatePartialOptimizationRule {}
 
+impl PhysicalOptimizerRule for SegmentedAggregatePartialOptimizationRule {
+    fn optimize(
+        &self,
+        plan: Arc<dyn ExecutionPlan>,
+        config: &ConfigOptions,
+    ) -> DFResult<Arc<dyn ExecutionPlan>> {
+        todo!()
+    }
+
+    fn name(&self) -> &str {
+        "PartitionedAggregatePartial"
+    }
+
+    fn schema_check(&self) -> bool {
+        todo!()
+    }
+}
 type NamedAggExpr = (Arc<Mutex<Box<dyn PartitionedAggregateExpr>>>, String);
 #[derive(Debug)]
 pub struct SegmentedAggregatePartialExec {
@@ -215,17 +235,18 @@ impl ExecutionPlan for SegmentedAggregatePartialExec {
     }
 
     fn required_input_ordering(&self) -> Vec<Option<Vec<PhysicalSortRequirement>>> {
-        let sort = vec![
-            PhysicalSortRequirement {
-                expr: col(COLUMN_PROJECT_ID, &self.input.schema()).unwrap(),
-                options: None,
-            },
-            PhysicalSortRequirement {
-                expr: col(COLUMN_USER_ID, &self.input.schema()).unwrap(),
-                options: None,
-            },
-        ];
-        vec![Some(sort); self.children().len()]
+        vec![None; self.children().len()]
+        // let sort = vec![
+        // PhysicalSortRequirement {
+        // expr: col(COLUMN_PROJECT_ID, &self.input.schema()).unwrap(),
+        // options: None,
+        // },
+        // PhysicalSortRequirement {
+        // expr: col(COLUMN_USER_ID, &self.input.schema()).unwrap(),
+        // options: None,
+        // },
+        // ];
+        // vec![Some(sort); self.children().len()]
     }
 
     fn output_partitioning(&self) -> Partitioning {

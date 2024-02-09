@@ -42,6 +42,7 @@ use datafusion::prelude::SessionContext;
 use datafusion_expr::col;
 use datafusion_expr::expr::Sort;
 use datafusion_expr::Expr;
+use datafusion_expr::Extension;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::LogicalPlanBuilder;
 use datafusion_expr::Partitioning;
@@ -50,6 +51,8 @@ use storage::db::OptiDBImpl;
 use tracing::debug;
 
 use crate::col_name;
+use crate::logical_plan::db_parquet::DbParquetNode;
+use crate::physical_optimizer::apply_parquet_projection::ApplyParquetProjection;
 use crate::physical_plan::planner::QueryPlanner;
 use crate::queries::event_records_search;
 use crate::queries::event_records_search::EventRecordsSearch;
@@ -85,39 +88,35 @@ impl QueryProvider {
 }
 
 impl QueryProvider {
-    pub async fn initial_plan(&self) -> Result<(SessionContext, SessionState, LogicalPlan)> {
+    pub async fn initial_plan(
+        &self,
+        projection: Option<Vec<usize>>,
+    ) -> Result<(SessionContext, SessionState, LogicalPlan)> {
         let runtime = Arc::new(RuntimeEnv::default());
-        let state = SessionState::new_with_config_rt(
+        let mut state = SessionState::new_with_config_rt(
             SessionConfig::new()
                 .with_collect_statistics(true)
                 .with_target_partitions(12),
             runtime,
         )
-        .with_query_planner(Arc::new(QueryPlanner {}))
-        /*.with_optimizer_rules(vec![
-            // Arc::new(OptimizeProjections::new()),
-            // Arc::new(PushDownFilter::new()),
-        ])
-        .with_physical_optimizer_rules(vec![Arc::new(ProjectionPushdown::new())])*/;
-        let exec_ctx = SessionContext::new_with_state(state.clone());
-        let c1 = Sort {
-            expr: Box::new(col(COLUMN_PROJECT_ID)),
-            asc: false,
-            nulls_first: false,
-        };
-        let c2 = Sort {
-            expr: Box::new(col(COLUMN_USER_ID)),
-            asc: false,
-            nulls_first: false,
-        };
-        let opts = ParquetReadOptions::default()
-            .file_sort_order(vec![vec![Expr::Sort(c1)], vec![Expr::Sort(c2)]]);
+        .with_query_planner(Arc::new(QueryPlanner {}));
 
-        let plan = exec_ctx
-            .read_parquet(self.db.parts_path("events")?, opts)
-            .await?
-            .into_optimized_plan()?;
-        debug!("logical plan: {}", plan.display_indent());
+        // if let Some(projection) = projection {
+        // state = state
+        // .add_physical_optimizer_rule(Arc::new(ApplyParquetProjection::new(projection)));
+        // }
+        // .with_optimizer_rules(vec![
+        // Arc::new(OptimizeProjections::new()),
+        // Arc::new(PushDownFilter::new()),
+        // ])
+        // .with_physical_optimizer_rules(vec![Arc::new(ProjectionPushdown::new())])
+        let exec_ctx = SessionContext::new_with_state(state.clone());
+        let plan = LogicalPlan::Extension(Extension {
+            node: Arc::new(DbParquetNode::try_new(
+                self.db.clone(),
+                projection.unwrap().clone(),
+            )?),
+        });
 
         Ok((exec_ctx, state, plan))
     }
@@ -141,7 +140,7 @@ impl QueryProvider {
 
     pub async fn property_values(&self, ctx: Context, req: PropertyValues) -> Result<ArrayRef> {
         let start = Instant::now();
-        let (session_ctx, state, plan) = self.initial_plan().await?;
+        let (session_ctx, state, plan) = self.initial_plan(None).await?;
         let plan = property_values::LogicalPlanBuilder::build(
             ctx,
             self.metadata.clone(),
@@ -162,7 +161,7 @@ impl QueryProvider {
         req: EventRecordsSearch,
     ) -> Result<DataTable> {
         let start = Instant::now();
-        let (session_ctx, state, plan) = self.initial_plan().await?;
+        let (session_ctx, state, plan) = self.initial_plan(None).await?;
         let plan = event_records_search::build(ctx, self.metadata.clone(), plan, req.clone())?;
 
         let result = self.execute(session_ctx, state, plan).await?;
@@ -192,7 +191,15 @@ impl QueryProvider {
         req: EventSegmentation,
     ) -> Result<DataTable> {
         let start = Instant::now();
-        let (session_ctx, state, plan) = self.initial_plan().await?;
+        let schema = self.db.schema1("events")?;
+        let projection = event_segmentation_projection(&ctx, &req, &self.metadata)?;
+        let projection = Some(
+            projection
+                .iter()
+                .map(|x| schema.index_of(x).unwrap())
+                .collect(),
+        );
+        let (session_ctx, state, plan) = self.initial_plan(projection).await?;
         let plan = event_segmentation::logical_plan_builder::LogicalPlanBuilder::build(
             ctx.clone(),
             self.metadata.clone(),
@@ -245,18 +252,76 @@ impl QueryProvider {
         Ok(DataTable::new(result.schema(), cols))
     }
 }
-fn prop_val_fields(
+
+fn event_segmentation_projection(
     ctx: &Context,
-    req: &PropertyValues,
-    md: Arc<MetadataProvider>,
+    req: &EventSegmentation,
+    md: &Arc<MetadataProvider>,
 ) -> Result<Vec<String>> {
-    let fields = vec![
+    let mut fields = vec![
         COLUMN_PROJECT_ID.to_string(),
         COLUMN_USER_ID.to_string(),
         COLUMN_CREATED_AT.to_string(),
         COLUMN_EVENT.to_string(),
-        col_name(ctx, &req.property, &md)?,
     ];
+
+    for event in &req.events {
+        if let Some(filters) = &event.filters {
+            for filter in filters {
+                match filter {
+                    EventFilter::Property { property, .. } => {
+                        fields.push(col_name(ctx, property, &md)?)
+                    }
+                }
+            }
+        }
+
+        for query in &event.queries {
+            match &query.agg {
+                Query::CountEvents => {}
+                Query::CountUniqueGroups => {}
+                Query::DailyActiveGroups => {}
+                Query::WeeklyActiveGroups => {}
+                Query::MonthlyActiveGroups => {}
+                Query::CountPerGroup { .. } => {}
+                Query::AggregatePropertyPerGroup { property, .. } => {
+                    fields.push(col_name(ctx, property, &md)?)
+                }
+                Query::AggregateProperty { property, .. } => {
+                    fields.push(col_name(ctx, property, &md)?)
+                }
+                Query::QueryFormula { .. } => {}
+            }
+        }
+
+        if let Some(breakdowns) = &event.breakdowns {
+            for breakdown in breakdowns {
+                match breakdown {
+                    Breakdown::Property(property) => fields.push(col_name(ctx, property, &md)?),
+                }
+            }
+        }
+    }
+
+    if let Some(filters) = &req.filters {
+        for filter in filters {
+            match filter {
+                EventFilter::Property { property, .. } => {
+                    fields.push(col_name(ctx, property, &md)?)
+                }
+            }
+        }
+    }
+
+    if let Some(breakdowns) = &req.breakdowns {
+        for breakdown in breakdowns {
+            match breakdown {
+                Breakdown::Property(property) => fields.push(col_name(ctx, property, &md)?),
+            }
+        }
+    }
+
+    fields.dedup();
 
     Ok(fields)
 }

@@ -117,79 +117,6 @@ macro_rules! breakdowns_to_dicts {
     }};
 }
 
-fn projection_cols(
-    ctx: &Context,
-    req: &EventSegmentation,
-    md: Arc<MetadataProvider>,
-) -> Result<Vec<String>> {
-    let mut fields = vec![
-        COLUMN_PROJECT_ID.to_string(),
-        COLUMN_USER_ID.to_string(),
-        COLUMN_CREATED_AT.to_string(),
-        COLUMN_EVENT.to_string(),
-    ];
-
-    for event in &req.events {
-        if let Some(filters) = &event.filters {
-            for filter in filters {
-                match filter {
-                    EventFilter::Property { property, .. } => {
-                        fields.push(col_name(ctx, property, &md)?)
-                    }
-                }
-            }
-        }
-
-        for query in &event.queries {
-            match &query.agg {
-                Query::CountEvents => {}
-                Query::CountUniqueGroups => {}
-                Query::DailyActiveGroups => {}
-                Query::WeeklyActiveGroups => {}
-                Query::MonthlyActiveGroups => {}
-                Query::CountPerGroup { .. } => {}
-                Query::AggregatePropertyPerGroup { property, .. } => {
-                    fields.push(col_name(ctx, property, &md)?)
-                }
-                Query::AggregateProperty { property, .. } => {
-                    fields.push(col_name(ctx, property, &md)?)
-                }
-                Query::QueryFormula { .. } => {}
-            }
-        }
-
-        if let Some(breakdowns) = &event.breakdowns {
-            for breakdown in breakdowns {
-                match breakdown {
-                    Breakdown::Property(property) => fields.push(col_name(ctx, property, &md)?),
-                }
-            }
-        }
-    }
-
-    if let Some(filters) = &req.filters {
-        for filter in filters {
-            match filter {
-                EventFilter::Property { property, .. } => {
-                    fields.push(col_name(ctx, property, &md)?)
-                }
-            }
-        }
-    }
-
-    if let Some(breakdowns) = &req.breakdowns {
-        for breakdown in breakdowns {
-            match breakdown {
-                Breakdown::Property(property) => fields.push(col_name(ctx, property, &md)?),
-            }
-        }
-    }
-
-    fields.dedup();
-
-    Ok(fields)
-}
-
 impl LogicalPlanBuilder {
     /// creates logical plan for event segmentation
     pub fn build(
@@ -236,16 +163,15 @@ impl LogicalPlanBuilder {
 
                 inputs.push(input);
             }
-
             Some(inputs)
         } else {
             None
         };
 
-        let proj_cols = projection_cols(&ctx, &es, builder.metadata.clone())?
-            .iter()
-            .map(|s| Expr::Column(Column::from_qualified_name(s.as_str())))
-            .collect::<Vec<_>>();
+        // let proj_cols = projection_cols(&ctx, &es, builder.metadata.clone())?
+        //     .iter()
+        //     .map(|s| Expr::Column(Column::from_qualified_name(s.as_str())))
+        //     .collect::<Vec<_>>();
         // let input = LogicalPlan::Repartition(Repartition {
         //     input: Arc::new(input),
         //     partitioning_scheme: Partitioning::Hash(
@@ -262,12 +188,17 @@ impl LogicalPlanBuilder {
         input = match events.len() {
             1 => {
                 let input = builder.build_event_logical_plan(input.clone(), 0, segment_inputs)?;
-                LogicalPlan::Extension(Extension {
-                    node: Arc::new(AddStringColumnNode::try_new(
-                        input,
-                        ("event".to_string(), events[0].event.name()),
-                    )?),
-                })
+
+                if ctx.format != Format::Compact {
+                    LogicalPlan::Extension(Extension {
+                        node: Arc::new(AddStringColumnNode::try_new(
+                            input,
+                            ("event".to_string(), events[0].event.name()),
+                        )?),
+                    })
+                } else {
+                    input
+                }
             }
             _ => {
                 let mut inputs: Vec<LogicalPlan> = vec![];
@@ -455,25 +386,25 @@ impl LogicalPlanBuilder {
     ) -> Result<LogicalPlan> {
         let input = self.build_filter_logical_plan(input.clone(), &self.es.events[event_id])?;
 
-        let input = {
-            let c1 = Expr::Sort(expr::Sort {
-                expr: Box::new(col(COLUMN_PROJECT_ID)),
-                asc: true,
-                nulls_first: false,
-            });
-
-            let c2 = Expr::Sort(expr::Sort {
-                expr: Box::new(col(COLUMN_USER_ID)),
-                asc: true,
-                nulls_first: false,
-            });
-
-            LogicalPlan::Sort(Sort {
-                expr: vec![c1, c2],
-                input: Arc::new(input),
-                fetch: None,
-            })
-        };
+        // let input = {
+        // let c1 = Expr::Sort(expr::Sort {
+        // expr: Box::new(col(COLUMN_PROJECT_ID)),
+        // asc: true,
+        // nulls_first: false,
+        // });
+        //
+        // let c2 = Expr::Sort(expr::Sort {
+        // expr: Box::new(col(COLUMN_USER_ID)),
+        // asc: true,
+        // nulls_first: false,
+        // });
+        //
+        // LogicalPlan::Sort(Sort {
+        // expr: vec![c1, c2],
+        // input: Arc::new(input),
+        // fetch: None,
+        // })
+        // };
         let (mut input, group_expr) = self.build_aggregate_logical_plan(
             input,
             &self.es.events[event_id],
