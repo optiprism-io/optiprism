@@ -8,7 +8,6 @@ mod pivot;
 // mod partitioned_aggregate;
 // mod partitioned_aggregate;
 // mod segmented_aggregate;
-pub mod local;
 mod partition;
 pub mod planner;
 mod segment;

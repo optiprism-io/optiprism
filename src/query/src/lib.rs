@@ -57,7 +57,6 @@ use metadata::MetadataProvider;
 pub use provider::QueryProvider;
 
 pub mod context;
-pub mod datasources;
 pub mod error;
 pub mod expr;
 pub mod logical_plan;
@@ -354,7 +353,6 @@ pub mod test_util {
     use metadata::properties::Type;
     use metadata::MetadataProvider;
     use storage::db::OptiDBImpl;
-    
 
     use crate::error::Result;
     use crate::physical_plan::planner::QueryPlanner;
