@@ -1,5 +1,3 @@
-
-
 use chrono::DateTime;
 use chrono::Utc;
 use datafusion_common::ScalarValue;
@@ -16,10 +14,6 @@ use crate::query::PropertyRef;
 use crate::query::QueryTime;
 use crate::query::TimeIntervalUnit;
 use crate::scalar::ScalarValueRef;
-
-
-
-
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum SegmentTime {

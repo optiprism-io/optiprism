@@ -52,8 +52,6 @@ use common::types::USER_PROPERTY_OS_VERSION_MAJOR;
 use common::types::USER_PROPERTY_OS_VERSION_MINOR;
 use common::types::USER_PROPERTY_OS_VERSION_PATCH;
 use common::types::USER_PROPERTY_OS_VERSION_PATCH_MINOR;
-
-
 use ingester::error::IngesterError;
 use ingester::executor::Executor;
 use ingester::transformers::geo;

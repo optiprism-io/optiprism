@@ -23,7 +23,6 @@ mod tests {
     use axum::Router;
     use chrono::Duration;
     use common::rbac::OrganizationRole;
-    
     use hyper::Server;
     use lazy_static::lazy_static;
     use metadata::accounts::Accounts;

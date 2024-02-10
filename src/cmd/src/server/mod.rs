@@ -1,52 +1,16 @@
 mod config;
 
-
-
-
-
-
 use std::net::SocketAddr;
-
 use std::sync::Arc;
 
-
 use axum::Router;
-
-
-
-
-
 use common::rbac::Role;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use metadata::accounts::CreateAccountRequest;
 use metadata::error::MetadataError;
 use metadata::MetadataProvider;
 use platform::auth::password::make_password_hash;
-
 use storage::db::OptiDBImpl;
 use storage::db::Options;
-
-
 use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tracing::debug;
@@ -57,7 +21,6 @@ use crate::error::Result;
 use crate::init_ingester;
 use crate::init_metrics;
 use crate::init_platform;
-
 use crate::init_session_cleaner;
 use crate::init_system;
 pub use crate::server::config::Config;

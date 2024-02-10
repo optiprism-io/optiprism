@@ -1,14 +1,7 @@
-
 use std::fs::File;
 use std::path::PathBuf;
 
-
-
-
-
 use arrow2::io::ipc::read;
-
-
 
 /// Simplest way: read all record batches from the file. This can be used e.g. for random access.
 #[allow(clippy::type_complexity)]

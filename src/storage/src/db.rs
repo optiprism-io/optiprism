@@ -60,7 +60,6 @@ use crate::table::part_path;
 use crate::table::Level;
 use crate::table::Metadata;
 use crate::table::Part;
-
 use crate::table::Table;
 use crate::Fs;
 use crate::KeyValue;
@@ -837,17 +836,12 @@ mod tests {
     use std::fs;
     use std::path::PathBuf;
     use std::pin::Pin;
-    
-    
 
     use arrow2::array::Array;
-    
     use arrow2::chunk::Chunk;
     use common::types::DType;
     use futures::Stream;
-    
 
-    
     use crate::db::OptiDBImpl;
     use crate::db::Options;
     use crate::table;

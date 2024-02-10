@@ -26,7 +26,6 @@ use clap::Parser;
 use common::types::DType;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
-
 use hyper::Server;
 use indicatif::ProgressBar;
 use indicatif::ProgressState;

@@ -1,4 +1,3 @@
-
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::path::PathBuf;
@@ -7,7 +6,6 @@ use std::sync::Arc;
 use arrow_array::ArrayRef;
 use arrow_array::Int32Array;
 use arrow_array::RecordBatch;
-
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use parquet::arrow::ArrowWriter;
 use parquet::basic::Compression;

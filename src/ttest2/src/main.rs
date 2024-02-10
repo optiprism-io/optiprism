@@ -1,17 +1,10 @@
 use std::fs::File;
 
-
 use arrow2::array::Int32Array;
-
-
 use arrow2::chunk::Chunk;
-
 use arrow2::datatypes::DataType;
 use arrow2::datatypes::Field;
 use arrow2::datatypes::Schema;
-
-
-
 use arrow2::io::parquet::write::FileWriter;
 use arrow2::io::parquet::write::RowGroupIterator;
 use arrow2::io::parquet::write::WriteOptions;

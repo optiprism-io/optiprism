@@ -45,7 +45,6 @@ use crate::physical_plan::planner::partitioned_aggregate::build_partitioned_aggr
 use crate::physical_plan::planner::partitioned_aggregate::build_partitioned_aggregate_partial_expr;
 use crate::physical_plan::planner::segment::build_segment_expr;
 use crate::physical_plan::segment::SegmentExec;
-
 use crate::physical_plan::segmented_aggregate::SegmentedAggregateFinalExec;
 use crate::physical_plan::segmented_aggregate::SegmentedAggregatePartialExec;
 use crate::physical_plan::unpivot::UnpivotExec;

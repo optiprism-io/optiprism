@@ -15,7 +15,6 @@ use common::query;
 use common::query::PartitionedAggregateFunction;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
-
 use datafusion::optimizer::OptimizerRule;
 use datafusion_common::Column;
 use datafusion_common::DFField;

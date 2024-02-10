@@ -14,7 +14,6 @@ use datafusion_expr::Expr;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::UserDefinedLogicalNode;
 
-
 use crate::Result;
 
 #[derive(Hash, Eq, PartialEq)]

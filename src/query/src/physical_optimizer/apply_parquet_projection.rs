@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-
 use datafusion::datasource::physical_plan::FileScanConfig;
 use datafusion::datasource::physical_plan::ParquetExec;
 use datafusion::physical_optimizer::PhysicalOptimizerRule;

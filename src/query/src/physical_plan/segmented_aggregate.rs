@@ -3,7 +3,6 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Debug;
-
 use std::pin::Pin;
 // use std::sync::mpsc::Sender;
 use std::sync::Arc;
@@ -11,14 +10,12 @@ use std::sync::Mutex;
 use std::task::Context;
 use std::task::Poll;
 
-
 use ahash::HashMapExt;
 use ahash::RandomState;
 use arrow::array::Array;
 use arrow::array::ArrayRef;
 use arrow::array::Int64Array;
 use arrow::compute::concat_batches;
-
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
 use arrow::datatypes::FieldRef;
@@ -29,8 +26,6 @@ use arrow_row::SortField;
 use axum::async_trait;
 use common::types::COLUMN_PROJECT_ID;
 use common::types::COLUMN_USER_ID;
-
-
 use datafusion::execution::context::TaskContext;
 use datafusion::physical_expr::expressions::col;
 use datafusion::physical_expr::expressions::Column;
@@ -42,7 +37,6 @@ use datafusion::physical_optimizer::PhysicalOptimizerRule;
 use datafusion::physical_plan::aggregates::AggregateExec as DFAggregateExec;
 use datafusion::physical_plan::aggregates::AggregateMode;
 use datafusion::physical_plan::aggregates::PhysicalGroupBy;
-
 use datafusion::physical_plan::expressions::PhysicalSortExpr;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
@@ -59,11 +53,8 @@ use datafusion::prelude::SessionContext;
 use datafusion_common::config::ConfigOptions;
 use datafusion_common::Result as DFResult;
 use datafusion_common::ScalarValue;
-
 use futures::Stream;
 use futures::StreamExt;
-
-
 
 use crate::error::QueryError;
 use crate::physical_plan::expressions::aggregate;
