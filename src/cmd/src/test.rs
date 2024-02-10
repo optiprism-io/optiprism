@@ -26,7 +26,7 @@ use clap::Parser;
 use common::types::DType;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
-use datafusion::datasource::TableProvider;
+
 use hyper::Server;
 use indicatif::ProgressBar;
 use indicatif::ProgressState;
@@ -38,7 +38,6 @@ use metadata::test_util::create_property;
 use metadata::test_util::CreatePropertyMainRequest;
 use metadata::MetadataProvider;
 use platform::auth;
-use query::datasources::local::LocalTable;
 use query::QueryProvider;
 use scan_dir::ScanDir;
 use storage::db::OptiDBImpl;
@@ -338,9 +337,6 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
     }
     db.flush()?;
     info!("successfully generated {i} events!");
-    let data_provider: Arc<dyn TableProvider> =
-        Arc::new(LocalTable::try_new(db.clone(), "events".to_string())?);
-
     let all_parquet_files: Vec<_> = ScanDir::files()
         .walk(args.path.join("store/tables/events"), |iter| {
             iter.filter(|(_, name)| name.ends_with(".parquet"))
@@ -356,11 +352,7 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
         )?;
     }
 
-    let query_provider = Arc::new(QueryProvider::try_new_from_provider(
-        md.clone(),
-        db.clone(),
-        data_provider,
-    )?);
+    let query_provider = Arc::new(QueryProvider::new(md.clone(), db.clone()));
 
     let auth_cfg = auth::provider::Config {
         access_token_duration: Duration::days(1),

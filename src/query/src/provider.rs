@@ -14,7 +14,7 @@ use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_PROJECT_ID;
 use common::types::COLUMN_USER_ID;
-use datafusion::datasource::DefaultTableSource;
+
 use datafusion::datasource::TableProvider;
 use datafusion::execution::context::SessionState;
 use datafusion::execution::runtime_env::RuntimeEnv;
@@ -47,21 +47,11 @@ use crate::Result;
 pub struct QueryProvider {
     metadata: Arc<MetadataProvider>,
     db: Arc<OptiDBImpl>,
-    table_source: Arc<DefaultTableSource>,
 }
 
 impl QueryProvider {
-    pub fn try_new_from_provider(
-        metadata: Arc<MetadataProvider>,
-        db: Arc<OptiDBImpl>,
-        table_provider: Arc<dyn TableProvider>,
-    ) -> Result<Self> {
-        let table_source = Arc::new(DefaultTableSource::new(table_provider));
-        Ok(Self {
-            metadata,
-            db,
-            table_source,
-        })
+    pub fn new(metadata: Arc<MetadataProvider>, db: Arc<OptiDBImpl>) -> Self {
+        Self { metadata, db }
     }
 }
 

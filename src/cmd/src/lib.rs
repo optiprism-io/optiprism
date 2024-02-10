@@ -52,8 +52,8 @@ use common::types::USER_PROPERTY_OS_VERSION_MAJOR;
 use common::types::USER_PROPERTY_OS_VERSION_MINOR;
 use common::types::USER_PROPERTY_OS_VERSION_PATCH;
 use common::types::USER_PROPERTY_OS_VERSION_PATCH_MINOR;
-use datafusion::datasource::TableProvider;
-use datafusion::logical_expr::LogicalPlan;
+
+
 use ingester::error::IngesterError;
 use ingester::executor::Executor;
 use ingester::transformers::geo;
@@ -77,7 +77,6 @@ use metrics::Unit;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use platform::auth;
 use platform::auth::password::make_password_hash;
-use query::datasources::local::LocalTable;
 use query::QueryProvider;
 use tracing::info;
 use uaparser::UserAgentParser;
@@ -266,13 +265,7 @@ fn init_platform(
     db: Arc<OptiDBImpl>,
     router: Router,
 ) -> crate::error::Result<Router> {
-    let data_provider: Arc<dyn TableProvider> =
-        Arc::new(LocalTable::try_new(db.clone(), "events".to_string())?);
-    let query_provider = Arc::new(QueryProvider::try_new_from_provider(
-        md.clone(),
-        db.clone(),
-        data_provider,
-    )?);
+    let query_provider = Arc::new(QueryProvider::new(md.clone(), db.clone()));
 
     let auth_cfg = auth::provider::Config {
         access_token_duration: Duration::days(1),
