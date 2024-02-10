@@ -76,7 +76,6 @@ impl Sessions {
 
     pub fn check_for_deletion(
         &self,
-
         project_id: u64,
         callback: impl Fn(&Session) -> Result<bool>,
     ) -> Result<()> {

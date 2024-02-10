@@ -254,6 +254,7 @@ impl Iterator for MemChunkIterator {
 type SendableChunk = Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>;
 
 pub struct MergingIterator {
+    current_idx: usize,
     // list of index cols (partitions) in parquet file
     index_cols: Vec<ColumnDescriptor>,
     array_size: usize,
@@ -302,6 +303,7 @@ impl MergingIterator {
         }
 
         let mut mr = Self {
+            current_idx: 0,
             index_cols,
             array_size: opts.array_size,
             schema,
@@ -392,6 +394,21 @@ impl Iterator for MergingIterator {
     type Item = Result<Chunk<Box<dyn Array>>>;
 
     fn next(&mut self) -> Option<Self::Item> {
+        if let Some(chunk) = self.sorter.pop() {
+            return Some(Ok(chunk.chunk));
+        }
+        return match self.next_stream_chunk(self.current_idx).ok()? {
+            None => {
+                self.current_idx += 1;
+                if self.current_idx > self.streams.len() - 1 {
+                    return None;
+                }
+                return self.next();
+            }
+            Some(chunk) => Some(Ok(chunk.chunk)),
+        };
+
+        // todo remove all the merging logic
         if let Some(chunk) = self.merge_result_buffer.pop_front() {
             return Some(Ok(chunk));
         }

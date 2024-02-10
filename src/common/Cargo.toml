@@ -11,6 +11,7 @@ arrow-schema = { version = "49.0.0", features = ["serde"] }
 async-trait = "0.1.59"
 chrono = { version = "0.4.23", features = ["serde"] }
 chronoutil = "0.2.3"
+
 datafusion = "34.0.0"
 datafusion-common = "34.0.0"
 datafusion-expr = "34.0.0"

@@ -1,73 +1,69 @@
 use std::any::Any;
-use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::hash::Hash;
 use std::hash::Hasher;
 use std::sync::Arc;
 
-use arrow::datatypes::DataType;
-use datafusion_common::DFField;
 use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;
 use datafusion_expr::Expr;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::UserDefinedLogicalNode;
+use storage::db::OptiDBImpl;
 
 use crate::error::QueryError;
 use crate::Result;
 
-#[derive(Hash, Eq, PartialEq)]
-pub struct MergeNode {
-    inputs: Vec<LogicalPlan>,
-    pub names: Option<(String, Vec<String>)>,
+pub struct DbParquetNode {
+    pub db: Arc<OptiDBImpl>,
+    pub projection: Vec<usize>,
     schema: DFSchemaRef,
 }
 
-impl MergeNode {
-    pub fn try_new(inputs: Vec<LogicalPlan>, names: Option<(String, Vec<String>)>) -> Result<Self> {
-        let mut schema = DFSchema::new_with_metadata(vec![], HashMap::new())?;
-        for input in inputs.iter() {
-            schema.merge(input.schema());
-        }
+impl Hash for DbParquetNode {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.projection.hash(state);
+        self.schema.hash(state);
+    }
+}
 
-        schema = if let Some((col_name, _)) = names.clone() {
-            DFSchema::new_with_metadata(
-                [
-                    vec![DFField::new_unqualified(&col_name, DataType::Utf8, false)],
-                    schema.fields().to_vec(),
-                ]
-                .concat(),
-                HashMap::default(),
-            )?
-        } else {
-            schema
-        };
+impl Eq for DbParquetNode {}
+
+impl PartialEq for DbParquetNode {
+    fn eq(&self, other: &Self) -> bool {
+        self.projection == other.projection && self.schema == other.schema
+    }
+}
+
+impl DbParquetNode {
+    pub fn try_new(db: Arc<OptiDBImpl>, projection: Vec<usize>) -> Result<Self> {
+        let schema = db.schema1("events")?.project(&projection)?;
         Ok(Self {
-            inputs,
-            names,
-            schema: Arc::new(schema),
+            db,
+            projection,
+            schema: Arc::new(DFSchema::try_from(schema)?),
         })
     }
 }
 
-impl Debug for MergeNode {
+impl Debug for DbParquetNode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         self.fmt_for_explain(f)
     }
 }
 
-impl UserDefinedLogicalNode for MergeNode {
+impl UserDefinedLogicalNode for DbParquetNode {
     fn as_any(&self) -> &dyn Any {
         self
     }
 
     fn name(&self) -> &str {
-        "Merge"
+        "DbParquet"
     }
 
     fn inputs(&self) -> Vec<&LogicalPlan> {
-        self.inputs.iter().collect()
+        vec![]
     }
 
     fn schema(&self) -> &DFSchemaRef {
@@ -79,12 +75,12 @@ impl UserDefinedLogicalNode for MergeNode {
     }
 
     fn fmt_for_explain(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "Merge")
+        write!(f, "DbParquet")
     }
 
-    fn from_template(&self, _: &[Expr], inputs: &[LogicalPlan]) -> Arc<dyn UserDefinedLogicalNode> {
+    fn from_template(&self, _: &[Expr], _: &[LogicalPlan]) -> Arc<dyn UserDefinedLogicalNode> {
         Arc::new(
-            MergeNode::try_new(inputs.to_vec(), self.names.clone())
+            DbParquetNode::try_new(self.db.clone(), self.projection.clone())
                 .map_err(QueryError::into_datafusion_plan_error)
                 .unwrap(),
         )

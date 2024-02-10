@@ -10,13 +10,13 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::memtable::Memtable;
+use crate::Fs;
 use crate::KeyValue;
 use crate::Stats;
-use crate::Vfs;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Options {
-    pub partitions: usize,
+    pub parallelism: usize,
     pub index_cols: usize,
     pub levels: usize,
     pub l0_max_parts: usize,
@@ -39,7 +39,7 @@ impl Options {
         Options {
             levels: 7,
             merge_array_size: 10000,
-            partitions: 1,
+            parallelism: 1,
             index_cols: 1,
             l1_max_size_bytes: 1024 * 1024 * 10,
             level_size_multiplier: 10,
@@ -117,7 +117,7 @@ pub(crate) struct Table {
     pub(crate) name: String,
     pub(crate) memtable: Arc<Mutex<Memtable>>,
     pub(crate) metadata: Arc<Mutex<Metadata>>,
-    pub(crate) vfs: Arc<Vfs>,
+    pub(crate) vfs: Arc<Fs>,
     pub(crate) log: Arc<Mutex<BufWriter<File>>>,
 }
 
@@ -128,20 +128,14 @@ pub(crate) struct Metadata {
     pub(crate) log_id: u64,
     pub(crate) table_name: String,
     pub(crate) schema: Schema,
-    pub(crate) partitions: Vec<Partition>,
+    pub(crate) levels: Vec<Level>,
     pub(crate) stats: Stats,
     pub(crate) opts: Options,
 }
 
-pub(crate) fn part_path(
-    path: &Path,
-    table_name: &str,
-    partition_id: usize,
-    level_id: usize,
-    part_id: usize,
-) -> PathBuf {
+pub(crate) fn part_path(path: &Path, table_name: &str, level_id: usize, part_id: usize) -> PathBuf {
     path.join(format!(
-        "tables/{}/{}/{}/{}.parquet",
-        table_name, partition_id, level_id, part_id
+        "tables/{}/{}/{}.parquet",
+        table_name, level_id, part_id
     ))
 }

@@ -5,6 +5,7 @@
 extern crate core;
 
 pub use std::cmp::Ordering;
+use std::sync::Arc;
 
 use arrow::array::Array;
 use arrow::array::ArrayRef;
@@ -49,17 +50,19 @@ use arrow::datatypes::IntervalUnit;
 use arrow::datatypes::SchemaRef;
 use arrow::datatypes::TimeUnit;
 use arrow2::array::Int128Array;
+use common::query::PropertyRef;
 pub use context::Context;
 pub use error::Result;
-pub use provider_impl::QueryProvider;
+use metadata::MetadataProvider;
+pub use provider::QueryProvider;
 
 pub mod context;
-pub mod datasources;
 pub mod error;
 pub mod expr;
 pub mod logical_plan;
+pub mod physical_optimizer;
 pub mod physical_plan;
-pub mod provider_impl;
+pub mod provider;
 pub mod queries;
 
 pub const DEFAULT_BATCH_SIZE: usize = 4096;
@@ -550,17 +553,37 @@ pub mod test_util {
     }
 
     pub async fn run_plan(plan: LogicalPlan) -> Result<Vec<RecordBatch>> {
-        println!("{:?}", plan);
         let runtime = Arc::new(RuntimeEnv::default());
-        let config = SessionConfig::new().with_target_partitions(1);
+        let config = SessionConfig::new().with_target_partitions(12);
         #[allow(deprecated)]
         let session_state = SessionState::with_config_rt(config, runtime)
-            .with_query_planner(Arc::new(QueryPlanner {}));
-        // .with_optimizer_rules(vec![]);
+            .with_query_planner(Arc::new(QueryPlanner {}))
+            .with_optimizer_rules(vec![])
+            .with_physical_optimizer_rules(vec![]);
         #[allow(deprecated)]
         let exec_ctx = SessionContext::with_state(session_state.clone());
         let physical_plan = session_state.create_physical_plan(&plan).await?;
 
         Ok(collect(physical_plan, exec_ctx.task_ctx()).await?)
     }
+}
+
+pub fn col_name(ctx: &Context, prop: &PropertyRef, md: &Arc<MetadataProvider>) -> Result<String> {
+    let name = match prop {
+        PropertyRef::System(v) => md
+            .system_properties
+            .get_by_name(ctx.project_id, v)?
+            .column_name(),
+        PropertyRef::User(v) => md
+            .user_properties
+            .get_by_name(ctx.project_id, v)?
+            .column_name(),
+        PropertyRef::Event(v) => md
+            .event_properties
+            .get_by_name(ctx.project_id, v)?
+            .column_name(),
+        _ => unimplemented!(),
+    };
+
+    Ok(name)
 }

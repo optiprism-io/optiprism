@@ -23,7 +23,6 @@ mod tests {
     use axum::Router;
     use chrono::Duration;
     use common::rbac::OrganizationRole;
-    use datafusion::datasource::TableProvider;
     use hyper::Server;
     use lazy_static::lazy_static;
     use metadata::accounts::Accounts;
@@ -34,7 +33,6 @@ mod tests {
     use platform::auth::Auth;
     use platform::http::attach_routes;
     use platform::PlatformProvider;
-    use query::datasources::local::LocalTable;
     use query::test_util::create_entities;
     use query::QueryProvider;
     use serde_json::json;
@@ -107,13 +105,7 @@ mod tests {
         if create_test_data {
             create_entities(md.clone(), &db, 1).await?;
         }
-        let data_provider: Arc<dyn TableProvider> =
-            Arc::new(LocalTable::try_new(db.clone(), "events".to_string())?);
-        let query_provider = Arc::new(QueryProvider::try_new_from_provider(
-            md.clone(),
-            db.clone(),
-            data_provider,
-        )?);
+        let query_provider = Arc::new(QueryProvider::new(md.clone(), db.clone()));
 
         let platform_provider = Arc::new(PlatformProvider::new(
             md.clone(),

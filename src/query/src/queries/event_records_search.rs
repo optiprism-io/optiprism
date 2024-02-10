@@ -88,7 +88,9 @@ pub fn build(
     );
 
     let mut filter_exprs = vec![];
-    if let Some(events) = &req.events {
+    if let Some(events) = &req.events
+        && !events.is_empty()
+    {
         let mut exprs = vec![];
         for event in events {
             // todo add project_id filtering
@@ -98,7 +100,9 @@ pub fn build(
             // event expression
             expr = and(expr, event_expression(&ctx, &metadata, &event.event)?);
             // apply event filters
-            if let Some(filters) = &event.filters {
+            if let Some(filters) = &event.filters
+                && !filters.is_empty()
+            {
                 expr = and(
                     expr.clone(),
                     event_filters_expression(&ctx, &metadata, filters)?,

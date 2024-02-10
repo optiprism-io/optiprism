@@ -116,53 +116,49 @@ impl Compactor {
                     let md = table.metadata.lock();
                     md.clone()
                 };
-                for (pid, partition) in metadata.partitions.iter().enumerate() {
-                    let _start = Instant::now();
-                    match compact(
-                        table.name.as_str(),
-                        partition.levels.clone(),
-                        pid,
-                        &self.path,
-                        &metadata.opts,
-                    ) {
-                        Ok(res) => match res {
-                            None => continue,
-                            Some(res) => {
-                                let mut metadata = table.metadata.lock();
-                                for rem in &res.l0_remove {
-                                    metadata.partitions[pid].levels[0].parts =
-                                        metadata.partitions[pid].levels[0]
-                                            .parts
-                                            .clone()
-                                            .into_iter()
-                                            .filter(|p| p.id != *rem)
-                                            .collect::<Vec<_>>();
-                                }
-                                for (idx, l) in res.levels.iter().enumerate().skip(1) {
-                                    metadata.partitions[pid].levels[idx] = l.clone();
-                                }
-                                let mut log = table.log.lock();
-                                log_metadata(log.get_mut(), &mut metadata).unwrap();
-                                drop(metadata);
-                                // drop because next fs operation is with locking
-                                for op in res.fs_ops {
-                                    match op {
-                                        FsOp::Rename(from, to) => {
-                                            trace!("renaming");
-                                            // todo handle error
-                                            table.vfs.rename(from, to).unwrap();
-                                        }
-                                        FsOp::Delete(path) => {
-                                            trace!("deleting {:?}", path);
-                                            table.vfs.remove_file(path).unwrap();
-                                        }
+                let _start = Instant::now();
+                match compact(
+                    table.name.as_str(),
+                    metadata.levels.clone(),
+                    &self.path,
+                    &metadata.opts,
+                ) {
+                    Ok(res) => match res {
+                        None => continue,
+                        Some(res) => {
+                            let mut metadata = table.metadata.lock();
+                            for rem in &res.l0_remove {
+                                metadata.levels[0].parts = metadata.levels[0]
+                                    .parts
+                                    .clone()
+                                    .into_iter()
+                                    .filter(|p| p.id != *rem)
+                                    .collect::<Vec<_>>();
+                            }
+                            for (idx, l) in res.levels.iter().enumerate().skip(1) {
+                                metadata.levels[idx] = l.clone();
+                            }
+                            let mut log = table.log.lock();
+                            log_metadata(log.get_mut(), &mut metadata).unwrap();
+                            drop(metadata);
+                            // drop because next fs operation is with locking
+                            for op in res.fs_ops {
+                                match op {
+                                    FsOp::Rename(from, to) => {
+                                        trace!("renaming");
+                                        // todo handle error
+                                        table.vfs.rename(from, to).unwrap();
+                                    }
+                                    FsOp::Delete(path) => {
+                                        trace!("deleting {:?}", path);
+                                        table.vfs.remove_file(path).unwrap();
                                     }
                                 }
                             }
-                        },
-                        Err(err) => {
-                            panic!("compaction error: {:?}", err);
                         }
+                    },
+                    Err(err) => {
+                        panic!("compaction error: {:?}", err);
                     }
                 }
             }
@@ -231,7 +227,6 @@ fn determine_compaction(
 fn compact(
     tbl_name: &str,
     levels: Vec<Level>,
-    partition_id: usize,
     path: &Path,
     opts: &table::Options,
 ) -> Result<Option<CompactResult>> {
@@ -270,9 +265,8 @@ fn compact(
                     tmp_levels[level_id].parts.remove(idx);
                     part.id = tmp_levels[level_id + 1].part_id + 1;
 
-                    let from =
-                        part_path(path, tbl_name, partition_id, level_id, to_compact[0].part);
-                    let to = part_path(path, tbl_name, partition_id, level_id + 1, part.id);
+                    let from = part_path(path, tbl_name, level_id, to_compact[0].part);
+                    let to = part_path(path, tbl_name, level_id + 1, part.id);
                     fs_ops.push(FsOp::Rename(from, to));
 
                     tmp_levels[level_id + 1].parts.push(part.clone());
@@ -284,7 +278,7 @@ fn compact(
                     if tc.level == 0 {
                         l0_rem.push(tc.part);
                     }
-                    tomerge.push(part_path(path, tbl_name, partition_id, tc.level, tc.part));
+                    tomerge.push(part_path(path, tbl_name, tc.level, tc.part));
                     tmp_levels[tc.level].parts = tmp_levels[tc.level]
                         .clone()
                         .parts
@@ -294,12 +288,7 @@ fn compact(
                 }
 
                 let out_part_id = tmp_levels[level_id + 1].part_id + 1;
-                let out_path = path.join(format!(
-                    "tables/{}/{}/{}",
-                    tbl_name,
-                    partition_id,
-                    level_id + 1
-                ));
+                let out_path = path.join(format!("tables/{}/{}", tbl_name, level_id + 1));
                 let rdrs = tomerge
                     .iter()
                     .map(File::open)

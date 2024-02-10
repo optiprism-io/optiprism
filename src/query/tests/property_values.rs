@@ -42,7 +42,7 @@ mod tests {
             }),
         };
 
-        let plan = LogicalPlanBuilder::build(ctx, md, input, req).await?;
+        let plan = LogicalPlanBuilder::build(ctx, md, input, req)?;
         let result = run_plan(plan).await?;
 
         print_batches(&result)?;
@@ -77,7 +77,7 @@ mod tests {
             }),
         };
 
-        let plan = LogicalPlanBuilder::build(ctx, md, input, req).await?;
+        let plan = LogicalPlanBuilder::build(ctx, md, input, req)?;
         let result = run_plan(plan).await?;
 
         print_batches(&result)?;
@@ -108,7 +108,7 @@ mod tests {
             }),
         };
 
-        let plan = LogicalPlanBuilder::build(ctx, md, input, req).await?;
+        let plan = LogicalPlanBuilder::build(ctx, md, input, req)?;
         let result = run_plan(plan).await?;
         print_batches(&result)?;
         Ok(())
@@ -137,7 +137,7 @@ mod tests {
                 value: Some(vec![ScalarValue::Utf8(Some("spa%".to_string()))]),
             }),
         };
-        let plan = LogicalPlanBuilder::build(ctx, md, input, req).await?;
+        let plan = LogicalPlanBuilder::build(ctx, md, input, req)?;
         let result = run_plan(plan).await?;
 
         print_batches(&result)?;
@@ -165,7 +165,7 @@ mod tests {
             filter: None,
         };
 
-        let plan = LogicalPlanBuilder::build(ctx, md, input, req).await?;
+        let plan = LogicalPlanBuilder::build(ctx, md, input, req)?;
         let result = run_plan(plan).await?;
 
         print_batches(&result)?;

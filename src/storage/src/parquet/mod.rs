@@ -445,7 +445,7 @@ pub fn array_to_pages_simple(
 ) -> Result<Vec<CompressedPage>> {
     let opts = WriteOptions {
         write_statistics: true,
-        compression: CompressionOptions::Uncompressed, // todo
+        compression: CompressionOptions::Snappy, // todo
         version: Version::V2,
         data_pagesize_limit,
     };
@@ -455,7 +455,7 @@ pub fn array_to_pages_simple(
         .unwrap();
     let compressed = pages
         .into_iter()
-        .map(|page| compress(page.unwrap(), vec![], CompressionOptions::Uncompressed))
+        .map(|page| compress(page.unwrap(), vec![], CompressionOptions::Snappy))
         .collect::<std::result::Result<Vec<CompressedPage>, _>>()?;
 
     Ok(compressed)

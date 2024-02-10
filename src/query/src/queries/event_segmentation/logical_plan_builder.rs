@@ -12,6 +12,7 @@ use common::query::PropertyRef;
 use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_PROJECT_ID;
+use common::types::COLUMN_SEGMENT;
 use common::types::COLUMN_USER_ID;
 use datafusion_common::Column;
 use datafusion_common::ScalarValue;
@@ -42,11 +43,13 @@ use crate::expr::event_filters_expression;
 use crate::expr::property_col;
 use crate::expr::property_expression;
 use crate::expr::time_expression;
+use crate::logical_plan::add_string_column::AddStringColumnNode;
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::logical_plan::merge::MergeNode;
 use crate::logical_plan::partitioned_aggregate;
 use crate::logical_plan::partitioned_aggregate::AggregateExpr;
-use crate::logical_plan::partitioned_aggregate::PartitionedAggregateNode;
+use crate::logical_plan::partitioned_aggregate::PartitionedAggregateFinalNode;
+use crate::logical_plan::partitioned_aggregate::PartitionedAggregatePartialNode;
 use crate::logical_plan::partitioned_aggregate::SortField;
 use crate::logical_plan::pivot::PivotNode;
 use crate::logical_plan::segment;
@@ -153,18 +156,43 @@ impl LogicalPlanBuilder {
 
                 inputs.push(input);
             }
-
             Some(inputs)
         } else {
             None
         };
+
+        // let proj_cols = projection_cols(&ctx, &es, builder.metadata.clone())?
+        //     .iter()
+        //     .map(|s| Expr::Column(Column::from_qualified_name(s.as_str())))
+        //     .collect::<Vec<_>>();
+        // let input = LogicalPlan::Repartition(Repartition {
+        //     input: Arc::new(input),
+        //     partitioning_scheme: Partitioning::Hash(
+        //         vec![col(COLUMN_PROJECT_ID), col(COLUMN_USER_ID)],
+        //         12,
+        //     ), // with_target_partitions
+        // });
+        // let input = LogicalPlan::Projection(Projection::try_new(proj_cols, Arc::new(input))?);
 
         let mut cols_hash: HashMap<String, ()> = HashMap::new();
 
         let mut input = builder.decode_filter_dictionaries(input, &mut cols_hash)?;
         // build main query
         input = match events.len() {
-            1 => builder.build_event_logical_plan(input.clone(), 0, segment_inputs)?,
+            1 => {
+                let input = builder.build_event_logical_plan(input.clone(), 0, segment_inputs)?;
+
+                if ctx.format != Format::Compact {
+                    LogicalPlan::Extension(Extension {
+                        node: Arc::new(AddStringColumnNode::try_new(
+                            input,
+                            ("event".to_string(), events[0].event.name()),
+                        )?),
+                    })
+                } else {
+                    input
+                }
+            }
             _ => {
                 let mut inputs: Vec<LogicalPlan> = vec![];
                 for idx in 0..events.len() {
@@ -176,10 +204,16 @@ impl LogicalPlanBuilder {
 
                     inputs.push(input);
                 }
-
+                let event_names = events
+                    .iter()
+                    .map(|event| event.event.name())
+                    .collect::<Vec<_>>();
                 // merge multiple results into one schema
                 LogicalPlan::Extension(Extension {
-                    node: Arc::new(MergeNode::try_new(inputs)?),
+                    node: Arc::new(MergeNode::try_new(
+                        inputs,
+                        Some(("event".to_string(), event_names)),
+                    )?),
                 })
             }
         };
@@ -344,13 +378,32 @@ impl LogicalPlanBuilder {
         segment_inputs: Option<Vec<LogicalPlan>>,
     ) -> Result<LogicalPlan> {
         let input = self.build_filter_logical_plan(input.clone(), &self.es.events[event_id])?;
+
+        // let input = {
+        // let c1 = Expr::Sort(expr::Sort {
+        // expr: Box::new(col(COLUMN_PROJECT_ID)),
+        // asc: true,
+        // nulls_first: false,
+        // });
+        //
+        // let c2 = Expr::Sort(expr::Sort {
+        // expr: Box::new(col(COLUMN_USER_ID)),
+        // asc: true,
+        // nulls_first: false,
+        // });
+        //
+        // LogicalPlan::Sort(Sort {
+        // expr: vec![c1, c2],
+        // input: Arc::new(input),
+        // fetch: None,
+        // })
+        // };
         let (mut input, group_expr) = self.build_aggregate_logical_plan(
             input,
             &self.es.events[event_id],
             event_id,
             segment_inputs,
         )?;
-
         // unpivot aggregate values into value column
         if self.ctx.format != Format::Compact {
             input = {
@@ -405,9 +458,7 @@ impl LogicalPlanBuilder {
 
             LogicalPlan::Sort(sort)
         };
-
         if self.ctx.format != Format::Compact {
-            // pivot date
             input = {
                 let (from_time, to_time) = self.es.time.range(self.ctx.cur_time);
                 let result_cols = time_columns(from_time, to_time, &self.es.interval_unit);
@@ -421,7 +472,6 @@ impl LogicalPlanBuilder {
                 })
             };
         }
-
         Ok(input)
     }
 
@@ -481,10 +531,6 @@ impl LogicalPlanBuilder {
         };
         let time_expr = Expr::ScalarFunction(expr_fn);
 
-        // group_expr.push(Expr::Alias(
-        // Box::new(lit(event.event.name())),
-        // COLUMN_EVENT.to_string(),
-        // ));
         group_expr.push(Expr::Alias(Alias {
             expr: Box::new(time_expr),
             relation: None,
@@ -514,8 +560,7 @@ impl LogicalPlanBuilder {
                 })
             })
             .collect::<Vec<_>>();
-        let mut aggr_expr = Vec::new();
-
+        let mut agg_expr = Vec::new();
         for (idx, query) in event.queries.iter().enumerate() {
             let agg = match &query.agg {
                 Query::CountEvents => AggregateExpr::Count {
@@ -568,23 +613,39 @@ impl LogicalPlanBuilder {
                 Query::QueryFormula { .. } => unimplemented!(),
             };
 
-            aggr_expr.push((agg, format!("{event_id}_{idx}")));
+            agg_expr.push((agg, format!("{event_id}_{idx}")));
         }
 
-        // todo check for duplicates
-
-        let agg_node = PartitionedAggregateNode::try_new(
+        let agg = PartitionedAggregatePartialNode::try_new(
             input,
-            segment_inputs,
+            segment_inputs.clone(),
             Column::from_qualified_name(COLUMN_USER_ID),
-            aggr_expr,
+            agg_expr.clone(),
         )?;
 
+        let input = LogicalPlan::Extension(Extension {
+            node: Arc::new(agg),
+        });
+
+        let final_agg_expr = agg_expr
+            .into_iter()
+            .map(|(expr, name)| {
+                let predicate =
+                    Column::from_qualified_name(format!("{}_{}", name, expr.field_names()[0]));
+                (
+                    expr.change_predicate(Column::from_qualified_name(COLUMN_SEGMENT), predicate),
+                    name,
+                )
+            })
+            .collect::<Vec<_>>();
+        let agg = PartitionedAggregateFinalNode::try_new(input, final_agg_expr)?;
+        let input = LogicalPlan::Extension(Extension {
+            node: Arc::new(agg),
+        });
+
         Ok((
-            LogicalPlan::Extension(Extension {
-                node: Arc::new(agg_node),
-            }),
-            group_expr.into_iter().map(|(a, _b)| a).collect::<Vec<_>>(),
+            input,
+            group_expr.into_iter().map(|(a, _)| a).collect::<Vec<_>>(),
         ))
     }
 }

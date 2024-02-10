@@ -138,6 +138,59 @@ pub enum Query {
     },
 }
 
+impl Query {
+    pub fn name(&self) -> String {
+        match self {
+            Query::CountEvents => "Count".to_string(),
+            Query::CountUniqueGroups => "Count unique".to_string(),
+            Query::DailyActiveGroups => "Daily active".to_string(),
+            Query::WeeklyActiveGroups => "Weekly active".to_string(),
+            Query::MonthlyActiveGroups => "Monthly active".to_string(),
+            Query::CountPerGroup { aggregate } => match aggregate {
+                AggregateFunction::Count => "Count".to_string(),
+                AggregateFunction::Sum => "Sum".to_string(),
+                AggregateFunction::Min => "Min".to_string(),
+                AggregateFunction::Max => "Max".to_string(),
+                AggregateFunction::Avg => "Avg".to_string(),
+                AggregateFunction::Median => "Median".to_string(),
+                AggregateFunction::ApproxDistinct => "Approx distinct".to_string(),
+                AggregateFunction::ArrayAgg => "Array agg".to_string(),
+                AggregateFunction::Variance => "Variance".to_string(),
+                AggregateFunction::VariancePop => "Variance pop".to_string(),
+                AggregateFunction::Stddev => "Std dev".to_string(),
+                AggregateFunction::StddevPop => "Std dev pop".to_string(),
+                AggregateFunction::Covariance => "Covariance".to_string(),
+                AggregateFunction::CovariancePop => "Covariance pop".to_string(),
+                AggregateFunction::Correlation => "Correlation".to_string(),
+                AggregateFunction::ApproxPercentileCont => "Approx percentile cont".to_string(),
+                AggregateFunction::ApproxPercentileContWithWeight => {
+                    "Approx percentile cont with weight".to_string()
+                }
+                AggregateFunction::ApproxMedian => "Approx median".to_string(),
+                AggregateFunction::Grouping => "Grouping".to_string(),
+            },
+            Query::AggregatePropertyPerGroup {
+                property,
+                aggregate_per_group,
+                aggregate,
+            } => {
+                format!(
+                    "{}({}({}))",
+                    aggregate,
+                    aggregate_per_group,
+                    property.name()
+                )
+            }
+            Query::AggregateProperty {
+                property,
+                aggregate,
+            } => {
+                format!("{}({})", aggregate, property.name())
+            }
+            Query::QueryFormula { formula } => formula.to_owned(),
+        }
+    }
+}
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct NamedQuery {
     pub agg: Query,

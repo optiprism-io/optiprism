@@ -23,6 +23,7 @@ pub const COLUMN_USER_ID: &str = "user_id";
 pub const COLUMN_CREATED_AT: &str = "created_at";
 pub const COLUMN_EVENT_ID: &str = "event_id";
 pub const COLUMN_EVENT: &str = "event";
+pub const COLUMN_SEGMENT: &str = "segment";
 
 pub const EVENT_PROPERTY_A_NAME: &str = "A Name";
 pub const EVENT_PROPERTY_A_HREF: &str = "A Href";

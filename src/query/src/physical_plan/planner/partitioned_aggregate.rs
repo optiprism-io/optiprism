@@ -158,7 +158,7 @@ fn get_return_type(
     }
 }
 
-pub fn build_partitioned_aggregate_expr(
+pub fn build_partitioned_aggregate_partial_expr(
     expr: AggregateExpr,
     schema: &Schema,
 ) -> Result<Box<dyn PartitionedAggregateExpr>> {
@@ -440,7 +440,6 @@ pub fn build_partitioned_aggregate_expr(
             let groups = build_groups(groups, &dfschema, schema, &execution_props)?;
             let predicate = col(predicate, &dfschema);
             let partition_col = col(partition_col, &dfschema);
-
             let ret = match predicate.data_type(schema)? {
                 DataType::Int8 => {
                     let t1 = get_return_type(DataType::Int8, &inner_fn);
@@ -1968,6 +1967,7 @@ pub fn build_partitioned_aggregate_expr(
                         &inner_fn,
                     );
                     let t2 = get_return_type(t1.clone(), &outer_fn);
+
                     match (&t1, &t2) {
                         (&DataType::Decimal128(_, _), &DataType::Decimal128(_, _)) => {
                             let inner = aggregate::<i128>(&inner_fn);
@@ -2202,5 +2202,340 @@ pub fn build_partitioned_aggregate_expr(
             let funnel = Funnel::try_new(opts)?;
             Ok(Box::new(funnel) as Box<dyn PartitionedAggregateExpr>)
         }
+    }
+}
+
+pub fn build_partitioned_aggregate_final_expr(
+    expr: AggregateExpr,
+    schema: &Schema,
+) -> Result<Box<dyn PartitionedAggregateExpr>> {
+    let dfschema = schema.clone().to_dfschema()?;
+    let execution_props = ExecutionProps::new();
+    match expr {
+        AggregateExpr::Count {
+            filter,
+            groups,
+            predicate,
+            partition_col,
+            distinct,
+        } => {
+            let filter = build_filter(filter, &dfschema, schema, &execution_props)?;
+            let groups = build_groups(groups, &dfschema, schema, &execution_props)?;
+            let predicate = col(predicate, &dfschema);
+            let partition_col = col(partition_col, &dfschema);
+
+            let count = match predicate.data_type(schema)? {
+                DataType::Int8 => count!(i8, filter, groups, predicate, partition_col, distinct),
+                DataType::Int16 => count!(i16, filter, groups, predicate, partition_col, distinct),
+                DataType::Int32 => count!(i32, filter, groups, predicate, partition_col, distinct),
+                DataType::Int64 => count!(i64, filter, groups, predicate, partition_col, distinct),
+                DataType::UInt8 => count!(u8, filter, groups, predicate, partition_col, distinct),
+                DataType::UInt16 => count!(u16, filter, groups, predicate, partition_col, distinct),
+                DataType::UInt32 => count!(u32, filter, groups, predicate, partition_col, distinct),
+                DataType::UInt64 => count!(u64, filter, groups, predicate, partition_col, distinct),
+                DataType::Float32 => {
+                    count!(f32, filter, groups, predicate, partition_col, distinct)
+                }
+                DataType::Float64 => {
+                    count!(f64, filter, groups, predicate, partition_col, distinct)
+                }
+                DataType::Decimal128(_, _) => {
+                    count!(i128, filter, groups, predicate, partition_col, distinct)
+                }
+                _ => return Err(QueryError::Plan("unsupported predicate type".to_string())),
+            };
+
+            Ok(count)
+        }
+        AggregateExpr::Aggregate {
+            filter,
+            groups,
+            partition_col,
+            predicate,
+            agg,
+        } => {
+            let dfschema = schema.clone().to_dfschema()?;
+            let execution_props = ExecutionProps::new();
+            let filter = build_filter(filter, &dfschema, schema, &execution_props)?;
+            let groups = build_groups(groups, &dfschema, schema, &execution_props)?;
+            let predicate = col(predicate, &dfschema);
+            let partition_col = col(partition_col, &dfschema);
+
+            let _dt = predicate.data_type(schema)?;
+            let expr = match predicate.data_type(schema)? {
+                DataType::Int8 => {
+                    let agg = aggregate::<i8>(&agg);
+                    aggregate!(i8, i8, filter, groups, predicate, partition_col, agg)
+                }
+                DataType::Int16 => {
+                    let agg = aggregate::<i16>(&agg);
+                    aggregate!(i16, i16, filter, groups, predicate, partition_col, agg)
+                }
+                DataType::Int32 => {
+                    let agg = aggregate::<i32>(&agg);
+                    aggregate!(i32, i32, filter, groups, predicate, partition_col, agg)
+                }
+                DataType::Int64 => {
+                    let agg = aggregate::<i64>(&agg);
+                    aggregate!(i64, i64, filter, groups, predicate, partition_col, agg)
+                }
+                DataType::UInt8 => {
+                    let agg = aggregate::<u8>(&agg);
+                    aggregate!(u8, u8, filter, groups, predicate, partition_col, agg)
+                }
+                DataType::UInt16 => {
+                    let agg = aggregate::<u16>(&agg);
+                    aggregate!(u16, u16, filter, groups, predicate, partition_col, agg)
+                }
+                DataType::UInt32 => {
+                    let agg = aggregate::<u32>(&agg);
+                    aggregate!(u32, u32, filter, groups, predicate, partition_col, agg)
+                }
+                DataType::UInt64 => {
+                    let agg = aggregate::<u64>(&agg);
+                    aggregate!(u64, u64, filter, groups, predicate, partition_col, agg)
+                }
+                DataType::Float32 => {
+                    let agg = aggregate::<f32>(&agg);
+                    aggregate!(f32, f32, filter, groups, predicate, partition_col, agg)
+                }
+                DataType::Float64 => {
+                    let agg = aggregate::<f64>(&agg);
+                    aggregate!(f64, f64, filter, groups, predicate, partition_col, agg)
+                }
+                DataType::Decimal128(_, _) => {
+                    let agg = aggregate::<i128>(&agg);
+                    aggregate!(i128, i128, filter, groups, predicate, partition_col, agg)
+                }
+                _ => return Err(QueryError::Plan("unsupported predicate type".to_string())),
+            };
+
+            Ok(expr)
+        }
+        AggregateExpr::PartitionedCount {
+            filter,
+            outer_fn,
+            groups,
+            partition_col,
+            distinct,
+        } => {
+            let filter = build_filter(filter, &dfschema, schema, &execution_props)?;
+            let groups = build_groups(groups, &dfschema, schema, &execution_props)?;
+            let partition_col = col(partition_col, &dfschema);
+            let expr = match get_return_type(DataType::Int64, &outer_fn) {
+                DataType::Float64 => {
+                    let agg = aggregate::<f64>(&outer_fn);
+                    partitioned_count!(f64, filter, agg, groups, partition_col, distinct)
+                }
+                DataType::Int64 => {
+                    let agg = aggregate::<i64>(&outer_fn);
+                    partitioned_count!(i64, filter, agg, groups, partition_col, distinct)
+                }
+                DataType::Decimal128(_, _) => {
+                    let agg = aggregate::<i128>(&outer_fn);
+                    partitioned_count!(i128, filter, agg, groups, partition_col, distinct)
+                }
+                _ => unreachable!(),
+            };
+            Ok(expr)
+        }
+        AggregateExpr::PartitionedAggregate {
+            filter,
+            inner_fn,
+            outer_fn,
+            predicate,
+            groups,
+            partition_col,
+        } => {
+            let dfschema = schema.clone().to_dfschema()?;
+            let execution_props = ExecutionProps::new();
+            let filter = build_filter(filter, &dfschema, schema, &execution_props)?;
+            let groups = build_groups(groups, &dfschema, schema, &execution_props)?;
+            let predicate = col(predicate, &dfschema);
+            let partition_col = col(partition_col, &dfschema);
+            let ret = match predicate.data_type(schema)? {
+                DataType::Int8 => {
+                    let inner = aggregate::<i8>(&inner_fn);
+                    let outer = aggregate::<i8>(&outer_fn);
+                    partitioned_aggregate!(
+                        i8,
+                        i8,
+                        i8,
+                        filter,
+                        inner,
+                        outer,
+                        predicate,
+                        groups,
+                        partition_col
+                    )
+                }
+
+                DataType::Int16 => {
+                    let inner = aggregate::<i16>(&inner_fn);
+                    let outer = aggregate::<i16>(&outer_fn);
+                    partitioned_aggregate!(
+                        i16,
+                        i16,
+                        i16,
+                        filter,
+                        inner,
+                        outer,
+                        predicate,
+                        groups,
+                        partition_col
+                    )
+                }
+
+                DataType::Int32 => {
+                    let inner = aggregate::<i32>(&inner_fn);
+                    let outer = aggregate::<i32>(&outer_fn);
+                    partitioned_aggregate!(
+                        i32,
+                        i32,
+                        i32,
+                        filter,
+                        inner,
+                        outer,
+                        predicate,
+                        groups,
+                        partition_col
+                    )
+                }
+
+                DataType::Int64 => {
+                    let t1 = get_return_type(DataType::Int64, &inner_fn);
+                    let _t2 = get_return_type(t1.clone(), &outer_fn);
+                    let inner = aggregate::<i64>(&inner_fn);
+                    let outer = aggregate::<i64>(&outer_fn);
+                    partitioned_aggregate!(
+                        i64,
+                        i64,
+                        i64,
+                        filter,
+                        inner,
+                        outer,
+                        predicate,
+                        groups,
+                        partition_col
+                    )
+                }
+
+                DataType::UInt8 => {
+                    let inner = aggregate::<u8>(&inner_fn);
+                    let outer = aggregate::<u8>(&outer_fn);
+                    partitioned_aggregate!(
+                        u8,
+                        u8,
+                        u8,
+                        filter,
+                        inner,
+                        outer,
+                        predicate,
+                        groups,
+                        partition_col
+                    )
+                }
+
+                DataType::UInt16 => {
+                    let inner = aggregate::<u16>(&inner_fn);
+                    let outer = aggregate::<u16>(&outer_fn);
+                    partitioned_aggregate!(
+                        u16,
+                        u16,
+                        u16,
+                        filter,
+                        inner,
+                        outer,
+                        predicate,
+                        groups,
+                        partition_col
+                    )
+                }
+
+                DataType::UInt32 => {
+                    let inner = aggregate::<u32>(&inner_fn);
+                    let outer = aggregate::<u32>(&outer_fn);
+                    partitioned_aggregate!(
+                        u32,
+                        u32,
+                        u32,
+                        filter,
+                        inner,
+                        outer,
+                        predicate,
+                        groups,
+                        partition_col
+                    )
+                }
+
+                DataType::UInt64 => {
+                    let inner = aggregate::<u64>(&inner_fn);
+                    let outer = aggregate::<u64>(&outer_fn);
+                    partitioned_aggregate!(
+                        u64,
+                        u64,
+                        u64,
+                        filter,
+                        inner,
+                        outer,
+                        predicate,
+                        groups,
+                        partition_col
+                    )
+                }
+
+                DataType::Float32 => {
+                    let inner = aggregate::<f32>(&inner_fn);
+                    let outer = aggregate::<f32>(&outer_fn);
+                    partitioned_aggregate!(
+                        f32,
+                        f32,
+                        f32,
+                        filter,
+                        inner,
+                        outer,
+                        predicate,
+                        groups,
+                        partition_col
+                    )
+                }
+
+                DataType::Float64 => {
+                    let inner = aggregate::<f64>(&inner_fn);
+                    let outer = aggregate::<f64>(&outer_fn);
+                    partitioned_aggregate!(
+                        f64,
+                        f64,
+                        f64,
+                        filter,
+                        inner,
+                        outer,
+                        predicate,
+                        groups,
+                        partition_col
+                    )
+                }
+
+                DataType::Decimal128(_, _) => {
+                    let inner = aggregate::<i128>(&inner_fn);
+                    let outer = aggregate::<i128>(&outer_fn);
+                    partitioned_aggregate!(
+                        i128,
+                        i128,
+                        i128,
+                        filter,
+                        inner,
+                        outer,
+                        predicate,
+                        groups,
+                        partition_col
+                    )
+                }
+                _ => unimplemented!(),
+            };
+
+            Ok(ret)
+        }
+        _ => unimplemented!(),
     }
 }

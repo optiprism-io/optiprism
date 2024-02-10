@@ -7,7 +7,6 @@
 resolver = "2"
 members = [
     "src/common",
-#    "src/contract-test-server",
     "src/events-gen",
     "src/metadata",
     "src/platform",
