@@ -14,7 +14,6 @@ use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_PROJECT_ID;
 use common::types::COLUMN_USER_ID;
-use datafusion::datasource::TableProvider;
 use datafusion::execution::context::SessionState;
 use datafusion::execution::runtime_env::RuntimeEnv;
 use datafusion::physical_plan::coalesce_batches::concat_batches;
@@ -139,7 +138,7 @@ impl QueryProvider {
                 .map(|x| schema.index_of(x).unwrap())
                 .collect()
         } else {
-            (0..schema.fields.len()).into_iter().collect::<Vec<_>>()
+            (0..schema.fields.len()).collect::<Vec<_>>()
         };
 
         let (session_ctx, state, plan) = self.initial_plan(projection).await?;
@@ -191,7 +190,7 @@ impl QueryProvider {
         let duration = start.elapsed();
         debug!("elapsed: {:?}", duration);
 
-        let metric_cols = req.time_columns(ctx.cur_time.clone());
+        let metric_cols = req.time_columns(ctx.cur_time);
         let cols = result
             .schema()
             .fields()
@@ -242,7 +241,7 @@ fn property_values_projection(
         COLUMN_USER_ID.to_string(),
         COLUMN_EVENT.to_string(),
     ];
-    fields.push(col_name(ctx, &req.property, &md)?);
+    fields.push(col_name(ctx, &req.property, md)?);
 
     Ok(fields)
 }
@@ -261,15 +260,13 @@ fn event_records_search(
     if let Some(filters) = &req.filters {
         for filter in filters {
             match filter {
-                EventFilter::Property { property, .. } => {
-                    fields.push(col_name(ctx, property, &md)?)
-                }
+                EventFilter::Property { property, .. } => fields.push(col_name(ctx, property, md)?),
             }
         }
     }
 
     for prop in req.properties.clone().unwrap() {
-        fields.push(col_name(ctx, &prop, &md)?);
+        fields.push(col_name(ctx, &prop, md)?);
     }
 
     Ok(fields)
@@ -292,7 +289,7 @@ fn event_segmentation_projection(
             for filter in filters {
                 match filter {
                     EventFilter::Property { property, .. } => {
-                        fields.push(col_name(ctx, property, &md)?)
+                        fields.push(col_name(ctx, property, md)?)
                     }
                 }
             }
@@ -307,10 +304,10 @@ fn event_segmentation_projection(
                 Query::MonthlyActiveGroups => {}
                 Query::CountPerGroup { .. } => {}
                 Query::AggregatePropertyPerGroup { property, .. } => {
-                    fields.push(col_name(ctx, property, &md)?)
+                    fields.push(col_name(ctx, property, md)?)
                 }
                 Query::AggregateProperty { property, .. } => {
-                    fields.push(col_name(ctx, property, &md)?)
+                    fields.push(col_name(ctx, property, md)?)
                 }
                 Query::QueryFormula { .. } => {}
             }
@@ -319,7 +316,7 @@ fn event_segmentation_projection(
         if let Some(breakdowns) = &event.breakdowns {
             for breakdown in breakdowns {
                 match breakdown {
-                    Breakdown::Property(property) => fields.push(col_name(ctx, property, &md)?),
+                    Breakdown::Property(property) => fields.push(col_name(ctx, property, md)?),
                 }
             }
         }
@@ -328,9 +325,7 @@ fn event_segmentation_projection(
     if let Some(filters) = &req.filters {
         for filter in filters {
             match filter {
-                EventFilter::Property { property, .. } => {
-                    fields.push(col_name(ctx, property, &md)?)
-                }
+                EventFilter::Property { property, .. } => fields.push(col_name(ctx, property, md)?),
             }
         }
     }
@@ -338,7 +333,7 @@ fn event_segmentation_projection(
     if let Some(breakdowns) = &req.breakdowns {
         for breakdown in breakdowns {
             match breakdown {
-                Breakdown::Property(property) => fields.push(col_name(ctx, property, &md)?),
+                Breakdown::Property(property) => fields.push(col_name(ctx, property, md)?),
             }
         }
     }

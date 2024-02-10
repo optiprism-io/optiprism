@@ -5,18 +5,6 @@ use std::ops::Add;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use arrow::array::ArrayBuilder;
-use arrow::array::ArrayRef;
-use arrow::array::BooleanBuilder;
-use arrow::array::Decimal128Builder;
-use arrow::array::Int16Builder;
-use arrow::array::Int32Builder;
-use arrow::array::Int64Builder;
-use arrow::array::Int8Builder;
-use arrow::array::StringBuilder;
-use arrow::array::TimestampNanosecondBuilder;
-use arrow::datatypes::SchemaRef;
-use arrow::record_batch::RecordBatch;
 use axum::Router;
 use chrono::Duration;
 use chrono::DurationRound;
@@ -24,7 +12,6 @@ use chrono::NaiveDateTime;
 use chrono::Utc;
 use clap::Parser;
 use common::types::DType;
-use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 use hyper::Server;
 use indicatif::ProgressBar;
@@ -63,72 +50,6 @@ pub struct Test {
     partitions: Option<usize>,
     #[arg(long, default_value = "4096")]
     batch_size: usize,
-}
-
-struct Builders {
-    b_project_id: Int64Builder,
-    b_user_id: Int64Builder,
-    b_created_at: TimestampNanosecondBuilder,
-    b_event: Int64Builder,
-    b_i8: Int8Builder,
-    b_i16: Int16Builder,
-    b_i32: Int32Builder,
-    b_i64: Int64Builder,
-    b_b: BooleanBuilder,
-    b_str: StringBuilder,
-    b_ts: TimestampNanosecondBuilder,
-    b_dec: Decimal128Builder,
-    b_group: Int64Builder,
-    b_v: Int64Builder,
-}
-
-impl Builders {
-    pub fn new() -> Self {
-        Self {
-            b_project_id: Int64Builder::new(),
-            b_user_id: Int64Builder::new(),
-            b_created_at: TimestampNanosecondBuilder::new(),
-            b_event: Int64Builder::new(),
-            b_i8: Int8Builder::new(),
-            b_i16: Int16Builder::new(),
-            b_i32: Int32Builder::new(),
-            b_i64: Int64Builder::new(),
-            b_b: BooleanBuilder::new(),
-            b_str: StringBuilder::new(),
-            b_ts: TimestampNanosecondBuilder::new(),
-            b_dec: Decimal128Builder::new()
-                .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)
-                .unwrap(),
-            b_group: Int64Builder::new(),
-            b_v: Int64Builder::new(),
-        }
-    }
-
-    pub fn finish(&mut self, schema: SchemaRef) -> RecordBatch {
-        let arrs = {
-            vec![
-                Arc::new(self.b_project_id.finish()) as ArrayRef,
-                Arc::new(self.b_user_id.finish()) as ArrayRef,
-                Arc::new(self.b_created_at.finish()) as ArrayRef,
-                Arc::new(self.b_event.finish()) as ArrayRef,
-                Arc::new(self.b_i8.finish()) as ArrayRef,
-                Arc::new(self.b_i16.finish()) as ArrayRef,
-                Arc::new(self.b_i32.finish()) as ArrayRef,
-                Arc::new(self.b_i64.finish()) as ArrayRef,
-                Arc::new(self.b_b.finish()) as ArrayRef,
-                Arc::new(self.b_str.finish()) as ArrayRef,
-                Arc::new(self.b_ts.finish()) as ArrayRef,
-                Arc::new(self.b_dec.finish()) as ArrayRef,
-                Arc::new(self.b_group.finish()) as ArrayRef,
-                Arc::new(self.b_v.finish()) as ArrayRef,
-            ]
-        };
-        RecordBatch::try_new(schema, arrs).unwrap()
-    }
-
-    pub fn len(&self) -> usize {
-        self.b_user_id.len()
-    }
 }
 
 pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
@@ -226,7 +147,7 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
                     ));
                     vals.push(NamedValue::new(
                         "user_id".to_string(),
-                        Value::Int64(Some(user as i64 + 1)),
+                        Value::Int64(Some(user + 1)),
                     ));
                     vals.push(NamedValue::new(
                         "created_at".to_string(),

@@ -17,7 +17,6 @@ use datafusion_common::DataFusionError;
 use datafusion_expr::Expr;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::UserDefinedLogicalNode;
-use datafusion_expr::UserDefinedLogicalNodeCore;
 
 mod partitioned_aggregate;
 mod segment;

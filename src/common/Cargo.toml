@@ -12,12 +12,9 @@ async-trait = "0.1.59"
 chrono = { version = "0.4.23", features = ["serde"] }
 chronoutil = "0.2.3"
 
-#datafusion = "34.0.0"
-#datafusion-common = "34.0.0"
-#datafusion-expr = "34.0.0"
-datafusion = { path = "../../../arrow-datafusion/datafusion/core" }
-datafusion-common = { path = "../../../arrow-datafusion/datafusion/common" }
-datafusion-expr = { path = "../../../arrow-datafusion/datafusion/expr" }
+datafusion = "34.0.0"
+datafusion-common = "34.0.0"
+datafusion-expr = "34.0.0"
 jsonwebtoken = "8.2.0"
 lazy_static = "1.4.0"
 rand = "0.8.5"

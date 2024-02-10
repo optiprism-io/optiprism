@@ -47,7 +47,7 @@ pub async fn start(cfg: Config) -> Result<()> {
 
     let _just_initialized = if !md.accounts.list()?.is_empty() {
         info!("creating admin account...");
-        let _admin = match md.accounts.create(CreateAccountRequest {
+        match md.accounts.create(CreateAccountRequest {
             created_by: None,
             password_hash: make_password_hash("admin")?,
             email: "admin@admin.com".to_string(),

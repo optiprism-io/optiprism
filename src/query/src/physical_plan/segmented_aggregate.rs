@@ -10,7 +10,6 @@ use std::sync::Mutex;
 use std::task::Context;
 use std::task::Poll;
 
-use ahash::HashMapExt;
 use ahash::RandomState;
 use arrow::array::Array;
 use arrow::array::ArrayRef;
@@ -147,7 +146,6 @@ pub struct SegmentedAggregatePartialExec {
     schema: SchemaRef,
     agg_schemas: Vec<SchemaRef>,
     metrics: ExecutionPlanMetricsSet,
-    group_fields: Vec<FieldRef>,
 }
 
 impl SegmentedAggregatePartialExec {
@@ -204,12 +202,9 @@ impl SegmentedAggregatePartialExec {
             schema: Arc::new(schema.clone()),
             agg_schemas,
             metrics: ExecutionPlanMetricsSet::new(),
-            group_fields,
         })
     }
 }
-
-type AggExpr = Arc<Mutex<Box<dyn PartitionedAggregateExpr>>>;
 
 impl DisplayAs for SegmentedAggregatePartialExec {
     fn fmt_as(&self, _t: DisplayFormatType, f: &mut fmt::Formatter) -> fmt::Result {
@@ -298,7 +293,6 @@ impl ExecutionPlan for SegmentedAggregatePartialExec {
             schema: self.schema.clone(),
             partition_col: self.partition_col.clone(),
             named_agg_expr: self.agg_expr.clone(),
-            group_fields: self.group_fields.clone(),
             agg_expr: vec![],
             agg_schemas: self.agg_schemas.clone(),
             finished: false,
@@ -321,7 +315,6 @@ struct FinalAggregateStream {
     schema: SchemaRef,
     named_agg_expr: Vec<NamedAggExpr>,
     group_fields: Vec<FieldRef>,
-    agg_expr: Vec<Vec<Arc<Mutex<Box<dyn PartitionedAggregateExpr>>>>>,
     // single partition input
     agg_schemas: Vec<SchemaRef>,
     final_batches: RefCell<Vec<RecordBatch>>,
@@ -347,7 +340,7 @@ struct PartialAggregateStream {
     schema: SchemaRef,
     partition_col: Column,
     named_agg_expr: Vec<NamedAggExpr>,
-    group_fields: Vec<FieldRef>,
+    #[warn(clippy::type_complexity)]
     agg_expr: Vec<Vec<Arc<Mutex<Box<dyn PartitionedAggregateExpr>>>>>,
     // single partition input
     agg_schemas: Vec<SchemaRef>,
@@ -506,7 +499,7 @@ impl Stream for PartialAggregateStream {
         let batch = concat_batches(&self.schema, batches.iter().collect::<Vec<_>>())?;
 
         self.finished = true;
-        return Poll::Ready(Some(Ok(batch)));
+        Poll::Ready(Some(Ok(batch)))
     }
 }
 
@@ -570,7 +563,6 @@ impl ExecutionPlan for SegmentedAggregateFinalExec {
         let partitions_count = self.input.output_partitioning().partition_count();
 
         let inputs = (0..partitions_count)
-            .into_iter()
             .map(|pid| self.input.execute(pid, context.clone()))
             .collect::<DFResult<_>>()?;
         Ok(Box::pin(FinalAggregateStream {
@@ -578,7 +570,6 @@ impl ExecutionPlan for SegmentedAggregateFinalExec {
             schema: self.schema.clone(),
             named_agg_expr: self.agg_expr.clone(),
             group_fields: self.group_fields.clone(),
-            agg_expr: vec![],
             agg_schemas: self.agg_schemas.clone(),
             final_batches: RefCell::new(vec![
                 RecordBatch::new_empty(self.schema.clone());
@@ -860,6 +851,7 @@ impl Stream for FinalAggregateStream {
             group_by,
             aggs,
             vec![None],
+            vec![None],
             input,
             self.schema.clone(),
         )?);
@@ -878,6 +870,6 @@ impl Stream for FinalAggregateStream {
         let result = concat_batches(&self.schema, &out_batches)?;
 
         self.finished = true;
-        return Poll::Ready(Some(Ok(result)));
+        Poll::Ready(Some(Ok(result)))
     }
 }

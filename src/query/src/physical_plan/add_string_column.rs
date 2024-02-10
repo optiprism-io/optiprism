@@ -34,7 +34,7 @@ pub struct AddStringColumnExec {
 impl AddStringColumnExec {
     pub fn new(input: Arc<dyn ExecutionPlan>, col: (String, String)) -> Self {
         let schema = input.schema();
-        let fields = vec![
+        let fields = [
             vec![Field::new(col.0.clone(), DataType::Utf8, false)],
             schema.fields.iter().map(|f| f.deref().to_owned()).collect(),
         ]
@@ -115,12 +115,12 @@ impl Stream for AddStringColumnStream {
                 let arr = v.to_array_of_size(batch.num_rows())?;
                 let new_batch = RecordBatch::try_new(
                     self.schema.clone(),
-                    vec![vec![arr], batch.columns().to_vec()].concat(),
+                    [vec![arr], batch.columns().to_vec()].concat(),
                 )?;
 
                 Poll::Ready(Some(Ok(new_batch)))
             }
-            other => return other,
+            other => other,
         }
     }
 }

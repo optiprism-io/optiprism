@@ -18,13 +18,9 @@ chrono = "0.4.23"
 chronoutil = "0.2.3"
 common = { path = "../common" }
 crossbeam = "0.8.2"
-#datafusion = "34.0.0"
-#datafusion-common = "34.0.0"
-#datafusion-expr = "34.0.0"
-#datafusion
-datafusion = { path = "../../../arrow-datafusion/datafusion/core" }
-datafusion-common = { path = "../../../arrow-datafusion/datafusion/common" }
-datafusion-expr = { path = "../../../arrow-datafusion/datafusion/expr" }
+datafusion = "34.0.0"
+datafusion-common = "34.0.0"
+datafusion-expr = "34.0.0"
 display_json = "0.2.1"
 dyn-clone = "1.0.11"
 fnv = "1.0.7"

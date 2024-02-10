@@ -26,7 +26,7 @@ pub struct AddStringColumnNode {
 impl AddStringColumnNode {
     pub fn try_new(input: LogicalPlan, col: (String, String)) -> Result<Self> {
         let schema = input.schema();
-        let fields = vec![
+        let fields = [
             vec![DFField::new_unqualified(&col.0, DataType::Utf8, false)],
             schema.fields().to_vec(),
         ]

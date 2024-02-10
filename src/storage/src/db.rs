@@ -382,7 +382,8 @@ fn write_level0(metadata: &Metadata, memtable: &Memtable, path: PathBuf) -> Resu
         min,
         max,
     };
-    return Ok(part);
+
+    Ok(part)
 }
 
 fn flush(
@@ -835,21 +836,14 @@ mod tests {
 
     use std::fs;
     use std::path::PathBuf;
-    use std::pin::Pin;
 
-    use arrow2::array::Array;
-    use arrow2::chunk::Chunk;
     use common::types::DType;
-    use futures::Stream;
 
     use crate::db::OptiDBImpl;
     use crate::db::Options;
     use crate::table;
     use crate::NamedValue;
     use crate::Value;
-
-    type SendableRecordBatchStream =
-        Pin<Box<dyn Stream<Item = crate::error::Result<Chunk<Box<dyn Array>>>> + Send>>;
 
     #[test]
     fn test_schema_evolution() {

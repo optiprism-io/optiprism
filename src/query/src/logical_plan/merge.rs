@@ -33,7 +33,7 @@ impl MergeNode {
 
         schema = if let Some((col_name, _)) = names.clone() {
             DFSchema::new_with_metadata(
-                vec![
+                [
                     vec![DFField::new_unqualified(&col_name, DataType::Utf8, false)],
                     schema.fields().to_vec(),
                 ]
