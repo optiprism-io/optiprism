@@ -1,18 +1,18 @@
 use std::any::Any;
-use std::cell::RefCell;
+
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::sync::Mutex;
+
 use std::task::Context;
 use std::task::Poll;
 
 use arrow::array::RecordBatch;
 use arrow::compute::SortOptions;
-use arrow::datatypes::FieldRef;
+
 use arrow::datatypes::SchemaRef;
-use arrow::util::pretty::print_batches;
+
 use arrow2::array::Array;
 use arrow2::chunk::Chunk;
 use async_trait::async_trait;
@@ -24,7 +24,7 @@ use datafusion::execution::TaskContext;
 use datafusion::physical_expr::expressions::col;
 use datafusion::physical_expr::Partitioning;
 use datafusion::physical_expr::PhysicalSortExpr;
-use datafusion::physical_expr::PhysicalSortRequirement;
+
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
@@ -32,13 +32,13 @@ use datafusion_common::DataFusionError;
 use datafusion_common::Result as DFResult;
 use futures::Stream;
 use futures::StreamExt;
-use storage::arrow_conversion;
+
 use storage::arrow_conversion::arrow2_to_arrow1;
 use storage::db::OptiDBImpl;
-use storage::db::ScanStream;
+
 
 use crate::error::QueryError;
-use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
+
 use crate::Result;
 
 #[derive(Debug)]
@@ -78,7 +78,7 @@ impl DBParquetExec {
 }
 
 impl DisplayAs for DBParquetExec {
-    fn fmt_as(&self, t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "DbParquetExec")
     }
 }
@@ -107,7 +107,7 @@ impl ExecutionPlan for DBParquetExec {
 
     fn with_new_children(
         self: Arc<Self>,
-        children: Vec<Arc<dyn ExecutionPlan>>,
+        _children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
         Ok(Arc::new(
             DBParquetExec::try_new(self.db.clone(), self.projection.clone())

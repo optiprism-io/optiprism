@@ -1,4 +1,4 @@
-use std::fs;
+
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::path::PathBuf;
@@ -7,7 +7,7 @@ use std::sync::Arc;
 use arrow_array::ArrayRef;
 use arrow_array::Int32Array;
 use arrow_array::RecordBatch;
-use parquet::arrow::arrow_reader::ParquetRecordBatchReader;
+
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use parquet::arrow::ArrowWriter;
 use parquet::basic::Compression;
@@ -26,7 +26,7 @@ fn read_chunks(path: PathBuf) {
     let mut c = 0;
     loop {
         let a = reader.next();
-        if let Some(b) = a {
+        if let Some(_b) = a {
         } else {
             break;
         }

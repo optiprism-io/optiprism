@@ -135,7 +135,7 @@ impl ExecutionPlan for LocalExec {
 
     fn execute(
         &self,
-        partition: usize,
+        _partition: usize,
         _cx: Arc<TaskContext>,
     ) -> datafusion_common::Result<SendableRecordBatchStream> {
         unimplemented!();

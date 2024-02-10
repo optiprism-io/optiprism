@@ -15,7 +15,7 @@ use common::query;
 use common::query::PartitionedAggregateFunction;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
-use datafusion::optimizer::OptimizerConfig;
+
 use datafusion::optimizer::OptimizerRule;
 use datafusion_common::Column;
 use datafusion_common::DFField;
@@ -520,7 +520,7 @@ impl UserDefinedLogicalNodeCore for PartitionedAggregatePartialNode {
         Ok(())
     }
 
-    fn from_template(&self, exprs: &[Expr], inputs: &[LogicalPlan]) -> Self {
+    fn from_template(&self, _exprs: &[Expr], inputs: &[LogicalPlan]) -> Self {
         let node = PartitionedAggregatePartialNode::try_new(
             inputs[0].clone(),
             self.partition_inputs.clone(),

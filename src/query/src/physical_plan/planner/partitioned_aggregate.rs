@@ -2261,7 +2261,7 @@ pub fn build_partitioned_aggregate_final_expr(
             let predicate = col(predicate, &dfschema);
             let partition_col = col(partition_col, &dfschema);
 
-            let dt = predicate.data_type(schema)?;
+            let _dt = predicate.data_type(schema)?;
             let expr = match predicate.data_type(schema)? {
                 DataType::Int8 => {
                     let agg = aggregate::<i8>(&agg);
@@ -2404,7 +2404,7 @@ pub fn build_partitioned_aggregate_final_expr(
 
                 DataType::Int64 => {
                     let t1 = get_return_type(DataType::Int64, &inner_fn);
-                    let t2 = get_return_type(t1.clone(), &outer_fn);
+                    let _t2 = get_return_type(t1.clone(), &outer_fn);
                     let inner = aggregate::<i64>(&inner_fn);
                     let outer = aggregate::<i64>(&outer_fn);
                     partitioned_aggregate!(

@@ -1,4 +1,4 @@
-use std::sync::Arc;
+
 
 use chrono::DateTime;
 use chrono::Utc;
@@ -16,10 +16,10 @@ use crate::query::PropertyRef;
 use crate::query::QueryTime;
 use crate::query::TimeIntervalUnit;
 use crate::scalar::ScalarValueRef;
-use crate::types::COLUMN_CREATED_AT;
-use crate::types::COLUMN_EVENT;
-use crate::types::COLUMN_PROJECT_ID;
-use crate::types::COLUMN_USER_ID;
+
+
+
+
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum SegmentTime {

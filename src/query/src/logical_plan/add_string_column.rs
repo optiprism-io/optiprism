@@ -14,7 +14,7 @@ use datafusion_expr::Expr;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::UserDefinedLogicalNode;
 
-use crate::logical_plan::merge::MergeNode;
+
 use crate::Result;
 
 #[derive(Hash, Eq, PartialEq)]
@@ -74,7 +74,7 @@ impl UserDefinedLogicalNode for AddStringColumnNode {
 
     fn from_template(
         &self,
-        exprs: &[Expr],
+        _exprs: &[Expr],
         inputs: &[LogicalPlan],
     ) -> Arc<dyn UserDefinedLogicalNode> {
         Arc::new(AddStringColumnNode::try_new(inputs[0].clone(), self.col.clone()).unwrap())

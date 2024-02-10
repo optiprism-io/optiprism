@@ -354,7 +354,7 @@ pub mod test_util {
     use metadata::properties::Type;
     use metadata::MetadataProvider;
     use storage::db::OptiDBImpl;
-    use storage::NamedValue;
+    
 
     use crate::error::Result;
     use crate::physical_plan::planner::QueryPlanner;

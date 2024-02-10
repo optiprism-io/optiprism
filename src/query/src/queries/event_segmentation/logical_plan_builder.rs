@@ -8,7 +8,7 @@ use common::query::event_segmentation::EventSegmentation;
 use common::query::event_segmentation::Query;
 use common::query::event_segmentation::SegmentCondition;
 use common::query::time_columns;
-use common::query::EventFilter;
+
 use common::query::PropertyRef;
 use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
@@ -24,7 +24,7 @@ use datafusion_expr::expr::Alias;
 use datafusion_expr::expr::ScalarFunction;
 use datafusion_expr::expr_fn::and;
 use datafusion_expr::lit;
-use datafusion_expr::Aggregate;
+
 use datafusion_expr::BuiltinScalarFunction;
 use datafusion_expr::Expr;
 use datafusion_expr::ExprSchemable;
@@ -32,16 +32,16 @@ use datafusion_expr::Extension;
 use datafusion_expr::Filter;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::Operator;
-use datafusion_expr::Partitioning;
-use datafusion_expr::Projection;
-use datafusion_expr::Repartition;
+
+
+
 use datafusion_expr::ScalarFunctionDefinition;
 use datafusion_expr::Sort;
 use datafusion_expr::UserDefinedLogicalNode;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
 
-use crate::col_name;
+
 use crate::context::Format;
 use crate::error::Result;
 use crate::expr::breakdown_expr;

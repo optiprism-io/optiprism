@@ -60,7 +60,7 @@ use crate::table::part_path;
 use crate::table::Level;
 use crate::table::Metadata;
 use crate::table::Part;
-use crate::table::Partition;
+
 use crate::table::Table;
 use crate::Fs;
 use crate::KeyValue;
@@ -158,7 +158,7 @@ fn recover_op(op: LogOp, memtable: &mut Memtable, metadata: &mut Metadata) -> Re
     match op {
         LogOp::Insert(k, v) => {
             let phash = siphash(&k);
-            let pid = phash as usize % metadata.opts.parallelism;
+            let _pid = phash as usize % metadata.opts.parallelism;
             let kv: Vec<Value> = k.iter().map(|k| k.into()).collect::<Vec<_>>();
             let vv = [kv, v].concat();
             for (idx, val) in vv.into_iter().enumerate() {
@@ -837,17 +837,17 @@ mod tests {
     use std::fs;
     use std::path::PathBuf;
     use std::pin::Pin;
-    use std::thread;
-    use std::time::Duration;
+    
+    
 
     use arrow2::array::Array;
-    use arrow2::array::PrimitiveArray;
+    
     use arrow2::chunk::Chunk;
     use common::types::DType;
     use futures::Stream;
-    use futures::StreamExt;
+    
 
-    use crate::db;
+    
     use crate::db::OptiDBImpl;
     use crate::db::Options;
     use crate::table;

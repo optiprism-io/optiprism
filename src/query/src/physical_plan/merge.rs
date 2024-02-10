@@ -16,7 +16,7 @@ use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use axum::async_trait;
 use datafusion::execution::context::TaskContext;
-use datafusion::physical_expr::expressions::Column;
+
 use datafusion::physical_plan::expressions::PhysicalSortExpr;
 use datafusion::physical_plan::metrics::BaselineMetrics;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
@@ -51,7 +51,7 @@ impl MergeExec {
     ) -> Result<Self> {
         let schemas: Vec<Schema> = inputs.iter().map(|i| i.schema().deref().clone()).collect();
         let schema = Schema::try_merge(schemas)?;
-        let schema = if let Some((col, names)) = &names {
+        let schema = if let Some((col, _names)) = &names {
             let fields = vec![
                 vec![Field::new(col, DataType::Utf8, false)],
                 schema.fields.iter().map(|f| f.deref().to_owned()).collect(),

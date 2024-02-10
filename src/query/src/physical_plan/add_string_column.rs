@@ -50,7 +50,7 @@ impl AddStringColumnExec {
 }
 
 impl DisplayAs for AddStringColumnExec {
-    fn fmt_as(&self, t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "AddStringColumnExec")
     }
 }

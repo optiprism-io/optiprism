@@ -1,23 +1,15 @@
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 
 use arrow::array::ArrayRef;
-use arrow::array::Int64Array;
 use arrow::array::StringArray;
 use arrow::array::StringBuilder;
-use arrow::array::TimestampNanosecondArray;
-use arrow::datatypes::DataType;
-use arrow::datatypes::Field;
 use arrow::datatypes::Schema;
-use arrow::datatypes::TimeUnit;
 use arrow::record_batch::RecordBatch;
-use chrono::Utc;
 use common::query::event_segmentation::Breakdown;
 use common::query::event_segmentation::EventSegmentation;
 use common::query::event_segmentation::Query;
 use common::query::EventFilter;
-use common::query::PropertyRef;
 use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_PROJECT_ID;
@@ -26,33 +18,19 @@ use datafusion::datasource::DefaultTableSource;
 use datafusion::datasource::TableProvider;
 use datafusion::execution::context::SessionState;
 use datafusion::execution::runtime_env::RuntimeEnv;
-use datafusion::optimizer::optimize_projections::OptimizeProjections;
-use datafusion::optimizer::push_down_filter::PushDownFilter;
-use datafusion::physical_optimizer::coalesce_batches::CoalesceBatches;
-use datafusion::physical_optimizer::enforce_distribution::EnforceDistribution;
-use datafusion::physical_optimizer::enforce_sorting::EnforceSorting;
-use datafusion::physical_optimizer::join_selection::JoinSelection;
-use datafusion::physical_optimizer::projection_pushdown::ProjectionPushdown;
 use datafusion::physical_plan::coalesce_batches::concat_batches;
 use datafusion::physical_plan::collect;
 use datafusion::physical_plan::display::DisplayableExecutionPlan;
-use datafusion::prelude::ParquetReadOptions;
 use datafusion::prelude::SessionConfig;
 use datafusion::prelude::SessionContext;
-use datafusion_expr::col;
-use datafusion_expr::expr::Sort;
-use datafusion_expr::Expr;
 use datafusion_expr::Extension;
 use datafusion_expr::LogicalPlan;
-use datafusion_expr::LogicalPlanBuilder;
-use datafusion_expr::Partitioning;
 use metadata::MetadataProvider;
 use storage::db::OptiDBImpl;
 use tracing::debug;
 
 use crate::col_name;
 use crate::logical_plan::db_parquet::DbParquetNode;
-use crate::physical_optimizer::apply_parquet_projection::ApplyParquetProjection;
 use crate::physical_plan::planner::QueryPlanner;
 use crate::queries::event_records_search;
 use crate::queries::event_records_search::EventRecordsSearch;
@@ -90,10 +68,10 @@ impl QueryProvider {
 impl QueryProvider {
     pub async fn initial_plan(
         &self,
-        projection: Option<Vec<usize>>,
+        projection: Vec<usize>,
     ) -> Result<(SessionContext, SessionState, LogicalPlan)> {
         let runtime = Arc::new(RuntimeEnv::default());
-        let mut state = SessionState::new_with_config_rt(
+        let state = SessionState::new_with_config_rt(
             SessionConfig::new()
                 .with_collect_statistics(true)
                 .with_target_partitions(12),
@@ -112,10 +90,7 @@ impl QueryProvider {
         // .with_physical_optimizer_rules(vec![Arc::new(ProjectionPushdown::new())])
         let exec_ctx = SessionContext::new_with_state(state.clone());
         let plan = LogicalPlan::Extension(Extension {
-            node: Arc::new(DbParquetNode::try_new(
-                self.db.clone(),
-                projection.unwrap().clone(),
-            )?),
+            node: Arc::new(DbParquetNode::try_new(self.db.clone(), projection.clone())?),
         });
 
         Ok((exec_ctx, state, plan))
@@ -140,7 +115,13 @@ impl QueryProvider {
 
     pub async fn property_values(&self, ctx: Context, req: PropertyValues) -> Result<ArrayRef> {
         let start = Instant::now();
-        let (session_ctx, state, plan) = self.initial_plan(None).await?;
+        let schema = self.db.schema1("events")?;
+        let projection = property_values_projection(&ctx, &req, &self.metadata)?;
+        let projection = projection
+            .iter()
+            .map(|x| schema.index_of(x).unwrap())
+            .collect();
+        let (session_ctx, state, plan) = self.initial_plan(projection).await?;
         let plan = property_values::LogicalPlanBuilder::build(
             ctx,
             self.metadata.clone(),
@@ -161,7 +142,18 @@ impl QueryProvider {
         req: EventRecordsSearch,
     ) -> Result<DataTable> {
         let start = Instant::now();
-        let (session_ctx, state, plan) = self.initial_plan(None).await?;
+        let schema = self.db.schema1("events")?;
+        let projection = if req.properties.is_some() {
+            let projection = event_records_search(&ctx, &req, &self.metadata)?;
+            projection
+                .iter()
+                .map(|x| schema.index_of(x).unwrap())
+                .collect()
+        } else {
+            (0..schema.fields.len()).into_iter().collect::<Vec<_>>()
+        };
+
+        let (session_ctx, state, plan) = self.initial_plan(projection).await?;
         let plan = event_records_search::build(ctx, self.metadata.clone(), plan, req.clone())?;
 
         let result = self.execute(session_ctx, state, plan).await?;
@@ -193,12 +185,10 @@ impl QueryProvider {
         let start = Instant::now();
         let schema = self.db.schema1("events")?;
         let projection = event_segmentation_projection(&ctx, &req, &self.metadata)?;
-        let projection = Some(
-            projection
-                .iter()
-                .map(|x| schema.index_of(x).unwrap())
-                .collect(),
-        );
+        let projection = projection
+            .iter()
+            .map(|x| schema.index_of(x).unwrap())
+            .collect();
         let (session_ctx, state, plan) = self.initial_plan(projection).await?;
         let plan = event_segmentation::logical_plan_builder::LogicalPlanBuilder::build(
             ctx.clone(),
@@ -251,6 +241,49 @@ impl QueryProvider {
 
         Ok(DataTable::new(result.schema(), cols))
     }
+}
+
+fn property_values_projection(
+    ctx: &Context,
+    req: &PropertyValues,
+    md: &Arc<MetadataProvider>,
+) -> Result<Vec<String>> {
+    let mut fields = vec![
+        COLUMN_PROJECT_ID.to_string(),
+        COLUMN_USER_ID.to_string(),
+        COLUMN_EVENT.to_string(),
+    ];
+    fields.push(col_name(ctx, &req.property, &md)?);
+
+    Ok(fields)
+}
+
+fn event_records_search(
+    ctx: &Context,
+    req: &EventRecordsSearch,
+    md: &Arc<MetadataProvider>,
+) -> Result<Vec<String>> {
+    let mut fields = vec![
+        COLUMN_PROJECT_ID.to_string(),
+        COLUMN_USER_ID.to_string(),
+        COLUMN_CREATED_AT.to_string(),
+        COLUMN_EVENT.to_string(),
+    ];
+    if let Some(filters) = &req.filters {
+        for filter in filters {
+            match filter {
+                EventFilter::Property { property, .. } => {
+                    fields.push(col_name(ctx, property, &md)?)
+                }
+            }
+        }
+    }
+
+    for prop in req.properties.clone().unwrap() {
+        fields.push(col_name(ctx, &prop, &md)?);
+    }
+
+    Ok(fields)
 }
 
 fn event_segmentation_projection(

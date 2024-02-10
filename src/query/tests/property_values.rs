@@ -165,7 +165,7 @@ mod tests {
             filter: None,
         };
 
-        let plan = LogicalPlanBuilder::build(ctx, md, input, req).await?;
+        let plan = LogicalPlanBuilder::build(ctx, md, input, req)?;
         let result = run_plan(plan).await?;
 
         print_batches(&result)?;

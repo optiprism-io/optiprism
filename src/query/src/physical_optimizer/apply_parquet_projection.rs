@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use datafusion::datasource::physical_plan::CsvExec;
+
 use datafusion::datasource::physical_plan::FileScanConfig;
 use datafusion::datasource::physical_plan::ParquetExec;
 use datafusion::physical_optimizer::PhysicalOptimizerRule;
@@ -23,7 +23,7 @@ impl PhysicalOptimizerRule for ApplyParquetProjection {
     fn optimize(
         &self,
         plan: Arc<dyn ExecutionPlan>,
-        config: &ConfigOptions,
+        _config: &ConfigOptions,
     ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
         plan.transform_down(&|plan| {
             let plan_any = plan.as_any();

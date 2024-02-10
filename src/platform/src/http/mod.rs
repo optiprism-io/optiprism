@@ -13,7 +13,7 @@ pub mod reports;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use axum::middleware;
+
 use axum::Extension;
 use axum::Router;
 use metadata::MetadataProvider;
@@ -26,7 +26,7 @@ use tower_http::trace::TraceLayer;
 use tracing::info;
 
 use crate::auth::provider::Config;
-use crate::context::print_request_response;
+
 use crate::properties::Properties;
 use crate::PlatformProvider;
 
