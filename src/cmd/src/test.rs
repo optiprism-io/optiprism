@@ -199,17 +199,18 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
     let days = 365;
     let events = 20;
     let total = (users * days * events) as u64;
+    let records_per_parquet = total as i64 / 3;
     let pb = ProgressBar::new(total);
 
     pb.set_style(
         ProgressStyle::with_template(
             "{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {pos}/{len} events ({eta})",
         )
-        .unwrap()
-        .with_key("eta", |state: &ProgressState, w: &mut dyn Write| {
-            write!(w, "{:.1}s", state.eta().as_secs_f64()).unwrap()
-        })
-        .progress_chars("#>-"),
+            .unwrap()
+            .with_key("eta", |state: &ProgressState, w: &mut dyn Write| {
+                write!(w, "{:.1}s", state.eta().as_secs_f64()).unwrap()
+            })
+            .progress_chars("#>-"),
     );
 
     let mut vals: Vec<NamedValue> = vec![];
@@ -325,12 +326,15 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
                 event_time = event_time.add(diff);
                 i += 1;
                 pb.inc(1);
+                if i >= records_per_parquet {
+                    i = 0;
+                    db.flush()?;
+                }
             }
             cur_time = cur_time.add(Duration::days(1));
         }
     }
     db.flush()?;
-
     info!("successfully generated {i} events!");
     let data_provider: Arc<dyn TableProvider> =
         Arc::new(LocalTable::try_new(db.clone(), "events".to_string())?);
