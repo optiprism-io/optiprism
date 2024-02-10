@@ -215,123 +215,125 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
 
     let mut vals: Vec<NamedValue> = vec![];
     let mut i = 0;
-    for user in 0..users {
-        let mut cur_time = now - Duration::days(days);
-        for _day in 0..days {
-            let mut event_time = cur_time;
-            for event in 0..events {
-                vals.truncate(0);
-                vals.push(NamedValue::new(
-                    "project_id".to_string(),
-                    Value::Int64(Some(proj_id as i64)),
-                ));
-                vals.push(NamedValue::new(
-                    "user_id".to_string(),
-                    Value::Int64(Some(user as i64 + 1)),
-                ));
-                vals.push(NamedValue::new(
-                    "created_at".to_string(),
-                    Value::Timestamp(Some(event_time.timestamp_nanos_opt().unwrap())),
-                ));
-                vals.push(NamedValue::new(
-                    "event".to_string(),
-                    Value::Int64(Some(e.id as i64)),
-                ));
-                vals.push(NamedValue::new(
-                    "event_id".to_string(),
-                    Value::Int64(Some(i)),
-                ));
-                vals.push(NamedValue::new(
-                    "i_8".to_string(),
-                    Value::Int8(Some(event as i8)),
-                ));
-                vals.push(NamedValue::new(
-                    "i_16".to_string(),
-                    Value::Int16(Some(event as i16)),
-                ));
-                vals.push(NamedValue::new(
-                    "i_32".to_string(),
-                    Value::Int32(Some(event as i32)),
-                ));
-                vals.push(NamedValue::new(
-                    "i_64".to_string(),
-                    Value::Int64(Some(event)),
-                ));
-                vals.push(NamedValue::new(
-                    "ts".to_string(),
-                    Value::Timestamp(Some(event)),
-                ));
-                vals.push(NamedValue::new(
-                    "bool".to_string(),
-                    Value::Boolean(Some(event % 3 == 0)),
-                ));
-
-                let bv = match event % 3 {
-                    0 => Some(true),
-                    1 => Some(false),
-                    2 => None,
-                    _ => unimplemented!(),
-                };
-
-                vals.push(NamedValue::new(
-                    "bool_nullable".to_string(),
-                    Value::Boolean(bv),
-                ));
-
-                if event % 3 == 0 {
+    for _ in 0..2 {
+        for user in 0..users {
+            let mut cur_time = now - Duration::days(days);
+            for _day in 0..days {
+                let mut event_time = cur_time;
+                for event in 0..events {
+                    vals.truncate(0);
                     vals.push(NamedValue::new(
-                        "string".to_string(),
-                        Value::String(Some("привет".to_string())),
+                        "project_id".to_string(),
+                        Value::Int64(Some(proj_id as i64)),
+                    ));
+                    vals.push(NamedValue::new(
+                        "user_id".to_string(),
+                        Value::Int64(Some(user as i64 + 1)),
+                    ));
+                    vals.push(NamedValue::new(
+                        "created_at".to_string(),
+                        Value::Timestamp(Some(event_time.timestamp_nanos_opt().unwrap())),
+                    ));
+                    vals.push(NamedValue::new(
+                        "event".to_string(),
+                        Value::Int64(Some(e.id as i64)),
+                    ));
+                    vals.push(NamedValue::new(
+                        "event_id".to_string(),
+                        Value::Int64(Some(i)),
+                    ));
+                    vals.push(NamedValue::new(
+                        "i_8".to_string(),
+                        Value::Int8(Some(event as i8)),
+                    ));
+                    vals.push(NamedValue::new(
+                        "i_16".to_string(),
+                        Value::Int16(Some(event as i16)),
+                    ));
+                    vals.push(NamedValue::new(
+                        "i_32".to_string(),
+                        Value::Int32(Some(event as i32)),
+                    ));
+                    vals.push(NamedValue::new(
+                        "i_64".to_string(),
+                        Value::Int64(Some(event)),
+                    ));
+                    vals.push(NamedValue::new(
+                        "ts".to_string(),
+                        Value::Timestamp(Some(event)),
+                    ));
+                    vals.push(NamedValue::new(
+                        "bool".to_string(),
+                        Value::Boolean(Some(event % 3 == 0)),
                     ));
 
-                    vals.push(NamedValue::new(
-                        "string_dict".to_string(),
-                        Value::Int8(Some(1)),
-                    ));
-                } else {
-                    vals.push(NamedValue::new(
-                        "string".to_string(),
-                        Value::String(Some("мир".to_string())),
-                    ));
+                    let bv = match event % 3 {
+                        0 => Some(true),
+                        1 => Some(false),
+                        2 => None,
+                        _ => unimplemented!(),
+                    };
 
                     vals.push(NamedValue::new(
-                        "string_dict".to_string(),
-                        Value::Int8(Some(2)),
+                        "bool_nullable".to_string(),
+                        Value::Boolean(bv),
                     ));
+
+                    if event % 3 == 0 {
+                        vals.push(NamedValue::new(
+                            "string".to_string(),
+                            Value::String(Some("привет".to_string())),
+                        ));
+
+                        vals.push(NamedValue::new(
+                            "string_dict".to_string(),
+                            Value::Int8(Some(1)),
+                        ));
+                    } else {
+                        vals.push(NamedValue::new(
+                            "string".to_string(),
+                            Value::String(Some("мир".to_string())),
+                        ));
+
+                        vals.push(NamedValue::new(
+                            "string_dict".to_string(),
+                            Value::Int8(Some(2)),
+                        ));
+                    }
+                    vals.push(NamedValue::new(
+                        "decimal".to_string(),
+                        Value::Decimal(Some(
+                            event as i128 * 10_i128.pow(DECIMAL_SCALE as u32) + event as i128 * 100,
+                        )),
+                    ));
+                    vals.push(NamedValue::new(
+                        "group".to_string(),
+                        Value::Int64(Some(event % (events / 2))),
+                    ));
+                    // two group of users with different "v" value to proper integration tests
+                    // event value
+                    if user % 3 == 0 {
+                        vals.push(NamedValue::new("v".to_string(), Value::Int64(Some(event))));
+                    } else {
+                        vals.push(NamedValue::new(
+                            "v".to_string(),
+                            Value::Int64(Some(event * 2)),
+                        ));
+                    }
+
+                    db.insert("events", vals.clone())?;
+                    let d = Duration::days(1).num_seconds() / events;
+                    let diff = Duration::seconds(d);
+                    event_time = event_time.add(diff);
+                    i += 1;
+                    pb.inc(1);
+                    if i >= records_per_parquet {
+                        i = 0;
+                        db.flush()?;
+                    }
                 }
-                vals.push(NamedValue::new(
-                    "decimal".to_string(),
-                    Value::Decimal(Some(
-                        event as i128 * 10_i128.pow(DECIMAL_SCALE as u32) + event as i128 * 100,
-                    )),
-                ));
-                vals.push(NamedValue::new(
-                    "group".to_string(),
-                    Value::Int64(Some(event % (events / 2))),
-                ));
-                // two group of users with different "v" value to proper integration tests
-                // event value
-                if user % 3 == 0 {
-                    vals.push(NamedValue::new("v".to_string(), Value::Int64(Some(event))));
-                } else {
-                    vals.push(NamedValue::new(
-                        "v".to_string(),
-                        Value::Int64(Some(event * 2)),
-                    ));
-                }
-
-                db.insert("events", vals.clone())?;
-                let d = Duration::days(1).num_seconds() / events;
-                let diff = Duration::seconds(d);
-                event_time = event_time.add(diff);
-                i += 1;
-                pb.inc(1);
-                if i >= records_per_parquet {
-                    i = 0;
-                    db.flush()?;
-                }
+                cur_time = cur_time.add(Duration::days(1));
             }
-            cur_time = cur_time.add(Duration::days(1));
         }
     }
     db.flush()?;

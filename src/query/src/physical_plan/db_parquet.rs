@@ -9,17 +9,22 @@ use std::task::Context;
 use std::task::Poll;
 
 use arrow::array::RecordBatch;
+use arrow::compute::SortOptions;
 use arrow::datatypes::FieldRef;
 use arrow::datatypes::SchemaRef;
 use arrow::util::pretty::print_batches;
 use arrow2::array::Array;
 use arrow2::chunk::Chunk;
 use async_trait::async_trait;
+use common::types::COLUMN_PROJECT_ID;
+use common::types::COLUMN_USER_ID;
 use datafusion::execution::RecordBatchStream;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::execution::TaskContext;
+use datafusion::physical_expr::expressions::col;
 use datafusion::physical_expr::Partitioning;
 use datafusion::physical_expr::PhysicalSortExpr;
+use datafusion::physical_expr::PhysicalSortRequirement;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
@@ -41,15 +46,33 @@ pub struct DBParquetExec {
     db: Arc<OptiDBImpl>,
     projection: Vec<usize>,
     schema: SchemaRef,
+    output_ordering: Vec<PhysicalSortExpr>,
 }
 
 impl DBParquetExec {
     pub fn try_new(db: Arc<OptiDBImpl>, projection: Vec<usize>) -> Result<Self> {
         let schema = db.schema1("events")?.project(&projection)?;
+        let output_ordering = vec![
+            PhysicalSortExpr {
+                expr: col(COLUMN_PROJECT_ID, &schema).unwrap(),
+                options: SortOptions {
+                    descending: false,
+                    nulls_first: false,
+                },
+            },
+            PhysicalSortExpr {
+                expr: col(COLUMN_USER_ID, &schema).unwrap(),
+                options: SortOptions {
+                    descending: false,
+                    nulls_first: false,
+                },
+            },
+        ];
         Ok(Self {
             db,
             projection,
             schema: Arc::new(schema),
+            output_ordering,
         })
     }
 }

@@ -144,7 +144,9 @@ impl PhysicalOptimizerRule for SegmentedAggregatePartialOptimizationRule {
         todo!()
     }
 }
+
 type NamedAggExpr = (Arc<Mutex<Box<dyn PartitionedAggregateExpr>>>, String);
+
 #[derive(Debug)]
 pub struct SegmentedAggregatePartialExec {
     input: Arc<dyn ExecutionPlan>,
@@ -235,18 +237,17 @@ impl ExecutionPlan for SegmentedAggregatePartialExec {
     }
 
     fn required_input_ordering(&self) -> Vec<Option<Vec<PhysicalSortRequirement>>> {
-        vec![None; self.children().len()]
-        // let sort = vec![
-        // PhysicalSortRequirement {
-        // expr: col(COLUMN_PROJECT_ID, &self.input.schema()).unwrap(),
-        // options: None,
-        // },
-        // PhysicalSortRequirement {
-        // expr: col(COLUMN_USER_ID, &self.input.schema()).unwrap(),
-        // options: None,
-        // },
-        // ];
-        // vec![Some(sort); self.children().len()]
+        let sort = vec![
+            PhysicalSortRequirement {
+                expr: col(COLUMN_PROJECT_ID, &self.input.schema()).unwrap(),
+                options: None,
+            },
+            PhysicalSortRequirement {
+                expr: col(COLUMN_USER_ID, &self.input.schema()).unwrap(),
+                options: None,
+            },
+        ];
+        vec![Some(sort); self.children().len()]
     }
 
     fn output_partitioning(&self) -> Partitioning {
