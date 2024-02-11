@@ -19,11 +19,12 @@ use indicatif::ProgressState;
 use indicatif::ProgressStyle;
 use metadata::properties::DictionaryType;
 use metadata::properties::Type;
-use metadata::test_util::create_event;
-use metadata::test_util::create_property;
-use metadata::test_util::CreatePropertyMainRequest;
+use metadata::util::create_event;
+use metadata::util::create_property;
+use metadata::util::CreatePropertyMainRequest;
 use metadata::MetadataProvider;
 use platform::auth;
+use platform::projects::init_project;
 use query::QueryProvider;
 use scan_dir::ScanDir;
 use storage::db::OptiDBImpl;
@@ -35,7 +36,6 @@ use tokio::signal::unix::SignalKind;
 use tracing::info;
 
 use crate::init_metrics;
-use crate::init_project;
 use crate::init_system;
 
 #[derive(Parser, Clone)]

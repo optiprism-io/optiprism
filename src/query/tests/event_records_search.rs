@@ -13,7 +13,7 @@ mod tests {
     use common::DECIMAL_PRECISION;
     use common::DECIMAL_SCALE;
     use datafusion_common::ScalarValue;
-    use metadata::test_util::init_db;
+    use metadata::util::init_db;
     use query::error::Result;
     use query::queries::event_records_search::build;
     use query::queries::event_records_search::EventRecordsSearch;

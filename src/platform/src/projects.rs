@@ -3,22 +3,61 @@ use std::sync::Arc;
 use chrono::DateTime;
 use chrono::Utc;
 use common::rbac::OrganizationPermission;
+use common::types::DType;
 use common::types::OptionalProperty;
+use common::types::EVENT_CLICK;
+use common::types::EVENT_PAGE;
+use common::types::EVENT_PROPERTY_A_CLASS;
+use common::types::EVENT_PROPERTY_A_HREF;
+use common::types::EVENT_PROPERTY_A_ID;
+use common::types::EVENT_PROPERTY_A_NAME;
+use common::types::EVENT_PROPERTY_A_STYLE;
+use common::types::EVENT_PROPERTY_PAGE_PATH;
+use common::types::EVENT_PROPERTY_PAGE_REFERER;
+use common::types::EVENT_PROPERTY_PAGE_SEARCH;
+use common::types::EVENT_PROPERTY_PAGE_TITLE;
+use common::types::EVENT_PROPERTY_PAGE_URL;
+use common::types::EVENT_PROPERTY_SESSION_LENGTH;
+use common::types::EVENT_SCREEN;
+use common::types::EVENT_SESSION_BEGIN;
+use common::types::EVENT_SESSION_END;
+use common::types::USER_PROPERTY_CITY;
+use common::types::USER_PROPERTY_CLIENT_FAMILY;
+use common::types::USER_PROPERTY_CLIENT_VERSION_MAJOR;
+use common::types::USER_PROPERTY_CLIENT_VERSION_MINOR;
+use common::types::USER_PROPERTY_CLIENT_VERSION_PATCH;
+use common::types::USER_PROPERTY_COUNTRY;
+use common::types::USER_PROPERTY_DEVICE_BRAND;
+use common::types::USER_PROPERTY_DEVICE_FAMILY;
+use common::types::USER_PROPERTY_DEVICE_MODEL;
+use common::types::USER_PROPERTY_OS;
+use common::types::USER_PROPERTY_OS_FAMILY;
+use common::types::USER_PROPERTY_OS_VERSION_MAJOR;
+use common::types::USER_PROPERTY_OS_VERSION_MINOR;
+use common::types::USER_PROPERTY_OS_VERSION_PATCH;
+use common::types::USER_PROPERTY_OS_VERSION_PATCH_MINOR;
 use metadata::projects::Projects as MDProjects;
+use metadata::properties::DictionaryType;
+use metadata::properties::Type;
+use metadata::util::create_event;
+use metadata::util::create_property;
+use metadata::util::CreatePropertyMainRequest;
+use metadata::MetadataProvider;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::error;
 use crate::Context;
 use crate::ListResponse;
 use crate::Result;
 
 pub struct Projects {
-    prov: Arc<MDProjects>,
+    md: Arc<MetadataProvider>,
 }
 
 impl Projects {
-    pub fn new(prov: Arc<MDProjects>) -> Self {
-        Self { prov }
+    pub fn new(prov: Arc<MetadataProvider>) -> Self {
+        Self { md: prov }
     }
     pub async fn create(&self, ctx: Context, request: CreateProjectRequest) -> Result<Project> {
         ctx.check_organization_permission(OrganizationPermission::ManageProjects)?;
@@ -32,15 +71,15 @@ impl Projects {
             organization_id: ctx.organization_id,
         };
 
-        let dashboard = self.prov.create(md)?;
-
-        Ok(dashboard.into())
+        let project = self.md.projects.create(md)?;
+        init_project(project.id, &self.md)?;
+        Ok(project.into())
     }
 
     pub async fn get_by_id(&self, ctx: Context, id: u64) -> Result<Project> {
         ctx.check_organization_permission(OrganizationPermission::ExploreProjects)?;
 
-        Ok(self.prov.get_by_id(id)?.into())
+        Ok(self.md.projects.get_by_id(id)?.into())
     }
 
     pub async fn list(
@@ -49,7 +88,7 @@ impl Projects {
         organization_id: Option<u64>,
     ) -> Result<ListResponse<Project>> {
         ctx.check_organization_permission(OrganizationPermission::ExploreProjects)?;
-        let resp = self.prov.list(organization_id)?;
+        let resp = self.md.projects.list(organization_id)?;
 
         Ok(ListResponse {
             data: resp.data.into_iter().map(|v| v.into()).collect(),
@@ -73,7 +112,7 @@ impl Projects {
             session_duration_seconds: req.session_duration_seconds,
         };
 
-        let project = self.prov.update(project_id, md_req)?;
+        let project = self.md.projects.update(project_id, md_req)?;
 
         Ok(project.into())
     }
@@ -81,7 +120,7 @@ impl Projects {
     pub async fn delete(&self, ctx: Context, project_id: u64) -> Result<Project> {
         ctx.check_organization_permission(OrganizationPermission::ManageProjects)?;
 
-        Ok(self.prov.delete(project_id)?.into())
+        Ok(self.md.projects.delete(project_id)?.into())
     }
 }
 
@@ -137,4 +176,71 @@ pub struct UpdateProjectRequest {
     pub description: OptionalProperty<Option<String>>,
     #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
     pub session_duration_seconds: OptionalProperty<u64>,
+}
+
+pub fn init_project(project_id: u64, md: &Arc<MetadataProvider>) -> error::Result<()> {
+    create_event(md, project_id, EVENT_CLICK.to_string())?;
+    create_event(md, project_id, EVENT_PAGE.to_string())?;
+    create_event(md, project_id, EVENT_SCREEN.to_string())?;
+    create_event(md, project_id, EVENT_SESSION_BEGIN.to_string())?;
+    create_event(md, project_id, EVENT_SESSION_END.to_string())?;
+    let user_dict_props = vec![
+        USER_PROPERTY_CLIENT_FAMILY,
+        USER_PROPERTY_CLIENT_VERSION_MINOR,
+        USER_PROPERTY_CLIENT_VERSION_MAJOR,
+        USER_PROPERTY_CLIENT_VERSION_PATCH,
+        USER_PROPERTY_DEVICE_FAMILY,
+        USER_PROPERTY_DEVICE_BRAND,
+        USER_PROPERTY_DEVICE_MODEL,
+        USER_PROPERTY_OS,
+        USER_PROPERTY_OS_FAMILY,
+        USER_PROPERTY_OS_VERSION_MAJOR,
+        USER_PROPERTY_OS_VERSION_MINOR,
+        USER_PROPERTY_OS_VERSION_PATCH,
+        USER_PROPERTY_OS_VERSION_PATCH_MINOR,
+        USER_PROPERTY_COUNTRY,
+        USER_PROPERTY_CITY,
+    ];
+    for prop in user_dict_props {
+        create_property(md, project_id, CreatePropertyMainRequest {
+            name: prop.to_string(),
+            typ: Type::User,
+            data_type: DType::String,
+            nullable: true,
+            dict: Some(DictionaryType::Int64),
+        })?;
+    }
+
+    let event_str_props = vec![
+        EVENT_PROPERTY_A_NAME,
+        EVENT_PROPERTY_A_HREF,
+        EVENT_PROPERTY_A_ID,
+        EVENT_PROPERTY_A_CLASS,
+        EVENT_PROPERTY_A_STYLE,
+        EVENT_PROPERTY_PAGE_PATH,
+        EVENT_PROPERTY_PAGE_REFERER,
+        EVENT_PROPERTY_PAGE_SEARCH,
+        EVENT_PROPERTY_PAGE_TITLE,
+        EVENT_PROPERTY_PAGE_URL,
+    ];
+
+    for prop in event_str_props {
+        create_property(md, project_id, CreatePropertyMainRequest {
+            name: prop.to_string(),
+            typ: Type::Event,
+            data_type: DType::String,
+            nullable: true,
+            dict: None,
+        })?;
+    }
+
+    create_property(md, project_id, CreatePropertyMainRequest {
+        name: EVENT_PROPERTY_SESSION_LENGTH.to_string(),
+        typ: Type::Event,
+        data_type: DType::Timestamp,
+        nullable: true,
+        dict: None,
+    })?;
+
+    Ok(())
 }

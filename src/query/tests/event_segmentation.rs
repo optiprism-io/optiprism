@@ -27,7 +27,7 @@ mod tests {
     use datafusion_common::ScalarValue;
     use metadata::custom_events;
     use metadata::custom_events::CreateCustomEventRequest;
-    use metadata::test_util::init_db;
+    use metadata::util::init_db;
     use query::error::Result;
     use query::queries::event_segmentation::logical_plan_builder::LogicalPlanBuilder;
     use query::test_util::create_entities;

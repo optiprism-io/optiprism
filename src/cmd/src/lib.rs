@@ -60,14 +60,17 @@ use ingester::Destination;
 use ingester::Identify;
 use ingester::Track;
 use ingester::Transformer;
+use metadata::accounts::Account;
 use metadata::accounts::CreateAccountRequest;
 use metadata::organizations::CreateOrganizationRequest;
+use metadata::organizations::Organization;
 use metadata::projects::CreateProjectRequest;
+use metadata::projects::Project;
 use metadata::properties::DictionaryType;
 use metadata::properties::Type;
-use metadata::test_util::create_event;
-use metadata::test_util::create_property;
-use metadata::test_util::CreatePropertyMainRequest;
+use metadata::util::create_event;
+use metadata::util::create_property;
+use metadata::util::CreatePropertyMainRequest;
 use metadata::MetadataProvider;
 use metrics::describe_counter;
 use metrics::describe_histogram;
@@ -75,6 +78,7 @@ use metrics::Unit;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use platform::auth;
 use platform::auth::password::make_password_hash;
+use platform::PlatformProvider;
 use query::QueryProvider;
 use tracing::info;
 use uaparser::UserAgentParser;
@@ -186,73 +190,6 @@ pub fn init_system(
         data_type: DType::String,
         nullable: false,
         dict: Some(DictionaryType::Int64),
-    })?;
-
-    Ok(())
-}
-
-pub fn init_project(project_id: u64, md: &Arc<MetadataProvider>) -> error::Result<()> {
-    create_event(md, project_id, EVENT_CLICK.to_string())?;
-    create_event(md, project_id, EVENT_PAGE.to_string())?;
-    create_event(md, project_id, EVENT_SCREEN.to_string())?;
-    create_event(md, project_id, EVENT_SESSION_BEGIN.to_string())?;
-    create_event(md, project_id, EVENT_SESSION_END.to_string())?;
-    let user_dict_props = vec![
-        USER_PROPERTY_CLIENT_FAMILY,
-        USER_PROPERTY_CLIENT_VERSION_MINOR,
-        USER_PROPERTY_CLIENT_VERSION_MAJOR,
-        USER_PROPERTY_CLIENT_VERSION_PATCH,
-        USER_PROPERTY_DEVICE_FAMILY,
-        USER_PROPERTY_DEVICE_BRAND,
-        USER_PROPERTY_DEVICE_MODEL,
-        USER_PROPERTY_OS,
-        USER_PROPERTY_OS_FAMILY,
-        USER_PROPERTY_OS_VERSION_MAJOR,
-        USER_PROPERTY_OS_VERSION_MINOR,
-        USER_PROPERTY_OS_VERSION_PATCH,
-        USER_PROPERTY_OS_VERSION_PATCH_MINOR,
-        USER_PROPERTY_COUNTRY,
-        USER_PROPERTY_CITY,
-    ];
-    for prop in user_dict_props {
-        create_property(md, project_id, CreatePropertyMainRequest {
-            name: prop.to_string(),
-            typ: Type::User,
-            data_type: DType::String,
-            nullable: true,
-            dict: Some(DictionaryType::Int64),
-        })?;
-    }
-
-    let event_str_props = vec![
-        EVENT_PROPERTY_A_NAME,
-        EVENT_PROPERTY_A_HREF,
-        EVENT_PROPERTY_A_ID,
-        EVENT_PROPERTY_A_CLASS,
-        EVENT_PROPERTY_A_STYLE,
-        EVENT_PROPERTY_PAGE_PATH,
-        EVENT_PROPERTY_PAGE_REFERER,
-        EVENT_PROPERTY_PAGE_SEARCH,
-        EVENT_PROPERTY_PAGE_TITLE,
-        EVENT_PROPERTY_PAGE_URL,
-    ];
-
-    for prop in event_str_props {
-        create_property(md, project_id, CreatePropertyMainRequest {
-            name: prop.to_string(),
-            typ: Type::Event,
-            data_type: DType::String,
-            nullable: true,
-            dict: None,
-        })?;
-    }
-
-    create_property(md, project_id, CreatePropertyMainRequest {
-        name: EVENT_PROPERTY_SESSION_LENGTH.to_string(),
-        typ: Type::Event,
-        data_type: DType::Timestamp,
-        nullable: true,
-        dict: None,
     })?;
 
     Ok(())

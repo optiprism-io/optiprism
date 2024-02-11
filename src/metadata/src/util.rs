@@ -30,7 +30,6 @@ pub fn init_db() -> anyhow::Result<(Arc<MetadataProvider>, Arc<OptiDBImpl>)> {
 
 pub fn create_event(
     md: &Arc<MetadataProvider>,
-
     proj_id: u64,
     name: String,
 ) -> anyhow::Result<Event> {

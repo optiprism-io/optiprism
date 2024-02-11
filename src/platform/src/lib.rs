@@ -105,7 +105,7 @@ impl PlatformProvider {
             reports: Arc::new(reports::Reports::new(md.reports.clone())),
             // event_records: Arc::new(stub::EventRecords {}),
             // group_records: Arc::new(stub::GroupRecords {}),
-            projects: Arc::new(Projects::new(md.projects.clone())),
+            projects: Arc::new(Projects::new(md.clone())),
         }
     }
 }

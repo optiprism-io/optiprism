@@ -37,6 +37,7 @@ use events_gen::store::scenario::EventRecord;
 use events_gen::store::scenario::Scenario;
 use events_gen::store::schema::create_properties;
 use metadata::MetadataProvider;
+use platform::projects::init_project;
 use rand::thread_rng;
 use storage::db::OptiDBImpl;
 use storage::db::Options;
@@ -52,7 +53,6 @@ use crate::error::Result;
 use crate::init_ingester;
 use crate::init_metrics;
 use crate::init_platform;
-use crate::init_project;
 use crate::init_session_cleaner;
 use crate::init_system;
 
