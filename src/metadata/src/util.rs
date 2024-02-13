@@ -33,6 +33,7 @@ pub fn create_event(
     proj_id: u64,
     name: String,
 ) -> anyhow::Result<Event> {
+    println!("projid {proj_id}");
     Ok(md
         .events
         .get_or_create(proj_id, events::CreateEventRequest {
