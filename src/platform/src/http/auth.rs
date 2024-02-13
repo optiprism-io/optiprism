@@ -6,6 +6,7 @@ use axum::routing::post;
 use axum::routing::put;
 use axum::Router;
 use axum_macros::debug_handler;
+use common::config::Config;
 use common::http::Json;
 use reqwest::StatusCode;
 use serde::Deserialize;
@@ -15,7 +16,6 @@ use tower_cookies::Cookie;
 use tower_cookies::Cookies;
 
 use crate::accounts::Account;
-use crate::auth::provider::Config;
 use crate::auth::provider::LogInRequest;
 use crate::auth::provider::SignUpRequest;
 use crate::auth::provider::TokensResponse;

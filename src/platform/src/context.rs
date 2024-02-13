@@ -17,6 +17,7 @@ use axum_core::extract::FromRequestParts;
 use axum_core::response::IntoResponse;
 use axum_core::response::Response;
 use bytes::Bytes;
+use common::config::Config;
 use common::rbac::OrganizationPermission;
 use common::rbac::OrganizationRole;
 use common::rbac::Permission;
@@ -29,7 +30,6 @@ use common::rbac::PROJECT_PERMISSIONS;
 use hyper::Body;
 use serde_json::Value;
 
-use crate::auth::provider::Config;
 use crate::auth::token::parse_access_token;
 use crate::error::AuthError;
 use crate::PlatformError;
@@ -164,11 +164,11 @@ where S: Send + Sync
                 .await
                 .map_err(|_err| AuthError::CantParseBearerHeader)?;
 
-        let Extension(auth_cfg) = Extension::<Config>::from_request_parts(parts, state)
+        let Extension(cfg) = Extension::<Config>::from_request_parts(parts, state)
             .await
             .map_err(|err| PlatformError::Internal(err.to_string()))?;
 
-        let claims = parse_access_token(bearer.token(), &auth_cfg.access_token_key)
+        let claims = parse_access_token(bearer.token(), "access")
             .map_err(|err| err.wrap_into(AuthError::CantParseAccessToken))?;
         let Extension(md_acc_prov) =
             Extension::<Arc<metadata::accounts::Accounts>>::from_request_parts(parts, state)

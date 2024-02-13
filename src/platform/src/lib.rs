@@ -38,6 +38,7 @@ use arrow::array::UInt32Array;
 use arrow::array::UInt64Array;
 use arrow::array::UInt8Array;
 use arrow::datatypes::TimeUnit;
+use common::config::Config;
 use common::types::DType;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
@@ -57,7 +58,6 @@ use serde_json::Number;
 use serde_json::Value;
 
 use crate::accounts::Accounts;
-use crate::auth::provider::Config;
 use crate::auth::Auth;
 use crate::custom_events::CustomEvents;
 use crate::dashboards::Dashboards;
@@ -86,26 +86,22 @@ impl PlatformProvider {
     pub fn new(
         md: Arc<MetadataProvider>,
         query_prov: Arc<query::QueryProvider>,
-        auth_cfg: Config,
+        cfg: Config,
     ) -> Self {
         Self {
-            events: Arc::new(events::Events::new(md.events.clone())),
-            custom_events: Arc::new(custom_events::CustomEvents::new(md.custom_events.clone())),
-            event_properties: Arc::new(properties::Properties::new_event(
-                md.event_properties.clone(),
-            )),
-            user_properties: Arc::new(properties::Properties::new_user(md.user_properties.clone())),
-            system_properties: Arc::new(properties::Properties::new_user(
-                md.system_properties.clone(),
-            )),
-            accounts: Arc::new(accounts::Accounts::new(md.accounts.clone())),
-            auth: Arc::new(auth::Auth::new(md.accounts.clone(), auth_cfg)),
-            query: Arc::new(queries::Queries::new(query_prov)),
-            dashboards: Arc::new(dashboards::Dashboards::new(md.dashboards.clone())),
-            reports: Arc::new(reports::Reports::new(md.reports.clone())),
+            events: Arc::new(Events::new(md.events.clone())),
+            custom_events: Arc::new(CustomEvents::new(md.custom_events.clone())),
+            event_properties: Arc::new(Properties::new_event(md.event_properties.clone())),
+            user_properties: Arc::new(Properties::new_user(md.user_properties.clone())),
+            system_properties: Arc::new(Properties::new_user(md.system_properties.clone())),
+            accounts: Arc::new(Accounts::new(md.accounts.clone())),
+            auth: Arc::new(Auth::new(md.accounts.clone(), cfg.clone())),
+            query: Arc::new(Queries::new(query_prov)),
+            dashboards: Arc::new(Dashboards::new(md.dashboards.clone())),
+            reports: Arc::new(Reports::new(md.reports.clone())),
             // event_records: Arc::new(stub::EventRecords {}),
             // group_records: Arc::new(stub::GroupRecords {}),
-            projects: Arc::new(Projects::new(md.clone())),
+            projects: Arc::new(Projects::new(md.clone(), cfg)),
         }
     }
 }

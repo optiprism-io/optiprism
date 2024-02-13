@@ -11,6 +11,7 @@ use ::storage::Value;
 use axum::Router;
 use chrono::Duration;
 use chrono::Utc;
+use common::config::Config;
 use common::defaults::SESSION_DURATION;
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
@@ -37,6 +38,7 @@ use common::types::EVENT_PROPERTY_SESSION_LENGTH;
 use common::types::EVENT_SCREEN;
 use common::types::EVENT_SESSION_BEGIN;
 use common::types::EVENT_SESSION_END;
+use common::types::TABLE_EVENTS;
 use common::types::USER_PROPERTY_CITY;
 use common::types::USER_PROPERTY_CLIENT_FAMILY;
 use common::types::USER_PROPERTY_CLIENT_VERSION_MAJOR;
@@ -144,7 +146,7 @@ pub fn init_system(
         merge_chunk_size: 1024 * 8 * 8,
         merge_max_page_size: 1024 * 1024 * 10,
     };
-    match db.create_table("events".to_string(), topts) {
+    match db.create_table(TABLE_EVENTS.to_string(), topts) {
         Ok(_) => {}
         Err(err) => match err {
             StoreError::AlreadyExists(_) => {}
@@ -199,20 +201,14 @@ fn init_platform(
     md: Arc<MetadataProvider>,
     db: Arc<OptiDBImpl>,
     router: Router,
+    cfg: Config,
 ) -> crate::error::Result<Router> {
     let query_provider = Arc::new(QueryProvider::new(md.clone(), db.clone()));
 
-    let auth_cfg = auth::provider::Config {
-        access_token_duration: Duration::days(1),
-        access_token_key: "access".to_owned(),
-        refresh_token_duration: Duration::days(1),
-        refresh_token_key: "refresh".to_owned(),
-    };
-
-    let platform_provider = Arc::new(platform::PlatformProvider::new(
+    let platform_provider = Arc::new(PlatformProvider::new(
         md.clone(),
         query_provider,
-        auth_cfg.clone(),
+        cfg.clone(),
     ));
 
     info!("attaching platform routes...");
@@ -220,7 +216,7 @@ fn init_platform(
         router,
         &md,
         &platform_provider,
-        auth_cfg,
+        cfg,
         None,
     ))
 }
@@ -285,16 +281,17 @@ fn init_ingester(
 fn init_session_cleaner(
     md: Arc<MetadataProvider>,
     db: Arc<OptiDBImpl>,
+    cfg: Config,
 ) -> crate::error::Result<()> {
     thread::spawn(move || {
         loop {
-            thread::sleep(std::time::Duration::from_secs(1));
+            thread::sleep(cfg.session_cleaner_interval.to_std().unwrap());
             for project in md.projects.list(None).unwrap() {
                 md.sessions
                     .check_for_deletion(project.id, |sess| {
                         let now = Utc::now();
                         let sess_len = now - sess.created_at;
-                        if sess_len.num_seconds() < SESSION_DURATION {
+                        if sess_len.num_seconds() < project.session_duration_seconds as i64 {
                             return Ok(false);
                         }
                         let record_id = md.events.next_record_sequence(project.id).unwrap();

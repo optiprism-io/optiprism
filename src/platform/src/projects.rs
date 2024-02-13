@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use chrono::DateTime;
 use chrono::Utc;
+use common::config::Config;
 use common::rbac::OrganizationPermission;
 use common::types::DType;
 use common::types::OptionalProperty;
@@ -53,11 +54,12 @@ use crate::Result;
 
 pub struct Projects {
     md: Arc<MetadataProvider>,
+    cfg: Config,
 }
 
 impl Projects {
-    pub fn new(prov: Arc<MetadataProvider>) -> Self {
-        Self { md: prov }
+    pub fn new(prov: Arc<MetadataProvider>, cfg: Config) -> Self {
+        Self { md: prov, cfg }
     }
     pub async fn create(&self, ctx: Context, request: CreateProjectRequest) -> Result<Project> {
         ctx.check_organization_permission(OrganizationPermission::ManageProjects)?;
@@ -67,7 +69,9 @@ impl Projects {
             tags: request.tags,
             name: request.name,
             description: request.description,
-            session_duration_seconds: request.session_duration_seconds,
+            session_duration_seconds: request
+                .session_duration_seconds
+                .unwrap_or(self.cfg.project_default_session_duration.num_seconds() as u64),
             organization_id: ctx.organization_id,
         };
 
@@ -162,7 +166,7 @@ pub struct CreateProjectRequest {
     pub tags: Option<Vec<String>>,
     pub name: String,
     pub description: Option<String>,
-    pub session_duration_seconds: u64,
+    pub session_duration_seconds: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize)]

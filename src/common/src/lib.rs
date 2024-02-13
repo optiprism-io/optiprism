@@ -1,4 +1,5 @@
 pub mod arrow;
+pub mod config;
 pub mod defaults;
 pub mod error;
 pub mod http;

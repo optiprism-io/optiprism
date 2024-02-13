@@ -18,6 +18,7 @@ use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
 use storage::db::OptiDBImpl;
+use storage::error::StoreError;
 
 use crate::error::MetadataError;
 use crate::index::check_insert_constraints;
@@ -163,7 +164,6 @@ impl Properties {
     fn get_by_id_(
         &self,
         tx: &Transaction<TransactionDB>,
-
         project_id: u64,
         id: u64,
     ) -> Result<Property> {
@@ -185,7 +185,6 @@ impl Properties {
     fn create_(
         &self,
         tx: &Transaction<TransactionDB>,
-
         project_id: u64,
         req: CreatePropertyRequest,
     ) -> Result<Property> {
@@ -260,9 +259,15 @@ impl Properties {
         } else {
             req.data_type.clone()
         };
-        self.opti_db
-            .add_field(TABLE_EVENTS, prop.column_name().as_str(), dt, req.nullable)?;
-        Ok(prop)
+
+        match self
+            .opti_db
+            .add_field(TABLE_EVENTS, prop.column_name().as_str(), dt, req.nullable)
+        {
+            Ok(_) => Ok(prop),
+            Err(StoreError::AlreadyExists(_)) => Ok(prop),
+            Err(err) => Err(err.into()),
+        }
     }
 
     pub fn create(&self, project_id: u64, req: CreatePropertyRequest) -> Result<Property> {

@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use chrono::Duration;
+use common::config::Config;
 use common::types::OptionalProperty;
 use metadata::accounts::Accounts;
 use metadata::accounts::CreateAccountRequest;
@@ -25,21 +26,12 @@ use crate::Result;
 #[derive(Clone)]
 pub struct Auth {
     accounts: Arc<Accounts>,
-    access_token_duration: Duration,
-    access_token_key: String,
-    refresh_token_duration: Duration,
-    refresh_token_key: String,
+    cfg: Config,
 }
 
 impl Auth {
     pub fn new(accounts: Arc<Accounts>, cfg: Config) -> Self {
-        Self {
-            accounts,
-            access_token_duration: cfg.access_token_duration,
-            access_token_key: cfg.access_token_key,
-            refresh_token_duration: cfg.refresh_token_duration,
-            refresh_token_key: cfg.refresh_token_key,
-        }
+        Self { accounts, cfg }
     }
 
     fn make_tokens(&self, account_id: u64) -> Result<TokensResponse> {
@@ -48,14 +40,14 @@ impl Auth {
                 account_id,
                 1,
                 1,
-                self.access_token_duration,
-                self.access_token_key.as_str(),
+                self.cfg.access_token_duration.clone(),
+                "access",
             )
             .map_err(|err| err.wrap_into(AuthError::CantMakeAccessToken))?,
             refresh_token: make_refresh_token(
                 account_id,
-                self.refresh_token_duration,
-                self.refresh_token_key.as_str(),
+                self.cfg.refresh_token_duration.clone(),
+                "refresh",
             )
             .map_err(|err| err.wrap_into(AuthError::CantMakeRefreshToken))?,
         })
@@ -127,7 +119,7 @@ impl Auth {
     }
 
     pub async fn refresh_token(&self, refresh_token: &str) -> Result<TokensResponse> {
-        let refresh_claims = parse_refresh_token(refresh_token, self.refresh_token_key.as_str())
+        let refresh_claims = parse_refresh_token(refresh_token, "refresh")
             .map_err(|err| err.wrap_into(AuthError::InvalidRefreshToken))?;
         let tokens = self.make_tokens(refresh_claims.account_id)?;
 
@@ -245,14 +237,6 @@ impl Auth {
 
         Ok(tokens)
     }
-}
-
-#[derive(Clone)]
-pub struct Config {
-    pub access_token_duration: Duration,
-    pub access_token_key: String,
-    pub refresh_token_duration: Duration,
-    pub refresh_token_key: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
