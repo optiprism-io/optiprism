@@ -60,9 +60,7 @@ impl QueryProvider {
     ) -> Result<(SessionContext, SessionState, LogicalPlan)> {
         let runtime = Arc::new(RuntimeEnv::default());
         let state = SessionState::new_with_config_rt(
-            SessionConfig::new()
-                .with_collect_statistics(true)
-                .with_target_partitions(12),
+            SessionConfig::new().with_collect_statistics(true),
             runtime,
         )
         .with_query_planner(Arc::new(QueryPlanner {}));
@@ -242,7 +240,7 @@ fn property_values_projection(
         COLUMN_EVENT.to_string(),
     ];
     fields.push(col_name(ctx, &req.property, md)?);
-
+    fields.dedup();
     Ok(fields)
 }
 

@@ -385,8 +385,7 @@ pub mod test_util {
                 .to_str()
                 .unwrap(),
         )?;
-        let target_partitions = 12;
-        let session_config = SessionConfig::new().with_target_partitions(target_partitions);
+        let session_config = SessionConfig::new();
         let listing_options = options.to_listing_options(&session_config);
 
         let config = ListingTableConfig::new(table_path)
@@ -554,7 +553,7 @@ pub mod test_util {
 
     pub async fn run_plan(plan: LogicalPlan) -> Result<Vec<RecordBatch>> {
         let runtime = Arc::new(RuntimeEnv::default());
-        let config = SessionConfig::new().with_target_partitions(12);
+        let config = SessionConfig::new();
         #[allow(deprecated)]
         let session_state = SessionState::with_config_rt(config, runtime)
             .with_query_planner(Arc::new(QueryPlanner {}))

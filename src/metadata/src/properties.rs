@@ -188,6 +188,11 @@ impl Properties {
         project_id: u64,
         req: CreatePropertyRequest,
     ) -> Result<Property> {
+        let project_id = if self.typ == Type::System {
+            0
+        } else {
+            project_id
+        };
         let idx_keys = index_keys(project_id, &self.typ, &req.name, req.display_name.clone());
 
         check_insert_constraints(tx, idx_keys.as_ref())?;
@@ -271,6 +276,12 @@ impl Properties {
     }
 
     pub fn create(&self, project_id: u64, req: CreatePropertyRequest) -> Result<Property> {
+        let project_id = if self.typ == Type::System {
+            0
+        } else {
+            project_id
+        };
+
         let tx = self.db.transaction();
         let ret = self.create_(&tx, project_id, req)?;
         tx.commit()?;
@@ -279,6 +290,12 @@ impl Properties {
     }
 
     pub fn get_or_create(&self, project_id: u64, req: CreatePropertyRequest) -> Result<Property> {
+        let project_id = if self.typ == Type::System {
+            0
+        } else {
+            project_id
+        };
+
         let tx = self.db.transaction();
         match self.get_by_name_(&tx, project_id, req.name.as_str()) {
             Ok(event) => return Ok(event),
@@ -298,11 +315,23 @@ impl Properties {
     }
 
     pub fn get_by_name(&self, project_id: u64, name: &str) -> Result<Property> {
+        let project_id = if self.typ == Type::System {
+            0
+        } else {
+            project_id
+        };
+
         let tx = self.db.transaction();
         self.get_by_name_(&tx, project_id, name)
     }
 
     pub fn list(&self, project_id: u64) -> Result<ListResponse<Property>> {
+        let project_id = if self.typ == Type::System {
+            0
+        } else {
+            project_id
+        };
+
         let tx = self.db.transaction();
         list_data(
             &tx,
@@ -316,6 +345,12 @@ impl Properties {
         property_id: u64,
         req: UpdatePropertyRequest,
     ) -> Result<Property> {
+        let project_id = if self.typ == Type::System {
+            0
+        } else {
+            project_id
+        };
+
         let tx = self.db.transaction();
 
         let prev_prop = self.get_by_id(project_id, property_id)?;
@@ -410,6 +445,12 @@ impl Properties {
     }
 
     pub fn delete(&self, project_id: u64, id: u64) -> Result<Property> {
+        let project_id = if self.typ == Type::System {
+            0
+        } else {
+            project_id
+        };
+
         let tx = self.db.transaction();
         let prop = self.get_by_id_(&tx, project_id, id)?;
         tx.delete(make_data_value_key(

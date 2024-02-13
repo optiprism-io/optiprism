@@ -161,19 +161,6 @@ impl LogicalPlanBuilder {
             None
         };
 
-        // let proj_cols = projection_cols(&ctx, &es, builder.metadata.clone())?
-        //     .iter()
-        //     .map(|s| Expr::Column(Column::from_qualified_name(s.as_str())))
-        //     .collect::<Vec<_>>();
-        // let input = LogicalPlan::Repartition(Repartition {
-        //     input: Arc::new(input),
-        //     partitioning_scheme: Partitioning::Hash(
-        //         vec![col(COLUMN_PROJECT_ID), col(COLUMN_USER_ID)],
-        //         12,
-        //     ), // with_target_partitions
-        // });
-        // let input = LogicalPlan::Projection(Projection::try_new(proj_cols, Arc::new(input))?);
-
         let mut cols_hash: HashMap<String, ()> = HashMap::new();
 
         let mut input = builder.decode_filter_dictionaries(input, &mut cols_hash)?;

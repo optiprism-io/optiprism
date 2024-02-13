@@ -129,7 +129,6 @@ impl LogicalPlanBuilder {
             input: Arc::new(input),
             fetch: None,
         });
-
         let input = LogicalPlan::Limit(Limit {
             skip: 0,
             fetch: Some(1000),

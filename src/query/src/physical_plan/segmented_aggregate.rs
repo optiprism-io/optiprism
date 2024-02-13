@@ -237,7 +237,7 @@ impl ExecutionPlan for SegmentedAggregatePartialExec {
     }
 
     fn output_partitioning(&self) -> Partitioning {
-        Partitioning::UnknownPartitioning(self.input.output_partitioning().partition_count()) //with_target
+        Partitioning::UnknownPartitioning(self.input.output_partitioning().partition_count())
     }
 
     fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {

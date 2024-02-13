@@ -61,7 +61,7 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
     info!("metrics initialization...");
     init_metrics();
     info!("system initialization...");
-    init_system(&md, &db, 1)?;
+    init_system(&md, &db, num_cpus::get())?;
 
     info!("creating org structure and admin account...");
     let proj_id = crate::init_test_org_structure(&md)?;
