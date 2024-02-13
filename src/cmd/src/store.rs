@@ -37,6 +37,7 @@ use events_gen::store::scenario::EventRecord;
 use events_gen::store::scenario::Scenario;
 use events_gen::store::schema::create_properties;
 use metadata::MetadataProvider;
+use platform::projects::init_project;
 use rand::thread_rng;
 use storage::db::OptiDBImpl;
 use storage::db::Options;
@@ -52,7 +53,6 @@ use crate::error::Result;
 use crate::init_ingester;
 use crate::init_metrics;
 use crate::init_platform;
-use crate::init_project;
 use crate::init_session_cleaner;
 use crate::init_system;
 
@@ -208,11 +208,12 @@ pub async fn start(args: &Store) -> Result<()> {
         future_gen(md.clone(), db.clone(), store_cfg)?;
     }
 
+    let cfg = common::config::Config::default();
     let router = Router::new();
     info!("initializing platform...");
-    let router = init_platform(md.clone(), db.clone(), router)?;
+    let router = init_platform(md.clone(), db.clone(), router, cfg.clone())?;
     info!("initializing session cleaner...");
-    init_session_cleaner(md.clone(), db.clone())?;
+    init_session_cleaner(md.clone(), db.clone(), cfg.clone())?;
     info!("initializing ingester...");
     let router = init_ingester(&args.geo_city_path, &args.ua_db_path, &md, &db, router)?;
 

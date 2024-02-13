@@ -1,12 +1,16 @@
-mod config;
+pub mod config;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::Router;
+use common::config::Config;
+use common::defaults::SESSION_DURATION;
 use common::rbac::Role;
 use metadata::accounts::CreateAccountRequest;
 use metadata::error::MetadataError;
+use metadata::organizations::CreateOrganizationRequest;
+use metadata::projects::CreateProjectRequest;
 use metadata::MetadataProvider;
 use platform::auth::password::make_password_hash;
 use storage::db::OptiDBImpl;
@@ -23,7 +27,6 @@ use crate::init_metrics;
 use crate::init_platform;
 use crate::init_session_cleaner;
 use crate::init_system;
-pub use crate::server::config::Config;
 
 pub async fn start(cfg: Config) -> Result<()> {
     debug!("db path: {:?}", cfg.path);
@@ -45,9 +48,9 @@ pub async fn start(cfg: Config) -> Result<()> {
         debug!("ui path: {:?}", ui_path);
     }
 
-    let _just_initialized = if !md.accounts.list()?.is_empty() {
+    let just_initialized = if md.accounts.list()?.is_empty() {
         info!("creating admin account...");
-        match md.accounts.create(CreateAccountRequest {
+        let acc = md.accounts.create(CreateAccountRequest {
             created_by: None,
             password_hash: make_password_hash("admin")?,
             email: "admin@admin.com".to_string(),
@@ -56,11 +59,14 @@ pub async fn start(cfg: Config) -> Result<()> {
             organizations: None,
             projects: None,
             teams: None,
-        }) {
-            Err(MetadataError::AlreadyExists(_)) => {}
-            Err(err) => return Err(err.into()),
-            _ => {}
-        };
+        })?;
+
+        info!("creating organization...");
+        md.organizations.create(CreateOrganizationRequest {
+            created_by: acc.id,
+            name: "My Organization".to_string(),
+        })?;
+
         true
     } else {
         false
@@ -68,18 +74,18 @@ pub async fn start(cfg: Config) -> Result<()> {
 
     let router = Router::new();
     info!("initializing session cleaner...");
-    init_session_cleaner(md.clone(), db.clone())?;
+    init_session_cleaner(md.clone(), db.clone(), cfg.clone())?;
     info!("initializing ingester...");
     let router = init_ingester(&cfg.geo_city_path, &cfg.ua_db_path, &md, &db, router)?;
     info!("initializing platform...");
-    let router = init_platform(md.clone(), db.clone(), router)?;
+    let router = init_platform(md.clone(), db.clone(), router, cfg.clone())?;
 
     let server = axum::Server::bind(&cfg.host)
         .serve(router.into_make_service_with_connect_info::<SocketAddr>());
-    info!(
-        "Web Interface: https://{} (email: admin@admin.com, password: admin, DON'T FORGET TO CHANGE)",
-        cfg.host
-    );
+    info!("Web Interface: https://{}", cfg.host);
+    if just_initialized {
+        info!("email: admin@admin.com, password: admin, (DON'T FORGET TO CHANGE)");
+    }
     let graceful = server.with_graceful_shutdown(async {
         let mut sig_int =
             tokio::signal::unix::signal(SignalKind::interrupt()).expect("failed to install signal");

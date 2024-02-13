@@ -11,6 +11,7 @@ extern crate parse_duration;
 use cmd::error::Error;
 use cmd::error::Result;
 use cmd::server;
+use cmd::server::config::Config;
 use cmd::test;
 
 #[derive(Parser, Clone)]
@@ -55,8 +56,8 @@ async fn main() -> Result<()> {
                     .add_source(config::File::from(cfg.config.clone()))
                     .build()?;
 
-                let cfg: server::Config = config.try_deserialize()?;
-                cmd::server::start(cfg).await?;
+                let cfg: Config = config.try_deserialize()?;
+                cmd::server::start(cfg.try_into()?).await?;
             }
             Commands::Store(store) => {
                 cmd::store::start(store).await?;

@@ -11,6 +11,7 @@ use ::storage::Value;
 use axum::Router;
 use chrono::Duration;
 use chrono::Utc;
+use common::config::Config;
 use common::defaults::SESSION_DURATION;
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
@@ -37,6 +38,7 @@ use common::types::EVENT_PROPERTY_SESSION_LENGTH;
 use common::types::EVENT_SCREEN;
 use common::types::EVENT_SESSION_BEGIN;
 use common::types::EVENT_SESSION_END;
+use common::types::TABLE_EVENTS;
 use common::types::USER_PROPERTY_CITY;
 use common::types::USER_PROPERTY_CLIENT_FAMILY;
 use common::types::USER_PROPERTY_CLIENT_VERSION_MAJOR;
@@ -60,14 +62,17 @@ use ingester::Destination;
 use ingester::Identify;
 use ingester::Track;
 use ingester::Transformer;
+use metadata::accounts::Account;
 use metadata::accounts::CreateAccountRequest;
 use metadata::organizations::CreateOrganizationRequest;
+use metadata::organizations::Organization;
 use metadata::projects::CreateProjectRequest;
+use metadata::projects::Project;
 use metadata::properties::DictionaryType;
 use metadata::properties::Type;
-use metadata::test_util::create_event;
-use metadata::test_util::create_property;
-use metadata::test_util::CreatePropertyMainRequest;
+use metadata::util::create_event;
+use metadata::util::create_property;
+use metadata::util::CreatePropertyMainRequest;
 use metadata::MetadataProvider;
 use metrics::describe_counter;
 use metrics::describe_histogram;
@@ -75,6 +80,7 @@ use metrics::Unit;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use platform::auth;
 use platform::auth::password::make_password_hash;
+use platform::PlatformProvider;
 use query::QueryProvider;
 use tracing::info;
 use uaparser::UserAgentParser;
@@ -140,7 +146,7 @@ pub fn init_system(
         merge_chunk_size: 1024 * 8 * 8,
         merge_max_page_size: 1024 * 1024 * 10,
     };
-    match db.create_table("events".to_string(), topts) {
+    match db.create_table(TABLE_EVENTS.to_string(), topts) {
         Ok(_) => {}
         Err(err) => match err {
             StoreError::AlreadyExists(_) => {}
@@ -191,91 +197,18 @@ pub fn init_system(
     Ok(())
 }
 
-pub fn init_project(project_id: u64, md: &Arc<MetadataProvider>) -> error::Result<()> {
-    create_event(md, project_id, EVENT_CLICK.to_string())?;
-    create_event(md, project_id, EVENT_PAGE.to_string())?;
-    create_event(md, project_id, EVENT_SCREEN.to_string())?;
-    create_event(md, project_id, EVENT_SESSION_BEGIN.to_string())?;
-    create_event(md, project_id, EVENT_SESSION_END.to_string())?;
-    let user_dict_props = vec![
-        USER_PROPERTY_CLIENT_FAMILY,
-        USER_PROPERTY_CLIENT_VERSION_MINOR,
-        USER_PROPERTY_CLIENT_VERSION_MAJOR,
-        USER_PROPERTY_CLIENT_VERSION_PATCH,
-        USER_PROPERTY_DEVICE_FAMILY,
-        USER_PROPERTY_DEVICE_BRAND,
-        USER_PROPERTY_DEVICE_MODEL,
-        USER_PROPERTY_OS,
-        USER_PROPERTY_OS_FAMILY,
-        USER_PROPERTY_OS_VERSION_MAJOR,
-        USER_PROPERTY_OS_VERSION_MINOR,
-        USER_PROPERTY_OS_VERSION_PATCH,
-        USER_PROPERTY_OS_VERSION_PATCH_MINOR,
-        USER_PROPERTY_COUNTRY,
-        USER_PROPERTY_CITY,
-    ];
-    for prop in user_dict_props {
-        create_property(md, project_id, CreatePropertyMainRequest {
-            name: prop.to_string(),
-            typ: Type::User,
-            data_type: DType::String,
-            nullable: true,
-            dict: Some(DictionaryType::Int64),
-        })?;
-    }
-
-    let event_str_props = vec![
-        EVENT_PROPERTY_A_NAME,
-        EVENT_PROPERTY_A_HREF,
-        EVENT_PROPERTY_A_ID,
-        EVENT_PROPERTY_A_CLASS,
-        EVENT_PROPERTY_A_STYLE,
-        EVENT_PROPERTY_PAGE_PATH,
-        EVENT_PROPERTY_PAGE_REFERER,
-        EVENT_PROPERTY_PAGE_SEARCH,
-        EVENT_PROPERTY_PAGE_TITLE,
-        EVENT_PROPERTY_PAGE_URL,
-    ];
-
-    for prop in event_str_props {
-        create_property(md, project_id, CreatePropertyMainRequest {
-            name: prop.to_string(),
-            typ: Type::Event,
-            data_type: DType::String,
-            nullable: true,
-            dict: None,
-        })?;
-    }
-
-    create_property(md, project_id, CreatePropertyMainRequest {
-        name: EVENT_PROPERTY_SESSION_LENGTH.to_string(),
-        typ: Type::Event,
-        data_type: DType::Timestamp,
-        nullable: true,
-        dict: None,
-    })?;
-
-    Ok(())
-}
-
 fn init_platform(
     md: Arc<MetadataProvider>,
     db: Arc<OptiDBImpl>,
     router: Router,
+    cfg: Config,
 ) -> crate::error::Result<Router> {
     let query_provider = Arc::new(QueryProvider::new(md.clone(), db.clone()));
 
-    let auth_cfg = auth::provider::Config {
-        access_token_duration: Duration::days(1),
-        access_token_key: "access".to_owned(),
-        refresh_token_duration: Duration::days(1),
-        refresh_token_key: "refresh".to_owned(),
-    };
-
-    let platform_provider = Arc::new(platform::PlatformProvider::new(
+    let platform_provider = Arc::new(PlatformProvider::new(
         md.clone(),
         query_provider,
-        auth_cfg.clone(),
+        cfg.clone(),
     ));
 
     info!("attaching platform routes...");
@@ -283,7 +216,7 @@ fn init_platform(
         router,
         &md,
         &platform_provider,
-        auth_cfg,
+        cfg,
         None,
     ))
 }
@@ -348,16 +281,17 @@ fn init_ingester(
 fn init_session_cleaner(
     md: Arc<MetadataProvider>,
     db: Arc<OptiDBImpl>,
+    cfg: Config,
 ) -> crate::error::Result<()> {
     thread::spawn(move || {
         loop {
-            thread::sleep(std::time::Duration::from_secs(1));
+            thread::sleep(cfg.session_cleaner_interval.to_std().unwrap());
             for project in md.projects.list(None).unwrap() {
                 md.sessions
                     .check_for_deletion(project.id, |sess| {
                         let now = Utc::now();
                         let sess_len = now - sess.created_at;
-                        if sess_len.num_seconds() < SESSION_DURATION {
+                        if sess_len.num_seconds() < project.session_duration_seconds as i64 {
                             return Ok(false);
                         }
                         let record_id = md.events.next_record_sequence(project.id).unwrap();

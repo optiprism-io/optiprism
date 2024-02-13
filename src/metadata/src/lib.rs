@@ -15,7 +15,7 @@ pub mod reports;
 pub mod rocksdb;
 mod sessions;
 pub mod teams;
-pub mod test_util;
+pub mod util;
 
 use ::rocksdb::Transaction;
 use ::rocksdb::TransactionDB;

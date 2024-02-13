@@ -4,9 +4,9 @@ use common::types::DType;
 use enum_iterator::all;
 use metadata::properties::DictionaryType;
 use metadata::properties::Type;
-use metadata::test_util::create_event;
-use metadata::test_util::create_property;
-use metadata::test_util::CreatePropertyMainRequest;
+use metadata::util::create_event;
+use metadata::util::create_property;
+use metadata::util::CreatePropertyMainRequest;
 use metadata::MetadataProvider;
 use storage::db::OptiDBImpl;
 

@@ -15,6 +15,7 @@ use std::sync::Arc;
 
 use axum::Extension;
 use axum::Router;
+use common::config::Config;
 use metadata::MetadataProvider;
 use tower_cookies::CookieManagerLayer;
 use tower_http::cors::Any;
@@ -24,7 +25,6 @@ use tower_http::services::ServeFile;
 use tower_http::trace::TraceLayer;
 use tracing::info;
 
-use crate::auth::provider::Config;
 use crate::properties::Properties;
 use crate::PlatformProvider;
 
@@ -41,7 +41,7 @@ pub fn attach_routes(
     mut router: Router,
     md: &Arc<MetadataProvider>,
     platform: &Arc<PlatformProvider>,
-    auth_cfg: Config,
+    cfg: Config,
     ui: Option<PathBuf>,
 ) -> Router {
     router = projects::attach_routes(router);
@@ -78,7 +78,7 @@ pub fn attach_routes(
             user: platform.user_properties.clone(),
             system: platform.system_properties.clone(),
         }))
-        .layer(Extension(auth_cfg))
+        .layer(Extension(cfg))
         .layer(Extension(platform.query.clone()))
         .layer(Extension(platform.dashboards.clone()))
         .layer(Extension(platform.reports.clone()));

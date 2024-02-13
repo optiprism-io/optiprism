@@ -11,6 +11,7 @@ use chrono::DurationRound;
 use chrono::NaiveDateTime;
 use chrono::Utc;
 use clap::Parser;
+use common::config::Config;
 use common::types::DType;
 use common::DECIMAL_SCALE;
 use hyper::Server;
@@ -19,11 +20,12 @@ use indicatif::ProgressState;
 use indicatif::ProgressStyle;
 use metadata::properties::DictionaryType;
 use metadata::properties::Type;
-use metadata::test_util::create_event;
-use metadata::test_util::create_property;
-use metadata::test_util::CreatePropertyMainRequest;
+use metadata::util::create_event;
+use metadata::util::create_property;
+use metadata::util::CreatePropertyMainRequest;
 use metadata::MetadataProvider;
 use platform::auth;
+use platform::projects::init_project;
 use query::QueryProvider;
 use scan_dir::ScanDir;
 use storage::db::OptiDBImpl;
@@ -35,7 +37,6 @@ use tokio::signal::unix::SignalKind;
 use tracing::info;
 
 use crate::init_metrics;
-use crate::init_project;
 use crate::init_system;
 
 #[derive(Parser, Clone)]
@@ -272,24 +273,18 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
         )?;
     }
 
+    let cfg = Config::default();
     let query_provider = Arc::new(QueryProvider::new(md.clone(), db.clone()));
-
-    let auth_cfg = auth::provider::Config {
-        access_token_duration: Duration::days(1),
-        access_token_key: "access".to_owned(),
-        refresh_token_duration: Duration::days(1),
-        refresh_token_key: "refresh".to_owned(),
-    };
 
     let platform_provider = Arc::new(platform::PlatformProvider::new(
         md.clone(),
         query_provider,
-        auth_cfg.clone(),
+        cfg.clone(),
     ));
 
     let mut router = Router::new();
     info!("attaching platform routes...");
-    router = platform::http::attach_routes(router, &md, &platform_provider, auth_cfg, None);
+    router = platform::http::attach_routes(router, &md, &platform_provider, cfg, None);
     info!("listening on {}", args.host);
     let server = Server::bind(&args.host).serve(router.into_make_service());
     let graceful = server.with_graceful_shutdown(async {

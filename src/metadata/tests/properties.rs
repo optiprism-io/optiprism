@@ -5,7 +5,7 @@ use metadata::properties::CreatePropertyRequest;
 use metadata::properties::Status;
 use metadata::properties::Type;
 use metadata::properties::UpdatePropertyRequest;
-use metadata::test_util::init_db;
+use metadata::util::init_db;
 
 #[test]
 fn test_properties() -> Result<()> {
