@@ -5,9 +5,12 @@ use std::sync::Arc;
 
 use axum::Router;
 use common::config::Config;
+use common::defaults::SESSION_DURATION;
 use common::rbac::Role;
 use metadata::accounts::CreateAccountRequest;
 use metadata::error::MetadataError;
+use metadata::organizations::CreateOrganizationRequest;
+use metadata::projects::CreateProjectRequest;
 use metadata::MetadataProvider;
 use platform::auth::password::make_password_hash;
 use storage::db::OptiDBImpl;
@@ -47,7 +50,7 @@ pub async fn start(cfg: Config) -> Result<()> {
 
     let just_initialized = if md.accounts.list()?.is_empty() {
         info!("creating admin account...");
-        match md.accounts.create(CreateAccountRequest {
+        let acc = md.accounts.create(CreateAccountRequest {
             created_by: None,
             password_hash: make_password_hash("admin")?,
             email: "admin@admin.com".to_string(),
@@ -56,11 +59,14 @@ pub async fn start(cfg: Config) -> Result<()> {
             organizations: None,
             projects: None,
             teams: None,
-        }) {
-            Err(MetadataError::AlreadyExists(_)) => {}
-            Err(err) => return Err(err.into()),
-            _ => {}
-        };
+        })?;
+
+        info!("creating organization...");
+        md.organizations.create(CreateOrganizationRequest {
+            created_by: acc.id,
+            name: "My Organization".to_string(),
+        })?;
+
         true
     } else {
         false

@@ -38,8 +38,7 @@ impl Auth {
         Ok(TokensResponse {
             access_token: make_access_token(
                 account_id,
-                1,
-                1,
+                1, // todo implement org management
                 self.cfg.access_token_duration.clone(),
                 "access",
             )
