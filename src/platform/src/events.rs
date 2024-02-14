@@ -28,7 +28,7 @@ impl Events {
         project_id: u64,
         request: CreateEventRequest,
     ) -> Result<Event> {
-        ctx.check_project_permission(ProjectPermission::ManageSchema)?;
+        ctx.check_project_permission(project_id, ProjectPermission::ManageSchema)?;
 
         let event = self
             .prov
@@ -49,13 +49,13 @@ impl Events {
     }
 
     pub async fn get_by_id(&self, ctx: Context, project_id: u64, id: u64) -> Result<Event> {
-        ctx.check_project_permission(ProjectPermission::ViewSchema)?;
+        ctx.check_project_permission(project_id, ProjectPermission::ViewSchema)?;
 
         self.prov.get_by_id(project_id, id)?.try_into()
     }
 
     pub async fn get_by_name(&self, ctx: Context, project_id: u64, name: &str) -> Result<Event> {
-        ctx.check_project_permission(ProjectPermission::ViewSchema)?;
+        ctx.check_project_permission(project_id, ProjectPermission::ViewSchema)?;
 
         let event = self.prov.get_by_name(project_id, name)?;
 
@@ -63,7 +63,7 @@ impl Events {
     }
 
     pub async fn list(&self, ctx: Context, project_id: u64) -> Result<ListResponse<Event>> {
-        ctx.check_project_permission(ProjectPermission::ViewSchema)?;
+        ctx.check_project_permission(project_id, ProjectPermission::ViewSchema)?;
         let resp = self.prov.list(project_id)?;
 
         resp.try_into()
@@ -77,7 +77,7 @@ impl Events {
         event_id: u64,
         req: UpdateEventRequest,
     ) -> Result<Event> {
-        ctx.check_project_permission(ProjectPermission::ManageSchema)?;
+        ctx.check_project_permission(project_id, ProjectPermission::ManageSchema)?;
 
         let md_req = metadata::events::UpdateEventRequest {
             updated_by: ctx.account_id.unwrap(),
@@ -101,7 +101,7 @@ impl Events {
         event_id: u64,
         prop_id: u64,
     ) -> Result<Event> {
-        ctx.check_project_permission(ProjectPermission::ManageSchema)?;
+        ctx.check_project_permission(project_id, ProjectPermission::ManageSchema)?;
 
         self.prov
             .attach_event_property(project_id, event_id, prop_id)?
@@ -116,7 +116,7 @@ impl Events {
         event_id: u64,
         prop_id: u64,
     ) -> Result<Event> {
-        ctx.check_project_permission(ProjectPermission::ManageSchema)?;
+        ctx.check_project_permission(project_id, ProjectPermission::ManageSchema)?;
 
         self.prov
             .detach_event_property(project_id, event_id, prop_id)?
@@ -124,7 +124,7 @@ impl Events {
     }
 
     pub async fn delete(&self, ctx: Context, project_id: u64, id: u64) -> Result<Event> {
-        ctx.check_project_permission(ProjectPermission::DeleteSchema)?;
+        ctx.check_project_permission(project_id, ProjectPermission::DeleteSchema)?;
 
         self.prov.delete(project_id, id)?.try_into()
     }

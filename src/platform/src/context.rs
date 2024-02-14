@@ -52,102 +52,103 @@ pub struct Context {
 
 impl Context {
     pub fn check_permission(&self, permission: Permission) -> Result<()> {
-        return Ok(());
-        // if let Some(role) = &self.role {
-        // for (root_role, role_permission) in PERMISSIONS.iter() {
-        // if *root_role != *role {
-        // continue;
-        // }
-        // if role_permission.contains(&Permission::All) {
-        // return Ok(());
-        // }
-        // if role_permission.contains(&permission) {
-        // return Ok(());
-        // }
-        // }
-        // }
-        //
-        // Err(PlatformError::Forbidden("forbidden".to_string()))
+        if let Some(role) = &self.role {
+            for (root_role, role_permission) in PERMISSIONS.iter() {
+                if *root_role != *role {
+                    continue;
+                }
+                if role_permission.contains(&Permission::All) {
+                    return Ok(());
+                }
+                if role_permission.contains(&permission) {
+                    return Ok(());
+                }
+            }
+        }
+
+        Err(PlatformError::Forbidden("forbidden".to_string()))
     }
 
     pub fn check_organization_permission(&self, permission: OrganizationPermission) -> Result<()> {
-        return Ok(());
-        // if self
-        // .check_permission(Permission::ManageOrganizations)
-        // .is_ok()
-        // {
-        // return Ok(());
-        // }
-        // let role = self.get_organization_role()?;
-        // for (org_role, role_permission) in ORGANIZATION_PERMISSIONS.iter() {
-        // if *org_role != role {
-        // continue;
-        // }
-        //
-        // if role_permission.contains(&OrganizationPermission::All) {
-        // return Ok(());
-        // }
-        // if role_permission.contains(&permission) {
-        // return Ok(());
-        // }
-        // }
-        //
-        // Err(PlatformError::Forbidden("forbidden".to_string()))
+        if self
+            .check_permission(Permission::ManageOrganizations)
+            .is_ok()
+        {
+            return Ok(());
+        }
+        let role = self.get_organization_role()?;
+        for (org_role, role_permission) in ORGANIZATION_PERMISSIONS.iter() {
+            if *org_role != role {
+                continue;
+            }
+
+            if role_permission.contains(&OrganizationPermission::All) {
+                return Ok(());
+            }
+            if role_permission.contains(&permission) {
+                return Ok(());
+            }
+        }
+
+        Err(PlatformError::Forbidden("forbidden".to_string()))
     }
 
-    pub fn check_project_permission(&self, permission: ProjectPermission) -> Result<()> {
-        return Ok(());
-        // if self.check_permission(Permission::ManageProjects).is_ok() {
-        // return Ok(());
-        // }
-        // if let Ok(role) = self.get_organization_role() {
-        // match role {
-        // OrganizationRole::Owner => return Ok(()),
-        // OrganizationRole::Admin => return Ok(()),
-        // OrganizationRole::Member => {}
-        // }
-        // }
-        //
-        // let role = self.get_project_role()?;
-        //
-        // for (proj_role, role_permission) in PROJECT_PERMISSIONS.iter() {
-        // if *proj_role != role {
-        // continue;
-        // }
-        //
-        // if role_permission.contains(&ProjectPermission::All) {
-        // return Ok(());
-        // }
-        // if role_permission.contains(&permission) {
-        // return Ok(());
-        // }
-        // }
-        //
-        // Err(PlatformError::Forbidden("forbidden".to_string()))
+    pub fn check_project_permission(
+        &self,
+        project_id: u64,
+        permission: ProjectPermission,
+    ) -> Result<()> {
+        if self.check_permission(Permission::ManageProjects).is_ok() {
+            return Ok(());
+        }
+        if let Ok(role) = self.get_organization_role() {
+            match role {
+                OrganizationRole::Owner => return Ok(()),
+                OrganizationRole::Admin => return Ok(()),
+                OrganizationRole::Member => {}
+            }
+        }
+
+        let role = self.get_project_role(project_id)?;
+
+        for (proj_role, role_permission) in PROJECT_PERMISSIONS.iter() {
+            if *proj_role != role {
+                continue;
+            }
+
+            if role_permission.contains(&ProjectPermission::All) {
+                return Ok(());
+            }
+            if role_permission.contains(&permission) {
+                return Ok(());
+            }
+        }
+
+        Err(PlatformError::Forbidden("forbidden".to_string()))
     }
 
-    //    fn get_organization_role(&self) -> Result<OrganizationRole> {
-    // if let Some(organizations) = &self.organizations {
-    // for (org_id, role) in organizations.iter() {
-    // if *org_id == self.organization_id {
-    // return Ok(role.to_owned());
-    // }
-    // }
-    // }
-    //
-    // Err(PlatformError::Forbidden("forbidden".to_string()))
-    // }
-    //    fn get_project_role(&self) -> Result<ProjectRole> {
-    // if let Some(projects) = &self.projects {
-    // for (proj_id, role) in projects.iter() {
-    // if *proj_id == self.project_id {
-    // return Ok(role.to_owned());
-    // }
-    // }
-    // }
-    //
-    // Err(PlatformError::Forbidden("forbidden".to_string()))
-    // }
+    fn get_organization_role(&self) -> Result<OrganizationRole> {
+        if let Some(organizations) = &self.organizations {
+            for (org_id, role) in organizations.iter() {
+                if *org_id == self.organization_id {
+                    return Ok(role.to_owned());
+                }
+            }
+        }
+
+        Err(PlatformError::Forbidden("forbidden".to_string()))
+    }
+    fn get_project_role(&self, project_id: u64) -> Result<ProjectRole> {
+        if let Some(projects) = &self.projects {
+            for (proj_id, role) in projects.iter() {
+                if *proj_id == project_id {
+                    return Ok(role.to_owned());
+                }
+            }
+        }
+
+        Err(PlatformError::Forbidden("forbidden".to_string()))
+    }
 }
 
 #[async_trait]

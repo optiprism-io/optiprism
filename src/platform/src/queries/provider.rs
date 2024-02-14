@@ -34,7 +34,7 @@ impl Queries {
         req: EventSegmentation,
         query: QueryParams,
     ) -> Result<QueryResponse> {
-        ctx.check_project_permission(ProjectPermission::ExploreReports)?;
+        ctx.check_project_permission(project_id, ProjectPermission::ExploreReports)?;
         let lreq = req.try_into()?;
         let cur_time = match query.timestamp {
             None => Utc::now(),
@@ -79,7 +79,7 @@ impl Queries {
         req: EventRecordsSearchRequest,
         query: QueryParams,
     ) -> Result<QueryResponse> {
-        ctx.check_project_permission(ProjectPermission::ExploreReports)?;
+        ctx.check_project_permission(project_id, ProjectPermission::ExploreReports)?;
         let lreq = req.try_into()?;
         let cur_time = match query.timestamp {
             None => Utc::now(),
@@ -124,7 +124,7 @@ impl Queries {
         project_id: u64,
         req: ListPropertyValuesRequest,
     ) -> Result<ListResponse<Value>> {
-        ctx.check_project_permission(ProjectPermission::ExploreReports)?;
+        ctx.check_project_permission(project_id, ProjectPermission::ExploreReports)?;
 
         let lreq = req.try_into()?;
         let result = self
