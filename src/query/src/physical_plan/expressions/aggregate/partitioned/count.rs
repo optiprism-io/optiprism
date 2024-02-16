@@ -21,7 +21,6 @@ use common::DECIMAL_SCALE;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
-use hyperlog_simd::HyperLogLog;
 use num_traits::Bounded;
 use num_traits::Num;
 use num_traits::NumCast;
@@ -37,7 +36,6 @@ struct Group<T>
 where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
 {
     count: i64,
-    hll: HyperLogLog,
     outer_fn: AggregateFunction<T>,
     first: bool,
     last_partition: i64,
@@ -49,7 +47,6 @@ where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
     pub fn new(outer_fn: AggregateFunction<T>) -> Self {
         Self {
             count: 0,
-            hll: HyperLogLog::new(),
             outer_fn,
             first: true,
             last_partition: 0,
@@ -208,7 +205,9 @@ macro_rules! count {
                     }
 
                     if self.distinct {
-                        bucket.hll.add(partition)
+                        bucket.count = 1;
+                        self.skip = true;
+                        // bucket.hll.add(partition)
                     } else {
                         bucket.count += 1;
                     }
@@ -223,11 +222,8 @@ macro_rules! count {
                     let mut res_col_b = $b::with_capacity(groups.groups.len());
                     for (row, group) in groups.groups.iter_mut() {
                         rows.push(row.row());
-                        if self.distinct {
-                            group.outer_fn.accumulate(group.hll.estimate() as $acc_ty);
-                        } else {
-                            group.outer_fn.accumulate(group.count as $acc_ty);
-                        }
+                        group.outer_fn.accumulate(group.count as $acc_ty);
+
                         let res = group.outer_fn.result();
 
                         res_col_b.append_value(res);
@@ -239,15 +235,9 @@ macro_rules! count {
                     Ok(vec![group_col, vec![res_col]].concat())
                 } else {
                     let mut res_col_b = $b::with_capacity(1);
-                    if self.distinct {
-                        self.single_group
-                            .outer_fn
-                            .accumulate(self.single_group.hll.estimate() as $acc_ty);
-                    } else {
-                        self.single_group
-                            .outer_fn
-                            .accumulate(self.single_group.count as $acc_ty);
-                    }
+                    self.single_group
+                        .outer_fn
+                        .accumulate(self.single_group.count as $acc_ty);
                     let res = self.single_group.outer_fn.result();
                     res_col_b.append_value(res);
                     let res_col = res_col_b.finish();

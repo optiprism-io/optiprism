@@ -14,6 +14,7 @@ use common::http::Json;
 use common::types::EVENT_CLICK;
 use common::types::EVENT_PAGE;
 use common::types::EVENT_SCREEN;
+use tower::ServiceBuilder;
 use tower_http::cors::Any;
 use tower_http::cors::CorsLayer;
 use tracing::info;
@@ -231,6 +232,6 @@ pub fn attach_routes(
         .route("/v1/ingest/:token/page", routing::post(page))
         .route("/v1/ingest/:token/screen", routing::post(screen))
         .route("/v1/ingest/:token/identify", routing::post(identify))
-        .layer(cors)
+        .layer(ServiceBuilder::new().layer(Extension(cors)))
         .layer(Extension(app))
 }

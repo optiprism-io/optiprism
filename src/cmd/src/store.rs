@@ -9,7 +9,6 @@ use std::sync::Arc;
 use std::thread;
 
 use axum::Router;
-use axum::Server;
 use chrono::DateTime;
 use chrono::Duration;
 use chrono::NaiveDateTime;
@@ -43,6 +42,7 @@ use storage::db::OptiDBImpl;
 use storage::db::Options;
 use storage::NamedValue;
 use storage::Value;
+use tokio::net::TcpListener;
 use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tracing::debug;
@@ -217,10 +217,7 @@ pub async fn start(args: &Store) -> Result<()> {
     info!("initializing ingester...");
     let router = init_ingester(&args.geo_city_path, &args.ua_db_path, &md, &db, router)?;
 
-    let server =
-        Server::bind(&args.host).serve(router.into_make_service_with_connect_info::<SocketAddr>());
-    info!("start listening on {}", args.host);
-    let graceful = server.with_graceful_shutdown(async {
+    let signal = async {
         let mut sig_int =
             tokio::signal::unix::signal(SignalKind::interrupt()).expect("failed to install signal");
         let mut sig_term =
@@ -229,9 +226,10 @@ pub async fn start(args: &Store) -> Result<()> {
             _=sig_int.recv()=>info!("SIGINT received"),
             _=sig_term.recv()=>info!("SIGTERM received"),
         }
-    });
-
-    Ok(graceful.await?)
+    };
+    Ok(axum::serve(TcpListener::bind(&args.host).await?, router)
+        .with_graceful_shutdown(signal)
+        .await?)
 }
 
 pub fn gen<R>(md: Arc<MetadataProvider>, db: Arc<OptiDBImpl>, cfg: Config<R>) -> Result<()>

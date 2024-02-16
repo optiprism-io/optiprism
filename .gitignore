@@ -7,6 +7,7 @@ target
 tmp
 Cargo.lock
 data
+init
 node_modules
 dist
 dist-ssr
@@ -19,3 +20,4 @@ test-results/
 playwright-report/
 playwright/.cache/
 __pycache__
+/init/

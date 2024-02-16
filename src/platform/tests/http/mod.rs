@@ -114,13 +114,7 @@ mod tests {
         ));
 
         let addr = SocketAddr::from(([127, 0, 0, 1], HTTP_PORT.fetch_add(1, Ordering::SeqCst)));
-        let router = attach_routes(
-            Router::new(),
-            &md,
-            &platform_provider,
-            AUTH_CFG.clone(),
-            None,
-        );
+        let router = attach_routes(Router::new(), &md, &platform_provider, AUTH_CFG.clone());
         tokio::spawn(async move {
             Server::bind(&addr)
                 .serve(router.into_make_service_with_connect_info::<SocketAddr>())

@@ -9,7 +9,7 @@ anyhow = "1.0.66"
 arrow = { version = "49.0.0", features = ["prettyprint"] }
 bytesize = "1.1.0"
 chrono = { version = "0.4.23" }
-clap = { version = "4.0.29", features = ["derive"] }
+clap = { version = "4.5.0", features = ["derive"] }
 common = { path = "../common" }
 crossbeam-channel = "0.5.6"
 csv = "1.1"
@@ -18,7 +18,7 @@ dateparser = "0.2.0"
 enum-iterator = "1.2.0"
 futures = "0.3.25"
 humantime = "2.1.0"
-indicatif = "0.17.2"
+indicatif = "0.17.6"
 lazy_static = "1.4.0"
 metadata = { path = "../metadata" }
 num_cpus = "1.14.0"
@@ -32,7 +32,6 @@ service = { path = "../service" }
 storage = { path = "../storage" }
 strum = "0.24"
 strum_macros = "0.24"
-test_util = { path = "../test_util" }
 thiserror = "1.0.37"
 tokio = { version = "1.23.0", features = ["full"] }
 tracing = "0.1.37"

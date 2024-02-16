@@ -18,6 +18,7 @@ use common::types::EVENT_PAGE;
 use common::types::EVENT_SCREEN;
 use rust_decimal::Decimal;
 use serde::Deserialize;
+use tower::ServiceBuilder;
 use tower_http::cors::Any;
 use tower_http::cors::CorsLayer;
 
@@ -314,7 +315,7 @@ pub fn attach_routes(
         .route("/v1/ingest/:token/page", routing::post(page))
         .route("/v1/ingest/:token/screen", routing::post(screen))
         .route("/v1/ingest/:token/identify", routing::post(identify))
-        .layer(cors)
+        .layer(Extension(cors))
         .layer(Extension(app))
 }
 

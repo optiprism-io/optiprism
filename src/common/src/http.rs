@@ -10,15 +10,20 @@ use axum::extract::FromRequest;
 use axum::http;
 use axum::http::HeaderMap;
 use axum::http::HeaderValue;
-use axum::http::Request;
 use axum::http::StatusCode;
 use axum::middleware::Next;
+use axum::middleware::{self};
+use axum::response::Html;
 use axum::response::IntoResponse;
+use axum::routing::post;
+use axum::Router;
 use axum_core::body;
+use axum_core::body::Body;
+use axum_core::extract::Request;
 use axum_core::response::Response;
 use axum_core::BoxError;
 use bytes::Bytes;
-use hyper::Body;
+use http_body_util::BodyExt;
 use lazy_static::lazy_static;
 use log::debug;
 use regex::Regex;
@@ -134,20 +139,14 @@ impl IntoResponse for ApiError {
 pub struct Json<T>(pub T);
 
 #[async_trait]
-impl<T, S, B> FromRequest<S, B> for Json<T>
+impl<T, S> FromRequest<S> for Json<T>
 where
     T: DeserializeOwned,
-    B: HttpBody + Send + 'static,
-    B::Data: Send,
-    B::Error: Into<BoxError>,
     S: Send + Sync,
 {
     type Rejection = ApiError;
 
-    async fn from_request(
-        req: Request<B>,
-        state: &S,
-    ) -> std::result::Result<Self, Self::Rejection> {
+    async fn from_request(req: Request, state: &S) -> std::result::Result<Self, Self::Rejection> {
         match axum::Json::<T>::from_request(req, state).await {
             Ok(v) => Ok(Json(v.0)),
             Err(err) => {
@@ -199,46 +198,43 @@ fn content_length(headers: &HeaderMap<HeaderValue>) -> Option<u64> {
         .and_then(|value| value.to_str().ok()?.parse::<u64>().ok())
 }
 
-pub async fn print_request_response(
-    mut req: Request<Body>,
-    next: Next<Body>,
-) -> Result<impl IntoResponse> {
-    tracing::debug!("request headers = {:?}", req.headers());
-
-    if content_length(req.headers()).is_some() {
-        let (parts, body) = req.into_parts();
-        let bytes = buffer_and_print("request", body).await?;
-        req = Request::from_parts(parts, Body::from(bytes));
-    }
+async fn print_request_response(
+    req: Request,
+    next: Next,
+) -> std::result::Result<impl IntoResponse, (StatusCode, String)> {
+    let (parts, body) = req.into_parts();
+    let bytes = buffer_and_print("request", body).await?;
+    let req = Request::from_parts(parts, Body::from(bytes));
 
     let res = next.run(req).await;
-    if content_length(res.headers()).is_none() {
-        return Ok(res);
-    }
 
     let (parts, body) = res.into_parts();
     let bytes = buffer_and_print("response", body).await?;
+    let res = Response::from_parts(parts, Body::from(bytes));
 
-    Ok(Response::from_parts(parts, body::boxed(Body::from(bytes))))
+    Ok(res)
 }
 
-async fn buffer_and_print<B>(direction: &str, body: B) -> Result<Bytes>
+async fn buffer_and_print<B>(
+    direction: &str,
+    body: B,
+) -> std::result::Result<Bytes, (StatusCode, String)>
 where
-    B: HttpBody<Data = Bytes>,
+    B: axum::body::HttpBody<Data = Bytes>,
     B::Error: std::fmt::Display,
 {
-    let bytes = match hyper::body::to_bytes(body).await {
-        Ok(bytes) => bytes,
+    let bytes = match body.collect().await {
+        Ok(collected) => collected.to_bytes(),
         Err(err) => {
-            return Err(CommonError::BadRequest(format!(
-                "failed to read {direction} body: {err}"
-            )));
+            return Err((
+                StatusCode::BAD_REQUEST,
+                format!("failed to read {direction} body: {err}"),
+            ));
         }
     };
 
     if let Ok(body) = std::str::from_utf8(&bytes) {
-        let v = serde_json::from_slice::<Value>(body.as_bytes())?;
-        tracing::debug!("{} body = {}", direction, serde_json::to_string_pretty(&v)?);
+        tracing::debug!("{direction} body = {body:?}");
     }
 
     Ok(bytes)
