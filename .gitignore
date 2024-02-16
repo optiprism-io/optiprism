@@ -7,6 +7,7 @@ target
 tmp
 Cargo.lock
 data
+init
 node_modules
 dist
 dist-ssr

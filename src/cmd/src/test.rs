@@ -32,6 +32,7 @@ use storage::db::OptiDBImpl;
 use storage::db::Options;
 use storage::NamedValue;
 use storage::Value;
+use tokio::net::TcpListener;
 use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tracing::info;
@@ -284,10 +285,9 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
 
     let mut router = Router::new();
     info!("attaching platform routes...");
-    router = platform::http::attach_routes(router, &md, &platform_provider, cfg, None);
+    router = platform::http::attach_routes(router, &md, &platform_provider, cfg);
     info!("listening on {}", args.host);
-    let server = Server::bind(&args.host).serve(router.into_make_service());
-    let graceful = server.with_graceful_shutdown(async {
+    let signal = async {
         let mut sig_int =
             tokio::signal::unix::signal(SignalKind::interrupt()).expect("failed to install signal");
         let mut sig_term =
@@ -296,7 +296,8 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
             _=sig_int.recv()=>info!("SIGINT received"),
             _=sig_term.recv()=>info!("SIGTERM received"),
         }
-    });
-
-    Ok(graceful.await?)
+    };
+    Ok(axum::serve(TcpListener::bind(&args.host).await?, router)
+        .with_graceful_shutdown(signal)
+        .await?)
 }

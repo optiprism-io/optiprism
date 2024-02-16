@@ -17,6 +17,7 @@ use axum::Extension;
 use axum::Router;
 use common::config::Config;
 use metadata::MetadataProvider;
+use tower::ServiceBuilder;
 use tower_cookies::CookieManagerLayer;
 use tower_http::cors::Any;
 use tower_http::cors::CorsLayer;
@@ -42,7 +43,6 @@ pub fn attach_routes(
     md: &Arc<MetadataProvider>,
     platform: &Arc<PlatformProvider>,
     cfg: Config,
-    ui: Option<PathBuf>,
 ) -> Router {
     router = projects::attach_routes(router);
     router = accounts::attach_routes(router);
@@ -57,13 +57,7 @@ pub fn attach_routes(
     router = reports::attach_routes(router);
     router = event_records::attach_routes(router);
     router = group_records::attach_routes(router);
-    if let Some(path) = ui {
-        info!("attaching ui static files handler...");
-        router = router.nest_service(
-            "/assets",
-            ServeDir::new(path.join("assets")).not_found_service(ServeFile::new("index.html")),
-        );
-    }
+
     // fixme get rid of cloning
     router = router.clone().nest("/api/v1", router);
     router = router
@@ -85,17 +79,16 @@ pub fn attach_routes(
     // .layer(Extension(platform.event_records.clone()))
     // .layer(Extension(platform.group_records.clone()));
 
-    router = router
-        .layer(CookieManagerLayer::new())
-        .layer(TraceLayer::new_for_http());
-    // .layer(middleware::from_fn(print_request_response));
-
     let cors = CorsLayer::new()
         .allow_methods(Any)
         .allow_origin(Any)
         .allow_headers(Any);
 
-    router = router.layer(cors);
+    router = router
+        .layer(Extension(cors))
+        .layer(CookieManagerLayer::new())
+        .layer(Extension(TraceLayer::new_for_http()));
+    // .layer(middleware::from_fn(print_request_response));
 
     router
 }

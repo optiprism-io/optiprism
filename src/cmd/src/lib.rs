@@ -217,7 +217,6 @@ fn init_platform(
         &md,
         &platform_provider,
         cfg,
-        None,
     ))
 }
 

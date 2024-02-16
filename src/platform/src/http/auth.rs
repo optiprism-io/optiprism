@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use axum::extract::Extension;
+use axum::http::StatusCode;
 use axum::routing::get;
 use axum::routing::post;
 use axum::routing::put;
@@ -8,7 +9,6 @@ use axum::Router;
 use axum_macros::debug_handler;
 use common::config::Config;
 use common::http::Json;
-use reqwest::StatusCode;
 use serde::Deserialize;
 use serde::Serialize;
 use time::OffsetDateTime;
@@ -36,7 +36,7 @@ pub struct RefreshTokenRequest {
 }
 
 fn set_refresh_token_cookie(cookies: &Cookies, refresh_token: &str, expires: OffsetDateTime) {
-    let cookie = Cookie::build(COOKIE_NAME_REFRESH_TOKEN, refresh_token.to_owned())
+    let cookie = Cookie::build((COOKIE_NAME_REFRESH_TOKEN, refresh_token.to_owned()))
         .expires(expires)
         .http_only(true)
         .finish();

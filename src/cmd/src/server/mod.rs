@@ -1,5 +1,6 @@
 pub mod config;
 
+use std::fs;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -7,6 +8,7 @@ use axum::Router;
 use common::config::Config;
 use common::defaults::SESSION_DURATION;
 use common::rbac::Role;
+use hyper::Server;
 use metadata::accounts::CreateAccountRequest;
 use metadata::error::MetadataError;
 use metadata::organizations::CreateOrganizationRequest;
@@ -15,6 +17,7 @@ use metadata::MetadataProvider;
 use platform::auth::password::make_password_hash;
 use storage::db::OptiDBImpl;
 use storage::db::Options;
+use tokio::net::TcpListener;
 use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tracing::debug;
@@ -31,8 +34,10 @@ use crate::init_system;
 pub async fn start(cfg: Config) -> Result<()> {
     debug!("db path: {:?}", cfg.path);
 
+    fs::create_dir_all(cfg.path.join("md"))?;
+    fs::create_dir_all(cfg.path.join("storage"))?;
     let rocks = Arc::new(metadata::rocksdb::new(cfg.path.join("md"))?);
-    let db = Arc::new(OptiDBImpl::open(cfg.path.join("store"), Options {})?);
+    let db = Arc::new(OptiDBImpl::open(cfg.path.join("storage"), Options {})?);
     let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
     info!("metrics initialization...");
     init_metrics();
@@ -80,13 +85,7 @@ pub async fn start(cfg: Config) -> Result<()> {
     info!("initializing platform...");
     let router = init_platform(md.clone(), db.clone(), router, cfg.clone())?;
 
-    let server = axum::Server::bind(&cfg.host)
-        .serve(router.into_make_service_with_connect_info::<SocketAddr>());
-    info!("Web Interface: https://{}", cfg.host);
-    if just_initialized {
-        info!("email: admin@admin.com, password: admin, (DON'T FORGET TO CHANGE)");
-    }
-    let graceful = server.with_graceful_shutdown(async {
+    let signal = async {
         let mut sig_int =
             tokio::signal::unix::signal(SignalKind::interrupt()).expect("failed to install signal");
         let mut sig_term =
@@ -95,7 +94,13 @@ pub async fn start(cfg: Config) -> Result<()> {
             _=sig_int.recv()=>info!("SIGINT received"),
             _=sig_term.recv()=>info!("SIGTERM received"),
         }
-    });
+    };
 
-    Ok(graceful.await?)
+    info!("Web Interface: https://{}", cfg.host);
+    if just_initialized {
+        info!("email: admin@admin.com, password: admin, (DON'T FORGET TO CHANGE)");
+    }
+    Ok(axum::serve(TcpListener::bind(&cfg.host).await?, router)
+        .with_graceful_shutdown(signal)
+        .await?)
 }
