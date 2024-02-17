@@ -192,13 +192,13 @@ where T: Serialize
     }
 }
 
-fn content_length(headers: &HeaderMap<HeaderValue>) -> Option<u64> {
+pub fn content_length(headers: &HeaderMap<HeaderValue>) -> Option<u64> {
     headers
         .get(http::header::CONTENT_LENGTH)
         .and_then(|value| value.to_str().ok()?.parse::<u64>().ok())
 }
 
-async fn print_request_response(
+pub async fn print_request_response(
     req: Request,
     next: Next,
 ) -> std::result::Result<impl IntoResponse, (StatusCode, String)> {

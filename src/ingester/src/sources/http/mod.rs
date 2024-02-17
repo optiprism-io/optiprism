@@ -315,7 +315,7 @@ pub fn attach_routes(
         .route("/v1/ingest/:token/page", routing::post(page))
         .route("/v1/ingest/:token/screen", routing::post(screen))
         .route("/v1/ingest/:token/identify", routing::post(identify))
-        .layer(Extension(cors))
+        .layer(cors)
         .layer(Extension(app))
 }
 
