@@ -217,6 +217,8 @@ pub async fn start(args: &Store) -> Result<()> {
     info!("initializing ingester...");
     let router = init_ingester(&args.geo_city_path, &args.ua_db_path, &md, &db, router)?;
 
+    info!("listening on {}", args.host);
+
     let signal = async {
         let mut sig_int =
             tokio::signal::unix::signal(SignalKind::interrupt()).expect("failed to install signal");
