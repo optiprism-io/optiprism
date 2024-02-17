@@ -26,4 +26,5 @@ RUN chown -R optiprism:optiprism /usr/bin/optiprism
 COPY init /var/lib/optiprism/init
 EXPOSE 8080
 VOLUME /var/lib/optiprism
-ENTRYPOINT ["/usr/bin/optiprism","server","--config","/etc/optiprism/config.d/config.toml"]
+#ENTRYPOINT ["/usr/bin/optiprism","server","--config","/etc/optiprism/config.d/config.toml"]
+ENTRYPOINT ["/usr/bin/optiprism"]
