@@ -1,3 +1,11 @@
+FROM node as node
+WORKDIR /app
+RUN apt-get install -y git
+RUN mkdir -p -m 0700 ~/.ssh && ssh-keyscan github.com >> ~/.ssh/known_hosts
+RUN --mount=type=ssh git clone ssh://git@github.com/optiprism-io/frontend.git .
+RUN npm i yarn
+RUN npm i
+RUN yarn build
 FROM rust:1.72.0 AS rust
 WORKDIR /app
 RUN apt-get update && apt-get install -y clang openssl
@@ -14,6 +22,9 @@ FROM debian:stable-slim AS runtime
 RUN groupadd -r optiprism --gid=101 && useradd -r -g optiprism --uid=101 --home-dir=/var/lib/optiprism --shell=/bin/bash optiprism
 RUN apt-get update && apt-get install -y openssl ca-certificates locales && apt-get clean
 RUN mkdir -p /var/lib/optiprism /var/log/optiprism /etc/optiprism /etc/optiprism/config.d
+COPY --from=node /app/dist/* /var/lib/optiprism/frontend
+RUN ls -al /var/lib/optiprism
+RUN ls -al /var/lib/optiprism/frontend
 COPY docker/config.toml /etc/optiprism/config.d/config.toml
 RUN chown -R optiprism:optiprism /var/lib/optiprism /var/log/optiprism /etc/optiprism
 RUN locale-gen en_US.UTF-8
@@ -26,4 +37,4 @@ RUN chown -R optiprism:optiprism /usr/bin/optiprism
 COPY init /var/lib/optiprism/init
 EXPOSE 8080
 VOLUME /var/lib/optiprism
-ENTRYPOINT ["/usr/bin/optiprism","server","--config","/etc/optiprism/config.d/config.toml"]
+ENTRYPOINT ["/usr/bin/optiprism"]

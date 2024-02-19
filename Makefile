@@ -1,7 +1,7 @@
 SHELL = /bin/bash
-DEMO_VERSION =$(shell cd src/cmd; cargo get package.version)
-DEMO_TAG = v$(DEMO_VERSION)
-DEMO_IMAGE = optiprismio/demo:$(DEMO_TAG)
+VERSION =$(shell cd src/cmd; cargo get package.version)
+DEMO_TAG = v$(VERSION)
+IMAGE = optiprismio/optiprism:$(DEMO_TAG)
 
 cargo-fix-fmt: cargo-fix cargo-fmt cargo-sort cargo-lint
 
@@ -49,15 +49,14 @@ clean:
 	cargo clean
 	yarn cache clean
 
-docker-build-demo:
-#	$(info building $(DEMO_IMAGE) docker image...)
-#ifneq ($(shell docker images -q $(DEMO_IMAGE) 2> /dev/null),)
-#	$(error image $(DEMO_IMAGE) already exists)
-#endif
-	docker buildx build  --ssh default --load --file docker/Dockerfile --platform=linux/arm64 --progress plain -t $(DEMO_IMAGE) .
+docker-build:
+	docker buildx build  --ssh default --load --file docker/Dockerfile --platform=linux/amd64 --progress plain -t $(IMAGE) .
 
-docker-publish-demo:
-	$(pushing pushing $(DEMO_IMAGE) docker image...)
-	docker push $(DEMO_IMAGE)
+docker-publish:
+	$(pushing pushing $(IMAGE) docker image...)
+	docker push $(IMAGE)
 
-docker-release-demo: docker-build-demo docker-publish-demo
+docker-release: docker-build docker-publish
+
+release-optiprism:
+	helm upgrade --install --values ./helm/optiprism/values.yaml --set image.tag=v$(VERSION) --set podAnnotations.version=$(VERSION) optiprism ./helm/optiprism -n optiprism

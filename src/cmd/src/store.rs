@@ -102,8 +102,11 @@ pub async fn start(args: &Store) -> Result<()> {
     if args.generate {
         fs::remove_dir_all(&args.path).unwrap();
     }
-    let rocks = Arc::new(metadata::rocksdb::new(args.path.join("md"))?);
-    let db = Arc::new(OptiDBImpl::open(args.path.join("store"), Options {})?);
+    let rocks = Arc::new(metadata::rocksdb::new(args.path.join("data/md"))?);
+    let db = Arc::new(OptiDBImpl::open(
+        args.path.join("data/storage"),
+        Options {},
+    )?);
     let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
     info!("metrics initialization...");
     init_metrics();
