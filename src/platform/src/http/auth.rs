@@ -148,11 +148,11 @@ async fn update_password(
 
 pub fn attach_routes(router: Router) -> Router {
     router
-        .route("/auth/signup", post(sign_up))
-        .route("/auth/login", post(log_in))
-        .route("/auth/refresh-token", post(refresh_token))
-        .route("/profile", get(get_profile))
-        .route("/profile/name", put(update_name))
-        .route("/profile/email", put(update_email))
-        .route("/profile/password", put(update_password))
+        .route("/api/v1/auth/signup", post(sign_up))
+        .route("/api/v1/auth/login", post(log_in))
+        .route("/api/v1/auth/refresh-token", post(refresh_token))
+        .route("/api/v1/profile", get(get_profile))
+        .route("/api/v1/profile/name", put(update_name))
+        .route("/api/v1/profile/email", put(update_email))
+        .route("/api/v1/profile/password", put(update_password))
 }

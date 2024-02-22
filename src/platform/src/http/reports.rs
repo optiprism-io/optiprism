@@ -64,7 +64,7 @@ async fn delete(
 
 pub fn attach_routes(router: Router) -> Router {
     router.nest(
-        "/projects/:project_id/reports",
+        "/api/v1/projects/:project_id/reports",
         Router::new()
             .route("/", routing::post(create).get(list))
             .route(

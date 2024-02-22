@@ -99,7 +99,7 @@ async fn detach_property(
 
 pub fn attach_routes(router: Router) -> Router {
     router.nest(
-        "/projects/:project_id/schema/events",
+        "/api/v1/projects/:project_id/schema/events",
         Router::new()
             .route("/", routing::post(create).get(list))
             .route(

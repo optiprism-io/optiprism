@@ -58,5 +58,5 @@ docker-publish:
 
 docker-release: docker-build docker-publish
 
-release-optiprism:
+release:
 	helm upgrade --install --values ./helm/optiprism/values.yaml --set image.tag=v$(VERSION) --set podAnnotations.version=$(VERSION) optiprism ./helm/optiprism -n optiprism
