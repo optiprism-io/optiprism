@@ -13,9 +13,11 @@ pub mod reports;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use axum::middleware;
 use axum::Extension;
 use axum::Router;
 use common::config::Config;
+use common::http::print_request_response;
 use metadata::MetadataProvider;
 use tower::ServiceBuilder;
 use tower_cookies::CookieManagerLayer;
@@ -90,7 +92,7 @@ pub fn attach_routes(
         .allow_headers(Any);
 
     router = router
-        .layer(Extension(cors))
+        .layer(cors)
         .layer(CookieManagerLayer::new())
         .layer(Extension(TraceLayer::new_for_http()));
     // .layer(middleware::from_fn(print_request_response));
