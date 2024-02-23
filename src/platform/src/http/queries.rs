@@ -59,7 +59,7 @@ async fn event_records_search(
 
 pub fn attach_routes(router: Router) -> Router {
     router.nest(
-        "/projects/:project_id",
+        "/api/v1/projects/:project_id",
         Router::new()
             .route(
                 "/queries/event-segmentation",

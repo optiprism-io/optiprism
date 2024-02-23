@@ -59,9 +59,14 @@ pub fn attach_routes(
     router = reports::attach_routes(router);
     router = event_records::attach_routes(router);
     router = group_records::attach_routes(router);
+    if let Some(ui_path) = &cfg.ui_path {
+        let serve_dir = ServeDir::new(ui_path.to_owned())
+            .not_found_service(ServeFile::new(ui_path.join("index.html")));
+        router = router
+            .nest_service("", serve_dir.clone())
+            .fallback_service(serve_dir)
+    }
 
-    // fixme get rid of cloning
-    router = router.clone().nest("/api/v1", router);
     router = router
         .layer(Extension(platform.projects.clone()))
         .layer(Extension(md.accounts.clone()))

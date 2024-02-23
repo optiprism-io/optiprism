@@ -183,7 +183,7 @@ async fn delete_system(
 
 pub fn attach_user_routes(router: Router) -> Router {
     router.clone().nest(
-        "/projects/:project_id/schema/user-properties",
+        "/api/v1/projects/:project_id/schema/user-properties",
         router
             .route("/", routing::get(list_user))
             .route(
@@ -198,7 +198,7 @@ pub fn attach_user_routes(router: Router) -> Router {
 
 pub fn attach_event_routes(router: Router) -> Router {
     router.nest(
-        "/projects/:project_id/schema/event-properties",
+        "/api/v1/projects/:project_id/schema/event-properties",
         Router::new()
             .route("/", routing::get(list_event))
             .route(
@@ -213,7 +213,7 @@ pub fn attach_event_routes(router: Router) -> Router {
 
 pub fn attach_system_routes(router: Router) -> Router {
     router.clone().nest(
-        "/projects/:project_id/schema/system-properties",
+        "/api/v1/projects/:project_id/schema/system-properties",
         router
             .route("/", routing::get(list_system))
             .route(

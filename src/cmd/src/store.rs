@@ -102,8 +102,11 @@ pub async fn start(args: &Store) -> Result<()> {
     if args.generate {
         fs::remove_dir_all(&args.path).unwrap();
     }
-    let rocks = Arc::new(metadata::rocksdb::new(args.path.join("md"))?);
-    let db = Arc::new(OptiDBImpl::open(args.path.join("store"), Options {})?);
+    let rocks = Arc::new(metadata::rocksdb::new(args.path.join("data/md"))?);
+    let db = Arc::new(OptiDBImpl::open(
+        args.path.join("data/storage"),
+        Options {},
+    )?);
     let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
     info!("metrics initialization...");
     init_metrics();
@@ -216,6 +219,8 @@ pub async fn start(args: &Store) -> Result<()> {
     init_session_cleaner(md.clone(), db.clone(), cfg.clone())?;
     info!("initializing ingester...");
     let router = init_ingester(&args.geo_city_path, &args.ua_db_path, &md, &db, router)?;
+
+    info!("listening on {}", args.host);
 
     let signal = async {
         let mut sig_int =

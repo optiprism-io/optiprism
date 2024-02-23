@@ -34,10 +34,10 @@ use crate::init_system;
 pub async fn start(cfg: Config) -> Result<()> {
     debug!("db path: {:?}", cfg.path);
 
-    fs::create_dir_all(cfg.path.join("md"))?;
-    fs::create_dir_all(cfg.path.join("storage"))?;
-    let rocks = Arc::new(metadata::rocksdb::new(cfg.path.join("md"))?);
-    let db = Arc::new(OptiDBImpl::open(cfg.path.join("storage"), Options {})?);
+    fs::create_dir_all(cfg.path.join("data/md"))?;
+    fs::create_dir_all(cfg.path.join("data/storage"))?;
+    let rocks = Arc::new(metadata::rocksdb::new(cfg.path.join("data/md"))?);
+    let db = Arc::new(OptiDBImpl::open(cfg.path.join("data/storage"), Options {})?);
     let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
     info!("metrics initialization...");
     init_metrics();
