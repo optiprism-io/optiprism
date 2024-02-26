@@ -7,6 +7,7 @@ pub mod event_records_search;
 pub mod event_segmentation;
 pub mod property_values;
 pub mod provider;
+mod validation;
 
 pub use provider::Queries;
 use serde::Deserialize;

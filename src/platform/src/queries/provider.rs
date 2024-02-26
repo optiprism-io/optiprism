@@ -9,6 +9,7 @@ use query::context::Format;
 use query::QueryProvider;
 use serde_json::Value;
 
+use crate::queries::event_records_search;
 use crate::queries::event_records_search::EventRecordsSearchRequest;
 use crate::queries::event_segmentation;
 use crate::queries::event_segmentation::EventSegmentation;
@@ -84,6 +85,7 @@ impl Queries {
         query: QueryParams,
     ) -> Result<QueryResponse> {
         ctx.check_project_permission(project_id, ProjectPermission::ExploreReports)?;
+        event_records_search::validate(&self.md, project_id, &req)?;
         let lreq = req.try_into()?;
         let cur_time = match query.timestamp {
             None => Utc::now(),
