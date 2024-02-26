@@ -108,6 +108,11 @@ pub(crate) fn validate(
     }
 
     if let Some(events) = &req.events {
+        if events.is_empty() {
+            return Err(PlatformError::BadRequest(
+                "events field can't be empty".to_string(),
+            ));
+        }
         for (event_id, event) in events.iter().enumerate() {
             match &event.event {
                 EventRef::Regular { event_name } => {
@@ -154,6 +159,11 @@ pub(crate) fn validate(
         match &req.properties {
             None => {}
             Some(props) => {
+                if events.is_empty() {
+                    return Err(PlatformError::BadRequest(
+                        "props field can't be empty".to_string(),
+                    ));
+                }
                 for (idx, prop) in props.iter().enumerate() {
                     match prop {
                         PropertyRef::User { property_name } => md
