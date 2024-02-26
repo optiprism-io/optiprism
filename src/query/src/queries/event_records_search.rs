@@ -68,9 +68,6 @@ pub fn build(
         input
     };
 
-    // todo add project_id filtering
-    // todo make obligatory
-
     let mut cols_hash: HashMap<String, ()> = HashMap::new();
     let input = decode_filter_dictionaries(
         &ctx,

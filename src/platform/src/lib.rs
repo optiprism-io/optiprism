@@ -190,17 +190,17 @@ impl From<metadata::metadata::ResponseMetadata> for ResponseMetadata {
 #[derive(Serialize, Deserialize, Default, Debug, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ListResponse<T>
-    where T: Debug
+where T: Debug
 {
     pub data: Vec<T>,
     pub meta: ResponseMetadata,
 }
 
 impl<A, B> TryInto<ListResponse<A>> for metadata::metadata::ListResponse<B>
-    where
-        A: Debug,
-        B: TryInto<A> + Clone + Debug,
-        PlatformError: std::convert::From<<B as TryInto<A>>::Error>,
+where
+    A: Debug,
+    B: TryInto<A> + Clone + Debug,
+    PlatformError: std::convert::From<<B as TryInto<A>>::Error>,
 {
     type Error = PlatformError;
 
