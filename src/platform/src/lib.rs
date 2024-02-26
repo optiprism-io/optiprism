@@ -78,8 +78,9 @@ pub struct PlatformProvider {
     pub query: Arc<Queries>,
     pub dashboards: Arc<Dashboards>,
     pub reports: Arc<Reports>,
-    pub projects: Arc<Projects>, /* pub event_records: Arc<dyn event_records::Provider>,
-                                  * pub group_records: Arc<dyn group_records::Provider>, */
+    pub projects: Arc<Projects>,
+    // pub event_records: Arc<dyn event_records::Provider>,
+    // pub group_records: Arc<dyn group_records::Provider>,
 }
 
 impl PlatformProvider {
@@ -96,7 +97,7 @@ impl PlatformProvider {
             system_properties: Arc::new(Properties::new_user(md.system_properties.clone())),
             accounts: Arc::new(Accounts::new(md.accounts.clone())),
             auth: Arc::new(Auth::new(md.accounts.clone(), cfg.clone())),
-            query: Arc::new(Queries::new(query_prov)),
+            query: Arc::new(Queries::new(query_prov, md.clone())),
             dashboards: Arc::new(Dashboards::new(md.dashboards.clone())),
             reports: Arc::new(Reports::new(md.reports.clone())),
             // event_records: Arc::new(stub::EventRecords {}),
@@ -497,6 +498,7 @@ impl From<query::ColumnType> for ColumnType {
         }
     }
 }
+
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct JSONQueryResponse {

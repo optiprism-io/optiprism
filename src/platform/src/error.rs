@@ -40,6 +40,8 @@ pub enum PlatformError {
     InvalidFields(BTreeMap<String, String>),
     #[error("bad request: {0:?}")]
     BadRequest(String),
+    #[error("unimplemented: {0:?}")]
+    Unimplemented(String),
     #[error("already exists: {0:?}")]
     AlreadyExists(String),
     #[error("unauthorized: {0:?}")]
@@ -149,6 +151,7 @@ impl PlatformError {
             PlatformError::NotFound(err) => ApiError::not_found(err),
             PlatformError::EntityMap(err) => ApiError::internal(err),
             PlatformError::AlreadyExists(err) => ApiError::conflict(err),
+            PlatformError::Unimplemented(err) => ApiError::unimplemented(err),
         }
     }
 }

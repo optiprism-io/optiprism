@@ -82,7 +82,7 @@ impl Dictionaries {
         let store_key = make_key_key(project_id, dict, key);
         match tx.get(store_key.as_slice())? {
             None => Err(MetadataError::NotFound(format!(
-                "value for key {} not found",
+                "dictionary value for key {} not found",
                 key
             ))),
             Some(value) => Ok(String::from_utf8(value)?),
@@ -94,7 +94,7 @@ impl Dictionaries {
         let store_key = make_value_key(project_id, dict, value);
         match tx.get(store_key.as_slice())? {
             None => Err(MetadataError::NotFound(format!(
-                "key by value {} not found",
+                "dictionary key by value {} not found",
                 value
             ))),
             Some(key) => Ok(LittleEndian::read_u64(key.as_slice())),

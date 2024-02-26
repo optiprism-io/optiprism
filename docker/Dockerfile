@@ -20,7 +20,8 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 
 FROM debian:stable-slim AS runtime
 RUN groupadd -r optiprism --gid=101 && useradd -r -g optiprism --uid=101 --home-dir=/var/lib/optiprism --shell=/bin/bash optiprism
-RUN apt-get update && apt-get install -y openssl ca-certificates locales && apt-get clean
+RUN apt-get update
+RUN apt-get install -y openssl ca-certificates locales && apt-get clean
 RUN mkdir -p /var/lib/optiprism /var/log/optiprism /etc/optiprism /etc/optiprism/config.d
 COPY --from=node /app/dist/* /var/lib/optiprism/frontend
 RUN ls -al /var/lib/optiprism

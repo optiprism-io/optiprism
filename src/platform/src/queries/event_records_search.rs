@@ -1,6 +1,10 @@
+use std::sync::Arc;
+
+use metadata::MetadataProvider;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::queries::validation::validate_event_filter;
 use crate::queries::QueryTime;
 use crate::EventFilter;
 use crate::EventRef;
@@ -85,4 +89,110 @@ impl TryInto<query::queries::event_records_search::EventRecordsSearch>
                 .transpose()?,
         })
     }
+}
+
+pub(crate) fn validate(
+    md: &Arc<MetadataProvider>,
+    project_id: u64,
+    req: &EventRecordsSearchRequest,
+) -> Result<()> {
+    match req.time {
+        QueryTime::Between { from, to } => {
+            if from > to {
+                return Err(PlatformError::BadRequest(
+                    "from time must be less than to time".to_string(),
+                ));
+            }
+        }
+        _ => {}
+    }
+
+    if let Some(events) = &req.events {
+        if events.is_empty() {
+            return Err(PlatformError::BadRequest(
+                "events field can't be empty".to_string(),
+            ));
+        }
+        for (event_id, event) in events.iter().enumerate() {
+            match &event.event {
+                EventRef::Regular { event_name } => {
+                    md.events
+                        .get_by_name(project_id, &event_name)
+                        .map_err(|err| {
+                            PlatformError::BadRequest(format!("event {event_id}: {err}"))
+                        })?;
+                }
+                EventRef::Custom { event_id } => {
+                    md.custom_events
+                        .get_by_id(project_id, *event_id)
+                        .map_err(|err| {
+                            PlatformError::BadRequest(format!("event {event_id}: {err}"))
+                        })?;
+                }
+            }
+
+            match &event.filters {
+                Some(filters) => {
+                    for (filter_id, filter) in filters.iter().enumerate() {
+                        validate_event_filter(
+                            md,
+                            project_id,
+                            filter,
+                            filter_id,
+                            format!("event #{event_id}, "),
+                        )?;
+                    }
+                }
+                None => {}
+            }
+        }
+
+        match &req.filters {
+            None => {}
+            Some(filters) => {
+                for (filter_id, filter) in filters.iter().enumerate() {
+                    validate_event_filter(md, project_id, filter, filter_id, "".to_string())?;
+                }
+            }
+        }
+
+        match &req.properties {
+            None => {}
+            Some(props) => {
+                if events.is_empty() {
+                    return Err(PlatformError::BadRequest(
+                        "props field can't be empty".to_string(),
+                    ));
+                }
+                for (idx, prop) in props.iter().enumerate() {
+                    match prop {
+                        PropertyRef::User { property_name } => md
+                            .user_properties
+                            .get_by_name(project_id, &property_name)
+                            .map_err(|err| {
+                                PlatformError::BadRequest(format!("property {idx}: {err}"))
+                            })?,
+                        PropertyRef::Event { property_name } => md
+                            .event_properties
+                            .get_by_name(project_id, &property_name)
+                            .map_err(|err| {
+                                PlatformError::BadRequest(format!("property {idx}: {err}"))
+                            })?,
+                        PropertyRef::System { property_name } => md
+                            .system_properties
+                            .get_by_name(project_id, &property_name)
+                            .map_err(|err| {
+                                PlatformError::BadRequest(format!("property {idx}: {err}"))
+                            })?,
+                        PropertyRef::Custom { .. } => {
+                            return Err(PlatformError::Unimplemented(
+                                "custom property is unimplemented".to_string(),
+                            ));
+                        }
+                    };
+                }
+            }
+        }
+    }
+    Ok(())
 }

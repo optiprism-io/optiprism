@@ -94,8 +94,8 @@ pub fn attach_routes(
     router = router
         .layer(cors)
         .layer(CookieManagerLayer::new())
-        .layer(Extension(TraceLayer::new_for_http()));
-    // .layer(middleware::from_fn(print_request_response));
+        .layer(Extension(TraceLayer::new_for_http()))
+        .layer(middleware::from_fn(print_request_response));
 
     router
 }

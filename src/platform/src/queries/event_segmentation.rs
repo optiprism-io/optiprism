@@ -1,17 +1,23 @@
+use std::sync::Arc;
+
 use chrono::DateTime;
 use chrono::Utc;
 use common::query::event_segmentation::NamedQuery;
+use common::types::DType;
+use metadata::MetadataProvider;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
 
 use crate::error::Result;
 use crate::json_value_to_scalar;
+use crate::queries::validation::validate_event_filter;
 use crate::queries::AggregateFunction;
 use crate::queries::PartitionedAggregateFunction;
 use crate::queries::QueryTime;
 use crate::queries::TimeIntervalUnit;
 use crate::scalar_to_json_value;
+use crate::Context;
 use crate::EventFilter;
 use crate::EventGroupedFilters;
 use crate::EventRef;
@@ -198,10 +204,10 @@ pub enum QueryAggregate {
     Avg,
     Median,
     DistinctCount,
-    Percentile25th,
-    Percentile75th,
-    Percentile90th,
-    Percentile99th,
+    Percentile25,
+    Percentile75,
+    Percentile90,
+    Percentile99,
 }
 
 impl TryInto<common::query::event_segmentation::QueryAggregate> for QueryAggregate {
@@ -219,16 +225,16 @@ impl TryInto<common::query::event_segmentation::QueryAggregate> for QueryAggrega
             QueryAggregate::DistinctCount => {
                 common::query::event_segmentation::QueryAggregate::DistinctCount
             }
-            QueryAggregate::Percentile25th => {
+            QueryAggregate::Percentile25 => {
                 common::query::event_segmentation::QueryAggregate::Percentile25th
             }
-            QueryAggregate::Percentile75th => {
+            QueryAggregate::Percentile75 => {
                 common::query::event_segmentation::QueryAggregate::Percentile75th
             }
-            QueryAggregate::Percentile90th => {
+            QueryAggregate::Percentile90 => {
                 common::query::event_segmentation::QueryAggregate::Percentile90th
             }
-            QueryAggregate::Percentile99th => {
+            QueryAggregate::Percentile99 => {
                 common::query::event_segmentation::QueryAggregate::Percentile99th
             }
         })
@@ -249,16 +255,16 @@ impl TryInto<QueryAggregate> for common::query::event_segmentation::QueryAggrega
                 QueryAggregate::DistinctCount
             }
             common::query::event_segmentation::QueryAggregate::Percentile25th => {
-                QueryAggregate::Percentile25th
+                QueryAggregate::Percentile25
             }
             common::query::event_segmentation::QueryAggregate::Percentile75th => {
-                QueryAggregate::Percentile75th
+                QueryAggregate::Percentile75
             }
             common::query::event_segmentation::QueryAggregate::Percentile90th => {
-                QueryAggregate::Percentile90th
+                QueryAggregate::Percentile90
             }
             common::query::event_segmentation::QueryAggregate::Percentile99th => {
-                QueryAggregate::Percentile99th
+                QueryAggregate::Percentile99
             }
         })
     }
@@ -1210,6 +1216,141 @@ impl TryInto<EventSegmentation> for common::query::event_segmentation::EventSegm
                 .transpose()?,
         })
     }
+}
+
+pub(crate) fn validate(
+    md: &Arc<MetadataProvider>,
+    project_id: u64,
+    req: &EventSegmentation,
+) -> Result<()> {
+    match req.time {
+        QueryTime::Between { from, to } => {
+            if from > to {
+                return Err(PlatformError::BadRequest(
+                    "from time must be less than to time".to_string(),
+                ));
+            }
+        }
+        _ => {}
+    }
+
+    if req.group == "" {
+        return Err(PlatformError::BadRequest(
+            "group cannot be empty".to_string(),
+        ));
+    }
+
+    if req.events.is_empty() {
+        return Err(PlatformError::BadRequest(
+            "events cannot be empty".to_string(),
+        ));
+    }
+    for (event_id, event) in req.events.iter().enumerate() {
+        match &event.event {
+            EventRef::Regular { event_name } => {
+                md.events
+                    .get_by_name(project_id, &event_name)
+                    .map_err(|err| PlatformError::BadRequest(format!("event {event_id}: {err}")))?;
+            }
+            EventRef::Custom { event_id } => {
+                md.custom_events
+                    .get_by_id(project_id, *event_id)
+                    .map_err(|err| PlatformError::BadRequest(format!("event {event_id}: {err}")))?;
+            }
+        }
+
+        match &event.filters {
+            Some(filters) => {
+                for (filter_id, filter) in filters.iter().enumerate() {
+                    validate_event_filter(
+                        md,
+                        project_id,
+                        filter,
+                        filter_id,
+                        format!("event #{event_id}, "),
+                    )?;
+                }
+            }
+            None => {}
+        }
+
+        if event.queries.is_empty() {
+            return Err(PlatformError::BadRequest(
+                format!("event #{event_id}, \"queries\" field can't be empty").to_string(),
+            ));
+        }
+    }
+
+    match &req.filters {
+        None => {}
+        Some(filters) => {
+            if filters.groups.is_empty() {
+                return Err(PlatformError::BadRequest(
+                    "filters field can't be empty".to_string(),
+                ));
+            }
+            for filter_group in &filters.groups {
+                if filters.groups.is_empty() {
+                    return Err(PlatformError::BadRequest(
+                        "filter_group field can't be empty".to_string(),
+                    ));
+                }
+                if filter_group.filters.is_empty() {
+                    return Err(PlatformError::BadRequest(
+                        "filters field can't be empty".to_string(),
+                    ));
+                }
+                for (filter_id, filter) in filter_group.filters.iter().enumerate() {
+                    validate_event_filter(md, project_id, filter, filter_id, "".to_string())?;
+                }
+            }
+        }
+    }
+
+    match &req.breakdowns {
+        None => {}
+        Some(breakdowns) => {
+            for (idx, breakdown) in breakdowns.iter().enumerate() {
+                match breakdown {
+                    Breakdown::Property { property } => {
+                        match property {
+                            PropertyRef::User { property_name } => md
+                                .user_properties
+                                .get_by_name(project_id, &property_name)
+                                .map_err(|err| {
+                                    PlatformError::BadRequest(format!("breakdown {idx}: {err}"))
+                                })?,
+                            PropertyRef::Event { property_name } => md
+                                .event_properties
+                                .get_by_name(project_id, &property_name)
+                                .map_err(|err| {
+                                    PlatformError::BadRequest(format!("breakdown {idx}: {err}"))
+                                })?,
+                            PropertyRef::System { property_name } => md
+                                .system_properties
+                                .get_by_name(project_id, &property_name)
+                                .map_err(|err| {
+                                    PlatformError::BadRequest(format!("breakdown {idx}: {err}"))
+                                })?,
+                            PropertyRef::Custom { .. } => {
+                                return Err(PlatformError::Unimplemented(
+                                    "custom property is unimplemented".to_string(),
+                                ));
+                            }
+                        };
+                    }
+                }
+            }
+        }
+    }
+
+    if req.segments.is_some() {
+        return Err(PlatformError::Unimplemented(
+            "segments are unimplemented yet".to_string(),
+        ));
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
