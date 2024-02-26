@@ -36,7 +36,7 @@ fn index_keys(project_id: u64, name: &str, display_name: Option<String>) -> Vec<
         index_name_key(project_id, name),
         index_display_name_key(project_id, display_name),
     ]
-    .to_vec()
+        .to_vec()
 }
 
 fn index_name_key(project_id: u64, name: &str) -> Option<Vec<u8>> {
@@ -50,7 +50,7 @@ fn index_display_name_key(project_id: u64, display_name: Option<String>) -> Opti
             IDX_DISPLAY_NAME,
             v.as_str(),
         )
-        .to_vec()
+            .to_vec()
     })
 }
 
@@ -86,7 +86,9 @@ macro_rules! detach_property {
         let mut event = $self.get_by_id_(&tx, $project_id, $event_id)?;
         event.$prop = match event.$prop {
             None => {
-                return Err(MetadataError::NotFound("property not found".to_string()));
+                return Err(MetadataError::NotFound(
+                    format!("property {} not found", $prop_id).to_string(),
+                ));
             }
             Some(props) => match props.iter().find(|x| $prop_id == **x) {
                 None => {
@@ -119,14 +121,15 @@ impl Events {
     fn get_by_id_(
         &self,
         tx: &Transaction<TransactionDB>,
-
         project_id: u64,
         id: u64,
     ) -> Result<Event> {
         let key = make_data_value_key(project_ns(project_id, NAMESPACE).as_slice(), id);
 
         match tx.get(key)? {
-            None => Err(MetadataError::NotFound("event not found".to_string())),
+            None => Err(MetadataError::NotFound(
+                format!("event {id} not found").to_string(),
+            )),
             Some(value) => Ok(deserialize(&value)?),
         }
     }
@@ -134,7 +137,6 @@ impl Events {
     fn create_(
         &self,
         tx: &Transaction<TransactionDB>,
-
         project_id: u64,
         req: CreateEventRequest,
     ) -> Result<Event> {
@@ -179,13 +181,13 @@ impl Events {
     fn get_by_name_(
         &self,
         tx: &Transaction<TransactionDB>,
-
         project_id: u64,
         name: &str,
     ) -> Result<Event> {
         let data = get_index(
             tx,
             make_index_key(project_ns(project_id, NAMESPACE).as_slice(), IDX_NAME, name),
+            format!("event with name \"{}\" not found", name).as_str(),
         )?;
 
         Ok(deserialize(&data)?)

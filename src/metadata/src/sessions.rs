@@ -38,7 +38,9 @@ impl Sessions {
         let tx = self.db.transaction();
         let key = make_data_key(project_id, user_id);
         match tx.get(key)? {
-            None => Err(MetadataError::NotFound("account not found".to_string())),
+            None => Err(MetadataError::NotFound(
+                format!("account {user_id} not found").to_string(),
+            )),
             Some(value) => Ok(deserialize(&value)?),
         }
     }
@@ -46,7 +48,6 @@ impl Sessions {
     // returns true if session is new
     pub fn set_current_time(
         &self,
-
         project_id: u64,
         user_id: u64,
         time: DateTime<Utc>,

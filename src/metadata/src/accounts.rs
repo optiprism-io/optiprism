@@ -51,7 +51,9 @@ impl Accounts {
     fn get_by_id_(&self, tx: &Transaction<TransactionDB>, id: u64) -> Result<Account> {
         let key = make_data_value_key(NAMESPACE, id);
         match tx.get(key)? {
-            None => Err(MetadataError::NotFound("account not found".to_string())),
+            None => Err(MetadataError::NotFound(
+                format!("account {id} not found").to_string(),
+            )),
             Some(value) => Ok(deserialize(&value)?),
         }
     }
@@ -81,7 +83,11 @@ impl Accounts {
 
     pub fn get_by_email(&self, email: &str) -> Result<Account> {
         let tx = self.db.transaction();
-        let data = get_index(&tx, make_index_key(NAMESPACE, IDX_EMAIL, email))?;
+        let data = get_index(
+            &tx,
+            make_index_key(NAMESPACE, IDX_EMAIL, email),
+            format!("account with email \"{}\" not found", email).as_str(),
+        )?;
         Ok(deserialize(&data)?)
     }
 

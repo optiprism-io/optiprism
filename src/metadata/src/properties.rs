@@ -156,7 +156,11 @@ impl Properties {
             IDX_NAME,
             name,
         );
-        let data = get_index(tx, idx_key)?;
+        let data = get_index(
+            tx,
+            idx_key,
+            format!("property with name \"{}\" not found", name).as_str(),
+        )?;
 
         Ok(deserialize(&data)?)
     }
@@ -177,7 +181,9 @@ impl Properties {
         );
 
         match tx.get(key)? {
-            None => Err(MetadataError::NotFound("property not found".to_string())),
+            None => Err(MetadataError::NotFound(
+                format!("property {id} not found").to_string(),
+            )),
             Some(value) => Ok(deserialize(&value)?),
         }
     }

@@ -1,6 +1,10 @@
+use std::sync::Arc;
+
 use chrono::DateTime;
 use chrono::Utc;
 use common::query::event_segmentation::NamedQuery;
+use common::types::DType;
+use metadata::MetadataProvider;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
@@ -12,6 +16,7 @@ use crate::queries::PartitionedAggregateFunction;
 use crate::queries::QueryTime;
 use crate::queries::TimeIntervalUnit;
 use crate::scalar_to_json_value;
+use crate::Context;
 use crate::EventFilter;
 use crate::EventGroupedFilters;
 use crate::EventRef;
@@ -198,10 +203,10 @@ pub enum QueryAggregate {
     Avg,
     Median,
     DistinctCount,
-    Percentile25th,
-    Percentile75th,
-    Percentile90th,
-    Percentile99th,
+    Percentile25,
+    Percentile75,
+    Percentile90,
+    Percentile99,
 }
 
 impl TryInto<common::query::event_segmentation::QueryAggregate> for QueryAggregate {
@@ -219,16 +224,16 @@ impl TryInto<common::query::event_segmentation::QueryAggregate> for QueryAggrega
             QueryAggregate::DistinctCount => {
                 common::query::event_segmentation::QueryAggregate::DistinctCount
             }
-            QueryAggregate::Percentile25th => {
+            QueryAggregate::Percentile25 => {
                 common::query::event_segmentation::QueryAggregate::Percentile25th
             }
-            QueryAggregate::Percentile75th => {
+            QueryAggregate::Percentile75 => {
                 common::query::event_segmentation::QueryAggregate::Percentile75th
             }
-            QueryAggregate::Percentile90th => {
+            QueryAggregate::Percentile90 => {
                 common::query::event_segmentation::QueryAggregate::Percentile90th
             }
-            QueryAggregate::Percentile99th => {
+            QueryAggregate::Percentile99 => {
                 common::query::event_segmentation::QueryAggregate::Percentile99th
             }
         })
@@ -249,16 +254,16 @@ impl TryInto<QueryAggregate> for common::query::event_segmentation::QueryAggrega
                 QueryAggregate::DistinctCount
             }
             common::query::event_segmentation::QueryAggregate::Percentile25th => {
-                QueryAggregate::Percentile25th
+                QueryAggregate::Percentile25
             }
             common::query::event_segmentation::QueryAggregate::Percentile75th => {
-                QueryAggregate::Percentile75th
+                QueryAggregate::Percentile75
             }
             common::query::event_segmentation::QueryAggregate::Percentile90th => {
-                QueryAggregate::Percentile90th
+                QueryAggregate::Percentile90
             }
             common::query::event_segmentation::QueryAggregate::Percentile99th => {
-                QueryAggregate::Percentile99th
+                QueryAggregate::Percentile99
             }
         })
     }
@@ -1210,6 +1215,278 @@ impl TryInto<EventSegmentation> for common::query::event_segmentation::EventSegm
                 .transpose()?,
         })
     }
+}
+
+pub(crate) fn validate_event_filter(
+    md: &Arc<MetadataProvider>,
+    project_id: u64,
+    filter: &EventFilter,
+    filter_id: usize,
+    err_prefix: String,
+) -> Result<()> {
+    match filter {
+        EventFilter::Property {
+            property,
+            operation,
+            value,
+        } => {
+            let prop = match property {
+                PropertyRef::User { property_name } => md
+                    .user_properties
+                    .get_by_name(project_id, &property_name)
+                    .map_err(|err| {
+                        PlatformError::BadRequest(format!("{err_prefix}filter #{filter_id}: {err}"))
+                    })?,
+                PropertyRef::Event { property_name } => md
+                    .event_properties
+                    .get_by_name(project_id, &property_name)
+                    .map_err(|err| {
+                        PlatformError::BadRequest(format!("{err_prefix}filter #{filter_id}: {err}"))
+                    })?,
+                PropertyRef::System { property_name } => md
+                    .system_properties
+                    .get_by_name(project_id, &property_name)
+                    .map_err(|err| {
+                        PlatformError::BadRequest(format!("{err_prefix}filter #{filter_id}: {err}"))
+                    })?,
+                PropertyRef::Custom { .. } => {
+                    return Err(PlatformError::Unimplemented(
+                        "custom property is unimplemented".to_string(),
+                    ));
+                }
+            };
+            match operation {
+                PropValueOperation::Gt
+                | PropValueOperation::Gte
+                | PropValueOperation::Lt
+                | PropValueOperation::Lte => match prop.data_type {
+                    DType::Int8 | DType::Int16 | DType::Int64 | DType::Decimal => {}
+                    _ => {
+                        return Err(PlatformError::BadRequest(format!(
+                            "{err_prefix}filter #{filter_id}, property \"{}\" is not numeric, but operation is \"{:?}\"",
+                            prop.name, operation
+                        )));
+                    }
+                },
+                PropValueOperation::True | PropValueOperation::False => {
+                    if prop.data_type != DType::Boolean {
+                        return Err(PlatformError::BadRequest(format!(
+                            "{err_prefix}filter #{filter_id}, property \"{}\" is not boolean, but operation is \"{:?}\"",
+                            prop.name, operation
+                        )));
+                    }
+                }
+                PropValueOperation::Exists | PropValueOperation::Empty => {
+                    if !prop.nullable {
+                        return Err(PlatformError::BadRequest(format!(
+                            "{err_prefix}filter #{filter_id}, property \"{}\" is not nullable, but operation is \"{:?}\"",
+                            prop.name, operation
+                        )));
+                    }
+                }
+                PropValueOperation::Regex
+                | PropValueOperation::Like
+                | PropValueOperation::NotLike
+                | PropValueOperation::NotRegex => {
+                    if prop.data_type != DType::String {
+                        return Err(PlatformError::BadRequest(format!(
+                            "{err_prefix}filter #{filter_id}, property \"{}\" is not string, but operation is \"{:?}\"",
+                            prop.name, operation
+                        )));
+                    }
+                }
+                _ => {}
+            }
+            match value {
+                None => {
+                    if !prop.nullable {
+                        return Err(PlatformError::BadRequest(format!(
+                            "{err_prefix}filter #{filter_id}, property \"{}\" is not nullable",
+                            prop.name
+                        )));
+                    }
+                }
+                Some(values) => {
+                    for (vid, value) in values.iter().enumerate() {
+                        match value {
+                            Value::Null => {
+                                if !prop.nullable {
+                                    return Err(PlatformError::BadRequest(format!(
+                                        "{err_prefix}filter #{filter_id}, property \"{}\" is not nullable, but value {vid} is \"{value:?}\"",
+                                        prop.name
+                                    )));
+                                }
+                            }
+                            Value::Bool(_) => {
+                                if prop.data_type != DType::Boolean {
+                                    return Err(PlatformError::BadRequest(format!(
+                                        "{err_prefix}filter #{filter_id}, property \"{}\" is not boolean, but value {vid} is \"{value:?}\"",
+                                        prop.name
+                                    )));
+                                }
+                            }
+                            Value::Number(_) => match prop.data_type {
+                                DType::Int8
+                                | DType::Int16
+                                | DType::Int32
+                                | DType::Int64
+                                | DType::Decimal => {}
+                                _ => {
+                                    return Err(PlatformError::BadRequest(format!(
+                                        "{err_prefix}filter #{filter_id}, property \"{}\" is not numeric, but value {vid} is \"{value:?}\"",
+                                        prop.name
+                                    )));
+                                }
+                            },
+                            Value::String(_) => {
+                                if prop.data_type != DType::String {
+                                    return Err(PlatformError::BadRequest(format!(
+                                        "{err_prefix}filter #{filter_id}, property \"{}\" is not string, but value {vid} is \"{value:?}\"",
+                                        prop.name
+                                    )));
+                                }
+                            }
+                            Value::Array(_) => {
+                                return Err(PlatformError::Unimplemented(
+                                    "array value is unimplemented".to_string(),
+                                ));
+                            }
+                            Value::Object(_) => {
+                                return Err(PlatformError::Unimplemented(
+                                    "object value is unimplemented".to_string(),
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        EventFilter::Cohort { .. } => {
+            return Err(PlatformError::Unimplemented(
+                "filter by cohort is unimplemented yet".to_string(),
+            ));
+        }
+        EventFilter::Group { .. } => {
+            return Err(PlatformError::Unimplemented(
+                "filter by group is unimplemented yet".to_string(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn validate(
+    md: &Arc<MetadataProvider>,
+    project_id: u64,
+    req: &EventSegmentation,
+) -> Result<()> {
+    match req.time {
+        QueryTime::Between { from, to } => {
+            if from > to {
+                return Err(PlatformError::BadRequest(
+                    "from time must be less than to time".to_string(),
+                ));
+            }
+        }
+        _ => {}
+    }
+
+    if req.group == "" {
+        return Err(PlatformError::BadRequest(
+            "group cannot be empty".to_string(),
+        ));
+    }
+
+    if req.events.is_empty() {
+        return Err(PlatformError::BadRequest(
+            "events cannot be empty".to_string(),
+        ));
+    }
+    for (event_id, event) in req.events.iter().enumerate() {
+        match &event.event {
+            EventRef::Regular { event_name } => {
+                md.events
+                    .get_by_name(project_id, &event_name)
+                    .map_err(|err| PlatformError::BadRequest(format!("event {event_id}: {err}")))?;
+            }
+            EventRef::Custom { event_id } => {
+                md.custom_events
+                    .get_by_id(project_id, *event_id)
+                    .map_err(|err| PlatformError::BadRequest(format!("event {event_id}: {err}")))?;
+            }
+        }
+
+        match &event.filters {
+            Some(filters) => {
+                for (filter_id, filter) in filters.iter().enumerate() {
+                    validate_event_filter(
+                        md,
+                        project_id,
+                        filter,
+                        filter_id,
+                        format!("event #{event_id}, "),
+                    )?;
+                }
+            }
+            None => {}
+        }
+    }
+
+    match &req.filters {
+        None => {}
+        Some(filters) => {
+            for filter_group in &filters.groups {
+                for (filter_id, filter) in filter_group.filters.iter().enumerate() {
+                    validate_event_filter(md, project_id, filter, filter_id, "".to_string())?;
+                }
+            }
+        }
+    }
+
+    match &req.breakdowns {
+        None => {}
+        Some(breakdowns) => {
+            for (idx, breakdown) in breakdowns.iter().enumerate() {
+                match breakdown {
+                    Breakdown::Property { property } => {
+                        match property {
+                            PropertyRef::User { property_name } => md
+                                .user_properties
+                                .get_by_name(project_id, &property_name)
+                                .map_err(|err| {
+                                    PlatformError::BadRequest(format!("breakdown {idx}: {err}"))
+                                })?,
+                            PropertyRef::Event { property_name } => md
+                                .event_properties
+                                .get_by_name(project_id, &property_name)
+                                .map_err(|err| {
+                                    PlatformError::BadRequest(format!("breakdown {idx}: {err}"))
+                                })?,
+                            PropertyRef::System { property_name } => md
+                                .system_properties
+                                .get_by_name(project_id, &property_name)
+                                .map_err(|err| {
+                                    PlatformError::BadRequest(format!("breakdown {idx}: {err}"))
+                                })?,
+                            PropertyRef::Custom { .. } => {
+                                return Err(PlatformError::Unimplemented(
+                                    "custom property is unimplemented".to_string(),
+                                ));
+                            }
+                        };
+                    }
+                }
+            }
+        }
+    }
+
+    if req.segments.is_some() {
+        return Err(PlatformError::Unimplemented(
+            "segments are unimplemented yet".to_string(),
+        ));
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

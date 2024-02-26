@@ -25,6 +25,7 @@ const NAMESPACE: &[u8] = b"reports";
 pub struct Reports {
     db: Arc<TransactionDB>,
 }
+
 impl Reports {
     pub fn new(db: Arc<TransactionDB>) -> Self {
         Reports { db }
@@ -33,14 +34,15 @@ impl Reports {
     fn get_by_id_(
         &self,
         tx: &Transaction<TransactionDB>,
-
         project_id: u64,
         id: u64,
     ) -> Result<Report> {
         let key = make_data_value_key(project_ns(project_id, NAMESPACE).as_slice(), id);
 
         match tx.get(key)? {
-            None => Err(MetadataError::NotFound("report not found".to_string())),
+            None => Err(MetadataError::NotFound(
+                format!("report {id} not found").to_string(),
+            )),
             Some(value) => Ok(deserialize(&value)?),
         }
     }
@@ -89,7 +91,6 @@ impl Reports {
 
     pub fn update(
         &self,
-
         project_id: u64,
         report_id: u64,
         req: UpdateReportRequest,

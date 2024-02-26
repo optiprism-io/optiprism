@@ -57,7 +57,9 @@ impl Projects {
         let key = make_data_value_key(NAMESPACE, project_id);
 
         match tx.get(key)? {
-            None => Err(MetadataError::NotFound(format!("project {project_id}"))),
+            None => Err(MetadataError::NotFound(format!(
+                "project {project_id} not found"
+            ))),
             Some(value) => Ok(deserialize(&value)?),
         }
     }
@@ -102,7 +104,11 @@ impl Projects {
 
     pub fn get_by_token(&self, token: &str) -> Result<Project> {
         let tx = self.db.transaction();
-        let data = get_index(&tx, index_token_key(token).unwrap())?;
+        let data = get_index(
+            &tx,
+            index_token_key(token).unwrap(),
+            "project can't be found by token",
+        )?;
         Ok(deserialize::<Project>(&data)?)
     }
 

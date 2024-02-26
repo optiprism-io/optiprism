@@ -112,7 +112,7 @@ impl CustomEvents {
 
         match tx.get(key)? {
             None => Err(MetadataError::NotFound(
-                "custom event not found".to_string(),
+                format!("custom event {id} not found").to_string(),
             )),
             Some(value) => Ok(deserialize(&value)?),
         }
@@ -173,6 +173,7 @@ impl CustomEvents {
         let data = get_index(
             &tx,
             make_index_key(project_ns(project_id, NAMESPACE).as_slice(), IDX_NAME, name),
+            format!("custom event with name \"{}\" not found", name).as_str(),
         )?;
         Ok(deserialize::<CustomEvent>(&data)?)
     }

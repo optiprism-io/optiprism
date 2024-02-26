@@ -35,6 +35,7 @@ use thiserror::Error;
 
 use crate::error::CommonError;
 use crate::error::Result;
+
 #[derive(Error, Serialize, Debug, Clone)]
 pub struct ApiError {
     #[serde(serialize_with = "serialize_http_code")]
@@ -70,7 +71,9 @@ impl ApiError {
     pub fn bad_request(err: impl ToString) -> Self {
         ApiError::new(StatusCode::BAD_REQUEST).with_message(err.to_string())
     }
-
+    pub fn unimplemented(err: impl ToString) -> Self {
+        ApiError::new(StatusCode::NOT_IMPLEMENTED).with_message(err.to_string())
+    }
     pub fn forbidden(err: impl ToString) -> Self {
         ApiError::new(StatusCode::FORBIDDEN).with_message(err.to_string())
     }
@@ -207,12 +210,12 @@ pub async fn print_request_response(
     let req = Request::from_parts(parts, Body::from(bytes));
 
     let res = next.run(req).await;
-
-    let (parts, body) = res.into_parts();
-    let bytes = buffer_and_print("response", body).await?;
-    let res = Response::from_parts(parts, Body::from(bytes));
-
     Ok(res)
+    // let (parts, body) = res.into_parts();
+    // let bytes = buffer_and_print("response", body).await?;
+    // let res = Response::from_parts(parts, Body::from(bytes));
+    //
+    // Ok(res)
 }
 
 async fn buffer_and_print<B>(
@@ -234,7 +237,7 @@ where
     };
 
     if let Ok(body) = std::str::from_utf8(&bytes) {
-        tracing::debug!("{direction} body = {body:?}");
+        tracing::debug!("{direction} body = {body}");
     }
 
     Ok(bytes)

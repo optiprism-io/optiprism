@@ -4,11 +4,13 @@ use arrow::array::Array;
 use chrono::DateTime;
 use chrono::Utc;
 use common::rbac::ProjectPermission;
+use metadata::MetadataProvider;
 use query::context::Format;
 use query::QueryProvider;
 use serde_json::Value;
 
 use crate::queries::event_records_search::EventRecordsSearchRequest;
+use crate::queries::event_segmentation;
 use crate::queries::event_segmentation::EventSegmentation;
 use crate::queries::property_values::ListPropertyValuesRequest;
 use crate::queries::QueryParams;
@@ -20,11 +22,12 @@ use crate::Result;
 
 pub struct Queries {
     query: Arc<QueryProvider>,
+    md: Arc<MetadataProvider>,
 }
 
 impl Queries {
-    pub fn new(query: Arc<QueryProvider>) -> Self {
-        Self { query }
+    pub fn new(query: Arc<QueryProvider>, md: Arc<MetadataProvider>) -> Self {
+        Self { query, md }
     }
 
     pub async fn event_segmentation(
@@ -35,6 +38,7 @@ impl Queries {
         query: QueryParams,
     ) -> Result<QueryResponse> {
         ctx.check_project_permission(project_id, ProjectPermission::ExploreReports)?;
+        event_segmentation::validate(&self.md, project_id, &req)?;
         let lreq = req.try_into()?;
         let cur_time = match query.timestamp {
             None => Utc::now(),
@@ -120,7 +124,6 @@ impl Queries {
     pub async fn property_values(
         &self,
         ctx: Context,
-
         project_id: u64,
         req: ListPropertyValuesRequest,
     ) -> Result<ListResponse<Value>> {

@@ -39,7 +39,9 @@ impl Dashboards {
         let key = make_data_value_key(project_ns(project_id, NAMESPACE).as_slice(), id);
 
         match tx.get(key)? {
-            None => Err(MetadataError::NotFound("dashboard not found".to_string())),
+            None => Err(MetadataError::NotFound(
+                format!("dashboard {} not found", id).to_string(),
+            )),
             Some(value) => Ok(deserialize(&value)?),
         }
     }

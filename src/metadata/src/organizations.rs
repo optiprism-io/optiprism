@@ -49,7 +49,7 @@ impl Organizations {
 
         match tx.get(key)? {
             None => Err(MetadataError::NotFound(
-                "organization not found".to_string(),
+                format!("organization {id} not found").to_string(),
             )),
             Some(value) => Ok(deserialize(&value)?),
         }

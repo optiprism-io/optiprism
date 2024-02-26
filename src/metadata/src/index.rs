@@ -1,3 +1,6 @@
+use std::any::Any;
+use std::fmt::Debug;
+
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 
@@ -75,12 +78,16 @@ pub fn delete_index(tx: &Transaction<TransactionDB>, keys: &[Option<Vec<u8>>]) -
     Ok(())
 }
 
-pub fn get_index<K>(tx: &Transaction<TransactionDB>, key: K) -> Result<Vec<u8>>
-where K: AsRef<[u8]> {
+pub fn get_index<K>(
+    tx: &Transaction<TransactionDB>,
+    key: K,
+    err_key: impl ToString,
+) -> Result<Vec<u8>>
+where
+    K: AsRef<[u8]>,
+{
     match tx.get(key.as_ref())? {
-        None => Err(MetadataError::NotFound(String::from_utf8(
-            key.as_ref().to_owned(),
-        )?)),
+        None => Err(MetadataError::NotFound(format!("{}", err_key.to_string()))),
         Some(v) => Ok(v),
     }
 }
