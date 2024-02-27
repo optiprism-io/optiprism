@@ -205,6 +205,7 @@ pub async fn print_request_response(
     req: Request,
     next: Next,
 ) -> std::result::Result<impl IntoResponse, (StatusCode, String)> {
+    tracing::debug!("{} {}", req.method(), req.uri());
     let (parts, body) = req.into_parts();
     let bytes = buffer_and_print("request", body).await?;
     let req = Request::from_parts(parts, Body::from(bytes));

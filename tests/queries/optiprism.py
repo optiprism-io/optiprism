@@ -52,16 +52,9 @@ def aggregate_property_query(agg, field: str, prop_type="system",
                 ],
                 "breakdowns": b,
                 "eventType": "regular",
-                "eventId": 1,
-                "filters": []
+                "eventId": 1
             }
-        ],
-        "filters": {
-            "groupsCondition": "and",
-            "groups": []
-        },
-        "segments": [],
-        "breakdowns": []
+        ]
     }
 
     print(q)
@@ -127,13 +120,7 @@ def partitioned_aggregate_property_query(agg, outer_agg, typ: str, prop_type="sy
                 "eventId": 8,
                 "filters": []
             }
-        ],
-        "filters": {
-            "groupsCondition": "and",
-            "groups": []
-        },
-        "segments": [],
-        "breakdowns": []
+        ]
     }
 
     resp = requests.post(
@@ -194,13 +181,7 @@ def simple_query(query: str, time_last=2, unit="day",
                 "filters": filters,
                 "breakdowns": b,
             }
-        ],
-        "filters": {
-            "groupsCondition": "and",
-            "groups": []
-        },
-        "segments": [],
-        "breakdowns": []
+        ]
     }
     print(q)
     resp = requests.post(
@@ -287,13 +268,7 @@ def all_aggregates_query(typ, time_last=2, unit="day",
                     }
                 ],
             }
-        ],
-        "filters": {
-            "groupsCondition": "and",
-            "groups": []
-        },
-        "segments": [],
-        "breakdowns": []
+        ]
     }
 
     resp = requests.post(
