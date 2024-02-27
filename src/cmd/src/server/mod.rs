@@ -6,7 +6,6 @@ use std::sync::Arc;
 
 use axum::Router;
 use common::config::Config;
-use common::defaults::SESSION_DURATION;
 use common::rbac::Role;
 use hyper::Server;
 use metadata::accounts::CreateAccountRequest;

@@ -14,6 +14,7 @@ use chrono::Duration;
 use chrono::NaiveDateTime;
 use chrono::Utc;
 use clap::Parser;
+use common::types::COLUMN_EVENT;
 use common::types::EVENT_PROPERTY_PAGE_PATH;
 use common::types::EVENT_PROPERTY_PAGE_TITLE;
 use common::types::EVENT_PROPERTY_PAGE_URL;
@@ -263,19 +264,14 @@ where R: io::Read {
     )?;
     let mut events_map: HashMap<Event, u64> = HashMap::default();
     for event in all::<Event>() {
-        let md_event = md
+        let e = md
             .events
-            .get_by_name(cfg.project_id, event.to_string().as_str())
-            .unwrap();
-        events_map.insert(event, md_event.id);
-        md.dictionaries
-            .get_key_or_create(1, "event_event", event.to_string().as_str())
-            .unwrap();
+            .get_by_name(cfg.project_id, event.to_string().as_str())?;
+        events_map.insert(event, e.id);
     }
 
     let (rx, tx) = bounded(1);
     // move init to thread because thread_rng is not movable
-    // todo parallelize?
     thread::spawn(move || {
         let rng = thread_rng();
         info!("creating generator...");

@@ -12,7 +12,6 @@ use axum::Router;
 use chrono::Duration;
 use chrono::Utc;
 use common::config::Config;
-use common::defaults::SESSION_DURATION;
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::rbac::Role;
@@ -371,7 +370,7 @@ fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<u
         name: "My Project".to_string(),
         description: None,
         tags: None,
-        session_duration_seconds: SESSION_DURATION as u64,
+        session_duration_seconds: 60 * 60 * 24,
     }) {
         Ok(proj) => proj,
         Err(_err) => md.projects.get_by_id(1)?,

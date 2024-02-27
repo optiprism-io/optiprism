@@ -2,6 +2,7 @@ use std::env::temp_dir;
 use std::sync::Arc;
 
 use common::types::DType;
+use common::types::COLUMN_EVENT;
 use storage::db::OptiDBImpl;
 use storage::db::Options;
 use storage::table::Options as TableOptions;
@@ -33,12 +34,12 @@ pub fn create_event(
     proj_id: u64,
     name: String,
 ) -> anyhow::Result<Event> {
-    Ok(md
+    let e = md
         .events
         .get_or_create(proj_id, events::CreateEventRequest {
             created_by: 0,
             tags: None,
-            name,
+            name: name.clone(),
             display_name: None,
             description: None,
             status: events::Status::Enabled,
@@ -46,7 +47,11 @@ pub fn create_event(
             event_properties: None,
             user_properties: None,
             custom_properties: None,
-        })?)
+        })?;
+    md.dictionaries
+        .get_key_or_create(proj_id, COLUMN_EVENT, name.as_str())?;
+
+    Ok(e)
 }
 
 pub struct CreatePropertyMainRequest {
