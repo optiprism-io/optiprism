@@ -722,7 +722,7 @@ pub fn gen_primitive_data_list_array_from_arrow_type<O: Offset>(
         }
         _ => unimplemented!("{:?}", pt),
     }
-    .boxed()
+        .boxed()
 }
 
 pub fn gen_utf8_data_list_array<O: Offset, O2: Offset>(
@@ -1090,14 +1090,17 @@ pub fn parse_markdown_table(data: &str, fields: &[Field]) -> anyhow::Result<Vec<
 
 pub fn parse_markdown_tables(data: &str) -> anyhow::Result<Vec<RecordBatch>> {
     let mut iter = data.lines();
-    let br = iter.next().unwrap();
-    let h1 = iter.next().unwrap();
-    let h2 = iter.next().unwrap();
+    let br = iter.next().unwrap().trim();
+    let h1 = iter.next().unwrap().trim();
+    let h2 = iter.next().unwrap().trim();
 
     let mut result = vec![];
     let mut table = vec![br, h1, h2];
     for line in iter {
         let cols = line.split('|').skip(1).collect::<Vec<_>>();
+        if cols.is_empty() {
+            break;
+        }
         if cols[0].trim() == "" {
             result.push(parse_markdown_table_v1(table.join("\n").as_str())?);
             table.clear();
