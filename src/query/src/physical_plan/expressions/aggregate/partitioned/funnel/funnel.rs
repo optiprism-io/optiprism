@@ -266,6 +266,7 @@ pub struct Funnel {
     buf: HashMap<usize, Batch, RandomState>,
     batch_id: usize,
     _processed_batches: usize,
+    #[cfg(test)]
     debug: Dbg,
     buckets: Vec<i64>,
     bucket_size: Duration,
@@ -516,6 +517,7 @@ impl Funnel {
             if group.cur_step > 0 {
                 if let Some(exclude) = &batch.exclude {
                     if !group.check_exclude(exclude, row_id) {
+                        #[cfg(test)]
                         self.debug
                             .push(batch_id, row_id, DebugStep::ExcludeViolation);
                         group.steps[0] = group.steps[group.cur_step].clone();
@@ -529,6 +531,7 @@ impl Funnel {
 
                 if cur_ts - group.steps[0].ts > self.window.num_milliseconds() {
                     group.push_result(&self.filter, self.bucket_size);
+                    #[cfg(test)]
                     self.debug.push(batch_id, row_id, DebugStep::OutOfWindow);
                     group.steps[0] = group.steps[group.cur_step].clone();
                     group.cur_step = 0;
@@ -548,6 +551,7 @@ impl Funnel {
                 // get constant row
                 if let Some(constants) = &batch.constants {
                     if !group.check_constants(constants, row_id) {
+                        #[cfg(test)]
                         self.debug
                             .push(batch_id, row_id, DebugStep::ConstantViolation);
                         group.steps[0] = group.steps[group.cur_step].clone();
@@ -561,6 +565,7 @@ impl Funnel {
 
             if batch_id == self.batch_id && partitions.value(row_id) != group.cur_partition {
                 group.push_result(&self.filter, self.bucket_size);
+                #[cfg(test)]
                 self.debug.push(batch_id, row_id, DebugStep::NewPartition);
                 group.cur_partition = partitions.value(row_id);
                 self.cur_partition = partitions.value(row_id);
@@ -598,6 +603,7 @@ impl Funnel {
                 if group.cur_step < self.steps_len - 1 {
                     group.cur_step += 1;
                 } else {
+                    #[cfg(test)]
                     self.debug.push(batch_id, row_id, DebugStep::Complete);
                     // uncommit for single funnel per partition
                     // self.skip = true;
@@ -618,6 +624,7 @@ impl Funnel {
                     break;
                 }
             }
+            #[cfg(test)]
             self.debug.push(batch_id, row_id, DebugStep::NextRow);
         }
 
@@ -648,6 +655,7 @@ impl Funnel {
             buf: Default::default(),
             batch_id: 0,
             _processed_batches: 0,
+            #[cfg(test)]
             debug: Dbg::new(),
             buckets: self.buckets.clone(),
             bucket_size: self.bucket_size,
