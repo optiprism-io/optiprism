@@ -573,44 +573,42 @@ impl Funnel {
                 group.skip = false;
                 group.steps_completed = 0;
             }
-            if !group.skip {
-                let mut matched = false;
-                match &self.steps_orders[group.cur_step] {
-                    StepOrder::Sequential => {
-                        matched = batch.steps[group.cur_step].value(row_id);
-                    }
-                    StepOrder::Any(pairs) => {
-                        for (from, to) in pairs {
-                            for step in *from..=*to {
-                                matched = batch.steps[step].value(row_id);
-                                if matched {
-                                    break;
-                                }
+            let mut matched = false;
+            match &self.steps_orders[group.cur_step] {
+                StepOrder::Sequential => {
+                    matched = batch.steps[group.cur_step].value(row_id);
+                }
+                StepOrder::Any(pairs) => {
+                    for (from, to) in pairs {
+                        for step in *from..=*to {
+                            matched = batch.steps[step].value(row_id);
+                            if matched {
+                                break;
                             }
                         }
                     }
                 }
-                if matched {
-                    group.steps_completed += 1;
+            }
+            if matched {
+                group.steps_completed += 1;
 
-                    group.steps[group.cur_step].batch_id = batch_id;
-                    group.steps[group.cur_step].row_id = row_id;
-                    group.steps[group.cur_step].ts = cur_ts;
-                    self.debug.push(batch_id, row_id, DebugStep::Step);
-                    if group.cur_step < self.steps_len - 1 {
-                        group.cur_step += 1;
-                    } else {
-                        self.debug.push(batch_id, row_id, DebugStep::Complete);
-                        // uncommit for single funnel per partition
-                        // self.skip = true;
+                group.steps[group.cur_step].batch_id = batch_id;
+                group.steps[group.cur_step].row_id = row_id;
+                group.steps[group.cur_step].ts = cur_ts;
+                self.debug.push(batch_id, row_id, DebugStep::Step);
+                if group.cur_step < self.steps_len - 1 {
+                    group.cur_step += 1;
+                } else {
+                    self.debug.push(batch_id, row_id, DebugStep::Complete);
+                    // uncommit for single funnel per partition
+                    // self.skip = true;
 
-                        let is_completed = group.push_result(&self.filter, self.bucket_size);
-                        if is_completed && self.count == Count::Unique {
-                            self.skip_partition = true;
-                        }
-                        group.cur_step = 0;
-                        group.steps_completed = 0;
+                    let is_completed = group.push_result(&self.filter, self.bucket_size);
+                    if is_completed && self.count == Count::Unique {
+                        self.skip_partition = true;
                     }
+                    group.cur_step = 0;
+                    group.steps_completed = 0;
                 }
             }
             row_id += 1;
@@ -1897,7 +1895,7 @@ asd
             filter: None,
             touch: Touch::First,
             partition_col: Column::new_with_schema("u", &schema).unwrap(),
-            bucket_size: Duration::days(1),
+            bucket_size: Duration::minutes(1),
             groups: Some(groups),
         };
         let mut f = Funnel::try_new(opts).unwrap();
