@@ -722,7 +722,7 @@ pub fn gen_primitive_data_list_array_from_arrow_type<O: Offset>(
         }
         _ => unimplemented!("{:?}", pt),
     }
-        .boxed()
+    .boxed()
 }
 
 pub fn gen_utf8_data_list_array<O: Offset, O2: Offset>(

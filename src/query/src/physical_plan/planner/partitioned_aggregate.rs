@@ -2096,112 +2096,111 @@ pub fn build_partitioned_aggregate_partial_expr(
             };
 
             Ok(ret)
-        }
-        AggregateExpr::Funnel {
-            ts_col,
-            from,
-            to,
-            window,
-            steps,
-            exclude,
-            constants,
-            count,
-            filter,
-            touch,
-            partition_col,
-            bucket_size,
-            groups,
-        } => {
-            let steps = steps
-                .iter()
-                .map(|(expr, step_order)| {
-                    create_physical_expr(expr, &dfschema, schema, &execution_props).map(|expr| {
-                        let step_order = match step_order {
-                            StepOrder::Sequential => partitioned::funnel::StepOrder::Sequential,
-                            StepOrder::Any(v) => partitioned::funnel::StepOrder::Any(v.to_owned()),
-                        };
-
-                        (expr, step_order)
-                    })
-                })
-                .collect::<DFResult<Vec<_>>>()?;
-
-            let exclude = exclude
-                .map(|exprs| {
-                    exprs
-                        .iter()
-                        .map(|expr| {
-                            create_physical_expr(&expr.expr, &dfschema, schema, &execution_props)
-                                .map(|pexpr| {
-                                    let _exclude_steps = expr.steps.clone().map(|es| {
-                                        es.iter()
-                                            .map(|es| partitioned::funnel::ExcludeSteps {
-                                                from: es.from,
-                                                to: es.to,
-                                            })
-                                            .collect::<Vec<_>>()
-                                    });
-
-                                    partitioned::funnel::ExcludeExpr {
-                                        expr: pexpr,
-                                        steps: None,
-                                    }
-                                })
-                        })
-                        .collect::<DFResult<Vec<_>>>()
-                })
-                .transpose()?;
-
-            let constants = constants.map(|cols| {
-                cols.iter()
-                    .map(|c| col(c.to_owned(), &dfschema))
-                    .collect::<Vec<_>>()
-            });
-            let count = match count {
-                logical_plan::partitioned_aggregate::funnel::Count::Unique => {
-                    partitioned::funnel::Count::Unique
-                }
-                logical_plan::partitioned_aggregate::funnel::Count::NonUnique => {
-                    partitioned::funnel::Count::NonUnique
-                }
-                logical_plan::partitioned_aggregate::funnel::Count::Session => {
-                    partitioned::funnel::Count::Session
-                }
-            };
-
-            let filter = filter.map(|f| match f {
-                Filter::DropOffOnAnyStep => partitioned::funnel::Filter::DropOffOnAnyStep,
-                Filter::DropOffOnStep(s) => partitioned::funnel::Filter::DropOffOnStep(s),
-                Filter::TimeToConvert(a, b) => partitioned::funnel::Filter::TimeToConvert(a, b),
-            });
-
-            let touch = match touch {
-                Touch::First => partitioned::funnel::Touch::First,
-                Touch::Last => partitioned::funnel::Touch::Last,
-                Touch::Step(s) => partitioned::funnel::Touch::Step(s),
-            };
-
-            let groups = build_groups(groups, &dfschema, schema, &execution_props)?;
-            let partition_col = col(partition_col, &dfschema);
-            let opts = funnel::Options {
-                schema: Arc::new(schema.clone()),
-                ts_col: col(ts_col, &dfschema),
-                from: from.to_owned(),
-                to: to.to_owned(),
-                window: window.to_owned(),
-                steps,
-                exclude,
-                constants,
-                count,
-                filter,
-                touch,
-                partition_col,
-                bucket_size,
-                groups,
-            };
-            let funnel = Funnel::try_new(opts)?;
-            Ok(Box::new(funnel) as Box<dyn PartitionedAggregateExpr>)
-        }
+        } /* AggregateExpr::Funnel {
+           * ts_col,
+           * from,
+           * to,
+           * window,
+           * steps,
+           * exclude,
+           * constants,
+           * count,
+           * filter,
+           * touch,
+           * partition_col,
+           * bucket_size,
+           * groups,
+           * } => {
+           * let steps = steps
+           * .iter()
+           * .map(|(expr, step_order)| {
+           * create_physical_expr(expr, &dfschema, schema, &execution_props).map(|expr| {
+           * let step_order = match step_order {
+           * StepOrder::Sequential => partitioned::funnel::StepOrder::Sequential,
+           * StepOrder::Any(v) => partitioned::funnel::StepOrder::Any(v.to_owned()),
+           * };
+           *
+           * (expr, step_order)
+           * })
+           * })
+           * .collect::<DFResult<Vec<_>>>()?;
+           *
+           * let exclude = exclude
+           * .map(|exprs| {
+           * exprs
+           * .iter()
+           * .map(|expr| {
+           * create_physical_expr(&expr.expr, &dfschema, schema, &execution_props)
+           * .map(|pexpr| {
+           * let _exclude_steps = expr.steps.clone().map(|es| {
+           * es.iter()
+           * .map(|es| partitioned::funnel::ExcludeSteps {
+           * from: es.from,
+           * to: es.to,
+           * })
+           * .collect::<Vec<_>>()
+           * });
+           *
+           * partitioned::funnel::ExcludeExpr {
+           * expr: pexpr,
+           * steps: None,
+           * }
+           * })
+           * })
+           * .collect::<DFResult<Vec<_>>>()
+           * })
+           * .transpose()?;
+           *
+           * let constants = constants.map(|cols| {
+           * cols.iter()
+           * .map(|c| col(c.to_owned(), &dfschema))
+           * .collect::<Vec<_>>()
+           * });
+           * let count = match count {
+           * logical_plan::partitioned_aggregate::funnel::Count::Unique => {
+           * partitioned::funnel::Count::Unique
+           * }
+           * logical_plan::partitioned_aggregate::funnel::Count::NonUnique => {
+           * partitioned::funnel::Count::NonUnique
+           * }
+           * logical_plan::partitioned_aggregate::funnel::Count::Session => {
+           * partitioned::funnel::Count::Session
+           * }
+           * };
+           *
+           * let filter = filter.map(|f| match f {
+           * Filter::DropOffOnAnyStep => partitioned::funnel::Filter::DropOffOnAnyStep,
+           * Filter::DropOffOnStep(s) => partitioned::funnel::Filter::DropOffOnStep(s),
+           * Filter::TimeToConvert(a, b) => partitioned::funnel::Filter::TimeToConvert(a, b),
+           * });
+           *
+           * let touch = match touch {
+           * Touch::First => partitioned::funnel::Touch::First,
+           * Touch::Last => partitioned::funnel::Touch::Last,
+           * Touch::Step(s) => partitioned::funnel::Touch::Step(s),
+           * };
+           *
+           * let groups = build_groups(groups, &dfschema, schema, &execution_props)?;
+           * let partition_col = col(partition_col, &dfschema);
+           * let opts = funnel::Options {
+           * schema: Arc::new(schema.clone()),
+           * ts_col: col(ts_col, &dfschema),
+           * from: from.to_owned(),
+           * to: to.to_owned(),
+           * window: window.to_owned(),
+           * steps,
+           * exclude,
+           * constants,
+           * count,
+           * filter,
+           * touch,
+           * partition_col,
+           * bucket_size,
+           * groups,
+           * };
+           * let funnel = Funnel::try_new(opts)?;
+           * Ok(Box::new(funnel))
+           * } */
     }
 }
 

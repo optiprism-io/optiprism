@@ -360,10 +360,8 @@ impl Funnel {
     pub fn schema(&self) -> SchemaRef {
         SchemaRef::new(Schema::new(self.fields()))
     }
-}
 
-impl PartitionedAggregateExpr for Funnel {
-    fn group_columns(&self) -> Vec<(PhysicalExprRef, String)> {
+    pub fn group_columns(&self) -> Vec<(PhysicalExprRef, String)> {
         if let Some(groups) = &self.groups {
             groups
                 .exprs
@@ -376,7 +374,7 @@ impl PartitionedAggregateExpr for Funnel {
         }
     }
 
-    fn fields(&self) -> Vec<Field> {
+    pub fn fields(&self) -> Vec<Field> {
         let mut fields = vec![
             Field::new("ts", DataType::Timestamp(TimeUnit::Millisecond, None), true),
             Field::new("total", DataType::Int64, true),
@@ -425,7 +423,7 @@ impl PartitionedAggregateExpr for Funnel {
         fields
     }
 
-    fn evaluate(
+    pub fn evaluate(
         &mut self,
         batch: &RecordBatch,
         partition_exist: Option<&HashMap<i64, (), RandomState>>,
@@ -631,7 +629,43 @@ impl PartitionedAggregateExpr for Funnel {
         Ok(())
     }
 
-    fn finalize(&mut self) -> crate::Result<Vec<ArrayRef>> {
+    pub fn make_new(&self) -> crate::Result<Funnel> {
+        let groups = if let Some(groups) = &self.groups {
+            Some(groups.try_make_new()?)
+        } else {
+            None
+        };
+
+        let res = Self {
+            input_schema: self.input_schema.clone(),
+            ts_col: self.ts_col.clone(),
+            window: self.window,
+            steps_expr: self.steps_expr.clone(),
+            steps_orders: self.steps_orders.clone(),
+            exclude_expr: self.exclude_expr.clone(),
+            constants: self.constants.clone(),
+            count: self.count.clone(),
+            filter: self.filter.clone(),
+            touch: self.touch.clone(),
+            partition_col: self.partition_col.clone(),
+            buf: Default::default(),
+            batch_id: 0,
+            _processed_batches: 0,
+            debug: Dbg::new(),
+            buckets: self.buckets.clone(),
+            bucket_size: self.bucket_size,
+            groups,
+            cur_partition: 0,
+            skip_partition: false,
+            first: true,
+            single_group: Group::new(self.steps_len, &self.buckets),
+            steps_len: self.steps_len,
+        };
+
+        Ok(res)
+    }
+
+    pub fn finalize(&mut self) -> crate::Result<Vec<ArrayRef>> {
         // in case of grouping make an array of groups (group_arrs)
         let (group_arrs, groups) = if let Some(groups) = &mut self.groups {
             let mut rows: Vec<arrow_row::Row> = Vec::with_capacity(groups.groups.len());
@@ -688,9 +722,9 @@ impl PartitionedAggregateExpr for Funnel {
                     let v = if step.count > 0 {
                         Decimal::from_i128_with_scale(step.total_time as i128, DECIMAL_SCALE as u32)
                             / Decimal::from_i128_with_scale(
-                            step.count as i128,
-                            DECIMAL_SCALE as u32,
-                        )
+                                step.count as i128,
+                                DECIMAL_SCALE as u32,
+                            )
                     } else {
                         Decimal::from_i128_with_scale(0, 0)
                     };
@@ -758,53 +792,6 @@ impl PartitionedAggregateExpr for Funnel {
             .collect::<Vec<_>>();
 
         Ok(res)
-    }
-
-    fn make_new(&self) -> crate::Result<Box<dyn PartitionedAggregateExpr>> {
-        let groups = if let Some(groups) = &self.groups {
-            Some(groups.try_make_new()?)
-        } else {
-            None
-        };
-
-        let res = Self {
-            input_schema: self.input_schema.clone(),
-            ts_col: self.ts_col.clone(),
-            window: self.window,
-            steps_expr: self.steps_expr.clone(),
-            steps_orders: self.steps_orders.clone(),
-            exclude_expr: self.exclude_expr.clone(),
-            constants: self.constants.clone(),
-            count: self.count.clone(),
-            filter: self.filter.clone(),
-            touch: self.touch.clone(),
-            partition_col: self.partition_col.clone(),
-            buf: Default::default(),
-            batch_id: 0,
-            _processed_batches: 0,
-            debug: Dbg::new(),
-            buckets: self.buckets.clone(),
-            bucket_size: self.bucket_size,
-            groups,
-            cur_partition: 0,
-            skip_partition: false,
-            first: true,
-            single_group: Group::new(self.steps_len, &self.buckets),
-            steps_len: self.steps_len,
-        };
-
-        Ok(Box::new(res))
-    }
-
-    fn merge(&mut self, _other: &dyn PartitionedAggregateExpr) -> crate::Result<()> {
-        todo!()
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-    fn op(&self) -> &str {
-        unreachable!()
     }
 }
 
@@ -886,14 +873,14 @@ mod tests {
                         "1976-01-01 12:00:00 +0000",
                         "%Y-%m-%d %H:%M:%S %z",
                     )
-                        .unwrap()
-                        .with_timezone(&Utc),
+                    .unwrap()
+                    .with_timezone(&Utc),
                     to: DateTime::parse_from_str(
                         "1976-02-01 12:00:00 +0000",
                         "%Y-%m-%d %H:%M:%S %z",
                     )
-                        .unwrap()
-                        .with_timezone(&Utc),
+                    .unwrap()
+                    .with_timezone(&Utc),
                     schema: schema.clone(),
                     groups: None,
                     ts_col: Column::new("ts", 1),

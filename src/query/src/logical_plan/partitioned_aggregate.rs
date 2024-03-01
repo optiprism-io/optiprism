@@ -60,6 +60,7 @@ impl From<&query::PartitionedAggregateFunction> for AggregateFunction {
         }
     }
 }
+
 pub mod funnel {
     use chrono::Duration;
     use datafusion_expr::Expr;
@@ -148,21 +149,21 @@ pub enum AggregateExpr {
         groups: Option<Vec<(Expr, SortField)>>,
         partition_col: Column,
     },
-    Funnel {
-        ts_col: Column,
-        from: DateTime<Utc>,
-        to: DateTime<Utc>,
-        window: Duration,
-        steps: Vec<(Expr, funnel::StepOrder)>,
-        exclude: Option<Vec<funnel::ExcludeExpr>>,
-        constants: Option<Vec<Column>>,
-        count: funnel::Count,
-        filter: Option<funnel::Filter>,
-        touch: funnel::Touch,
-        partition_col: Column,
-        bucket_size: Duration,
-        groups: Option<Vec<(Expr, SortField)>>,
-    },
+    // Funnel {
+    // ts_col: Column,
+    // from: DateTime<Utc>,
+    // to: DateTime<Utc>,
+    // window: Duration,
+    // steps: Vec<(Expr, funnel::StepOrder)>,
+    // exclude: Option<Vec<funnel::ExcludeExpr>>,
+    // constants: Option<Vec<Column>>,
+    // count: funnel::Count,
+    // filter: Option<funnel::Filter>,
+    // touch: funnel::Touch,
+    // partition_col: Column,
+    // bucket_size: Duration,
+    // groups: Option<Vec<(Expr, SortField)>>,
+    // },
 }
 
 impl AggregateExpr {
@@ -222,38 +223,39 @@ impl AggregateExpr {
                 groups,
                 partition_col,
             },
-            AggregateExpr::Funnel {
-                ts_col,
-                from,
-                to,
-                window,
-                steps,
-                exclude,
-                constants,
-                count,
-                filter,
-                touch,
-                partition_col: _,
-                bucket_size,
-                groups,
-            } => AggregateExpr::Funnel {
-                ts_col,
-                from,
-                to,
-                window,
-                steps,
-                exclude,
-                constants,
-                count,
-                filter,
-                touch,
-                partition_col,
-                bucket_size,
-                groups,
-            },
+            // AggregateExpr::Funnel {
+            // ts_col,
+            // from,
+            // to,
+            // window,
+            // steps,
+            // exclude,
+            // constants,
+            // count,
+            // filter,
+            // touch,
+            // partition_col: _,
+            // bucket_size,
+            // groups,
+            // } => AggregateExpr::Funnel {
+            // ts_col,
+            // from,
+            // to,
+            // window,
+            // steps,
+            // exclude,
+            // constants,
+            // count,
+            // filter,
+            // touch,
+            // partition_col,
+            // bucket_size,
+            // groups,
+            // },
         }
     }
 }
+
 fn return_type(dt: DataType, agg: &AggregateFunction, _schema: &DFSchema) -> DataType {
     match agg {
         AggregateFunction::Avg => DataType::Float64,
@@ -279,7 +281,7 @@ impl AggregateExpr {
             AggregateExpr::Aggregate { groups, .. } => groups,
             AggregateExpr::PartitionedCount { groups, .. } => groups,
             AggregateExpr::PartitionedAggregate { groups, .. } => groups,
-            AggregateExpr::Funnel { groups, .. } => groups,
+            // AggregateExpr::Funnel { groups, .. } => groups,
         };
 
         if let Some(groups) = groups {
@@ -295,7 +297,7 @@ impl AggregateExpr {
             AggregateExpr::Aggregate { .. } => vec!["agg".to_string()],
             AggregateExpr::PartitionedCount { .. } => vec!["partitioned_count".to_string()],
             AggregateExpr::PartitionedAggregate { .. } => vec!["partitioned_agg".to_string()],
-            AggregateExpr::Funnel { .. } => unimplemented!(),
+            // AggregateExpr::Funnel { .. } => unimplemented!(),
         }
     }
     pub fn fields(&self, schema: &DFSchema, final_: bool) -> Result<Vec<DFField>> {
@@ -352,7 +354,7 @@ impl AggregateExpr {
                     vec![DFField::new_unqualified("partitioned_agg", rt2, true)]
                 }
             }
-            AggregateExpr::Funnel { groups, steps, .. } => {
+            /*AggregateExpr::Funnel { groups, steps, .. } => {
                 let mut fields = vec![
                     DFField::new_unqualified(
                         "ts",
@@ -404,7 +406,7 @@ impl AggregateExpr {
                 fields.append(&mut step_fields);
 
                 fields
-            }
+            }*/
         };
 
         Ok(fields)
