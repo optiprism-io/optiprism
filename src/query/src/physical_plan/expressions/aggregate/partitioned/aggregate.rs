@@ -35,6 +35,7 @@ use arrow::record_batch::RecordBatch;
 use arrow::row::Row;
 use arrow::row::SortField;
 use common::arrow::DecimalBuilder;
+use common::types::RESERVED_COLUMN_AGG_PARTITIONED_AGGREGATE;
 use common::DECIMAL_MULTIPLIER;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
@@ -145,7 +146,7 @@ macro_rules! agg {
             }
 
             fn fields(&self) -> Vec<Field> {
-                let field = Field::new("partitioned_agg", $dt, true);
+                let field = Field::new(RESERVED_COLUMN_AGG_PARTITIONED_AGGREGATE, $dt, true);
                 vec![field]
             }
 

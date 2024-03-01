@@ -13,6 +13,10 @@ use chrono::Duration;
 use chrono::Utc;
 use common::query;
 use common::query::PartitionedAggregateFunction;
+use common::types::RESERVED_COLUMN_AGG;
+use common::types::RESERVED_COLUMN_AGG_PARTITIONED_AGGREGATE;
+use common::types::RESERVED_COLUMN_AGG_PARTITIONED_COUNT;
+use common::types::RESERVED_COLUMN_COUNT;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 use datafusion_common::Column;
@@ -293,28 +297,31 @@ impl AggregateExpr {
 
     pub fn field_names(&self) -> Vec<String> {
         match self {
-            AggregateExpr::Count { .. } => vec!["count".to_string()],
-            AggregateExpr::Aggregate { .. } => vec!["agg".to_string()],
-            AggregateExpr::PartitionedCount { .. } => vec!["partitioned_count".to_string()],
-            AggregateExpr::PartitionedAggregate { .. } => vec!["partitioned_agg".to_string()],
-            // AggregateExpr::Funnel { .. } => unimplemented!(),
+            AggregateExpr::Count { .. } => vec![RESERVED_COLUMN_COUNT.to_string()],
+            AggregateExpr::Aggregate { .. } => vec![RESERVED_COLUMN_AGG.to_string()],
+            AggregateExpr::PartitionedCount { .. } => {
+                vec![RESERVED_COLUMN_AGG_PARTITIONED_COUNT.to_string()]
+            }
+            AggregateExpr::PartitionedAggregate { .. } => {
+                vec![RESERVED_COLUMN_AGG_PARTITIONED_AGGREGATE.to_string()]
+            } // AggregateExpr::Funnel { .. } => unimplemented!(),
         }
     }
     pub fn fields(&self, schema: &DFSchema, final_: bool) -> Result<Vec<DFField>> {
         let fields = match self {
             AggregateExpr::Count { .. } => {
-                vec![DFField::new_unqualified("count", DataType::Int64, true)]
+                vec![DFField::new_unqualified(RESERVED_COLUMN_COUNT, DataType::Int64, true)]
             }
             AggregateExpr::Aggregate { predicate, agg, .. } => {
                 if final_ {
                     vec![DFField::new_unqualified(
-                        "agg",
+                        RESERVED_COLUMN_AGG,
                         schema.field_from_column(predicate)?.data_type().to_owned(),
                         true,
                     )]
                 } else {
                     vec![DFField::new_unqualified(
-                        "agg",
+                        RESERVED_COLUMN_AGG,
                         return_type(
                             schema.field_from_column(predicate)?.data_type().to_owned(),
                             agg,
@@ -332,7 +339,7 @@ impl AggregateExpr {
                     _ => Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
                 };
 
-                vec![DFField::new_unqualified("partitioned_count", dt, true)]
+                vec![DFField::new_unqualified(RESERVED_COLUMN_AGG_PARTITIONED_COUNT, dt, true)]
             }
             AggregateExpr::PartitionedAggregate {
                 predicate,
@@ -344,14 +351,14 @@ impl AggregateExpr {
                 let rt1 = return_type(dt.to_owned(), inner_fn, schema);
                 if final_ {
                     vec![DFField::new_unqualified(
-                        "partitioned_agg",
+                        RESERVED_COLUMN_AGG,
                         dt.to_owned(),
                         true,
                     )]
                 } else {
                     let rt2 = return_type(rt1, outer_fn, schema);
 
-                    vec![DFField::new_unqualified("partitioned_agg", rt2, true)]
+                    vec![DFField::new_unqualified(RESERVED_COLUMN_AGG, rt2, true)]
                 }
             }
             /*AggregateExpr::Funnel { groups, steps, .. } => {

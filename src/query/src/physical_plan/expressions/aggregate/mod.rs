@@ -38,6 +38,7 @@ use arrow_row::OwnedRow;
 use arrow_row::RowConverter;
 use arrow_row::SortField;
 use common::arrow::DecimalBuilder;
+use common::types::RESERVED_COLUMN_AGG;
 use common::DECIMAL_MULTIPLIER;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
@@ -180,7 +181,7 @@ macro_rules! agg {
             }
 
             fn fields(&self) -> Vec<Field> {
-                let field = Field::new("agg", $dt, true);
+                let field = Field::new(RESERVED_COLUMN_AGG, $dt, true);
                 vec![field]
             }
 

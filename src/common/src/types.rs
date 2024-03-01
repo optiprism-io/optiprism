@@ -83,7 +83,10 @@ pub const EVENT_SESSION_END: &str = "Session End";
 
 pub const RESERVED_COLUMN_FUNNEL_TOTAL: &str = "total";
 pub const RESERVED_COLUMN_FUNNEL_COMPLETED: &str = "completed";
-
+pub const RESERVED_COLUMN_AGG_PARTITIONED_AGGREGATE: &str = "partitioned_agg";
+pub const RESERVED_COLUMN_AGG_PARTITIONED_COUNT: &str = "partitioned_count";
+pub const RESERVED_COLUMN_AGG: &str = "agg";
+pub const RESERVED_COLUMN_COUNT: &str = "count";
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum DType {
