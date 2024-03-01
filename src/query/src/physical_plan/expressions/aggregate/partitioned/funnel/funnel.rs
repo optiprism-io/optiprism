@@ -908,6 +908,116 @@ asd
                 "#,
             },
             TestCase {
+                name: "unique count should skip second funnel".to_string(),
+                data: r#"
+| user_id(i64) | ts(ts) | event(utf8) | const(i64) |
+|--------------|--------|-------------|------------|
+| 1            | 1      | e1          | 1          |
+| 1            | 2      | e2          | 1          |
+| 1            | 3      | e3          | 1          |
+| 1            | 4      | e1          | 1          |
+| 1            | 5      | e2          | 1          |
+| 1            | 6      | e3          | 1          |
+"#,
+                opts: Options {
+                    from: DateTime::parse_from_str(
+                        "1976-01-01 12:00:00 +0000",
+                        "%Y-%m-%d %H:%M:%S %z",
+                    )
+                    .unwrap()
+                    .with_timezone(&Utc),
+                    to: DateTime::parse_from_str(
+                        "1976-02-01 12:00:00 +0000",
+                        "%Y-%m-%d %H:%M:%S %z",
+                    )
+                    .unwrap()
+                    .with_timezone(&Utc),
+                    schema: schema.clone(),
+                    groups: None,
+                    ts_col: Column::new("ts", 1),
+                    window: Duration::minutes(15),
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+                    exclude: None,
+                    constants: None,
+                    count: Count::Unique,
+                    filter: None,
+                    touch: Touch::First,
+                    partition_col: Column::new("user_id", 0),
+                    bucket_size: Duration::minutes(10),
+                },
+                exp_debug: vec![
+                    (0, 0, DebugStep::Step),
+                    (0, 1, DebugStep::NextRow),
+                    (0, 1, DebugStep::Step),
+                    (0, 2, DebugStep::NextRow),
+                    (0, 2, DebugStep::Step),
+                    (0, 2, DebugStep::Complete),
+                    (0, 3, DebugStep::NextRow),
+                ],
+                partition_exist: HashMap::from_iter([(1, ()), (2, ())]),
+                exp: r#"
+asd
+                "#,
+            },
+            TestCase {
+                name: "non-unique count should take both funnels".to_string(),
+                data: r#"
+| user_id(i64) | ts(ts) | event(utf8) | const(i64) |
+|--------------|--------|-------------|------------|
+| 1            | 1      | e1          | 1          |
+| 1            | 2      | e2          | 1          |
+| 1            | 3      | e3          | 1          |
+| 1            | 4      | e1          | 1          |
+| 1            | 5      | e2          | 1          |
+| 1            | 6      | e3          | 1          |
+"#,
+                opts: Options {
+                    from: DateTime::parse_from_str(
+                        "1976-01-01 12:00:00 +0000",
+                        "%Y-%m-%d %H:%M:%S %z",
+                    )
+                    .unwrap()
+                    .with_timezone(&Utc),
+                    to: DateTime::parse_from_str(
+                        "1976-02-01 12:00:00 +0000",
+                        "%Y-%m-%d %H:%M:%S %z",
+                    )
+                    .unwrap()
+                    .with_timezone(&Utc),
+                    schema: schema.clone(),
+                    groups: None,
+                    ts_col: Column::new("ts", 1),
+                    window: Duration::minutes(15),
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+                    exclude: None,
+                    constants: None,
+                    count: Count::NonUnique,
+                    filter: None,
+                    touch: Touch::First,
+                    partition_col: Column::new("user_id", 0),
+                    bucket_size: Duration::minutes(10),
+                },
+                exp_debug: vec![
+                    (0, 0, DebugStep::Step),
+                    (0, 1, DebugStep::NextRow),
+                    (0, 1, DebugStep::Step),
+                    (0, 2, DebugStep::NextRow),
+                    (0, 2, DebugStep::Step),
+                    (0, 2, DebugStep::Complete),
+                    (0, 3, DebugStep::NextRow),
+                    (0, 3, DebugStep::Step),
+                    (0, 4, DebugStep::NextRow),
+                    (0, 4, DebugStep::Step),
+                    (0, 5, DebugStep::NextRow),
+                    (0, 5, DebugStep::Step),
+                    (0, 5, DebugStep::Complete),
+                ],
+                partition_exist: HashMap::from_iter([(1, ()), (2, ())]),
+                exp: r#"
+asd
+                "#,
+            },
+            TestCase {
                 name: "3 steps in a row, 2 batches should pass".to_string(),
                 data: r#"
 | user_id(i64) | ts(ts) | event(utf8) | const(i64) |
@@ -1433,6 +1543,7 @@ asd
             },
         ];
 
+        // let run_only: Option<&str> = Some("non-unique count should take both funnels");
         let run_only: Option<&str> = None;
         for case in cases.iter().cloned() {
             if let Some(name) = run_only {
