@@ -240,7 +240,6 @@ impl Dbg {
         }
     }
     fn push(&mut self, batch_id: usize, row_id: usize, step: DebugStep) {
-        // println!("{} {} {:?}", batch_id, row_id, step);
         self.inner.push((batch_id, row_id, step));
     }
 
@@ -1836,7 +1835,7 @@ asd
 | 1      | 2020-04-12 22:13:57 | android      | 1      | 1      |
 | 1      | 2020-04-12 22:15:57 | android      | 2      | 1      |
 | 1      | 2020-04-12 22:17:57 | android      | 3      | 1      |
-| 3      | 2020-04-12 22:17:57 | android      | 1      | 1      |
+| 3      | 2020-04-12 22:18:57 | android      | 1      | 1      |
 "#;
         let res = parse_markdown_tables(data).unwrap();
         let schema = res[0].schema();

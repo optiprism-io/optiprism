@@ -19,23 +19,36 @@ use arrow::datatypes::Field;
 use arrow::datatypes::FieldRef;
 use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
+use arrow::util::pretty::print_batches;
 use async_trait::async_trait;
 use common::types::COLUMN_PROJECT_ID;
 use common::types::COLUMN_USER_ID;
+use common::types::RESERVED_COLUMN_FUNNEL_COMPLETED;
+use common::types::RESERVED_COLUMN_FUNNEL_TOTAL;
 use datafusion::execution::RecordBatchStream;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::execution::TaskContext;
 use datafusion::physical_expr::expressions::col;
+use datafusion::physical_expr::expressions::Avg;
 use datafusion::physical_expr::expressions::Column;
+use datafusion::physical_expr::expressions::Max;
+use datafusion::physical_expr::expressions::Sum;
+use datafusion::physical_expr::AggregateExpr;
 use datafusion::physical_expr::Distribution;
 use datafusion::physical_expr::Partitioning;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalSortExpr;
 use datafusion::physical_expr::PhysicalSortRequirement;
+use datafusion::physical_plan::aggregates::AggregateExec as DFAggregateExec;
+use datafusion::physical_plan::aggregates::AggregateMode;
+use datafusion::physical_plan::aggregates::PhysicalGroupBy;
+use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
+use datafusion::physical_plan::AggregateExpr as DFAggregateExpr;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
+use datafusion::prelude::SessionContext;
 use datafusion_common::Result as DFResult;
 use datafusion_common::ScalarValue;
 use futures::Stream;
@@ -325,6 +338,224 @@ impl Stream for PartialFunnelStream {
     }
 }
 
+#[derive(Debug)]
+pub struct FunnelFinalExec {
+    input: Arc<dyn ExecutionPlan>,
+    groups: usize,
+    steps: usize,
+    metrics: ExecutionPlanMetricsSet,
+}
+
+impl FunnelFinalExec {
+    pub fn try_new(input: Arc<dyn ExecutionPlan>, groups: usize, steps: usize) -> Result<Self> {
+        Ok(Self {
+            input,
+            groups,
+            steps,
+            metrics: ExecutionPlanMetricsSet::new(),
+        })
+    }
+}
+impl DisplayAs for FunnelFinalExec {
+    fn fmt_as(&self, t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "FunnelFinalExec")
+    }
+}
+
+#[async_trait]
+impl ExecutionPlan for FunnelFinalExec {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn schema(&self) -> SchemaRef {
+        self.input.schema()
+    }
+
+    fn output_partitioning(&self) -> Partitioning {
+        Partitioning::UnknownPartitioning(1)
+    }
+
+    fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {
+        None
+    }
+
+    fn required_input_distribution(&self) -> Vec<Distribution> {
+        vec![Distribution::UnspecifiedDistribution]
+    }
+
+    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
+        vec![self.input.clone()]
+    }
+
+    fn with_new_children(
+        self: Arc<Self>,
+        children: Vec<Arc<dyn ExecutionPlan>>,
+    ) -> DFResult<Arc<dyn ExecutionPlan>> {
+        Ok(Arc::new(
+            FunnelFinalExec::try_new(children[0].clone(), self.groups, self.steps)
+                .map_err(QueryError::into_datafusion_execution_error)?,
+        ))
+    }
+
+    fn execute(
+        &self,
+        _partition: usize,
+        context: Arc<TaskContext>,
+    ) -> DFResult<SendableRecordBatchStream> {
+        let partitions_count = self.input.output_partitioning().partition_count();
+
+        let inputs = (0..partitions_count)
+            .map(|pid| self.input.execute(pid, context.clone()))
+            .collect::<DFResult<_>>()?;
+
+        Ok(Box::pin(FinalFunnelStream {
+            inputs: RefCell::new(inputs),
+            steps: self.steps,
+            schema: self.schema(),
+            final_batches: RefCell::new(vec![
+                RecordBatch::new_empty(self.schema());
+                partitions_count
+            ]),
+            finished: false,
+            groups: self.groups,
+        }))
+    }
+}
+
+struct FinalFunnelStream {
+    inputs: RefCell<Vec<SendableRecordBatchStream>>,
+    schema: SchemaRef,
+    final_batches: RefCell<Vec<RecordBatch>>,
+    groups: usize,
+    steps: usize,
+    finished: bool,
+}
+
+impl Stream for FinalFunnelStream {
+    type Item = DFResult<RecordBatch>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        if self.finished {
+            return Poll::Ready(None);
+        }
+
+        for (idx, input) in self.inputs.borrow_mut().iter_mut().enumerate() {
+            match input.poll_next_unpin(cx) {
+                Poll::Ready(Some(Ok(batch))) => {
+                    self.final_batches.borrow_mut()[idx] = batch;
+                }
+                Poll::Ready(None) => {}
+                Poll::Pending => return Poll::Pending,
+                Poll::Ready(other) => return Poll::Ready(other),
+            }
+        }
+
+        let groups = self
+            .schema
+            .fields()
+            .iter()
+            .take(self.groups + 2) // segment+ts
+            .map(|f| (col(f.name(), &self.schema).unwrap(), f.name().to_owned()))
+            .collect::<Vec<_>>();
+        // merge
+
+        let mut aggs = vec![];
+        aggs.push(Arc::new(Sum::new(
+            col(RESERVED_COLUMN_FUNNEL_TOTAL, &self.schema).unwrap(),
+            RESERVED_COLUMN_FUNNEL_TOTAL,
+            self.schema
+                .field_with_name(RESERVED_COLUMN_FUNNEL_TOTAL)
+                .unwrap()
+                .data_type()
+                .clone(),
+        )) as Arc<dyn DFAggregateExpr>);
+        aggs.push(Arc::new(Sum::new(
+            col(RESERVED_COLUMN_FUNNEL_COMPLETED, &self.schema).unwrap(),
+            RESERVED_COLUMN_FUNNEL_COMPLETED,
+            self.schema
+                .field_with_name(RESERVED_COLUMN_FUNNEL_COMPLETED)
+                .unwrap()
+                .data_type()
+                .clone(),
+        )) as Arc<dyn DFAggregateExpr>);
+
+        for i in 0..self.steps {
+            let cname = format!("step{}_total", i);
+            aggs.push(Arc::new(Sum::new(
+                col(&cname, &self.schema).unwrap(),
+                cname.clone(),
+                self.schema
+                    .field_with_name(&cname)
+                    .unwrap()
+                    .data_type()
+                    .clone(),
+            )) as Arc<dyn DFAggregateExpr>);
+            let cname = format!("step{}_time_to_convert", i);
+            aggs.push(Arc::new(Sum::new(
+                col(&cname, &self.schema).unwrap(),
+                cname.clone(),
+                self.schema
+                    .field_with_name(&cname)
+                    .unwrap()
+                    .data_type()
+                    .clone(),
+            )) as Arc<dyn DFAggregateExpr>);
+            let cname = format!("step{}_time_to_convert_from_start", i);
+            aggs.push(Arc::new(Sum::new(
+                col(&cname, &self.schema).unwrap(),
+                cname.clone(),
+                self.schema
+                    .field_with_name(&cname)
+                    .unwrap()
+                    .data_type()
+                    .clone(),
+            )) as Arc<dyn DFAggregateExpr>);
+        }
+        let session_ctx = SessionContext::new();
+        let task_ctx = session_ctx.task_ctx();
+        let group_by = PhysicalGroupBy::new_single(groups);
+        let input = Arc::new(MemoryExec::try_new(
+            &[self.final_batches.borrow().clone()],
+            self.schema.clone(),
+            None,
+        )?);
+        let partial_aggregate = Arc::new(DFAggregateExec::try_new(
+            AggregateMode::Final,
+            group_by,
+            aggs,
+            vec![None],
+            vec![None],
+            input,
+            self.schema.clone(),
+        )?);
+
+        let mut stream = partial_aggregate.execute(0, task_ctx)?;
+        let mut out_batches = vec![];
+
+        loop {
+            match stream.poll_next_unpin(cx) {
+                Poll::Ready(Some(Ok(batch))) => out_batches.push(batch),
+                Poll::Pending => {}
+                Poll::Ready(None) => break,
+                other => return other,
+            }
+        }
+
+        // todo return multiple batches
+        let result = concat_batches(&out_batches[0].schema(), &out_batches)?;
+
+        self.finished = true;
+        Poll::Ready(Some(Ok(result)))
+    }
+}
+
+impl RecordBatchStream for FinalFunnelStream {
+    fn schema(&self) -> SchemaRef {
+        self.schema.clone()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -356,10 +587,11 @@ mod tests {
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::ExcludeExpr;
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::StepOrder;
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::Touch;
+    use crate::physical_plan::funnel::FunnelFinalExec;
     use crate::physical_plan::funnel::FunnelPartialExec;
 
     #[tokio::test]
-    async fn test_groups() {
+    async fn test_partial() {
         let data = r#"
 | u(i64) | ts(ts)              | device(utf8) | v(i64) | c(i64) |
 |--------|---------------------|--------------|--------|--------|
@@ -445,6 +677,36 @@ mod tests {
             Arc::new(Mutex::new(f)),
         )
         .unwrap();
+        let session_ctx = SessionContext::new();
+        let task_ctx = session_ctx.task_ctx();
+        let stream = exec.execute(0, task_ctx).unwrap();
+        let result = collect(stream).await.unwrap();
+
+        print_batches(&result).unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_final() {
+        let p1 = r#"
+|segment(i64)  | device(utf8)  | ts(ts)                  | total(i64) | completed(i64) | step0_total(i64) | step0_time_to_convert(decimal) | step0_time_to_convert_from_start(decimal) | step1_total(i64) | step1_time_to_convert(decimal) | step1_time_to_convert_from_start(decimal) |
+|--------------|---------------|-------------------------|------------|----------------|------------------|--------------------------------|-------------------------------------------|------------------|--------------------------------|-------------------------------------------|
+|1             | iphone        | 1                       | 1          | 1              | 1                | 1                              | 1                                         | 1                | 1                              |      1                                    |
+|1             | android       | 1                       | 1          | 1              | 1                | 1                              | 1                                         | 1                | 1                              |      1                                    |
+"#;
+
+        let p2 = r#"
+|segment(i64)   | device(utf8)  | ts(ts)                  | total(i64) | completed(i64) | step0_total(i64) | step0_time_to_convert(decimal) | step0_time_to_convert_from_start(decimal) | step1_total(i64) | step1_time_to_convert(decimal) | step1_time_to_convert_from_start(decimal) |
+|---------------|---------------|-------------------------|------------|----------------|------------------|--------------------------------|-------------------------------------------|------------------|--------------------------------|-------------------------------------------|
+|1              | iphone        | 1                       | 1          | 1              | 1                | 1                              | 1                                         | 1                | 1                              |      1                                    |
+|1              | ios           | 1                       | 1          | 1              | 1                | 1                              | 1                                         | 1                | 1                              |      1                                    |
+"#;
+        let res1 = parse_markdown_tables(p1).unwrap();
+        let schema = res1[0].schema();
+
+        let res2 = parse_markdown_tables(p2).unwrap();
+        let input = MemoryExec::try_new(&[res1, res2], schema.clone(), None).unwrap();
+
+        let exec = FunnelFinalExec::try_new(Arc::new(input), 1, 2).unwrap();
         let session_ctx = SessionContext::new();
         let task_ctx = session_ctx.task_ctx();
         let stream = exec.execute(0, task_ctx).unwrap();

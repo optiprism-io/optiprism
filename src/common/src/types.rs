@@ -80,6 +80,10 @@ pub const EVENT_PAGE: &str = "Page";
 pub const EVENT_SCREEN: &str = "Screen";
 pub const EVENT_SESSION_BEGIN: &str = "Session Begin";
 pub const EVENT_SESSION_END: &str = "Session End";
+
+pub const RESERVED_COLUMN_FUNNEL_TOTAL: &str = "total";
+pub const RESERVED_COLUMN_FUNNEL_COMPLETED: &str = "completed";
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum DType {
