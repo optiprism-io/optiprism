@@ -341,6 +341,7 @@ impl Funnel {
             buf: Default::default(),
             batch_id: 0,
             _processed_batches: 0,
+            #[cfg(test)]
             debug: Dbg::new(),
             buckets: buckets.clone(),
             bucket_size: opts.bucket_size,
@@ -599,14 +600,13 @@ impl Funnel {
                 group.steps[group.cur_step].batch_id = batch_id;
                 group.steps[group.cur_step].row_id = row_id;
                 group.steps[group.cur_step].ts = cur_ts;
+                #[cfg(test)]
                 self.debug.push(batch_id, row_id, DebugStep::Step);
                 if group.cur_step < self.steps_len - 1 {
                     group.cur_step += 1;
                 } else {
                     #[cfg(test)]
                     self.debug.push(batch_id, row_id, DebugStep::Complete);
-                    // uncommit for single funnel per partition
-                    // self.skip = true;
 
                     let is_completed = group.push_result(&self.filter, self.bucket_size);
                     if is_completed && self.count == Count::Unique {
