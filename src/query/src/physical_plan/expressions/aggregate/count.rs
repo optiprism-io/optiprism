@@ -333,4 +333,38 @@ mod tests {
 
         let _res = count.finalize();
     }
+
+    #[test]
+    fn count_grouped_decimal() {
+        let data = r#"
+| user_id(i64)| d  (decimal) | v(i64)| event(utf8) |
+|-------------|--------------|-------|-------------|
+| 0           | 1       | 1     | e1          |
+| 0           | 1      | 1     | e1          |
+| 0           | 1      | 1     | e1          |
+| 0           | 2          | 1     | e1          |
+| 0           | 2          | 1     | e3          |
+| 0           | 2          | 1     | e3          |
+"#;
+        let res = parse_markdown_tables(data).unwrap();
+        let schema = res[0].schema();
+        let groups = vec![(
+            Arc::new(Column::new_with_schema("d", &schema).unwrap()) as PhysicalExprRef,
+            "device".to_string(),
+            SortField::new(DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE)),
+        )];
+        let mut count = Count::<i64>::try_new(
+            None,
+            Some(groups),
+            Column::new_with_schema("v", &schema).unwrap(),
+            Column::new_with_schema("user_id", &schema).unwrap(),
+            false,
+        )
+        .unwrap();
+        for b in res {
+            count.evaluate(&b, None).unwrap();
+        }
+
+        let _res = count.finalize().unwrap();
+    }
 }
