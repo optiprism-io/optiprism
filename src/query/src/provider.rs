@@ -14,6 +14,7 @@ use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_PROJECT_ID;
 use common::types::COLUMN_USER_ID;
+use common::types::TABLE_EVENTS;
 use datafusion::execution::context::SessionState;
 use datafusion::execution::runtime_env::RuntimeEnv;
 use datafusion::physical_plan::coalesce_batches::concat_batches;
@@ -101,7 +102,7 @@ impl QueryProvider {
 
     pub async fn property_values(&self, ctx: Context, req: PropertyValues) -> Result<ArrayRef> {
         let start = Instant::now();
-        let schema = self.db.schema1("events")?;
+        let schema = self.db.schema1(TABLE_EVENTS)?;
         let projection = property_values_projection(&ctx, &req, &self.metadata)?;
         let projection = projection
             .iter()
@@ -128,7 +129,7 @@ impl QueryProvider {
         req: EventRecordsSearch,
     ) -> Result<DataTable> {
         let start = Instant::now();
-        let schema = self.db.schema1("events")?;
+        let schema = self.db.schema1(TABLE_EVENTS)?;
         let projection = if req.properties.is_some() {
             let projection = event_records_search(&ctx, &req, &self.metadata)?;
             projection
@@ -169,7 +170,7 @@ impl QueryProvider {
         req: EventSegmentation,
     ) -> Result<DataTable> {
         let start = Instant::now();
-        let schema = self.db.schema1("events")?;
+        let schema = self.db.schema1(TABLE_EVENTS)?;
         let projection = event_segmentation_projection(&ctx, &req, &self.metadata)?;
         let projection = projection
             .iter()
