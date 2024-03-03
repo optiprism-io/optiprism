@@ -115,29 +115,48 @@ macro_rules! arr_to_json_values {
     }};
 }
 
+#[macro_export]
+macro_rules! int_arr_to_json_values {
+    ($array_ref:expr,$array_type:ident) => {{
+        let arr = $array_ref.as_any().downcast_ref::<$array_type>().unwrap();
+        Ok(arr
+            .iter()
+            .map(|value| match value {
+                None => Value::Number(Number::from_f64(0.0).unwrap()),
+                Some(v) => json!(v),
+            })
+            .collect())
+    }};
+}
+
 pub fn array_ref_to_json_values(arr: &ArrayRef) -> Result<Vec<Value>> {
     match arr.data_type() {
-        arrow::datatypes::DataType::Int8 => arr_to_json_values!(arr, Int8Array),
-        arrow::datatypes::DataType::Int16 => arr_to_json_values!(arr, Int16Array),
-        arrow::datatypes::DataType::Int32 => arr_to_json_values!(arr, Int32Array),
-        arrow::datatypes::DataType::Int64 => arr_to_json_values!(arr, Int64Array),
-        arrow::datatypes::DataType::UInt8 => arr_to_json_values!(arr, UInt8Array),
-        arrow::datatypes::DataType::UInt16 => arr_to_json_values!(arr, UInt16Array),
-        arrow::datatypes::DataType::UInt32 => arr_to_json_values!(arr, UInt32Array),
-        arrow::datatypes::DataType::UInt64 => arr_to_json_values!(arr, UInt64Array),
+        arrow::datatypes::DataType::Int8 => int_arr_to_json_values!(arr, Int8Array),
+        arrow::datatypes::DataType::Int16 => int_arr_to_json_values!(arr, Int16Array),
+        arrow::datatypes::DataType::Int32 => int_arr_to_json_values!(arr, Int32Array),
+        arrow::datatypes::DataType::Int64 => int_arr_to_json_values!(arr, Int64Array),
+        arrow::datatypes::DataType::UInt8 => int_arr_to_json_values!(arr, UInt8Array),
+        arrow::datatypes::DataType::UInt16 => int_arr_to_json_values!(arr, UInt16Array),
+        arrow::datatypes::DataType::UInt32 => int_arr_to_json_values!(arr, UInt32Array),
+        arrow::datatypes::DataType::UInt64 => int_arr_to_json_values!(arr, UInt64Array),
         arrow::datatypes::DataType::Float32 => {
             let arr = arr.as_any().downcast_ref::<Float32Array>().unwrap();
             Ok(arr
                 .iter()
                 .map(|value| {
-                    // https://stackoverflow.com/questions/73871891/how-to-serialize-a-struct-containing-f32-using-serde-json
-                    json!(value.map(|v| (v as f64 * 1000000.0).trunc() / 1000000.0))
+                    match value {
+                        None => Value::Number(Number::from_f64(0.0).unwrap()),
+                        Some(_) => {
+                            // https://stackoverflow.com/questions/73871891/how-to-serialize-a-struct-containing-f32-using-serde-json
+                            json!(value.map(|v| (v as f64 * 1000000.0).trunc() / 1000000.0))
+                        }
+                    }
                 })
                 .collect())
 
             // arr_to_json_values!(arr, Float32Array)
         }
-        arrow::datatypes::DataType::Float64 => arr_to_json_values!(arr, Float64Array),
+        arrow::datatypes::DataType::Float64 => int_arr_to_json_values!(arr, Float64Array),
         arrow::datatypes::DataType::Boolean => arr_to_json_values!(arr, BooleanArray),
         arrow::datatypes::DataType::Utf8 => arr_to_json_values!(arr, StringArray),
         arrow::datatypes::DataType::Timestamp(TimeUnit::Nanosecond, _) => {
@@ -147,7 +166,7 @@ pub fn array_ref_to_json_values(arr: &ArrayRef) -> Result<Vec<Value>> {
             let arr = arr.as_any().downcast_ref::<Decimal128Array>().unwrap();
             arr.iter()
                 .map(|value| match value {
-                    None => Ok(Value::Null),
+                    None => Ok(Value::Number(Number::from_f64(0.0).unwrap())),
                     Some(v) => {
                         let d = Decimal::from_i128_with_scale(v, DECIMAL_SCALE as u32);
                         let d_f = match d.to_f64() {
