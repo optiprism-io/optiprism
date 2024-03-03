@@ -269,9 +269,7 @@ macro_rules! build_group_arr {
                 }
         }
 
-        let b = Arc::new(result.finish()) as ArrayRef;
-        println!("BBBLEN?{}", b.len());
-        Ok(b)
+        Ok(Arc::new(result.finish()) as ArrayRef)
     }};
 }
 
@@ -427,7 +425,6 @@ pub fn unpivot(
         })
         .collect::<ArrowResult<Vec<_>>>()?;
 
-    group_arrs.iter().for_each(|c| println!("%# {:?}", c.len()));
     // define value type
     let value_type = DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE);
 
