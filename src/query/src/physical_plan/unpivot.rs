@@ -37,6 +37,7 @@ use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
 use arrow::error::Result as ArrowResult;
 use arrow::record_batch::RecordBatch;
+use arrow::util::pretty::print_batches;
 use axum::async_trait;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
@@ -246,7 +247,6 @@ macro_rules! build_group_arr {
                     }
                 }
         }
-
         Ok(Arc::new(result.finish()) as ArrayRef)
     }};
     ($batch_col_idx:expr, $src_arr_ref:expr, $array_type:ident, $unpivot_cols_len:ident,$builder_type:ident) => {{
@@ -403,23 +403,23 @@ pub fn unpivot(
                 )
             }
             DataType::Decimal128(p, s) => {
-                // build group array realisation for decimal type
+                // build group array realization for decimal type
                 let src_arr_typed = arr.as_any().downcast_ref::<Decimal128Array>().unwrap();
                 let mut result = Decimal128Builder::with_capacity(builder_cap);
-
                 for row_idx in 0..arr.len() {
                     if src_arr_typed.is_null(row_idx) {
-                        for _ in 0..=unpivot_cols_len {
+                        for _ in 0..unpivot_cols_len {
                             result.append_null();
                         }
                     } else {
-                        for _ in 0..=unpivot_cols_len {
+                        for _ in 0..unpivot_cols_len {
                             result.append_value(src_arr_typed.value(row_idx));
                         }
                     }
                 }
 
-                Ok(Arc::new(result.finish().with_precision_and_scale(*p, *s)?) as ArrayRef)
+                let arr = Arc::new(result.finish().with_precision_and_scale(*p, *s)?) as ArrayRef;
+                Ok(arr)
             }
             _ => unimplemented!("{}", arr.data_type()),
         })
