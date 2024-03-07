@@ -123,6 +123,7 @@ impl Stream for ParquetStream {
                     .map(|c| arrow2_to_arrow1::convert(c.to_owned()))
                     .collect::<storage::error::Result<Vec<_>>>()
                     .map_err(|e| DataFusionError::Execution(e.to_string()))?;
+                println!("{:?}", self.schema);
                 let batch = RecordBatch::try_new(self.schema.clone(), cols)?;
                 Poll::Ready(Some(Ok(batch)))
             }
