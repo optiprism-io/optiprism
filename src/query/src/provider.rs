@@ -172,13 +172,10 @@ impl QueryProvider {
         let start = Instant::now();
         let schema = self.db.schema1(TABLE_EVENTS)?;
         let projection = event_segmentation_projection(&ctx, &req, &self.metadata)?;
-        println!("{:?}", projection);
         let projection = projection
             .iter()
             .map(|x| schema.index_of(x).unwrap())
             .collect();
-        println!("{schema:?}");
-        println!("{projection:?}");
         let (session_ctx, state, plan) = self.initial_plan(projection).await?;
         let plan = event_segmentation::logical_plan_builder::LogicalPlanBuilder::build(
             ctx.clone(),
