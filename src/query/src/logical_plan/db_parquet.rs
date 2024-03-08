@@ -40,6 +40,7 @@ impl DbParquetNode {
     pub fn try_new(db: Arc<OptiDBImpl>, mut projection: Vec<usize>) -> Result<Self> {
         // sort projection to make sure it's sync with fields order in schema
         projection.sort();
+        projection.dedup();
         let schema = db.schema1("events")?.project(&projection)?;
         Ok(Self {
             db,
