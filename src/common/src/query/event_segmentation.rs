@@ -310,4 +310,16 @@ impl EventSegmentation {
 
         time_columns(from, to, &self.interval_unit)
     }
+
+    pub fn groups(&self) -> Vec<String> {
+        match &self.breakdowns {
+            Some(breakdowns) => breakdowns
+                .iter()
+                .map(|b| match b {
+                    Breakdown::Property(p) => p.name(),
+                })
+                .collect(),
+            None => vec![self.group.clone()],
+        }
+    }
 }

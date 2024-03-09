@@ -170,7 +170,12 @@ impl SegmentedAggregatePartialExec {
 
                 agg_fields.push(Arc::new(f.to_owned()));
             }
-
+            // let mut agg_fields = input_schema
+            // .fields
+            // .iter()
+            // .filter(|f| agg_fields.contains(f))
+            // .cloned()
+            // .collect::<Vec<_>>();
             for f in agg.fields().iter() {
                 let f = Field::new(
                     format!("{}_{}", agg_name, f.name()),
@@ -192,7 +197,6 @@ impl SegmentedAggregatePartialExec {
             .collect::<Vec<_>>();
         let group_fields = [vec![segment_field], group_fields].concat();
         let fields: Vec<FieldRef> = [group_fields.clone(), agg_result_fields].concat();
-
         let schema = Schema::new(fields);
         Ok(Self {
             input,
@@ -615,6 +619,14 @@ impl crate::physical_plan::segmented_aggregate::SegmentedAggregateFinalExec {
                 agg_result_fields.push(f.clone().into());
                 agg_fields.push(f.into());
             }
+            //            let agg_fields = input_schema
+            // .fields
+            // .iter()
+            // .filter(|f| agg_fields.contains(f))
+            // .cloned()
+            // .collect::<Vec<_>>();
+            //
+            // dbg!(agg_fields.clone());
             agg_schemas.push(Arc::new(Schema::new(agg_fields)));
         }
 
@@ -627,7 +639,6 @@ impl crate::physical_plan::segmented_aggregate::SegmentedAggregateFinalExec {
             .collect::<Vec<_>>();
         let group_fields = [vec![segment_field], group_fields].concat();
         let fields: Vec<FieldRef> = [group_fields.clone(), agg_result_fields].concat();
-
         let schema = Schema::new(fields);
         Ok(Self {
             input,

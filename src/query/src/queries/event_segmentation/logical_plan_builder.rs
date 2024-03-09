@@ -509,7 +509,7 @@ impl LogicalPlanBuilder {
         event_id: usize,
         segment_inputs: Option<Vec<LogicalPlan>>,
     ) -> Result<(LogicalPlan, Vec<Expr>)> {
-        let mut group_expr: Vec<Expr> = vec![];
+        let mut group_expr: Vec<(Expr, String)> = vec![];
 
         let ts_col = Expr::Column(Column::from_qualified_name(COLUMN_CREATED_AT));
         let expr_fn = ScalarFunction {
@@ -518,35 +518,85 @@ impl LogicalPlanBuilder {
         };
         let time_expr = Expr::ScalarFunction(expr_fn);
 
-        group_expr.push(Expr::Alias(Alias {
-            expr: Box::new(time_expr),
-            relation: None,
-            name: COLUMN_CREATED_AT.to_string(),
-        }));
+        group_expr.push((
+            Expr::Alias(Alias {
+                expr: Box::new(time_expr),
+                relation: None,
+                name: COLUMN_CREATED_AT.to_string(),
+            }),
+            "created_at".to_string(),
+        ));
 
         // event groups
         if let Some(breakdowns) = &event.breakdowns {
             for breakdown in breakdowns.iter() {
-                group_expr.push(breakdown_expr(&self.ctx, &self.metadata, breakdown)?);
+                let prop = match breakdown {
+                    Breakdown::Property(p) => match p {
+                        PropertyRef::System(p) => self
+                            .metadata
+                            .system_properties
+                            .get_by_name(self.ctx.project_id, p)?,
+                        PropertyRef::User(p) => self
+                            .metadata
+                            .user_properties
+                            .get_by_name(self.ctx.project_id, p)?,
+                        PropertyRef::Event(p) => self
+                            .metadata
+                            .event_properties
+                            .get_by_name(self.ctx.project_id, p)?,
+                        PropertyRef::Custom(_) => unimplemented!(),
+                    },
+                };
+                group_expr.push((
+                    breakdown_expr(&self.ctx, &self.metadata, breakdown)?,
+                    prop.column_name(),
+                ));
             }
         }
 
         // common groups
         if let Some(breakdowns) = &self.es.breakdowns {
             for breakdown in breakdowns.iter() {
-                group_expr.push(breakdown_expr(&self.ctx, &self.metadata, breakdown)?);
+                let prop = match breakdown {
+                    Breakdown::Property(p) => match p {
+                        PropertyRef::System(p) => self
+                            .metadata
+                            .system_properties
+                            .get_by_name(self.ctx.project_id, p)?,
+                        PropertyRef::User(p) => self
+                            .metadata
+                            .user_properties
+                            .get_by_name(self.ctx.project_id, p)?,
+                        PropertyRef::Event(p) => self
+                            .metadata
+                            .event_properties
+                            .get_by_name(self.ctx.project_id, p)?,
+                        PropertyRef::Custom(_) => unimplemented!(),
+                    },
+                };
+                group_expr.push((
+                    breakdown_expr(&self.ctx, &self.metadata, breakdown)?,
+                    prop.column_name(),
+                ));
             }
         }
 
-        let group_expr = group_expr
+        let group_expr = input
+            .schema()
+            .fields()
             .iter()
-            .enumerate()
-            .map(|(_idx, expr)| {
-                (expr.to_owned(), SortField {
-                    data_type: expr.get_type(input.schema()).unwrap(),
-                })
+            .filter_map(|f| {
+                group_expr
+                    .iter()
+                    .find(|v| v.1 == *f.name())
+                    .map(|(expr, _)| {
+                        (expr.clone(), SortField {
+                            data_type: expr.get_type(input.schema()).unwrap(),
+                        })
+                    })
             })
             .collect::<Vec<_>>();
+
         let mut agg_expr = Vec::new();
         for (idx, query) in event.queries.iter().enumerate() {
             let agg = match &query.agg {
