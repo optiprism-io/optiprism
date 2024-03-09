@@ -6,6 +6,7 @@ pub mod pivot;
 pub mod add_string_column;
 pub mod db_parquet;
 pub mod partitioned_aggregate;
+pub mod rename_columns;
 pub mod reorder_columns;
 pub mod segment;
 pub mod unpivot;

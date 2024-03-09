@@ -33,6 +33,7 @@ use crate::logical_plan::merge::MergeNode;
 use crate::logical_plan::partitioned_aggregate::PartitionedAggregateFinalNode;
 use crate::logical_plan::partitioned_aggregate::PartitionedAggregatePartialNode;
 use crate::logical_plan::pivot::PivotNode;
+use crate::logical_plan::rename_columns::RenameColumnsNode;
 use crate::logical_plan::reorder_columns::ReorderColumnsNode;
 use crate::logical_plan::segment::SegmentNode;
 use crate::logical_plan::unpivot::UnpivotNode;
@@ -44,6 +45,7 @@ use crate::physical_plan::pivot::PivotExec;
 use crate::physical_plan::planner::partitioned_aggregate::build_partitioned_aggregate_final_expr;
 use crate::physical_plan::planner::partitioned_aggregate::build_partitioned_aggregate_partial_expr;
 use crate::physical_plan::planner::segment::build_segment_expr;
+use crate::physical_plan::rename_columns::RenameColumnsExec;
 use crate::physical_plan::reorder_columns::ReorderColumnsExec;
 use crate::physical_plan::segment::SegmentExec;
 use crate::physical_plan::segmented_aggregate::SegmentedAggregateFinalExec;
@@ -116,6 +118,9 @@ impl DFExtensionPlanner for ExtensionPlanner {
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<ReorderColumnsNode>() {
             let exec = ReorderColumnsExec::new(physical_inputs[0].clone(), node.columns.clone());
+            Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
+        } else if let Some(node) = any.downcast_ref::<RenameColumnsNode>() {
+            let exec = RenameColumnsExec::new(physical_inputs[0].clone(), node.columns.clone());
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<DbParquetNode>() {
             let exec = DBParquetExec::try_new(node.db.clone(), node.projection.clone())

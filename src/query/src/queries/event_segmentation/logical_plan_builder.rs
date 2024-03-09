@@ -52,6 +52,7 @@ use crate::logical_plan::partitioned_aggregate::PartitionedAggregateFinalNode;
 use crate::logical_plan::partitioned_aggregate::PartitionedAggregatePartialNode;
 use crate::logical_plan::partitioned_aggregate::SortField;
 use crate::logical_plan::pivot::PivotNode;
+use crate::logical_plan::rename_columns::RenameColumnsNode;
 use crate::logical_plan::reorder_columns::ReorderColumnsNode;
 use crate::logical_plan::segment;
 use crate::logical_plan::segment::SegmentExpr;
@@ -209,9 +210,38 @@ impl LogicalPlanBuilder {
 
         input = builder.decode_breakdowns_dictionaries(input, &mut cols_hash)?;
 
-        let group_cols = {
-            let mut cols = vec![COLUMN_EVENT.to_string(), COLUMN_SEGMENT.to_string()];
-            if let Some(breakdowns) = &es.breakdowns {
+        let mut group_cols = vec![COLUMN_EVENT.to_string(), COLUMN_SEGMENT.to_string()];
+        let mut rename_groups = vec![
+            (COLUMN_EVENT.to_string(), "Event".to_string()),
+            (COLUMN_SEGMENT.to_string(), "Segment".to_string()),
+        ];
+
+        if let Some(breakdowns) = &es.breakdowns {
+            for breakdown in breakdowns.iter() {
+                let prop = match breakdown {
+                    Breakdown::Property(p) => match p {
+                        PropertyRef::System(p) => {
+                            metadata.system_properties.get_by_name(ctx.project_id, p)?
+                        }
+                        PropertyRef::User(p) => {
+                            metadata.user_properties.get_by_name(ctx.project_id, p)?
+                        }
+                        PropertyRef::Event(p) => {
+                            metadata.event_properties.get_by_name(ctx.project_id, p)?
+                        }
+                        PropertyRef::Custom(_) => unimplemented!(),
+                    },
+                };
+                let cn = prop.column_name();
+                if !group_cols.contains(&cn) {
+                    group_cols.push(cn.clone());
+                    rename_groups.push((cn, prop.name()));
+                }
+            }
+        }
+
+        for event in &es.events {
+            if let Some(breakdowns) = &event.breakdowns {
                 for breakdown in breakdowns.iter() {
                     let prop = match breakdown {
                         Breakdown::Property(p) => match p {
@@ -228,45 +258,21 @@ impl LogicalPlanBuilder {
                         },
                     };
                     let cn = prop.column_name();
-                    if !cols.contains(&cn) {
-                        cols.push(cn);
+                    if !group_cols.contains(&cn) {
+                        group_cols.push(cn.clone());
+                        rename_groups.push((cn, prop.name()));
                     }
                 }
             }
-
-            for event in &es.events {
-                if let Some(breakdowns) = &event.breakdowns {
-                    for breakdown in breakdowns.iter() {
-                        let prop = match breakdown {
-                            Breakdown::Property(p) => match p {
-                                PropertyRef::System(p) => {
-                                    metadata.system_properties.get_by_name(ctx.project_id, p)?
-                                }
-                                PropertyRef::User(p) => {
-                                    metadata.user_properties.get_by_name(ctx.project_id, p)?
-                                }
-                                PropertyRef::Event(p) => {
-                                    metadata.event_properties.get_by_name(ctx.project_id, p)?
-                                }
-                                PropertyRef::Custom(_) => unimplemented!(),
-                            },
-                        };
-                        let cn = prop.column_name();
-                        if !cols.contains(&cn) {
-                            cols.push(cn);
-                        }
-                    }
-                }
-            }
-            cols.push(COL_AGG_NAME.to_string());
-
-            cols
-        };
-
+        }
+        group_cols.push(COL_AGG_NAME.to_string());
+        rename_groups.push((COL_AGG_NAME.to_string(), "Result".to_string()));
         let input = LogicalPlan::Extension(Extension {
             node: Arc::new(ReorderColumnsNode::try_new(input, group_cols)?),
         });
-
+        let input = LogicalPlan::Extension(Extension {
+            node: Arc::new(RenameColumnsNode::try_new(input, rename_groups)?),
+        });
         Ok(input)
     }
 
