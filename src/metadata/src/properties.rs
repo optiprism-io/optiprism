@@ -331,6 +331,18 @@ impl Properties {
         self.get_by_name_(&tx, project_id, name)
     }
 
+    pub fn get_by_column_name(&self, project_id: u64, col_name: &str) -> Result<Property> {
+        let props = self.list(project_id)?;
+        for prop in props.data {
+            if prop.column_name() == col_name {
+                return Ok(prop);
+            }
+        }
+
+        Err(MetadataError::NotFound(
+            format!("property with column name \"{}\" not found", col_name).to_string(),
+        ))
+    }
     pub fn list(&self, project_id: u64) -> Result<ListResponse<Property>> {
         let project_id = if self.typ == Type::System {
             0
@@ -568,9 +580,19 @@ impl Property {
 
                 name
             }
-            _ => {
-                format!("{}_{}", self.data_type.short_name(), self.order)
+            Type::Event => {
+                format!("e_{}_{}", self.data_type.short_name(), self.order)
             }
+            Type::User => {
+                format!("u_{}_{}", self.data_type.short_name(), self.order)
+            }
+        }
+    }
+
+    pub fn name(&self) -> String {
+        match &self.display_name {
+            None => self.name.to_owned(),
+            Some(dn) => dn.to_owned(),
         }
     }
 }
