@@ -52,6 +52,7 @@ use crate::logical_plan::partitioned_aggregate::PartitionedAggregateFinalNode;
 use crate::logical_plan::partitioned_aggregate::PartitionedAggregatePartialNode;
 use crate::logical_plan::partitioned_aggregate::SortField;
 use crate::logical_plan::pivot::PivotNode;
+use crate::logical_plan::rename_column_rows::RenameColumnRowsNode;
 use crate::logical_plan::rename_columns::RenameColumnsNode;
 use crate::logical_plan::reorder_columns::ReorderColumnsNode;
 use crate::logical_plan::segment;
@@ -210,6 +211,23 @@ impl LogicalPlanBuilder {
 
         input = builder.decode_breakdowns_dictionaries(input, &mut cols_hash)?;
 
+        let mut rename_rows = vec![];
+        for (event_id, event) in es.events.iter().enumerate() {
+            for (query_id, query) in event.queries.iter().enumerate() {
+                let from = format!("{event_id}_{query_id}_{}", query.agg.initial_name());
+                let to = query.agg.name();
+                rename_rows.push((from, to));
+            }
+        }
+
+        let input = LogicalPlan::Extension(Extension {
+            node: Arc::new(RenameColumnRowsNode::try_new(
+                input,
+                Column::new_unqualified(COL_AGG_NAME.to_string()),
+                rename_rows,
+            )?),
+        });
+
         let mut group_cols = vec![COLUMN_EVENT.to_string(), COLUMN_SEGMENT.to_string()];
         let mut rename_groups = vec![
             (COLUMN_EVENT.to_string(), "Event".to_string()),
@@ -266,13 +284,15 @@ impl LogicalPlanBuilder {
             }
         }
         group_cols.push(COL_AGG_NAME.to_string());
-        rename_groups.push((COL_AGG_NAME.to_string(), "Result".to_string()));
+        rename_groups.push((COL_AGG_NAME.to_string(), "Formula".to_string()));
+
         let input = LogicalPlan::Extension(Extension {
             node: Arc::new(ReorderColumnsNode::try_new(input, group_cols)?),
         });
         let input = LogicalPlan::Extension(Extension {
             node: Arc::new(RenameColumnsNode::try_new(input, rename_groups)?),
         });
+
         Ok(input)
     }
 
@@ -478,7 +498,7 @@ impl LogicalPlanBuilder {
                             format!("{event_id}_{idx}_partitioned_agg")
                         }
                         Query::AggregateProperty { .. } => format!("{event_id}_{idx}_agg"),
-                        Query::QueryFormula { .. } => format!("{event_id}_{idx}_count"),
+                        Query::QueryFormula { .. } => unimplemented!(),
                     })
                     .collect();
 
