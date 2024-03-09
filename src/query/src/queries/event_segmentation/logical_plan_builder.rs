@@ -211,28 +211,23 @@ impl LogicalPlanBuilder {
 
         input = builder.decode_breakdowns_dictionaries(input, &mut cols_hash)?;
 
-        let mut rename_rows = vec![];
-        for (event_id, event) in es.events.iter().enumerate() {
-            for (query_id, query) in event.queries.iter().enumerate() {
-                let from = format!("{event_id}_{query_id}_{}", query.agg.initial_name());
-                let to = query.agg.name();
-                rename_rows.push((from, to));
-            }
+        if ctx.format == Format::Compact {
+            return Ok(input);
         }
+        let mut group_cols = if ctx.format != Format::Compact {
+            vec![COLUMN_EVENT.to_string(), COLUMN_SEGMENT.to_string()]
+        } else {
+            vec![COLUMN_SEGMENT.to_string()]
+        };
 
-        let input = LogicalPlan::Extension(Extension {
-            node: Arc::new(RenameColumnRowsNode::try_new(
-                input,
-                Column::new_unqualified(COL_AGG_NAME.to_string()),
-                rename_rows,
-            )?),
-        });
-
-        let mut group_cols = vec![COLUMN_EVENT.to_string(), COLUMN_SEGMENT.to_string()];
-        let mut rename_groups = vec![
-            (COLUMN_EVENT.to_string(), "Event".to_string()),
-            (COLUMN_SEGMENT.to_string(), "Segment".to_string()),
-        ];
+        let mut rename_groups = if ctx.format != Format::Compact {
+            vec![
+                (COLUMN_EVENT.to_string(), "Event".to_string()),
+                (COLUMN_SEGMENT.to_string(), "Segment".to_string()),
+            ]
+        } else {
+            vec![(COLUMN_SEGMENT.to_string(), "Segment".to_string())]
+        };
 
         if let Some(breakdowns) = &es.breakdowns {
             for breakdown in breakdowns.iter() {
@@ -545,6 +540,23 @@ impl LogicalPlanBuilder {
                     )?),
                 })
             };
+
+            let mut rename_rows = vec![];
+            for (event_id, event) in self.es.events.iter().enumerate() {
+                for (query_id, query) in event.queries.iter().enumerate() {
+                    let from = format!("{event_id}_{query_id}_{}", query.agg.initial_name());
+                    let to = query.agg.name();
+                    rename_rows.push((from, to));
+                }
+            }
+
+            input = LogicalPlan::Extension(Extension {
+                node: Arc::new(RenameColumnRowsNode::try_new(
+                    input,
+                    Column::new_unqualified(COL_AGG_NAME.to_string()),
+                    rename_rows,
+                )?),
+            });
         }
         Ok(input)
     }
