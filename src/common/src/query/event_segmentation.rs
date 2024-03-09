@@ -139,6 +139,19 @@ pub enum Query {
 }
 
 impl Query {
+    pub fn initial_name(&self) -> &str {
+        match self {
+            Query::CountEvents => "count",
+            Query::CountUniqueGroups | Query::DailyActiveGroups | Query::CountPerGroup { .. } => {
+                "partitioned_count"
+            }
+            Query::WeeklyActiveGroups => unimplemented!(),
+            Query::MonthlyActiveGroups => unimplemented!(),
+            Query::AggregatePropertyPerGroup { .. } => "partitioned_agg",
+            Query::AggregateProperty { .. } => "agg",
+            Query::QueryFormula { .. } => unimplemented!(),
+        }
+    }
     pub fn name(&self) -> String {
         match self {
             Query::CountEvents => "Count".to_string(),

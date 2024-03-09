@@ -201,20 +201,7 @@ impl QueryProvider {
                     false => ColumnType::Dimension,
                 };
 
-                let arr = if field.name() == COL_AGG_NAME {
-                    let mut res = StringBuilder::new();
-                    let col = result.column(idx);
-                    for v in col.as_any().downcast_ref::<StringArray>().unwrap().iter() {
-                        let v = v.unwrap();
-                        let parts = v.split('_').collect::<Vec<&str>>();
-                        let event_id = parts[0].parse::<usize>().unwrap();
-                        let query_id = parts[1].parse::<usize>().unwrap();
-                        res.append_value(req.events[event_id].queries[query_id].agg.name());
-                    }
-                    Arc::new(res.finish())
-                } else {
-                    result.column(idx).to_owned()
-                };
+                let arr = result.column(idx).to_owned();
 
                 Column {
                     name: field.name().to_owned(),
