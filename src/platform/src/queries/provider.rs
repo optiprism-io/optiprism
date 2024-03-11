@@ -41,6 +41,8 @@ impl Queries {
         ctx.check_project_permission(project_id, ProjectPermission::ExploreReports)?;
         event_segmentation::validate(&self.md, project_id, &req)?;
         let lreq = req.try_into()?;
+        let lreq = event_segmentation::fix_types(&self.md, project_id, lreq)?;
+
         let cur_time = match query.timestamp {
             None => Utc::now(),
             Some(ts_sec) => DateTime::from_naive_utc_and_offset(

@@ -41,7 +41,7 @@ pub fn validate_filter_property(
         | PropValueOperation::Gte
         | PropValueOperation::Lt
         | PropValueOperation::Lte => match prop.data_type {
-            DType::Int8 | DType::Int16 | DType::Int64 | DType::Decimal => {}
+            DType::Int8 | DType::Int16 | DType::Int64 | DType::Decimal | DType::Timestamp => {}
             _ => {
                 return Err(PlatformError::BadRequest(format!(
                     "{err_prefix}property \"{}\" is not numeric, but operation is \"{:?}\"",
@@ -111,7 +111,8 @@ pub fn validate_filter_property(
                         | DType::Int16
                         | DType::Int32
                         | DType::Int64
-                        | DType::Decimal => {}
+                        | DType::Decimal
+                        | DType::Timestamp => {}
                         _ => {
                             return Err(PlatformError::BadRequest(format!(
                                 "{err_prefix}property \"{}\" is not numeric, but value {vid} is \"{value:?}\"",
