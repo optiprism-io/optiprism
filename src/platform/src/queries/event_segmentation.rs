@@ -4,6 +4,7 @@ use chrono::DateTime;
 use chrono::Utc;
 use common::query::event_segmentation::NamedQuery;
 use common::types::DType;
+use datafusion_common::ScalarValue;
 use metadata::MetadataProvider;
 use serde::Deserialize;
 use serde::Serialize;
@@ -1351,6 +1352,88 @@ pub(crate) fn validate(
     }
 
     Ok(())
+}
+
+pub(crate) fn fix_types(
+    md: &Arc<MetadataProvider>,
+    project_id: u64,
+    req: common::query::event_segmentation::EventSegmentation,
+) -> Result<common::query::event_segmentation::EventSegmentation> {
+    let mut out = req.clone();
+    for (event_id, event) in req.events.iter().enumerate() {
+        let filters = if let Some(filters) = &event.filters {
+            let mut filters_out = vec![];
+            for (filter_id, filter) in filters.iter().enumerate() {
+                match filter {
+                    common::query::EventFilter::Property {
+                        property,
+                        value,
+                        operation,
+                    } => {
+                        if value.is_none() {
+                            continue;
+                        }
+                        let prop = match property {
+                            common::query::PropertyRef::System(name) => {
+                                md.system_properties.get_by_name(project_id, name)?
+                            }
+                            common::query::PropertyRef::User(name) => {
+                                md.system_properties.get_by_name(project_id, name)?
+                            }
+                            common::query::PropertyRef::Event(name) => {
+                                md.system_properties.get_by_name(project_id, name)?
+                            }
+                            common::query::PropertyRef::Custom(_) => unimplemented!(),
+                        };
+
+                        let mut ev = vec![];
+                        for value in value.to_owned().unwrap().iter() {
+                            match (&prop.data_type, value) {
+                                (&DType::Timestamp, &ScalarValue::Decimal128(_, _, _)) => {
+                                    match out.events[event_id].clone().filters.unwrap()[filter_id]
+                                        .clone()
+                                    {
+                                        common::query::EventFilter::Property { value, .. } => {
+                                            for value in value.unwrap().iter() {
+                                                if let ScalarValue::Decimal128(Some(ts), _, _) =
+                                                    value
+                                                {
+                                                    let sv = ScalarValue::TimestampNanosecond(
+                                                        Some(*ts as i64),
+                                                        None,
+                                                    );
+                                                    ev.push(sv);
+                                                } else {
+                                                    unreachable!()
+                                                }
+                                            }
+                                        }
+                                    };
+                                }
+                                _ => ev.push(value.to_owned()),
+                            }
+                        }
+
+                        let filter = common::query::EventFilter::Property {
+                            property: property.to_owned(),
+                            operation: operation.to_owned(),
+                            value: Some(ev),
+                        };
+                        filters_out.push(filter);
+                    }
+                };
+            }
+            Some(filters_out)
+        } else {
+            None
+        };
+        out.events[event_id].filters = filters;
+    }
+
+    // TODO make for out.filters
+    dbg!(out.clone());
+
+    Ok(out)
 }
 
 #[cfg(test)]

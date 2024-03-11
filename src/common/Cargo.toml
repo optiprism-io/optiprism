@@ -23,10 +23,11 @@ serde_json = "1.0.89"
 serde_with = "3.0.0"
 thiserror = "1.0.37"
 axum = { version = "0.7.4" }
-axum-extra = {version = "0.9.2"}
+axum-extra = { version = "0.9.2" }
 log = "0.4.20"
 axum-core = "0.4.3"
 regex = "1"
 tracing = "0.1.37"
 hyper = "1.1.0"
 bytes = "1.4.0"
+derive-visitor = "0.3.0"

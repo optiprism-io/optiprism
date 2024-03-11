@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use chrono::DateTime;
 use chrono::Utc;
 use datafusion_common::ScalarValue;
