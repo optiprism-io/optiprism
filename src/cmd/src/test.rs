@@ -136,9 +136,9 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
     for _ in 0..2 {
         for user in 0..users {
             let mut cur_time = now - Duration::days(days);
-            for _day in 0..days {
+            for _day in 0..=days {
                 let mut event_time = cur_time;
-                for event in 0..events {
+                for event in 0..=events {
                     vals.truncate(0);
                     vals.push(NamedValue::new(
                         "project_id".to_string(),

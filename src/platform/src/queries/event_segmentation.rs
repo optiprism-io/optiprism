@@ -1133,8 +1133,16 @@ impl TryInto<common::query::event_segmentation::EventSegmentation> for EventSegm
                 .iter()
                 .map(|v| v.try_into())
                 .collect::<std::result::Result<_, _>>()?,
-            filters: None,
-            // filters: self.filters.map(|v| v.try_into()).transpose()?,
+            filters: self.filters.map(|v| {
+                v.groups[0]
+                    .filters
+                    .iter()
+                    .map(|f| {
+                        dbg!(f.to_owned());
+                        f.try_into().unwrap()
+                    })
+                    .collect::<Vec<_>>()
+            }),
             breakdowns: self
                 .breakdowns
                 .map_or_else(
