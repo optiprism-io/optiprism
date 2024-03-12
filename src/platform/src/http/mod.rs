@@ -5,6 +5,7 @@ pub mod dashboards;
 pub mod event_records;
 pub mod events;
 pub mod group_records;
+pub mod organizations;
 pub mod projects;
 pub mod properties;
 pub mod queries;
@@ -46,6 +47,7 @@ pub fn attach_routes(
     platform: &Arc<PlatformProvider>,
     cfg: Config,
 ) -> Router {
+    router = organizations::attach_routes(router);
     router = projects::attach_routes(router);
     router = accounts::attach_routes(router);
     router = auth::attach_routes(router);
@@ -68,6 +70,7 @@ pub fn attach_routes(
     }
 
     router = router
+        .layer(Extension(platform.organizations.clone()))
         .layer(Extension(platform.projects.clone()))
         .layer(Extension(md.accounts.clone()))
         .layer(Extension(platform.accounts.clone()))

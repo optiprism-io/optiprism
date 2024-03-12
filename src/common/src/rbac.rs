@@ -8,6 +8,7 @@ pub enum Permission {
     ManageAccounts,
     ViewAccounts,
     ManageOrganizations,
+    ViewOrganizations,
     ManageProjects,
 }
 
