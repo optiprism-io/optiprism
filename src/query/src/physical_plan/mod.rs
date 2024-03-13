@@ -17,5 +17,8 @@ mod add_string_column;
 mod db_parquet;
 mod funnel;
 mod unpivot;
+mod rename_column_rows;
+mod rename_columns;
+mod reorder_columns;
 // pub mod merge;
 // pub mod planner;

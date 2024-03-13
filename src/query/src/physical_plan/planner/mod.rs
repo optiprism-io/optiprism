@@ -45,6 +45,7 @@ use crate::physical_plan::db_parquet::DBParquetExec;
 use crate::physical_plan::dictionary_decode::DictionaryDecodeExec;
 use crate::physical_plan::merge::MergeExec;
 use crate::physical_plan::pivot::PivotExec;
+use crate::physical_plan::planner::funnel::funnel;
 use crate::physical_plan::planner::partitioned_aggregate::build_partitioned_aggregate_final_expr;
 use crate::physical_plan::planner::partitioned_aggregate::build_partitioned_aggregate_partial_expr;
 use crate::physical_plan::planner::segment::build_segment_expr;
@@ -181,6 +182,8 @@ impl DFExtensionPlanner for ExtensionPlanner {
                 .collect();
             let exec = DictionaryDecodeExec::new(physical_inputs[0].clone(), decode_cols);
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
+        } else if let Some(node) = any.downcast_ref::<FunnelNode>() {
+            Some(Arc::new(funnel(node)) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<PartitionedAggregatePartialNode>() {
             let partition_inputs = node
                 .partition_inputs
