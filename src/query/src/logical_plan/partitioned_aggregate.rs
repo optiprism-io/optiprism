@@ -29,6 +29,7 @@ use datafusion_expr::UserDefinedLogicalNode;
 use datafusion_expr::UserDefinedLogicalNodeCore;
 
 use crate::error::QueryError;
+use crate::logical_plan::SortField;
 use crate::Result;
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -64,64 +65,6 @@ impl From<&query::PartitionedAggregateFunction> for AggregateFunction {
         }
     }
 }
-
-pub mod funnel {
-    use chrono::Duration;
-    use datafusion_expr::Expr;
-
-    #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-    pub enum StepOrder {
-        Sequential,
-        Any(Vec<(usize, usize)>), // any of the steps
-    }
-
-    #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-    pub struct ExcludeSteps {
-        pub from: usize,
-        pub to: usize,
-    }
-
-    #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-    pub struct ExcludeExpr {
-        pub expr: Expr,
-        pub steps: Option<Vec<ExcludeSteps>>,
-    }
-
-    #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-    pub enum Count {
-        Unique,
-        NonUnique,
-        Session,
-    }
-
-    #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-    pub enum Order {
-        Any,
-        Asc,
-    }
-
-    #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-    pub enum Filter {
-        DropOffOnAnyStep,
-        // funnel should fail on any step
-        DropOffOnStep(usize),
-        // funnel should fail on certain step
-        TimeToConvert(Duration, Duration), // conversion should be within certain window
-    }
-
-    #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-    pub enum Touch {
-        First,
-        Last,
-        Step(usize),
-    }
-}
-
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub struct SortField {
-    pub data_type: DataType,
-}
-
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum AggregateExpr {
     Count {
