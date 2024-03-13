@@ -147,11 +147,9 @@ impl Group {
             let mut to_check = false;
             // check if this exclude is relevant to current step
             if let Some(steps) = &excl.steps {
-                for pair in steps {
-                    if pair.from <= self.cur_step && pair.to >= self.cur_step {
-                        to_check = true;
-                        break;
-                    }
+                if steps.from <= self.cur_step && steps.to >= self.cur_step {
+                    to_check = true;
+                    break;
                 }
             } else {
                 // check anyway

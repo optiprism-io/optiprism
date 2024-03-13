@@ -27,20 +27,20 @@ use crate::logical_plan::merge::MergeNode;
 use crate::logical_plan::SortField;
 use crate::Result;
 
-struct Funnel {
-    ts_col: Column,
-    from: DateTime<Utc>,
-    to: DateTime<Utc>,
-    window: Duration,
-    steps: Vec<(Expr, StepOrder)>,
-    exclude: Option<Vec<ExcludeExpr>>,
-    constants: Option<Vec<Column>>,
-    count: Count,
-    filter: Option<Filter>,
-    touch: Touch,
-    partition_col: Column,
-    bucket_size: Duration,
-    groups: Option<Vec<(Expr, String, SortField)>>,
+pub struct Funnel {
+    pub ts_col: Column,
+    pub from: DateTime<Utc>,
+    pub to: DateTime<Utc>,
+    pub window: Duration,
+    pub steps: Vec<(Expr, StepOrder)>,
+    pub exclude: Option<Vec<ExcludeExpr>>,
+    pub constants: Option<Vec<Expr>>,
+    pub count: Count,
+    pub filter: Option<Filter>,
+    pub touch: Touch,
+    pub partition_col: Expr,
+    pub bucket_size: Duration,
+    pub groups: Option<Vec<(Expr, String, SortField)>>,
 }
 
 impl Funnel {
@@ -110,7 +110,7 @@ pub struct ExcludeSteps {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct ExcludeExpr {
     pub expr: Expr,
-    pub steps: Option<Vec<ExcludeSteps>>,
+    pub steps: Option<ExcludeSteps>,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -144,9 +144,9 @@ pub enum Touch {
 
 #[derive(Hash, Eq, PartialEq, Clone)]
 pub struct FunnelNode {
-    input: LogicalPlan,
+    pub input: LogicalPlan,
     pub funnel: Funnel,
-    schema: DFSchemaRef,
+    pub schema: DFSchemaRef,
 }
 
 impl FunnelNode {
@@ -154,6 +154,7 @@ impl FunnelNode {
         let schema = funnel.schema(input.schema());
         let segment_field = DFField::new_unqualified("segment", DataType::Int64, false);
         let fields = vec![vec![segment_field], schema.fields().to_vec()].concat();
+        let schema = Arc::new(DFSchema::new_with_metadata(fields, Default::default())?);
         Ok(Self {
             input,
             funnel,

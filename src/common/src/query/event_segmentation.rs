@@ -8,12 +8,14 @@ use serde::Serialize;
 
 use crate::query::time_columns;
 use crate::query::AggregateFunction;
+use crate::query::Breakdown;
 use crate::query::EventFilter;
 use crate::query::EventRef;
 use crate::query::PartitionedAggregateFunction;
 use crate::query::PropValueOperation;
 use crate::query::PropertyRef;
 use crate::query::QueryTime;
+use crate::query::Segment;
 use crate::query::TimeIntervalUnit;
 use crate::scalar::ScalarValueRef;
 
@@ -219,11 +221,6 @@ impl NamedQuery {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub enum Breakdown {
-    Property(PropertyRef),
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Event {
     pub event: EventRef,
     pub filters: Option<Vec<EventFilter>>,
@@ -245,64 +242,6 @@ impl Event {
             queries,
         }
     }
-}
-
-#[serde_with::serde_as]
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub enum DidEventAggregate {
-    Count {
-        operation: PropValueOperation,
-        value: i64,
-        time: SegmentTime,
-    },
-    RelativeCount {
-        event: EventRef,
-        operation: PropValueOperation,
-        filters: Option<Vec<EventFilter>>,
-        time: SegmentTime,
-    },
-    AggregateProperty {
-        property: PropertyRef,
-        aggregate: QueryAggregate,
-        operation: PropValueOperation,
-        #[serde_as(as = "Option<ScalarValueRef>")]
-        value: Option<ScalarValue>,
-        time: SegmentTime,
-    },
-    HistoricalCount {
-        operation: PropValueOperation,
-        value: u64,
-        time: SegmentTime,
-    },
-}
-
-#[serde_with::serde_as]
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub enum SegmentCondition {
-    HasPropertyValue {
-        property_name: String,
-        operation: PropValueOperation,
-        #[serde_as(as = "Option<Vec<ScalarValueRef>>")]
-        value: Option<Vec<ScalarValue>>,
-    },
-    HadPropertyValue {
-        property_name: String,
-        operation: PropValueOperation,
-        #[serde_as(as = "Option<Vec<ScalarValueRef>>")]
-        value: Option<Vec<ScalarValue>>,
-        time: SegmentTime,
-    },
-    DidEvent {
-        event: EventRef,
-        filters: Option<Vec<EventFilter>>,
-        aggregate: DidEventAggregate,
-    },
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct Segment {
-    pub name: String,
-    pub conditions: Vec<Vec<SegmentCondition>>, // Or<And<SegmentCondition>>
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
