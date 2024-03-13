@@ -46,6 +46,7 @@ use crate::logical_plan::expr::multi_or;
 use crate::logical_plan::funnel::FunnelNode;
 use crate::logical_plan::SortField;
 use crate::queries::decode_filter_single_dictionary;
+use crate::queries::event_records_search::Event;
 use crate::Context;
 
 pub fn build(
@@ -54,6 +55,9 @@ pub fn build(
     mut input: LogicalPlan,
     req: Funnel,
 ) -> Result<LogicalPlan> {
+    let mut cols_hash: HashMap<String, ()> = HashMap::new();
+    let input = decode_filter_dictionaries(&ctx, &metadata, req.as_ref(), input, &mut cols_hash)?;
+
     let mut expr = col(Column {
         relation: None,
         name: COLUMN_PROJECT_ID.to_string(),
@@ -63,6 +67,7 @@ pub fn build(
     if let Some(filters) = &req.filters {
         expr = and(expr, event_filters_expression(&ctx, &metadata, filters)?)
     }
+    let input = LogicalPlan::Filter(PlanFilter::try_new(expr, Arc::new(input))?);
 
     let (from, to) = match req.time {
         QueryTime::Between { from, to } => (from, to),
@@ -217,4 +222,42 @@ pub fn build(
     });
 
     Ok(input)
+}
+
+fn decode_filter_dictionaries(
+    ctx: &Context,
+    metadata: &Arc<MetadataProvider>,
+    funnel: &Funnel,
+    input: LogicalPlan,
+    cols_hash: &mut HashMap<String, ()>,
+) -> Result<LogicalPlan> {
+    let mut decode_cols: Vec<(Column, Arc<SingleDictionaryProvider>)> = Vec::new();
+
+    for step in &funnel.steps {
+        for event in &step.events {
+            if let Some(filters) = &event.filters {
+                for filter in filters {
+                    decode_filter_single_dictionary(
+                        ctx,
+                        metadata,
+                        cols_hash,
+                        &mut decode_cols,
+                        filter,
+                    )?;
+                }
+            }
+        }
+    }
+
+    if let Some(filters) = &funnel.filters {
+        for filter in filters {
+            decode_filter_single_dictionary(ctx, metadata, cols_hash, &mut decode_cols, filter)?;
+        }
+    }
+    if decode_cols.is_empty() {
+        return Ok(input);
+    }
+    Ok(LogicalPlan::Extension(Extension {
+        node: Arc::new(DictionaryDecodeNode::try_new(input, decode_cols.clone())?),
+    }))
 }

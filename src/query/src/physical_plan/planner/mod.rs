@@ -18,6 +18,7 @@ use datafusion_expr::Expr;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::UserDefinedLogicalNode;
 
+mod funnel;
 mod partitioned_aggregate;
 mod segment;
 
@@ -29,6 +30,7 @@ use crate::error::Result;
 use crate::logical_plan::add_string_column::AddStringColumnNode;
 use crate::logical_plan::db_parquet::DbParquetNode;
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
+use crate::logical_plan::funnel::FunnelNode;
 use crate::logical_plan::merge::MergeNode;
 use crate::logical_plan::partitioned_aggregate::PartitionedAggregateFinalNode;
 use crate::logical_plan::partitioned_aggregate::PartitionedAggregatePartialNode;
