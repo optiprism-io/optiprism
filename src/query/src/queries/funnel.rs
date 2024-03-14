@@ -201,9 +201,10 @@ pub fn build(
         filter: req.filter.map(|f| match f {
             Filter::DropOffOnAnyStep => logical_plan::funnel::Filter::DropOffOnAnyStep,
             Filter::DropOffOnStep(n) => logical_plan::funnel::Filter::DropOffOnStep(n),
-            Filter::TimeToConvert(from, to) => {
-                logical_plan::funnel::Filter::TimeToConvert(from, to)
-            }
+            Filter::TimeToConvert(from, to) => logical_plan::funnel::Filter::TimeToConvert(
+                Duration::from_millis(from),
+                Duration::from_millis(to),
+            ),
         }),
         touch: match req.touch {
             Touch::First => logical_plan::funnel::Touch::First,

@@ -16,6 +16,7 @@ mod tests {
     use common::query::funnel::TimeIntervalUnitSession;
     use common::query::funnel::TimeWindow;
     use common::query::funnel::Touch;
+    use common::query::Breakdown;
     use common::query::EventFilter;
     use common::query::EventRef;
     use common::query::PropValueOperation;
@@ -27,6 +28,7 @@ mod tests {
     use query::test_util::events_provider;
     use query::Context;
 
+    #[test]
     async fn test_full() {
         let (md, db) = init_db()?;
 
@@ -89,9 +91,15 @@ mod tests {
                 },
                 steps: None,
             }]),
-            breakdowns: None,
+            breakdowns: Some(vec![Breakdown::Property(PropertyRef::User(
+                "Device".to_string(),
+            ))]),
             segments: None,
-            filters: None,
+            filters: Some(vec![EventFilter::Property {
+                property: PropertyRef::User("Is Premium".to_string()),
+                operation: PropValueOperation::Eq,
+                value: Some(vec![ScalarValue::Boolean(Some(true))]),
+            }]),
         };
     }
 }

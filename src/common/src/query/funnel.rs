@@ -7,14 +7,14 @@ use datafusion_expr::Expr;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::query::event_segmentation::Breakdown;
-use crate::query::event_segmentation::Segment;
+use crate::query::Breakdown;
 use crate::query::EventFilter;
 use crate::query::EventRef;
 use crate::query::PropertyRef;
 use crate::query::QueryTime;
+use crate::query::Segment;
 use crate::query::TimeIntervalUnit;
-
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Funnel {
     pub time: QueryTime,
     pub group: String,
@@ -32,21 +32,22 @@ pub struct Funnel {
     pub segments: Option<Vec<Segment>>,
     pub filters: Option<Vec<EventFilter>>,
 }
-
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Step {
     pub events: Vec<Event>,
     pub order: StepOrder,
 }
-
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum Order {
     Any,
     Exact,
 }
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Event {
     pub event: EventRef,
     pub filters: Option<Vec<EventFilter>>,
 }
-
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct TimeWindow {
     pub n: i64,
     pub unit: TimeIntervalUnitSession,
@@ -104,50 +105,44 @@ impl TimeIntervalUnitSession {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum StepOrder {
     Sequential,
     Any(Vec<(usize, usize)>), // any of the steps
 }
-
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum ExcludeSteps {
     All,
     Between(usize, usize),
 }
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub struct ExcludeExpr {
-    pub expr: Expr,
-    pub steps: Option<Vec<ExcludeSteps>>,
-    pub step_order: StepOrder,
-}
-
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum Count {
     Unique,
     NonUnique,
     Session,
 }
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Exclude {
     pub event: Event,
     pub steps: Option<ExcludeSteps>,
 }
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum Filter {
     DropOffOnAnyStep,
     // funnel should fail on any step
     DropOffOnStep(usize),
     // funnel should fail on certain step
-    TimeToConvert(Duration, Duration), // conversion should be within certain window
+    TimeToConvert(i64, i64), // conversion should be within certain window
 }
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum Touch {
     First,
     Last,
     Step(usize),
 }
-
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum ChartType {
     Steps,
     ConversionOverTime {
