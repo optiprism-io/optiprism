@@ -21,6 +21,7 @@ use datafusion_common::DFSchemaRef;
 use datafusion_expr::Expr;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::UserDefinedLogicalNode;
+use common::types::TIME_UNIT;
 
 use crate::error::QueryError;
 use crate::logical_plan::merge::MergeNode;
@@ -49,7 +50,7 @@ impl Funnel {
         let mut fields = vec![
             DFField::new_unqualified(
                 "ts",
-                DataType::Timestamp(TimeUnit::Millisecond, None),
+                DataType::Timestamp(TIME_UNIT, None),
                 false,
             ),
             DFField::new_unqualified("total", DataType::Int64, false),

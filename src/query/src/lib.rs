@@ -325,7 +325,7 @@ pub mod test_util {
     use arrow::datatypes::Field;
     use arrow::datatypes::Schema;
     use arrow::datatypes::TimeUnit;
-    use common::types::DType;
+    use common::types::{DType, TIME_UNIT};
     use common::types::COLUMN_CREATED_AT;
     use common::types::COLUMN_EVENT;
     use common::types::COLUMN_PROJECT_ID;
@@ -363,7 +363,7 @@ pub mod test_util {
             Field::new("user_id", DataType::Int64, false),
             Field::new(
                 "created_at",
-                DataType::Timestamp(TimeUnit::Millisecond, None),
+                DataType::Timestamp(TIME_UNIT, None),
                 false,
             ),
             Field::new("event", DataType::Int64, true),

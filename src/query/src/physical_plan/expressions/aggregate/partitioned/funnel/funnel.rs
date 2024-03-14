@@ -29,6 +29,7 @@ use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
 use datafusion_common::ScalarValue;
 use rust_decimal::Decimal;
+use common::types::TIME_UNIT;
 
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::evaluate_batch;
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::Batch;
@@ -375,7 +376,7 @@ impl Funnel {
 
     pub fn fields(&self) -> Vec<Field> {
         let mut fields = vec![
-            Field::new("ts", DataType::Timestamp(TimeUnit::Millisecond, None), true),
+            Field::new("ts", DataType::Timestamp(TIME_UNIT, None), true),
             Field::new("total", DataType::Int64, true),
             Field::new("completed", DataType::Int64, true),
         ];

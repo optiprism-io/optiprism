@@ -304,59 +304,6 @@ impl AggregateExpr {
                     vec![DFField::new_unqualified(RESERVED_COLUMN_AGG, rt2, true)]
                 }
             }
-            /*AggregateExpr::Funnel { groups, steps, .. } => {
-                let mut fields = vec![
-                    DFField::new_unqualified(
-                        "ts",
-                        DataType::Timestamp(TimeUnit::Millisecond, None),
-                        true,
-                    ),
-                    DFField::new_unqualified("total", DataType::Int64, true),
-                    DFField::new_unqualified("completed", DataType::Int64, true),
-                ];
-
-                // prepend group fields if we have grouping
-                if let Some(groups) = &groups {
-                    let group_fields = groups
-                        .iter()
-                        .map(|(expr, _)| {
-                            schema
-                                .field_with_unqualified_name(expr.display_name().unwrap().as_str())
-                                .unwrap()
-                                .to_owned()
-                        })
-                        .collect::<Vec<_>>();
-
-                    fields = [group_fields, fields].concat();
-                }
-
-                // add fields for each step
-                let mut step_fields = (0..steps.len())
-                    .flat_map(|step_id| {
-                        let fields = vec![
-                            DFField::new_unqualified(
-                                format!("step{}_total", step_id).as_str(),
-                                DataType::Int64,
-                                true,
-                            ),
-                            DFField::new_unqualified(
-                                format!("step{}_time_to_convert", step_id).as_str(),
-                                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
-                                true,
-                            ),
-                            DFField::new_unqualified(
-                                format!("step{}_time_to_convert_from_start", step_id).as_str(),
-                                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
-                                true,
-                            ),
-                        ];
-                        fields
-                    })
-                    .collect::<Vec<_>>();
-                fields.append(&mut step_fields);
-
-                fields
-            }*/
         };
 
         Ok(fields)

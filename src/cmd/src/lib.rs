@@ -103,7 +103,7 @@ pub fn init_metrics() {
     describe_histogram!("store.insert_time_seconds", Unit::Seconds, "insert time");
     describe_counter!("store.scans_total", "number of scans processed");
     describe_counter!("store.scan_merges_total", "number of merges during scan");
-    describe_histogram!("store.scan_time_seconds", Unit::Microseconds, "scan time");
+    describe_histogram!("store.scan_time_seconds", Unit::Seconds, "scan time");
     describe_histogram!(
         "store.scan_memtable_seconds",
         Unit::Seconds,
