@@ -253,7 +253,11 @@ impl AggregateExpr {
     pub fn fields(&self, schema: &DFSchema, final_: bool) -> Result<Vec<DFField>> {
         let fields = match self {
             AggregateExpr::Count { .. } => {
-                vec![DFField::new_unqualified(RESERVED_COLUMN_COUNT, DataType::Int64, true)]
+                vec![DFField::new_unqualified(
+                    RESERVED_COLUMN_COUNT,
+                    DataType::Int64,
+                    true,
+                )]
             }
             AggregateExpr::Aggregate { predicate, agg, .. } => {
                 if final_ {
@@ -282,7 +286,11 @@ impl AggregateExpr {
                     _ => Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
                 };
 
-                vec![DFField::new_unqualified(RESERVED_COLUMN_AGG_PARTITIONED_COUNT, dt, true)]
+                vec![DFField::new_unqualified(
+                    RESERVED_COLUMN_AGG_PARTITIONED_COUNT,
+                    dt,
+                    true,
+                )]
             }
             AggregateExpr::PartitionedAggregate {
                 predicate,

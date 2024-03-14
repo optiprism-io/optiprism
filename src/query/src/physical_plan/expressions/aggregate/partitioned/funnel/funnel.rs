@@ -22,6 +22,7 @@ use chrono::Duration;
 use chrono::DurationRound;
 use chrono::NaiveDateTime;
 use chrono::Utc;
+use common::types::TIME_UNIT;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 use datafusion::physical_expr::expressions::Column;
@@ -29,7 +30,6 @@ use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
 use datafusion_common::ScalarValue;
 use rust_decimal::Decimal;
-use common::types::TIME_UNIT;
 
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::evaluate_batch;
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::Batch;

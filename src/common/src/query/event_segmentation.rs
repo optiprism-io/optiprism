@@ -43,7 +43,7 @@ pub enum SegmentTime {
 impl SegmentTime {
     pub fn try_window(&self) -> Option<i64> {
         match self {
-            SegmentTime::Each { n, unit } => Some(unit.duration(*n).num_seconds()),
+            SegmentTime::Each { n, unit } => Some(unit.duration(*n).num_milliseconds()),
             _ => None,
         }
     }

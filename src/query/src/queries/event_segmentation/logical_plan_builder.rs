@@ -2,13 +2,13 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use common::query::event_segmentation::Breakdown;
-use common::query::event_segmentation::DidEventAggregate;
 use common::query::event_segmentation::Event;
 use common::query::event_segmentation::EventSegmentation;
 use common::query::event_segmentation::Query;
-use common::query::event_segmentation::SegmentCondition;
 use common::query::time_columns;
+use common::query::DidEventAggregate;
 use common::query::PropertyRef;
+use common::query::SegmentCondition;
 use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_PROJECT_ID;

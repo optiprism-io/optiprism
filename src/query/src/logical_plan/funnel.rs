@@ -11,6 +11,7 @@ use arrow::datatypes::TimeUnit;
 use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
+use common::types::TIME_UNIT;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 use datafusion::physical_plan::common::collect;
@@ -21,7 +22,6 @@ use datafusion_common::DFSchemaRef;
 use datafusion_expr::Expr;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::UserDefinedLogicalNode;
-use common::types::TIME_UNIT;
 
 use crate::error::QueryError;
 use crate::logical_plan::merge::MergeNode;
@@ -48,11 +48,7 @@ pub struct Funnel {
 impl Funnel {
     pub fn schema(&self, schema: &DFSchemaRef) -> DFSchemaRef {
         let mut fields = vec![
-            DFField::new_unqualified(
-                "ts",
-                DataType::Timestamp(TIME_UNIT, None),
-                false,
-            ),
+            DFField::new_unqualified("ts", DataType::Timestamp(TIME_UNIT, None), false),
             DFField::new_unqualified("total", DataType::Int64, false),
             DFField::new_unqualified("completed", DataType::Int64, false),
         ];

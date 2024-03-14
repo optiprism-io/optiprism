@@ -325,11 +325,12 @@ pub mod test_util {
     use arrow::datatypes::Field;
     use arrow::datatypes::Schema;
     use arrow::datatypes::TimeUnit;
-    use common::types::{DType, TIME_UNIT};
+    use common::types::DType;
     use common::types::COLUMN_CREATED_AT;
     use common::types::COLUMN_EVENT;
     use common::types::COLUMN_PROJECT_ID;
     use common::types::COLUMN_USER_ID;
+    use common::types::TIME_UNIT;
     use common::DECIMAL_PRECISION;
     use common::DECIMAL_SCALE;
     use datafusion::datasource::listing::ListingTable;
@@ -361,11 +362,7 @@ pub mod test_util {
         let schema = Schema::new(vec![
             Field::new("project_id", DataType::Int64, false),
             Field::new("user_id", DataType::Int64, false),
-            Field::new(
-                "created_at",
-                DataType::Timestamp(TIME_UNIT, None),
-                false,
-            ),
+            Field::new("created_at", DataType::Timestamp(TIME_UNIT, None), false),
             Field::new("event", DataType::Int64, true),
             Field::new("user_country", DataType::Int64, true),
             Field::new("user_device", DataType::Utf8, true),

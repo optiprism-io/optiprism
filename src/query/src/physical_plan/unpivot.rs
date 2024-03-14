@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
 
-use arrow::array::{Array, TimestampMillisecondArray, TimestampMillisecondBuilder};
+use arrow::array::Array;
 use arrow::array::ArrayAccessor;
 use arrow::array::ArrayRef;
 use arrow::array::BooleanArray;
