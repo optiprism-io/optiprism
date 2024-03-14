@@ -27,6 +27,7 @@ use crate::logical_plan::merge::MergeNode;
 use crate::logical_plan::SortField;
 use crate::Result;
 
+#[derive(Hash, Eq, PartialEq, Clone)]
 pub struct Funnel {
     pub ts_col: Column,
     pub from: DateTime<Utc>,
@@ -145,18 +146,27 @@ pub enum Touch {
 #[derive(Hash, Eq, PartialEq, Clone)]
 pub struct FunnelNode {
     pub input: LogicalPlan,
+    pub partition_inputs: Option<Vec<LogicalPlan>>,
+    pub partition_col: Column,
     pub funnel: Funnel,
     pub schema: DFSchemaRef,
 }
 
 impl FunnelNode {
-    pub fn new(input: LogicalPlan, funnel: Funnel) -> Result<Self> {
+    pub fn new(
+        input: LogicalPlan,
+        partition_inputs: Option<Vec<LogicalPlan>>,
+        partition_col: Column,
+        funnel: Funnel,
+    ) -> Result<Self> {
         let schema = funnel.schema(input.schema());
         let segment_field = DFField::new_unqualified("segment", DataType::Int64, false);
         let fields = vec![vec![segment_field], schema.fields().to_vec()].concat();
         let schema = Arc::new(DFSchema::new_with_metadata(fields, Default::default())?);
         Ok(Self {
             input,
+            partition_inputs,
+            partition_col,
             funnel,
             schema,
         })
@@ -194,7 +204,12 @@ impl UserDefinedLogicalNode for FunnelNode {
     }
 
     fn from_template(&self, _: &[Expr], inputs: &[LogicalPlan]) -> Arc<dyn UserDefinedLogicalNode> {
-        Arc::new(FunnelNode::new(inputs[0].to_owned(), self.funnel.clone()))
+        Arc::new(FunnelNode::new(
+            inputs[0].to_owned(),
+            self.partition_inputs.clone(),
+            self.partition_col.clone(),
+            self.funnel.clone(),
+        ))
     }
 
     fn dyn_hash(&self, state: &mut dyn Hasher) {
@@ -205,7 +220,6 @@ impl UserDefinedLogicalNode for FunnelNode {
     fn dyn_eq(&self, other: &dyn UserDefinedLogicalNode) -> bool {
         match other.as_any().downcast_ref::<Self>() {
             Some(o) => self == o,
-
             None => false,
         }
     }

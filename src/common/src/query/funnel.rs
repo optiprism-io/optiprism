@@ -48,8 +48,8 @@ pub struct Event {
 }
 
 pub struct TimeWindow {
-    n: i64,
-    unit: TimeIntervalUnitSession,
+    pub n: i64,
+    pub unit: TimeIntervalUnitSession,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]

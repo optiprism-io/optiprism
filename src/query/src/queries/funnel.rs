@@ -218,7 +218,12 @@ pub fn build(
         groups,
     };
     let input = LogicalPlan::Extension(Extension {
-        node: Arc::new(FunnelNode::new(input, funnel)?),
+        node: Arc::new(FunnelNode::new(
+            input,
+            None,
+            Column::from_qualified_name(COLUMN_USER_ID),
+            funnel,
+        )?),
     });
 
     Ok(input)

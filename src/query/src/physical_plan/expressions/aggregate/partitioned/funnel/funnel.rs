@@ -287,7 +287,7 @@ pub struct Options {
     pub window: Duration,
     pub steps: Vec<(PhysicalExprRef, StepOrder)>,
     pub exclude: Option<Vec<ExcludeExpr>>,
-    pub constants: Option<Vec<Column>>,
+    pub constants: Option<Vec<PhysicalExprRef>>,
     pub count: Count,
     pub filter: Option<Filter>,
     pub touch: Touch,
