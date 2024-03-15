@@ -183,10 +183,10 @@ impl DFExtensionPlanner for ExtensionPlanner {
             let exec = DictionaryDecodeExec::new(physical_inputs[0].clone(), decode_cols);
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<FunnelNode>() {
-            Some(
-                Arc::new(build_funnel(logical_inputs, physical_inputs, node)?)
-                    as Arc<dyn ExecutionPlan>,
-            )
+            Some(Arc::new(
+                build_funnel(logical_inputs, physical_inputs, node)
+                    .map_err(|err| DataFusionError::Plan(err.to_string()))?,
+            ) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<PartitionedAggregatePartialNode>() {
             let partition_inputs = node
                 .partition_inputs

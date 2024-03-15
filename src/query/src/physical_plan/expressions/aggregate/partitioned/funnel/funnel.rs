@@ -16,6 +16,7 @@ use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
 use arrow::datatypes::TimeUnit;
 use arrow::record_batch::RecordBatch;
+use arrow::util::pretty::print_batches;
 use arrow_row::SortField;
 use chrono::DateTime;
 use chrono::Duration;
@@ -203,7 +204,7 @@ impl Group {
             },
         };
 
-        let ts = NaiveDateTime::from_timestamp_opt(self.steps[0].ts, 0).unwrap();
+        let ts = NaiveDateTime::from_timestamp_millis(self.steps[0].ts).unwrap();
         let ts = ts.duration_trunc(bucket_size).unwrap();
         let k = ts.timestamp_millis();
 
@@ -250,18 +251,18 @@ impl Dbg {
 #[derive(Debug)]
 pub struct Funnel {
     input_schema: SchemaRef,
-    ts_col: Column,
+    ts_col: PhysicalExprRef,
     window: Duration,
     steps_expr: Vec<PhysicalExprRef>,
     steps_orders: Vec<StepOrder>,
     exclude_expr: Option<Vec<ExcludeExpr>>,
     // expr and vec of step ids
-    constants: Option<Vec<Column>>,
+    constants: Option<Vec<PhysicalExprRef>>,
     count: Count,
     // vec of col ids
     filter: Option<Filter>,
     touch: Touch,
-    partition_col: Column,
+    partition_col: PhysicalExprRef,
     buf: HashMap<usize, Batch, RandomState>,
     batch_id: usize,
     _processed_batches: usize,
@@ -282,7 +283,7 @@ pub struct Funnel {
 #[derive(Debug, Clone)]
 pub struct Options {
     pub schema: SchemaRef,
-    pub ts_col: Column,
+    pub ts_col: PhysicalExprRef,
     pub from: DateTime<Utc>,
     pub to: DateTime<Utc>,
     pub window: Duration,
@@ -292,7 +293,7 @@ pub struct Options {
     pub count: Count,
     pub filter: Option<Filter>,
     pub touch: Touch,
-    pub partition_col: Column,
+    pub partition_col: PhysicalExprRef,
     pub bucket_size: Duration,
     pub groups: Option<Vec<(PhysicalExprRef, String, SortField)>>,
 }
@@ -428,6 +429,7 @@ impl Funnel {
         batch: &RecordBatch,
         partition_exist: Option<&HashMap<i64, (), RandomState>>,
     ) -> crate::Result<()> {
+        print_batches(&[batch.clone()]).unwrap();
         let funnel_batch = evaluate_batch(
             batch.to_owned(),
             &self.steps_expr,
@@ -445,7 +447,6 @@ impl Funnel {
             .downcast_ref::<Int64Array>()
             .unwrap()
             .clone();
-
         let rows = if let Some(groups) = &mut self.groups {
             let arrs = groups
                 .exprs
@@ -670,6 +671,7 @@ impl Funnel {
     }
 
     pub fn finalize(&mut self) -> crate::Result<Vec<ArrayRef>> {
+        dbg!(self.debug.clone().inner());
         // in case of grouping make an array of groups (group_arrs)
         let (group_arrs, groups) = if let Some(groups) = &mut self.groups {
             let mut rows: Vec<arrow_row::Row> = Vec::with_capacity(groups.groups.len());
@@ -788,6 +790,9 @@ impl Funnel {
             res.push([arrs, step_arrs].concat());
         }
 
+        if res.is_empty() {
+            return Ok(RecordBatch::new_empty(self.schema()).columns().to_vec());
+        }
         let res = (0..res[0].len())
             .map(|col_id| {
                 let arrs = res.iter().map(|v| v[col_id].as_ref()).collect::<Vec<_>>();
@@ -887,7 +892,7 @@ mod tests {
                     .with_timezone(&Utc),
                     schema: schema.clone(),
                     groups: None,
-                    ts_col: Column::new("ts", 1),
+                    ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::minutes(15),
                     steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
                     exclude: None,
@@ -895,7 +900,7 @@ mod tests {
                     count: Count::Unique,
                     filter: None,
                     touch: Touch::First,
-                    partition_col: Column::new("user_id", 0),
+                    partition_col: Arc::new(Column::new("user_id", 0)),
                     bucket_size: Duration::minutes(10),
                 },
                 exp_debug: vec![
@@ -938,7 +943,7 @@ asd
                     .with_timezone(&Utc),
                     schema: schema.clone(),
                     groups: None,
-                    ts_col: Column::new("ts", 1),
+                    ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::minutes(15),
                     steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
                     exclude: None,
@@ -946,7 +951,7 @@ asd
                     count: Count::Unique,
                     filter: None,
                     touch: Touch::First,
-                    partition_col: Column::new("user_id", 0),
+                    partition_col: Arc::new(Column::new("user_id", 0)),
                     bucket_size: Duration::minutes(10),
                 },
                 exp_debug: vec![
@@ -990,7 +995,7 @@ asd
                     .with_timezone(&Utc),
                     schema: schema.clone(),
                     groups: None,
-                    ts_col: Column::new("ts", 1),
+                    ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::minutes(15),
                     steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
                     exclude: None,
@@ -998,7 +1003,7 @@ asd
                     count: Count::NonUnique,
                     filter: None,
                     touch: Touch::First,
-                    partition_col: Column::new("user_id", 0),
+                    partition_col: Arc::new(Column::new("user_id", 0)),
                     bucket_size: Duration::minutes(10),
                 },
                 exp_debug: vec![
@@ -1037,7 +1042,7 @@ asd
                     to: DateTime::from_timestamp(2, 0).unwrap(),
                     schema: schema.clone(),
                     groups: None,
-                    ts_col: Column::new("ts", 1),
+                    ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::seconds(15),
                     steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
                     exclude: None,
@@ -1045,7 +1050,7 @@ asd
                     count: Count::Unique,
                     filter: None,
                     touch: Touch::First,
-                    partition_col: Column::new("user_id", 0),
+                    partition_col: Arc::new(Column::new("user_id", 0)),
                     bucket_size: Duration::minutes(10),
                 },
                 exp_debug: vec![
@@ -1077,7 +1082,7 @@ asd
                     to: DateTime::from_timestamp(2, 0).unwrap(),
                     bucket_size: Duration::minutes(10),
                     groups: None,
-                    ts_col: Column::new("ts", 1),
+                    ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::seconds(15),
                     steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
                     exclude: None,
@@ -1085,7 +1090,7 @@ asd
                     count: Count::Unique,
                     filter: None,
                     touch: Touch::First,
-                    partition_col: Column::new("user_id", 0),
+                    partition_col: Arc::new(Column::new("user_id", 0)),
                 },
                 exp_debug: vec![
                     (0, 0, DebugStep::Step),
@@ -1117,15 +1122,17 @@ asd
                     to: DateTime::from_timestamp(2, 0).unwrap(),
                     bucket_size: Duration::minutes(10),
                     groups: None,
-                    ts_col: Column::new("ts", 1),
+                    ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::seconds(15),
                     steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
                     exclude: None,
-                    constants: Some(vec![Column::new_with_schema("const", &schema).unwrap()]),
+                    constants: Some(vec![Arc::new(
+                        Column::new_with_schema("const", &schema).unwrap(),
+                    )]),
                     count: Count::Unique,
                     filter: None,
                     touch: Touch::First,
-                    partition_col: Column::new("user_id", 0),
+                    partition_col: Arc::new(Column::new("user_id", 0)),
                 },
                 exp_debug: vec![
                     (0, 0, DebugStep::Step),
@@ -1156,15 +1163,17 @@ asd
                     to: DateTime::from_timestamp(2, 0).unwrap(),
                     bucket_size: Duration::minutes(10),
                     groups: None,
-                    ts_col: Column::new("ts", 1),
+                    ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::seconds(15),
                     steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
                     exclude: None,
-                    constants: Some(vec![Column::new_with_schema("const", &schema).unwrap()]),
+                    constants: Some(vec![Arc::new(
+                        Column::new_with_schema("const", &schema).unwrap(),
+                    )]),
                     count: Count::Unique,
                     filter: None,
                     touch: Touch::First,
-                    partition_col: Column::new("user_id", 0),
+                    partition_col: Arc::new(Column::new("user_id", 0)),
                 },
                 exp_debug: vec![
                     (0, 0, DebugStep::Step),
@@ -1196,15 +1205,17 @@ asd
                     to: DateTime::from_timestamp(4, 0).unwrap(),
                     bucket_size: Duration::minutes(10),
                     groups: None,
-                    ts_col: Column::new("ts", 1),
+                    ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::seconds(15),
                     steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
                     exclude: None,
-                    constants: Some(vec![Column::new_with_schema("const", &schema).unwrap()]),
+                    constants: Some(vec![Arc::new(
+                        Column::new_with_schema("const", &schema).unwrap(),
+                    )]),
                     count: Count::Unique,
                     filter: None,
                     touch: Touch::First,
-                    partition_col: Column::new("user_id", 0),
+                    partition_col: Arc::new(Column::new("user_id", 0)),
                 },
                 exp_debug: vec![
                     (0, 0, DebugStep::Step),
@@ -1243,7 +1254,7 @@ asd
                     to: DateTime::from_timestamp(5, 0).unwrap(),
                     bucket_size: Duration::minutes(10),
                     groups: None,
-                    ts_col: Column::new("ts", 1),
+                    ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::seconds(15),
                     steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
                     exclude: Some(vec![ExcludeExpr {
@@ -1259,7 +1270,7 @@ asd
                     count: Count::Unique,
                     filter: None,
                     touch: Touch::First,
-                    partition_col: Column::new("user_id", 0),
+                    partition_col: Arc::new(Column::new("user_id", 0)),
                 },
                 exp_debug: vec![
                     (0, 0, DebugStep::Step),
@@ -1301,7 +1312,7 @@ asd
             // to: DateTime::from_timestamp(8, 0).unwrap(),
             // bucket_size: Duration::minutes(10),
             // groups: None,
-            // ts_col: Column::new("ts", 1),
+            // ts_col: Arc::new(Column::new("ts", 1)),
             // window: Duration::milliseconds(3),
             // steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
             // exclude: None,
@@ -1309,7 +1320,7 @@ asd
             // count: Count::Unique,
             // filter: None,
             // touch: Touch::First,
-            // partition_col: Column::new("user_id", 0),
+            // partition_col: Arc::new(Column::new("user_id", 0)),
             // },
             // exp_debug: vec![
             // (0, 0, DebugStep::Step),
@@ -1347,7 +1358,7 @@ asd
                     to: DateTime::from_timestamp(2, 0).unwrap(),
                     bucket_size: Duration::minutes(10),
                     groups: None,
-                    ts_col: Column::new("ts", 1),
+                    ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::seconds(15),
                     steps: vec![
                         event_eq_(&schema, "e1", Sequential),
@@ -1359,7 +1370,7 @@ asd
                     count: Count::Unique,
                     filter: None,
                     touch: Touch::First,
-                    partition_col: Column::new("user_id", 0),
+                    partition_col: Arc::new(Column::new("user_id", 0)),
                 },
                 exp_debug: vec![
                     (0, 0, DebugStep::Step),
@@ -1393,7 +1404,7 @@ asd
                     to: DateTime::from_timestamp(2, 0).unwrap(),
                     bucket_size: Duration::minutes(10),
                     groups: None,
-                    ts_col: Column::new("ts", 1),
+                    ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::seconds(15),
                     steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
                     exclude: None,
@@ -1401,7 +1412,7 @@ asd
                     count: Count::Unique,
                     filter: None,
                     touch: Touch::First,
-                    partition_col: Column::new("user_id", 0),
+                    partition_col: Arc::new(Column::new("user_id", 0)),
                 },
                 exp_debug: vec![
                     (0, 0, DebugStep::Step),
@@ -1443,7 +1454,7 @@ asd
                     to: DateTime::from_timestamp(2, 0).unwrap(),
                     bucket_size: Duration::minutes(10),
                     groups: None,
-                    ts_col: Column::new("ts", 1),
+                    ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::seconds(15),
                     steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
                     exclude: None,
@@ -1451,7 +1462,7 @@ asd
                     count: Count::Unique,
                     filter: None,
                     touch: Touch::First,
-                    partition_col: Column::new("user_id", 0),
+                    partition_col: Arc::new(Column::new("user_id", 0)),
                 },
                 exp_debug: vec![
                     (0, 0, DebugStep::Step),
@@ -1487,7 +1498,7 @@ asd
                     to: DateTime::from_timestamp(2, 0).unwrap(),
                     bucket_size: Duration::minutes(10),
                     groups: None,
-                    ts_col: Column::new("ts", 1),
+                    ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::seconds(15),
                     steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
                     exclude: None,
@@ -1495,7 +1506,7 @@ asd
                     count: Count::Unique,
                     filter: Some(Filter::DropOffOnAnyStep),
                     touch: Touch::First,
-                    partition_col: Column::new("user_id", 0),
+                    partition_col: Arc::new(Column::new("user_id", 0)),
                 },
                 exp_debug: vec![
                     (0, 0, DebugStep::Step),
@@ -1524,7 +1535,7 @@ asd
                     to: DateTime::from_timestamp(2, 0).unwrap(),
                     bucket_size: Duration::minutes(10),
                     groups: None,
-                    ts_col: Column::new("ts", 1),
+                    ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::seconds(15),
                     steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
                     exclude: None,
@@ -1532,7 +1543,7 @@ asd
                     count: Count::Unique,
                     filter: Some(Filter::DropOffOnStep(2)),
                     touch: Touch::First,
-                    partition_col: Column::new("user_id", 0),
+                    partition_col: Arc::new(Column::new("user_id", 0)),
                 },
                 exp_debug: vec![
                     (0, 0, DebugStep::Step),
@@ -1619,7 +1630,7 @@ asd
 
         let opts = Options {
             schema: schema.clone(),
-            ts_col: Column::new_with_schema("ts", &schema).unwrap(),
+            ts_col: Arc::new(Column::new_with_schema("ts", &schema).unwrap()),
             from: DateTime::parse_from_str("2020-04-12 22:10:57 +0000", "%Y-%m-%d %H:%M:%S %z")
                 .unwrap()
                 .with_timezone(&Utc),
@@ -1638,7 +1649,7 @@ asd
             count: Unique,
             filter: None,
             touch: Touch::First,
-            partition_col: Column::new_with_schema("u", &schema).unwrap(),
+            partition_col: Arc::new(Column::new_with_schema("u", &schema).unwrap()),
             bucket_size: Duration::minutes(1),
             groups: None,
         };
@@ -1703,7 +1714,7 @@ asd
 
         let opts = Options {
             schema: schema.clone(),
-            ts_col: Column::new_with_schema("ts", &schema).unwrap(),
+            ts_col: Arc::new(Column::new_with_schema("ts", &schema).unwrap()),
             from: DateTime::parse_from_str("2020-04-12 22:10:57 +0000", "%Y-%m-%d %H:%M:%S %z")
                 .unwrap()
                 .with_timezone(&Utc),
@@ -1722,7 +1733,7 @@ asd
             count: Unique,
             filter: None,
             touch: Touch::First,
-            partition_col: Column::new_with_schema("u", &schema).unwrap(),
+            partition_col: Arc::new(Column::new_with_schema("u", &schema).unwrap()),
             bucket_size: Duration::minutes(1),
             groups: None,
         };
@@ -1796,7 +1807,7 @@ asd
         )];
         let opts = Options {
             schema: schema.clone(),
-            ts_col: Column::new_with_schema("ts", &schema).unwrap(),
+            ts_col: Arc::new(Column::new_with_schema("ts", &schema).unwrap()),
             from: DateTime::parse_from_str("2020-04-12 22:10:57 +0000", "%Y-%m-%d %H:%M:%S %z")
                 .unwrap()
                 .with_timezone(&Utc),
@@ -1815,7 +1826,7 @@ asd
             count: Unique,
             filter: None,
             touch: Touch::First,
-            partition_col: Column::new_with_schema("u", &schema).unwrap(),
+            partition_col: Arc::new(Column::new_with_schema("u", &schema).unwrap()),
             bucket_size: Duration::days(2),
             groups: Some(groups),
         };
@@ -1881,7 +1892,7 @@ asd
         )];
         let opts = Options {
             schema: schema.clone(),
-            ts_col: Column::new_with_schema("ts", &schema).unwrap(),
+            ts_col: Arc::new(Column::new_with_schema("ts", &schema).unwrap()),
             from: DateTime::parse_from_str("2020-04-12 22:10:57 +0000", "%Y-%m-%d %H:%M:%S %z")
                 .unwrap()
                 .with_timezone(&Utc),
@@ -1900,7 +1911,7 @@ asd
             count: Unique,
             filter: None,
             touch: Touch::First,
-            partition_col: Column::new_with_schema("u", &schema).unwrap(),
+            partition_col: Arc::new(Column::new_with_schema("u", &schema).unwrap()),
             bucket_size: Duration::minutes(1),
             groups: Some(groups),
         };

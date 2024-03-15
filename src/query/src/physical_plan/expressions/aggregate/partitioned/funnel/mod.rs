@@ -135,7 +135,6 @@ fn evaluate_batch(
         // add steps to state
         steps.push(arr);
     }
-
     // evaluate exclude
     let mut exclude = Some(vec![]);
     if let Some(exprs) = &exclude_expr {
@@ -163,7 +162,6 @@ fn evaluate_batch(
             }
         }
     }
-
     // prepare constants
     let mut constants_out: Option<Vec<_>> = None;
     if let Some(cc) = constants {
@@ -186,7 +184,6 @@ fn evaluate_batch(
         .downcast_ref::<TimestampMillisecondArray>()
         .unwrap()
         .clone();
-
     let parr = partition_col
         .evaluate(&batch)?
         .into_array(batch.num_rows())?
@@ -194,7 +191,6 @@ fn evaluate_batch(
         .downcast_ref::<Int64Array>()
         .unwrap()
         .clone();
-
     let res = Batch {
         steps,
         exclude,

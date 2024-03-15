@@ -129,10 +129,10 @@ pub struct Exclude {
 }
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum Filter {
-    DropOffOnAnyStep,
     // funnel should fail on any step
-    DropOffOnStep(usize),
+    DropOffOnAnyStep,
     // funnel should fail on certain step
+    DropOffOnStep(usize),
     TimeToConvert(i64, i64), // conversion should be within certain window
 }
 

@@ -20,7 +20,7 @@ use crate::error::QueryError;
 use crate::error::Result;
 use crate::logical_plan;
 use crate::logical_plan::partitioned_aggregate::AggregateExpr;
-use crate::logical_plan::partitioned_aggregate::SortField;
+use crate::logical_plan::SortField;
 use crate::physical_plan::expressions::aggregate::count::Count;
 // use crate::physical_plan::expressions::aggregate::aggregate;
 // use crate::physical_plan::expressions::aggregate::aggregate::Aggregate;

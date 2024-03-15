@@ -2,6 +2,7 @@
 mod tests {
     use std::ops::Sub;
 
+    use arrow::util::pretty::print_batches;
     use chrono::DateTime;
     use chrono::Duration;
     use chrono::Utc;
@@ -24,13 +25,16 @@ mod tests {
     use common::query::QueryTime;
     use datafusion_common::ScalarValue;
     use metadata::util::init_db;
+    use query::queries::event_segmentation::logical_plan_builder::LogicalPlanBuilder;
+    use query::queries::funnel;
     use query::test_util::create_entities;
     use query::test_util::events_provider;
+    use query::test_util::run_plan;
     use query::Context;
 
-    #[test]
+    #[tokio::test]
     async fn test_full() {
-        let (md, db) = init_db()?;
+        let (md, db) = init_db().unwrap();
 
         let proj_id = 1;
 
@@ -40,10 +44,9 @@ mod tests {
             cur_time: Default::default(),
         };
 
-        create_entities(md.clone(), &db, proj_id).await?;
-        let input = events_provider(db, proj_id).await?;
+        create_entities(md.clone(), &db, proj_id).await.unwrap();
 
-        let to = DateTime::parse_from_rfc3339("2021-09-08T15:42:29.190855+00:00")
+        let to = DateTime::parse_from_rfc3339("2022-08-29T15:42:29.190855+00:00")
             .unwrap()
             .with_timezone(&Utc);
 
@@ -57,11 +60,11 @@ mod tests {
                 Step {
                     events: vec![Event {
                         event: EventRef::RegularName("View Product".to_string()),
-                        filters: Some(vec![EventFilter::Property {
-                            property: PropertyRef::User("Is Premium".to_string()),
-                            operation: PropValueOperation::Eq,
-                            value: Some(vec![ScalarValue::Boolean(Some(true))]),
-                        }]),
+                        filters: None, /* Some(vec![EventFilter::Property {
+                                        * property: PropertyRef::User("Is Premium".to_string()),
+                                        * operation: PropValueOperation::Eq,
+                                        * value: Some(vec![ScalarValue::Boolean(Some(true))]),
+                                        * }]), */
                     }],
                     order: StepOrder::Sequential,
                 },
@@ -79,27 +82,41 @@ mod tests {
             },
             chart_type: ChartType::Steps,
             count: Count::Unique,
-            filter: Some(Filter::DropOffOnAnyStep),
+            filter: None,
             touch: Touch::First,
             step_order: StepOrder::Sequential,
             attribution: Some(Touch::First),
-            holding_constants: Some(vec![PropertyRef::User("Is Premium".to_string())]),
-            exclude: Some(vec![Exclude {
-                event: Event {
-                    event: EventRef::RegularName("Leave Site".to_string()),
-                    filters: None,
-                },
-                steps: None,
-            }]),
+            holding_constants: None, // Some(vec![PropertyRef::User("Is Premium".to_string())])
+            exclude: None,           /* Some(vec![Exclude {
+                                      * event: Event {
+                                      * event: EventRef::RegularName("Buy Product".to_string()),
+                                      * filters: None,
+                                      * },
+                                      * steps: None,
+                                      * }]) */
             breakdowns: Some(vec![Breakdown::Property(PropertyRef::User(
                 "Device".to_string(),
             ))]),
             segments: None,
-            filters: Some(vec![EventFilter::Property {
-                property: PropertyRef::User("Is Premium".to_string()),
-                operation: PropValueOperation::Eq,
-                value: Some(vec![ScalarValue::Boolean(Some(true))]),
-            }]),
+            filters: None, /* Some(vec![EventFilter::Property {
+                            * property: PropertyRef::User("Is Premium".to_string()),
+                            * operation: PropValueOperation::Eq,
+                            * value: Some(vec![ScalarValue::Boolean(Some(true))]),
+                            * }]) */
         };
+
+        let ctx = Context {
+            project_id: proj_id,
+            cur_time: Default::default(),
+            format: Default::default(),
+        };
+
+        let input = events_provider(db, proj_id).await.unwrap();
+        let _cur_time = DateTime::parse_from_rfc3339("2021-09-08T13:42:00.000000+00:00")
+            .unwrap()
+            .with_timezone(&Utc);
+        let plan = funnel::build(ctx, md.clone(), input, req).unwrap();
+        let result = run_plan(plan).await.unwrap();
+        print_batches(&result).unwrap();
     }
 }

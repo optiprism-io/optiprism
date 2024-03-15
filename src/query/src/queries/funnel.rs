@@ -56,7 +56,7 @@ pub fn build(
     req: Funnel,
 ) -> Result<LogicalPlan> {
     let mut cols_hash: HashMap<String, ()> = HashMap::new();
-    let input = decode_filter_dictionaries(&ctx, &metadata, req.as_ref(), input, &mut cols_hash)?;
+    let input = decode_filter_dictionaries(&ctx, &metadata, &req, input, &mut cols_hash)?;
 
     let mut expr = col(Column {
         relation: None,
@@ -93,7 +93,7 @@ pub fn build(
 
             let order = match &step.order {
                 StepOrder::Sequential => logical_plan::funnel::StepOrder::Sequential,
-                StepOrder::Any(order) => logical_plan::funnel::StepOrder::Any(order.into_vec()),
+                StepOrder::Any(order) => logical_plan::funnel::StepOrder::Any(order.to_vec()),
             };
             steps.push((multi_or(exprs), order))
         }
@@ -202,8 +202,8 @@ pub fn build(
             Filter::DropOffOnAnyStep => logical_plan::funnel::Filter::DropOffOnAnyStep,
             Filter::DropOffOnStep(n) => logical_plan::funnel::Filter::DropOffOnStep(n),
             Filter::TimeToConvert(from, to) => logical_plan::funnel::Filter::TimeToConvert(
-                Duration::from_millis(from),
-                Duration::from_millis(to),
+                chrono::Duration::milliseconds(from),
+                chrono::Duration::milliseconds(to),
             ),
         }),
         touch: match req.touch {

@@ -9,13 +9,13 @@ mod tests {
     use chrono::Duration;
     use chrono::Utc;
     use common::query::event_segmentation::Analysis;
-    use common::query::event_segmentation::Breakdown;
     use common::query::event_segmentation::ChartType;
     use common::query::event_segmentation::Event;
     use common::query::event_segmentation::EventSegmentation;
     use common::query::event_segmentation::NamedQuery;
     use common::query::event_segmentation::Query;
     use common::query::AggregateFunction;
+    use common::query::Breakdown;
     use common::query::EventFilter;
     use common::query::EventRef;
     use common::query::PartitionedAggregateFunction;
@@ -40,7 +40,7 @@ mod tests {
     #[traced_test]
     #[tokio::test]
     async fn test_filters() -> Result<()> {
-        let to = DateTime::parse_from_rfc3339("2021-09-08T15:42:29.190855+00:00")
+        let to = DateTime::parse_from_rfc3339("2022-08-30T15:42:29.190855+00:00")
             .unwrap()
             .with_timezone(&Utc);
         let _es = EventSegmentation {
@@ -377,7 +377,7 @@ mod tests {
         };
 
         let input = events_provider(db, proj_id).await?;
-        let _cur_time = DateTime::parse_from_rfc3339("2021-09-08T13:42:00.000000+00:00")
+        let _cur_time = DateTime::parse_from_rfc3339("2022-08-29T13:42:00.000000+00:00")
             .unwrap()
             .with_timezone(&Utc);
         let plan = LogicalPlanBuilder::build(ctx, md.clone(), input, es)?;

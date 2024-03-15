@@ -1,12 +1,14 @@
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use arrow::datatypes::Schema;
 use arrow_row::SortField;
 use datafusion::execution::context::ExecutionProps;
 use datafusion::physical_expr::create_physical_expr;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExprRef;
 use datafusion::physical_plan::ExecutionPlan;
+use datafusion_common::ToDFSchema;
 use datafusion_expr::Expr;
 use datafusion_expr::LogicalPlan;
 
@@ -48,15 +50,14 @@ pub(crate) fn build_funnel(
         logical_inputs[0].schema().index_of_column(&f.ts_col)?,
     );
 
-    let dfschema = node.funnel.schema(logical_inputs[0].schema());
-
-    let schema = dfschema.into();
+    let schema = physical_inputs[0].schema();
+    let dfschema = schema.clone().to_dfschema()?;
     let execution_props = ExecutionProps::new();
     let steps = f
         .steps
         .iter()
         .map(|(expr, order)| {
-            let expr = create_physical_expr(&expr, &dfschema, schema, &execution_props)?;
+            let expr = create_physical_expr(&expr, &dfschema, &schema, &execution_props).unwrap();
             let order = match order {
                 logical_plan::funnel::StepOrder::Sequential => StepOrder::Sequential,
                 logical_plan::funnel::StepOrder::Any(v) => StepOrder::Any(v.to_vec()),
@@ -68,7 +69,7 @@ pub(crate) fn build_funnel(
     let exclude = if let Some(exclude) = f.exclude {
         let mut out = vec![];
         for exclude in exclude {
-            let expr = create_physical_expr(&exclude.expr, &dfschema, schema, &execution_props)?;
+            let expr = create_physical_expr(&exclude.expr, &dfschema, &schema, &execution_props)?;
             let steps = if let Some(steps) = exclude.steps {
                 Some(ExcludeSteps {
                     from: steps.from,
@@ -88,19 +89,19 @@ pub(crate) fn build_funnel(
         Some(
             constants
                 .iter()
-                .map(|expr| create_physical_expr(expr, &dfschema, schema, &execution_props))
-                .collect::<Result<Vec<_>>>()?,
+                .map(|expr| create_physical_expr(expr, &dfschema, &schema, &execution_props))
+                .collect::<std::result::Result<Vec<_>, _>>()?,
         )
     } else {
         None
     };
 
-    let groups = if let Some(groups) = f.groups {
+    let groups = if let Some(groups) = &f.groups {
         Some(
             groups
                 .iter()
                 .map(|(expr, name, sort_field)| {
-                    let expr = create_physical_expr(&expr, &dfschema, schema, &execution_props)?;
+                    let expr = create_physical_expr(&expr, &dfschema, &schema, &execution_props)?;
                     let sf = SortField::new(sort_field.data_type.clone());
                     Ok((expr, name.clone(), sf))
                 })
@@ -110,8 +111,8 @@ pub(crate) fn build_funnel(
         None
     };
     let opts = Options {
-        schema: Arc::new(schema.to_owned()),
-        ts_col,
+        schema: schema.to_owned(),
+        ts_col: Arc::new(ts_col),
         from: f.from,
         to: f.to,
         window: f.window,
@@ -135,7 +136,7 @@ pub(crate) fn build_funnel(
             logical_plan::funnel::Touch::Last => Touch::Last,
             logical_plan::funnel::Touch::Step(n) => Touch::Step(n),
         },
-        partition_col: partition_col.clone(),
+        partition_col: Arc::new(partition_col.clone()),
         bucket_size: f.bucket_size,
         groups: groups.clone(),
     };

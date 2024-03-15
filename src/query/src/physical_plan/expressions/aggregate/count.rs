@@ -294,6 +294,8 @@ mod tests {
 
     use arrow::datatypes::DataType;
     use arrow::row::SortField;
+    use common::DECIMAL_PRECISION;
+    use common::DECIMAL_SCALE;
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_expr::PhysicalExprRef;
     use storage::test_util::parse_markdown_tables;

@@ -97,14 +97,14 @@ impl FunnelPartialExec {
     }
 }
 
-impl Debug for FunnelPartialExec {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        todo!()
+impl DisplayAs for FunnelPartialExec {
+    fn fmt_as(&self, t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "FunnelExec")
     }
 }
 
-impl DisplayAs for FunnelPartialExec {
-    fn fmt_as(&self, t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
+impl Debug for FunnelPartialExec {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "FunnelExec")
     }
 }
@@ -645,7 +645,7 @@ mod tests {
         )];
         let opts = Options {
             schema: schema.clone(),
-            ts_col: Column::new_with_schema("ts", &schema).unwrap(),
+            ts_col: Arc::new(Column::new_with_schema("ts", &schema).unwrap()),
             from: DateTime::parse_from_str("2020-04-12 22:10:57 +0000", "%Y-%m-%d %H:%M:%S %z")
                 .unwrap()
                 .with_timezone(&Utc),
@@ -664,7 +664,7 @@ mod tests {
             count: Unique,
             filter: None,
             touch: Touch::First,
-            partition_col: Column::new_with_schema("u", &schema).unwrap(),
+            partition_col: Arc::new(Column::new_with_schema("u", &schema).unwrap()),
             bucket_size: Duration::days(2),
             groups: Some(groups),
         };

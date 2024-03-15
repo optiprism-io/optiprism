@@ -5,7 +5,7 @@ use chrono::DateTime;
 use chrono::NaiveDateTime;
 use chrono::TimeZone;
 use chrono::Utc;
-use common::query::event_segmentation::Breakdown;
+use common::query::Breakdown;
 use common::query::EventFilter;
 use common::query::EventRef;
 use common::query::PropValueOperation;
@@ -69,7 +69,7 @@ pub fn event_expression(
             binary_expr(
                 col(COLUMN_EVENT),
                 Operator::Eq,
-                lit(ScalarValue::from(e.id as u16)),
+                lit(ScalarValue::from(e.id as i64)),
             )
         }
         EventRef::Regular(id) => binary_expr(

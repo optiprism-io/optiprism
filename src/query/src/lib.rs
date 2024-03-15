@@ -360,10 +360,14 @@ pub mod test_util {
 
     pub async fn events_provider(db: Arc<OptiDBImpl>, _proj_id: u64) -> Result<LogicalPlan> {
         let schema = Schema::new(vec![
-            Field::new("project_id", DataType::Int64, false),
-            Field::new("user_id", DataType::Int64, false),
-            Field::new("created_at", DataType::Timestamp(TIME_UNIT, None), false),
-            Field::new("event", DataType::Int64, true),
+            Field::new(COLUMN_PROJECT_ID, DataType::Int64, false),
+            Field::new(COLUMN_USER_ID, DataType::Int64, false),
+            Field::new(
+                COLUMN_CREATED_AT,
+                DataType::Timestamp(TIME_UNIT, None),
+                false,
+            ),
+            Field::new(COLUMN_EVENT, DataType::Int64, true),
             Field::new("user_country", DataType::Int64, true),
             Field::new("user_device", DataType::Utf8, true),
             Field::new("user_is_premium", DataType::Boolean, true),
