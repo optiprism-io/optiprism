@@ -16,7 +16,6 @@ use serde::Serialize;
 use crate::error::CommonError;
 use crate::error::Result;
 use crate::query::event_segmentation::QueryAggregate;
-use crate::query::event_segmentation::SegmentTime;
 use crate::scalar::ScalarValueRef;
 
 pub mod event_segmentation;
@@ -332,6 +331,36 @@ pub enum EventFilter {
         #[serde_as(as = "Option<Vec<ScalarValueRef>>")]
         value: Option<Vec<ScalarValue>>,
     },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub enum SegmentTime {
+    Between {
+        from: DateTime<Utc>,
+        to: DateTime<Utc>,
+    },
+    From(DateTime<Utc>),
+    Last {
+        n: i64,
+        unit: TimeIntervalUnit,
+    },
+    AfterFirstUse {
+        within: i64,
+        unit: TimeIntervalUnit,
+    },
+    Each {
+        n: i64,
+        unit: TimeIntervalUnit,
+    },
+}
+
+impl SegmentTime {
+    pub fn try_window(&self) -> Option<i64> {
+        match self {
+            SegmentTime::Each { n, unit } => Some(unit.duration(*n).num_milliseconds()),
+            _ => None,
+        }
+    }
 }
 
 #[serde_with::serde_as]

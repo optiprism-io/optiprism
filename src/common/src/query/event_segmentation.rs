@@ -20,35 +20,6 @@ use crate::query::TimeIntervalUnit;
 use crate::scalar::ScalarValueRef;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub enum SegmentTime {
-    Between {
-        from: DateTime<Utc>,
-        to: DateTime<Utc>,
-    },
-    From(DateTime<Utc>),
-    Last {
-        n: i64,
-        unit: TimeIntervalUnit,
-    },
-    AfterFirstUse {
-        within: i64,
-        unit: TimeIntervalUnit,
-    },
-    Each {
-        n: i64,
-        unit: TimeIntervalUnit,
-    },
-}
-
-impl SegmentTime {
-    pub fn try_window(&self) -> Option<i64> {
-        match self {
-            SegmentTime::Each { n, unit } => Some(unit.duration(*n).num_milliseconds()),
-            _ => None,
-        }
-    }
-}
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum ChartType {
     Line,
     Column,

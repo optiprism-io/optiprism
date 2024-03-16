@@ -79,6 +79,17 @@ impl Queries {
         Ok(resp)
     }
 
+    pub async fn funnel(
+        &self,
+        ctx: Context,
+        project_id: u64,
+        req: EventRecordsSearchRequest,
+        query: QueryParams,
+    ) -> Result<QueryResponse> {
+        ctx.check_project_permission(project_id, ProjectPermission::ExploreReports)?;
+        funnel::validate(&self.md, project_id, &req)?;
+        Ok()
+    }
     pub async fn event_record_search(
         &self,
         ctx: Context,

@@ -10,6 +10,7 @@ use serde_json::Value;
 
 use crate::queries::event_records_search::EventRecordsSearchRequest;
 use crate::queries::event_segmentation::EventSegmentation;
+use crate::queries::funnel::Funnel;
 use crate::queries::property_values::ListPropertyValuesRequest;
 use crate::queries::Queries;
 use crate::queries::QueryParams;
@@ -17,7 +18,6 @@ use crate::Context;
 use crate::ListResponse;
 use crate::QueryResponse;
 use crate::Result;
-
 async fn event_segmentation(
     ctx: Context,
     Extension(provider): Extension<Arc<Queries>>,
@@ -29,6 +29,18 @@ async fn event_segmentation(
         provider
             .event_segmentation(ctx, project_id, request, query)
             .await?,
+    ))
+}
+
+async fn funnel(
+    ctx: Context,
+    Extension(provider): Extension<Arc<Queries>>,
+    Path(project_id): Path<u64>,
+    Query(query): Query<QueryParams>,
+    Json(request): Json<Funnel>,
+) -> Result<Json<QueryResponse>> {
+    Ok(Json(
+        provider.funnel(ctx, project_id, request, query).await?,
     ))
 }
 
@@ -66,6 +78,7 @@ pub fn attach_routes(router: Router) -> Router {
                 routing::post(event_segmentation),
             )
             .route("/property-values", routing::post(property_values))
-            .route("/event-records/search", routing::post(event_records_search)),
+            .route("/event-records/search", routing::post(event_records_search))
+            .route("/queries/funnel", routing::post(funnel)),
     )
 }
