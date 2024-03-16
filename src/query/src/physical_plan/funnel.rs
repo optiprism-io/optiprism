@@ -313,6 +313,7 @@ impl Stream for PartialFunnelStream {
                 ScalarValue::Int64(Some(segment as i64)).to_array_of_size(agg_cols[0].len())?;
             let cols = [vec![seg_col], agg_cols].concat();
             let batch = RecordBatch::try_new(self.schema.clone(), cols)?;
+
             let cols = self
                 .schema
                 .fields()
@@ -595,18 +596,18 @@ mod tests {
         let data = r#"
 | u(i64) | ts(ts)              | device(utf8) | v(i64) | c(i64) |
 |--------|---------------------|--------------|--------|--------|
-| 1      | 2020-04-12 22:10:57 | iphone       | 1      | 1      |
-| 1      | 2020-04-12 22:11:57 | iphone       | 2      | 1      |
-| 1      | 2020-04-12 22:12:57 | iphone       | 3      | 1      |
+| 1      | 2022-08-29 22:10:57 | iphone       | 1      | 1      |
+| 1      | 2022-08-29 22:11:57 | iphone       | 2      | 1      |
+| 1      | 2022-08-29 22:12:57 | iphone       | 3      | 1      |
 |        |                     |              |        |        |
-| 1      | 2020-04-12 22:13:57 | android      | 1      | 1      |
-| 1      | 2020-04-12 22:15:57 | android      | 2      | 1      |
-| 1      | 2020-04-12 22:17:57 | android      | 3      | 1      |
+| 1      | 2022-08-29 22:13:57 | android      | 1      | 1      |
+| 1      | 2022-08-29 22:15:57 | android      | 2      | 1      |
+| 1      | 2022-08-29 22:17:57 | android      | 3      | 1      |
 |        |                     |              |        |        |
-| 2      | 2020-04-12 22:10:57 | ios          | 1      | 1      |
+| 2      | 2022-08-29 22:10:57 | ios          | 1      | 1      |
 |        |                     |              |        |        |
-| 2      | 2020-04-12 22:11:57 | ios          | 2      | 1      |
-| 2      | 2020-04-12 22:12:57 | ios          | 3      | 1      |
+| 2      | 2022-08-29 22:11:57 | ios          | 2      | 1      |
+| 2      | 2022-08-29 22:12:57 | ios          | 3      | 1      |
 "#;
         let res = parse_markdown_tables(data).unwrap();
         let schema = res[0].schema();
@@ -646,10 +647,10 @@ mod tests {
         let opts = Options {
             schema: schema.clone(),
             ts_col: Arc::new(Column::new_with_schema("ts", &schema).unwrap()),
-            from: DateTime::parse_from_str("2020-04-12 22:10:57 +0000", "%Y-%m-%d %H:%M:%S %z")
+            from: DateTime::parse_from_str("2022-08-29 22:10:57 +0000", "%Y-%m-%d %H:%M:%S %z")
                 .unwrap()
                 .with_timezone(&Utc),
-            to: DateTime::parse_from_str("2020-04-12 22:21:57 +0000", "%Y-%m-%d %H:%M:%S %z")
+            to: DateTime::parse_from_str("2022-08-29 22:21:57 +0000", "%Y-%m-%d %H:%M:%S %z")
                 .unwrap()
                 .with_timezone(&Utc),
             window: Duration::milliseconds(200),
@@ -665,7 +666,7 @@ mod tests {
             filter: None,
             touch: Touch::First,
             partition_col: Arc::new(Column::new_with_schema("u", &schema).unwrap()),
-            bucket_size: Duration::days(2),
+            bucket_size: Duration::minutes(10),
             groups: Some(groups),
         };
         let mut f = Funnel::try_new(opts).unwrap();

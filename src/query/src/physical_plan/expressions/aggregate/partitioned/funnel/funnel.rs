@@ -310,7 +310,7 @@ impl Funnel {
             .duration_trunc(opts.bucket_size)
             .unwrap()
             .timestamp_millis();
-        let mut buckets = (from..to)
+        let mut buckets = (from..=to)
             .step_by(opts.bucket_size.num_milliseconds() as usize)
             .collect::<Vec<i64>>();
         // case where bucket size is bigger than time range
@@ -429,7 +429,6 @@ impl Funnel {
         batch: &RecordBatch,
         partition_exist: Option<&HashMap<i64, (), RandomState>>,
     ) -> crate::Result<()> {
-        print_batches(&[batch.clone()]).unwrap();
         let funnel_batch = evaluate_batch(
             batch.to_owned(),
             &self.steps_expr,
@@ -671,7 +670,6 @@ impl Funnel {
     }
 
     pub fn finalize(&mut self) -> crate::Result<Vec<ArrayRef>> {
-        dbg!(self.debug.clone().inner());
         // in case of grouping make an array of groups (group_arrs)
         let (group_arrs, groups) = if let Some(groups) = &mut self.groups {
             let mut rows: Vec<arrow_row::Row> = Vec::with_capacity(groups.groups.len());
@@ -720,7 +718,7 @@ impl Funnel {
                 .collect::<Vec<_>>();
 
             // iterate over buckets and fill values to builders
-            for bucket in buckets.values() {
+            for (ts, bucket) in buckets {
                 total.append_value(bucket.total_funnels);
                 completed.append_value(bucket.completed_funnels);
                 for (step_id, step) in bucket.steps.iter().enumerate() {

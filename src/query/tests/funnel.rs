@@ -78,7 +78,7 @@ mod tests {
             ],
             time_window: TimeWindow {
                 n: 1,
-                unit: TimeIntervalUnitSession::Day,
+                unit: TimeIntervalUnitSession::Hour,
             },
             chart_type: ChartType::Steps,
             count: Count::Unique,
