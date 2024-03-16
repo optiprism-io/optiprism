@@ -12,10 +12,14 @@ use serde_json::Value;
 
 use crate::error::Result;
 use crate::json_value_to_scalar;
+use crate::queries::validation::validate_event;
 use crate::queries::validation::validate_event_filter;
+use crate::queries::validation::validate_property;
 use crate::queries::AggregateFunction;
+use crate::queries::Breakdown;
 use crate::queries::PartitionedAggregateFunction;
 use crate::queries::QueryTime;
+use crate::queries::Segment;
 use crate::queries::TimeIntervalUnit;
 use crate::scalar_to_json_value;
 use crate::Context;
@@ -757,18 +761,7 @@ pub(crate) fn validate(
         ));
     }
     for (event_id, event) in req.events.iter().enumerate() {
-        match &event.event {
-            EventRef::Regular { event_name } => {
-                md.events
-                    .get_by_name(project_id, &event_name)
-                    .map_err(|err| PlatformError::BadRequest(format!("event {event_id}: {err}")))?;
-            }
-            EventRef::Custom { event_id } => {
-                md.custom_events
-                    .get_by_id(project_id, *event_id)
-                    .map_err(|err| PlatformError::BadRequest(format!("event {event_id}: {err}")))?;
-            }
-        }
+        validate_event(md, project_id, &event.event, event_id, "".to_string())?;
 
         match &event.filters {
             Some(filters) => {
@@ -824,31 +817,7 @@ pub(crate) fn validate(
             for (idx, breakdown) in breakdowns.iter().enumerate() {
                 match breakdown {
                     Breakdown::Property { property } => {
-                        match property {
-                            PropertyRef::User { property_name } => md
-                                .user_properties
-                                .get_by_name(project_id, &property_name)
-                                .map_err(|err| {
-                                    PlatformError::BadRequest(format!("breakdown {idx}: {err}"))
-                                })?,
-                            PropertyRef::Event { property_name } => md
-                                .event_properties
-                                .get_by_name(project_id, &property_name)
-                                .map_err(|err| {
-                                    PlatformError::BadRequest(format!("breakdown {idx}: {err}"))
-                                })?,
-                            PropertyRef::System { property_name } => md
-                                .system_properties
-                                .get_by_name(project_id, &property_name)
-                                .map_err(|err| {
-                                    PlatformError::BadRequest(format!("breakdown {idx}: {err}"))
-                                })?,
-                            PropertyRef::Custom { .. } => {
-                                return Err(PlatformError::Unimplemented(
-                                    "custom property is unimplemented".to_string(),
-                                ));
-                            }
-                        };
+                        validate_property(md, project_id, property, format!("breakdown {idx}"))?;
                     }
                 }
             }

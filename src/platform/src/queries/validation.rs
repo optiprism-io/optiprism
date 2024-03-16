@@ -5,10 +5,41 @@ use metadata::MetadataProvider;
 use serde_json::Value;
 
 use crate::EventFilter;
+use crate::EventRef;
 use crate::PlatformError;
 use crate::PropValueOperation;
 use crate::PropertyRef;
 
+pub fn validate_property(
+    md: &Arc<MetadataProvider>,
+    project_id: u64,
+    property: &PropertyRef,
+    err_prefix: String,
+) -> crate::Result<()> {
+    match property {
+        PropertyRef::User { property_name } => {
+            md.user_properties
+                .get_by_name(project_id, &property_name)
+                .map_err(|err| PlatformError::BadRequest(format!("{err_prefix}: {err}")))?;
+        }
+        PropertyRef::Event { property_name } => {
+            md.event_properties
+                .get_by_name(project_id, &property_name)
+                .map_err(|err| PlatformError::BadRequest(format!("{err_prefix}: {err}")))?;
+        }
+        PropertyRef::System { property_name } => {
+            md.system_properties
+                .get_by_name(project_id, &property_name)
+                .map_err(|err| PlatformError::BadRequest(format!("{err_prefix}: {err}")))?;
+        }
+        PropertyRef::Custom { .. } => {
+            return Err(PlatformError::Unimplemented(
+                "custom property is unimplemented".to_string(),
+            ));
+        }
+    }
+    Ok(())
+}
 pub fn validate_filter_property(
     md: &Arc<MetadataProvider>,
     project_id: u64,
@@ -142,6 +173,29 @@ pub fn validate_filter_property(
             }
         }
     }
+    Ok(())
+}
+
+pub(crate) fn validate_event(
+    md: &Arc<MetadataProvider>,
+    project_id: u64,
+    event: &EventRef,
+    event_id: usize,
+    err_prefix: String,
+) -> crate::Result<()> {
+    match event {
+        EventRef::Regular { event_name } => {
+            md.events
+                .get_by_name(project_id, &event_name)
+                .map_err(|err| PlatformError::BadRequest(format!("event {event_id}: {err}")))?;
+        }
+        EventRef::Custom { event_id } => {
+            md.custom_events
+                .get_by_id(project_id, *event_id)
+                .map_err(|err| PlatformError::BadRequest(format!("event {event_id}: {err}")))?;
+        }
+    }
+
     Ok(())
 }
 

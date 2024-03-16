@@ -6,6 +6,9 @@ use serde::Serialize;
 
 use crate::error::Result;
 use crate::queries::event_records_search::EventRecordsSearchRequest;
+use crate::queries::validation::validate_event;
+use crate::queries::validation::validate_event_filter;
+use crate::queries::validation::validate_property;
 use crate::queries::Breakdown;
 use crate::queries::QueryTime;
 use crate::queries::Segment;
@@ -106,7 +109,7 @@ impl Into<Event> for common::query::funnel::Event {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct TimeWindow {
-    pub n: i64,
+    pub n: usize,
     pub unit: TimeIntervalUnitSession,
 }
 
@@ -530,17 +533,142 @@ pub(crate) fn validate(md: &Arc<MetadataProvider>, project_id: u64, req: &Funnel
     }
 
     if req.steps.is_empty() {
-        return Err(PlatformError::BadRequest("steps must not be empty".to_string()));
+        return Err(PlatformError::BadRequest(
+            "steps must not be empty".to_string(),
+        ));
     }
 
-    for (step_id,step) in req.steps.iter().enumerate() {
+    for (step_id, step) in req.steps.iter().enumerate() {
         if step.events.is_empty() {
-            return Err(PlatformError::BadRequest(format!("step #{step_id}, events must not be empty" )));
+            return Err(PlatformError::BadRequest(format!(
+                "step #{step_id}, events must not be empty"
+            )));
         }
 
-        for (event_id,event) in step.events.iter().enumerate() {
+        for (event_id, event) in step.events.iter().enumerate() {
+            validate_event(
+                md,
+                project_id,
+                &event.event,
+                event_id,
+                format!("step #{step_id}, "),
+            )?;
 
+            match &event.filters {
+                Some(filters) => {
+                    for (filter_id, filter) in filters.iter().enumerate() {
+                        validate_event_filter(
+                            md,
+                            project_id,
+                            filter,
+                            filter_id,
+                            format!("event #{event_id}, "),
+                        )?;
+                    }
+                }
+                None => {}
+            }
         }
     }
-    d
+
+    match &req.step_order {
+        StepOrder::Sequential => {}
+        StepOrder::Any(v) => v
+            .iter()
+            .map(|(from, to)| {
+                if *from >= req.steps.len() {
+                    return Err(PlatformError::BadRequest(
+                        "step_order: from step index out of range".to_string(),
+                    ));
+                }
+                if *to >= req.steps.len() {
+                    return Err(PlatformError::BadRequest(
+                        "step_order: to step index out of range".to_string(),
+                    ));
+                }
+                Ok(())
+            })
+            .collect::<Result<_>>()?,
+    }
+
+    if let Some(exclude) = &req.exclude {
+        for (exclude_id, exclude) in exclude.iter().enumerate() {
+            validate_event(
+                md,
+                project_id,
+                &exclude.event.event,
+                exclude_id,
+                format!("exclude #{exclude_id}, "),
+            )?;
+            match &exclude.steps {
+                Some(steps) => match steps {
+                    ExcludeSteps::Between(from, to) => {
+                        if *from >= req.steps.len() {
+                            return Err(PlatformError::BadRequest(
+                                "exclude: from step index out of range".to_string(),
+                            ));
+                        }
+                        if *to >= req.steps.len() {
+                            return Err(PlatformError::BadRequest(
+                                "exclude: to step index out of range".to_string(),
+                            ));
+                        }
+                    }
+                    ExcludeSteps::All => {}
+                },
+                None => {}
+            }
+        }
+
+        match &req.breakdowns {
+            None => {}
+            Some(breakdowns) => {
+                for (idx, breakdown) in breakdowns.iter().enumerate() {
+                    match breakdown {
+                        Breakdown::Property { property } => {
+                            validate_property(
+                                md,
+                                project_id,
+                                property,
+                                format!("breakdown {idx}"),
+                            )?;
+                        }
+                    }
+                }
+            }
+        }
+
+        if req.segments.is_some() {
+            return Err(PlatformError::Unimplemented(
+                "segments are unimplemented yet".to_string(),
+            ));
+        }
+
+        if let Some(hc) = &req.holding_constants {
+            for (idx, prop) in hc.iter().enumerate() {
+                validate_property(md, project_id, prop, format!("holding constant {idx}"))?;
+            }
+        }
+
+        if let Some(filter) = &req.filter {
+            match filter {
+                Filter::DropOffOnAnyStep => {}
+                Filter::DropOffOnStep(_) => {}
+                Filter::TimeToConvert(from, to) => {
+                    if from > to {
+                        return Err(PlatformError::BadRequest(
+                            "from time must be less than to time".to_string(),
+                        ));
+                    }
+                }
+            }
+        }
+
+        if let Some(filters) = &req.filters {
+            for (idx, filter) in filters.iter().enumerate() {
+                validate_event_filter(md, project_id, filter, idx, "".to_string())?;
+            }
+        }
+    }
+    Ok(())
 }

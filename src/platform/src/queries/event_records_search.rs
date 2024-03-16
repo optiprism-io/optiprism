@@ -4,6 +4,7 @@ use metadata::MetadataProvider;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::queries::validation::validate_event;
 use crate::queries::validation::validate_event_filter;
 use crate::queries::QueryTime;
 use crate::EventFilter;
@@ -114,22 +115,7 @@ pub(crate) fn validate(
             ));
         }
         for (event_id, event) in events.iter().enumerate() {
-            match &event.event {
-                EventRef::Regular { event_name } => {
-                    md.events
-                        .get_by_name(project_id, &event_name)
-                        .map_err(|err| {
-                            PlatformError::BadRequest(format!("event {event_id}: {err}"))
-                        })?;
-                }
-                EventRef::Custom { event_id } => {
-                    md.custom_events
-                        .get_by_id(project_id, *event_id)
-                        .map_err(|err| {
-                            PlatformError::BadRequest(format!("event {event_id}: {err}"))
-                        })?;
-                }
-            }
+            validate_event(md, project_id, &event.event, event_id, "".to_string())?;
 
             match &event.filters {
                 Some(filters) => {
