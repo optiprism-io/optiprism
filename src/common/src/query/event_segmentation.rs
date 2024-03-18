@@ -140,22 +140,6 @@ impl Query {
                 AggregateFunction::Min => "Min".to_string(),
                 AggregateFunction::Max => "Max".to_string(),
                 AggregateFunction::Avg => "Avg".to_string(),
-                AggregateFunction::Median => "Median".to_string(),
-                AggregateFunction::ApproxDistinct => "Approx distinct".to_string(),
-                AggregateFunction::ArrayAgg => "Array agg".to_string(),
-                AggregateFunction::Variance => "Variance".to_string(),
-                AggregateFunction::VariancePop => "Variance pop".to_string(),
-                AggregateFunction::Stddev => "Std dev".to_string(),
-                AggregateFunction::StddevPop => "Std dev pop".to_string(),
-                AggregateFunction::Covariance => "Covariance".to_string(),
-                AggregateFunction::CovariancePop => "Covariance pop".to_string(),
-                AggregateFunction::Correlation => "Correlation".to_string(),
-                AggregateFunction::ApproxPercentileCont => "Approx percentile cont".to_string(),
-                AggregateFunction::ApproxPercentileContWithWeight => {
-                    "Approx percentile cont with weight".to_string()
-                }
-                AggregateFunction::ApproxMedian => "Approx median".to_string(),
-                AggregateFunction::Grouping => "Grouping".to_string(),
             },
             Query::AggregatePropertyPerGroup {
                 property,

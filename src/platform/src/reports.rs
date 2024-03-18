@@ -9,6 +9,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::queries::event_segmentation::EventSegmentation;
+use crate::queries::funnel::Funnel;
 use crate::Context;
 use crate::ListResponse;
 use crate::Result;
@@ -119,6 +120,7 @@ impl From<Type> for metadata::reports::Type {
 #[serde(untagged)]
 pub enum Query {
     EventSegmentation(EventSegmentation),
+    Funnel(Funnel),
 }
 
 impl From<metadata::reports::Query> for Query {
@@ -127,6 +129,7 @@ impl From<metadata::reports::Query> for Query {
             metadata::reports::Query::EventSegmentation(es) => {
                 Query::EventSegmentation(es.try_into().unwrap())
             }
+            metadata::reports::Query::Funnel(f) => Query::Funnel(f.try_into().unwrap()),
         }
     }
 }
@@ -137,6 +140,7 @@ impl From<Query> for metadata::reports::Query {
             Query::EventSegmentation(es) => {
                 metadata::reports::Query::EventSegmentation(es.try_into().unwrap())
             }
+            Query::Funnel(f) => metadata::reports::Query::Funnel(f.try_into().unwrap()),
         }
     }
 }

@@ -221,17 +221,6 @@ pub(crate) fn validate_event_filter(
                 format!("{err_prefix}filter #{filter_id}"),
             )?;
         }
-        EventFilter::Group { .. } => {}
-        EventFilter::Cohort { .. } => {
-            return Err(PlatformError::Unimplemented(
-                "filter by cohort is unimplemented yet".to_string(),
-            ));
-        }
-        EventFilter::Group { .. } => {
-            return Err(PlatformError::Unimplemented(
-                "filter by group is unimplemented yet".to_string(),
-            ));
-        }
     }
 
     Ok(())

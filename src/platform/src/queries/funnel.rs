@@ -45,7 +45,11 @@ pub struct Step {
 impl Into<common::query::funnel::Step> for Step {
     fn into(self) -> common::query::funnel::Step {
         common::query::funnel::Step {
-            events: self.events.into(),
+            events: self
+                .events
+                .iter()
+                .map(|e| e.to_owned().into())
+                .collect::<Vec<_>>(),
             order: self.order.into(),
         }
     }
@@ -54,7 +58,11 @@ impl Into<common::query::funnel::Step> for Step {
 impl Into<Step> for common::query::funnel::Step {
     fn into(self) -> Step {
         Step {
-            events: self.events.into(),
+            events: self
+                .events
+                .iter()
+                .map(|e| e.to_owned().into())
+                .collect::<Vec<_>>(),
             order: self.order.into(),
         }
     }
@@ -93,7 +101,9 @@ impl Into<common::query::funnel::Event> for Event {
     fn into(self) -> common::query::funnel::Event {
         common::query::funnel::Event {
             event: self.event.into(),
-            filters: self.filters.map(|f| f.into()),
+            filters: self
+                .filters
+                .map(|f| f.iter().map(|e| e.to_owned().into()).collect::<Vec<_>>()),
         }
     }
 }
@@ -102,7 +112,9 @@ impl Into<Event> for common::query::funnel::Event {
     fn into(self) -> Event {
         Event {
             event: self.event.into(),
-            filters: self.filters.map(|f| f.into()),
+            filters: self
+                .filters
+                .map(|f| f.iter().map(|e| e.to_owned().into()).collect::<Vec<_>>()),
         }
     }
 }
@@ -209,7 +221,7 @@ impl Into<StepOrder> for common::query::funnel::StepOrder {
     }
 }
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub enum ExcludeSteps {
     All,
     Between(usize, usize),
@@ -415,107 +427,74 @@ impl Into<ChartType> for common::query::funnel::ChartType {
     }
 }
 
-impl TryInto<common::query::funnel::Funnel> for Funnel {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<common::query::funnel::Funnel, Self::Error> {
-        Ok(common::query::funnel::Funnel {
-            time: self.time.into(),
-            group: self.group.clone(),
-            steps: self
-                .steps
-                .iter()
-                .map(|step| step.into())
-                .collect::<Vec<_>>()?,
-            time_window: self.time_window.into(),
-            chart_type: self.chart_type.into(),
-            count: self.count.into(),
-            filter: self.filter.map(|f| f.into()),
-            touch: self.touch.into(),
-            step_order: self.step_order.into(),
-            attribution: self.attribution.map(|attr| attr.into()),
-            holding_constants: self
-                .holding_constants
-                .map(|hc| hc.iter().map(|p| p.into()).collect::<Vec<_>>()),
-            exclude: self
-                .exclude
-                .map(|ex| ex.iter().map(|e| e.into()).collect::<Vec<_>>()),
-            breakdowns: self.breakdowns.map(|b| {
-                b.iter()
-                    .map(|b| b.iter().map(|b| b.into()).collect::<Vec<_>>())
-                    .collect::<Vec<_>>()
-            }),
-            segments: self
-                .segments
-                .map(|s| s.iter().map(|s| s.into()).collect::<Vec<_>>()),
-            filters: self
-                .filters
-                .map(|f| f.iter().map(|f| f.into()).collect::<Vec<_>>()),
-        })
-    }
-}
-
-impl TryInto<Funnel> for common::query::funnel::Funnel {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<Funnel, Self::Error> {
-        Ok(Funnel {
-            time: self.time.into(),
-            group: self.group.clone(),
-            steps: self
-                .steps
-                .iter()
-                .map(|step| step.into())
-                .collect::<Vec<_>>()?,
-            time_window: self.time_window.into(),
-            chart_type: self.chart_type.into(),
-            count: self.count.into(),
-            filter: self.filter.map(|f| f.into()),
-            touch: self.touch.into(),
-            step_order: self.step_order.into(),
-            attribution: self.attribution.map(|attr| attr.into()),
-            holding_constants: self
-                .holding_constants
-                .map(|hc| hc.iter().map(|p| p.into()).collect::<Vec<_>>()),
-            exclude: self
-                .exclude
-                .map(|ex| ex.iter().map(|e| e.into()).collect::<Vec<_>>()),
-            breakdowns: self.breakdowns.map(|b| {
-                b.iter()
-                    .map(|b| b.iter().map(|b| b.into()).collect::<Vec<_>>())
-                    .collect::<Vec<_>>()
-            }),
-            segments: self
-                .segments
-                .map(|s| s.iter().map(|s| s.into()).collect::<Vec<_>>()),
-            filters: self
-                .filters
-                .map(|f| f.iter().map(|f| f.into()).collect::<Vec<_>>()),
-        })
-    }
-}
-impl Funnel {
-    pub fn try_into_query(self) -> Result<common::query::funnel::Funnel> {
+impl Into<common::query::funnel::Funnel> for Funnel {
+    fn into(self) -> common::query::funnel::Funnel {
         common::query::funnel::Funnel {
             time: self.time.into(),
-            group: self.group,
+            group: self.group.clone(),
             steps: self
                 .steps
-                .into_iter()
-                .map(|s| s.try_into_query()?)
-                .collect(),
-            time_window: self.time_window.into_query(),
-            chart_type: self.chart_type,
-            count: self.count,
-            filter: self.filter,
-            touch: self.touch,
-            step_order: self.step_order,
-            attribution: self.attribution,
-            holding_constants: self.holding_constants,
-            exclude: self.exclude,
-            breakdowns: self.breakdowns,
-            segments: self.segments,
-            filters: self.filters,
+                .iter()
+                .map(|step| step.to_owned().into())
+                .collect::<Vec<_>>(),
+            time_window: self.time_window.into(),
+            chart_type: self.chart_type.into(),
+            count: self.count.into(),
+            filter: self.filter.map(|f| f.into()),
+            touch: self.touch.into(),
+            step_order: self.step_order.into(),
+            attribution: self.attribution.map(|attr| attr.into()),
+            holding_constants: self
+                .holding_constants
+                .map(|hc| hc.iter().map(|p| p.to_owned().into()).collect::<Vec<_>>()),
+            exclude: self
+                .exclude
+                .map(|ex| ex.iter().map(|e| e.to_owned().into()).collect::<Vec<_>>()),
+            breakdowns: self
+                .breakdowns
+                .map(|b| b.iter().map(|b| b.to_owned().into()).collect::<Vec<_>>()),
+            segments: self
+                .segments
+                .map(|s| s.iter().map(|s| s.to_owned().into()).collect::<Vec<_>>()),
+            filters: self
+                .filters
+                .map(|f| f.iter().map(|f| f.to_owned().into()).collect::<Vec<_>>()),
+        }
+    }
+}
+
+impl Into<Funnel> for common::query::funnel::Funnel {
+    fn into(self) -> Funnel {
+        Funnel {
+            time: self.time.into(),
+            group: self.group.clone(),
+            steps: self
+                .steps
+                .iter()
+                .map(|step| step.to_owned().into())
+                .collect::<Vec<_>>(),
+            time_window: self.time_window.into(),
+            chart_type: self.chart_type.into(),
+            count: self.count.into(),
+            filter: self.filter.map(|f| f.into()),
+            touch: self.touch.into(),
+            step_order: self.step_order.into(),
+            attribution: self.attribution.map(|attr| attr.into()),
+            holding_constants: self
+                .holding_constants
+                .map(|hc| hc.iter().map(|p| p.to_owned().into()).collect::<Vec<_>>()),
+            exclude: self
+                .exclude
+                .map(|ex| ex.iter().map(|e| e.to_owned().into()).collect::<Vec<_>>()),
+            breakdowns: self
+                .breakdowns
+                .map(|b| b.iter().map(|b| b.to_owned().into()).collect::<Vec<_>>()),
+            segments: self
+                .segments
+                .map(|s| s.iter().map(|s| s.to_owned().into()).collect::<Vec<_>>()),
+            filters: self
+                .filters
+                .map(|f| f.iter().map(|f| f.to_owned().into()).collect::<Vec<_>>()),
         }
     }
 }

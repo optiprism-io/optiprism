@@ -130,10 +130,9 @@ impl DType {
     }
 }
 
-impl TryFrom<DType> for datatypes::DataType {
-    type Error = CommonError;
-    fn try_from(value: DType) -> Result<Self, Self::Error> {
-        Ok(match value {
+impl From<DType> for datatypes::DataType {
+    fn from(value: DType) -> Self {
+        match value {
             DType::String => datatypes::DataType::Utf8,
             DType::Int8 => datatypes::DataType::Int8,
             DType::Int16 => datatypes::DataType::Int16,
@@ -151,17 +150,15 @@ impl TryFrom<DType> for datatypes::DataType {
                 DType::Decimal => DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
                 DType::Boolean => DataType::Boolean,
                 DType::Timestamp => DataType::Timestamp(TIME_UNIT, None),
-                _ => return Err(CommonError::General("Unsupported type1".to_string())),
+                _ => unreachable!("Unsupported type"),
             },
-        })
+        }
     }
 }
 
-impl TryFrom<DataType> for DType {
-    type Error = CommonError;
-
-    fn try_from(dt: DataType) -> Result<Self, Self::Error> {
-        Ok(match dt {
+impl From<DataType> for DType {
+    fn from(dt: DataType) -> Self {
+        match dt {
             DataType::Boolean => DType::Boolean,
             DataType::Int8 => DType::Int8,
             DataType::Int16 => DType::Int16,
@@ -179,10 +176,10 @@ impl TryFrom<DataType> for DType {
                 DataType::Utf8 => DType::String,
                 DataType::Decimal128(_, _) => DType::Decimal,
                 DataType::Timestamp(_, _) => DType::Timestamp,
-                _ => return Err(CommonError::General("Unsupported type2".to_string())),
+                _ => unreachable!("unsupported list type"),
             },
-            _ => return Err(CommonError::General(format!("Unsupported type {:?}", dt))),
-        })
+            _ => unreachable!("unsupported type"),
+        }
     }
 }
 

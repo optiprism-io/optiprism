@@ -8,6 +8,7 @@ use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
 use common::query::event_segmentation::EventSegmentation;
 use common::query::event_segmentation::Query;
+use common::query::funnel::Funnel;
 use common::query::Breakdown;
 use common::query::EventFilter;
 use common::types::COLUMN_CREATED_AT;
@@ -36,6 +37,7 @@ use crate::queries::event_records_search;
 use crate::queries::event_records_search::EventRecordsSearch;
 use crate::queries::event_segmentation;
 use crate::queries::event_segmentation::logical_plan_builder::COL_AGG_NAME;
+use crate::queries::funnel;
 use crate::queries::property_values;
 use crate::queries::property_values::PropertyValues;
 use crate::Column;
@@ -132,7 +134,7 @@ impl QueryProvider {
         let start = Instant::now();
         let schema = self.db.schema1(TABLE_EVENTS)?;
         let projection = if req.properties.is_some() {
-            let projection = event_records_search(&ctx, &req, &self.metadata)?;
+            let projection = event_records_search_projection(&ctx, &req, &self.metadata)?;
             projection
                 .iter()
                 .map(|x| schema.index_of(x).unwrap())
@@ -216,6 +218,39 @@ impl QueryProvider {
 
         Ok(DataTable::new(result.schema(), cols))
     }
+
+    pub async fn funnel(&self, ctx: Context, req: Funnel) -> Result<DataTable> {
+        let start = Instant::now();
+        let schema = self.db.schema1(TABLE_EVENTS)?;
+        let projection = funnel_projection(&ctx, &req, &self.metadata)?;
+        let projection = projection
+            .iter()
+            .map(|x| schema.index_of(x).unwrap())
+            .collect();
+
+        let (session_ctx, state, plan) = self.initial_plan(projection).await?;
+        let plan = funnel::build(ctx, self.metadata.clone(), plan, req.clone())?;
+
+        let result = self.execute(session_ctx, state, plan).await?;
+        let duration = start.elapsed();
+        debug!("elapsed: {:?}", duration);
+
+        let cols = result
+            .schema()
+            .fields()
+            .iter()
+            .enumerate()
+            .map(|(idx, field)| Column {
+                name: field.name().to_owned(),
+                typ: ColumnType::Dimension,
+                is_nullable: field.is_nullable(),
+                data_type: field.data_type().to_owned(),
+                data: result.column(idx).to_owned(),
+            })
+            .collect();
+
+        Ok(DataTable::new(result.schema(), cols))
+    }
 }
 
 fn property_values_projection(
@@ -233,7 +268,7 @@ fn property_values_projection(
     Ok(fields)
 }
 
-fn event_records_search(
+fn event_records_search_projection(
     ctx: &Context,
     req: &EventRecordsSearch,
     md: &Arc<MetadataProvider>,
@@ -328,5 +363,71 @@ fn event_segmentation_projection(
 
     fields.dedup();
 
+    Ok(fields)
+}
+
+fn funnel_projection(
+    ctx: &Context,
+    req: &Funnel,
+    md: &Arc<MetadataProvider>,
+) -> Result<Vec<String>> {
+    let mut fields = vec![
+        COLUMN_PROJECT_ID.to_string(),
+        COLUMN_USER_ID.to_string(),
+        COLUMN_CREATED_AT.to_string(),
+        COLUMN_EVENT.to_string(),
+    ];
+
+    for step in &req.steps {
+        for event in &step.events {
+            if let Some(filters) = &event.filters {
+                for filter in filters {
+                    match filter {
+                        EventFilter::Property { property, .. } => {
+                            fields.push(col_name(ctx, property, md)?)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(c) = &req.holding_constants {
+        for constant in c {
+            fields.push(col_name(ctx, constant, md)?);
+        }
+    }
+
+    if let Some(exclude) = &req.exclude {
+        for e in exclude {
+            if let Some(filters) = &e.event.filters {
+                for filter in filters {
+                    match filter {
+                        EventFilter::Property { property, .. } => {
+                            fields.push(col_name(ctx, property, md)?)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(filters) = &req.filters {
+        for filter in filters {
+            match filter {
+                EventFilter::Property { property, .. } => fields.push(col_name(ctx, property, md)?),
+            }
+        }
+    }
+
+    if let Some(breakdowns) = &req.breakdowns {
+        for breakdown in breakdowns {
+            match breakdown {
+                Breakdown::Property(property) => fields.push(col_name(ctx, property, md)?),
+            }
+        }
+    }
+
+    fields.dedup();
     Ok(fields)
 }

@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
 use axum::async_trait;
+use common::query::Segment;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::queries::event_segmentation::Segment;
 use crate::queries::QueryTime;
 use crate::Context;
 use crate::EventGroupedFilters;

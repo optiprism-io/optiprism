@@ -13,6 +13,8 @@ use crate::queries::event_records_search;
 use crate::queries::event_records_search::EventRecordsSearchRequest;
 use crate::queries::event_segmentation;
 use crate::queries::event_segmentation::EventSegmentation;
+use crate::queries::funnel;
+use crate::queries::funnel::Funnel;
 use crate::queries::property_values::ListPropertyValuesRequest;
 use crate::queries::QueryParams;
 use crate::queries::QueryResponseFormat;
@@ -40,7 +42,7 @@ impl Queries {
     ) -> Result<QueryResponse> {
         ctx.check_project_permission(project_id, ProjectPermission::ExploreReports)?;
         event_segmentation::validate(&self.md, project_id, &req)?;
-        let lreq = req.try_into()?;
+        let lreq = req.into();
         let lreq = event_segmentation::fix_types(&self.md, project_id, lreq)?;
 
         let cur_time = match query.timestamp {
@@ -83,13 +85,48 @@ impl Queries {
         &self,
         ctx: Context,
         project_id: u64,
-        req: EventRecordsSearchRequest,
+        req: Funnel,
         query: QueryParams,
     ) -> Result<QueryResponse> {
         ctx.check_project_permission(project_id, ProjectPermission::ExploreReports)?;
         funnel::validate(&self.md, project_id, &req)?;
-        Ok()
+        let lreq = req.into();
+        let cur_time = match query.timestamp {
+            None => Utc::now(),
+            Some(ts_sec) => DateTime::from_naive_utc_and_offset(
+                chrono::NaiveDateTime::from_timestamp_millis(ts_sec * 1000).unwrap(),
+                Utc,
+            ),
+        };
+        let ctx = query::Context {
+            project_id,
+            format: match &query.format {
+                None => Format::Regular,
+                Some(format) => match format {
+                    QueryResponseFormat::Json => Format::Regular,
+                    QueryResponseFormat::JsonCompact => Format::Compact,
+                },
+            },
+            cur_time,
+        };
+
+        let mut data = self.query.funnel(ctx, lreq).await?;
+
+        // do empty response so it will be [] instead of [[],[],[],...]
+        if !data.columns.is_empty() && data.columns[0].data.is_empty() {
+            data.columns = vec![];
+        }
+        let resp = match query.format {
+            None => QueryResponse::try_new_json(data.columns),
+            Some(QueryResponseFormat::Json) => QueryResponse::try_new_json(data.columns),
+            Some(QueryResponseFormat::JsonCompact) => {
+                QueryResponse::try_new_json_compact(data.columns)
+            }
+        }?;
+
+        Ok(resp)
     }
+
     pub async fn event_record_search(
         &self,
         ctx: Context,
@@ -99,7 +136,7 @@ impl Queries {
     ) -> Result<QueryResponse> {
         ctx.check_project_permission(project_id, ProjectPermission::ExploreReports)?;
         event_records_search::validate(&self.md, project_id, &req)?;
-        let lreq = req.try_into()?;
+        let lreq = req.into();
         let cur_time = match query.timestamp {
             None => Utc::now(),
             Some(ts_sec) => DateTime::from_naive_utc_and_offset(
@@ -144,12 +181,12 @@ impl Queries {
     ) -> Result<ListResponse<Value>> {
         ctx.check_project_permission(project_id, ProjectPermission::ExploreReports)?;
 
-        let lreq = req.try_into()?;
+        let lreq = req.into();
         let result = self
             .query
             .property_values(query::Context::new(project_id), lreq)
             .await?;
 
-        result.try_into()
+        Ok(result.into())
     }
 }

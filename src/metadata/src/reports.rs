@@ -5,6 +5,7 @@ use bincode::serialize;
 use chrono::DateTime;
 use chrono::Utc;
 use common::query::event_segmentation::EventSegmentation;
+use common::query::funnel::Funnel;
 use common::types::OptionalProperty;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
@@ -145,6 +146,7 @@ pub enum Type {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum Query {
     EventSegmentation(EventSegmentation),
+    Funnel(Funnel),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]

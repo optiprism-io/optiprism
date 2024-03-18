@@ -127,27 +127,23 @@ pub enum Breakdown {
     },
 }
 
-impl TryInto<common::query::Breakdown> for &Breakdown {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<common::query::Breakdown, Self::Error> {
-        Ok(match self {
+impl Into<common::query::Breakdown> for Breakdown {
+    fn into(self) -> common::query::Breakdown {
+        match self {
             Breakdown::Property { property } => {
-                common::query::Breakdown::Property(property.to_owned().try_into()?)
+                common::query::Breakdown::Property(property.to_owned().into())
             }
-        })
+        }
     }
 }
 
-impl TryInto<Breakdown> for &common::query::Breakdown {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<Breakdown, Self::Error> {
-        Ok(match self {
+impl Into<Breakdown> for common::query::Breakdown {
+    fn into(self) -> Breakdown {
+        match self {
             common::query::Breakdown::Property(property) => Breakdown::Property {
-                property: property.to_owned().try_into()?,
+                property: property.to_owned().into(),
             },
-        })
+        }
     }
 }
 
@@ -218,19 +214,17 @@ pub enum DidEventAggregate {
     },
 }
 
-impl TryInto<common::query::DidEventAggregate> for DidEventAggregate {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<common::query::DidEventAggregate, Self::Error> {
-        Ok(match self {
+impl Into<common::query::DidEventAggregate> for DidEventAggregate {
+    fn into(self) -> common::query::DidEventAggregate {
+        match self {
             DidEventAggregate::Count {
                 operation,
                 value,
                 time,
             } => common::query::DidEventAggregate::Count {
-                operation: operation.try_into()?,
+                operation: operation.into(),
                 value,
-                time: time.try_into()?,
+                time: time.into(),
             },
             DidEventAggregate::RelativeCount {
                 event,
@@ -239,20 +233,18 @@ impl TryInto<common::query::DidEventAggregate> for DidEventAggregate {
                 time,
             } => common::query::DidEventAggregate::RelativeCount {
                 event: event.into(),
-                operation: operation.try_into()?,
-                filters: filters
-                    .map_or_else(
-                        || None,
-                        |v| {
-                            if v.is_empty() {
-                                None
-                            } else {
-                                Some(v.iter().map(|v| v.try_into()).collect::<crate::Result<_>>())
-                            }
-                        },
-                    )
-                    .transpose()?,
-                time: time.try_into()?,
+                operation: operation.into(),
+                filters: filters.map_or_else(
+                    || None,
+                    |v| {
+                        if v.is_empty() {
+                            None
+                        } else {
+                            Some(v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>())
+                        }
+                    },
+                ),
+                time: time.into(),
             },
             DidEventAggregate::AggregateProperty {
                 property,
@@ -261,22 +253,22 @@ impl TryInto<common::query::DidEventAggregate> for DidEventAggregate {
                 value,
                 time,
             } => common::query::DidEventAggregate::AggregateProperty {
-                property: property.try_into()?,
-                aggregate: aggregate.try_into()?,
-                operation: operation.try_into()?,
-                value: value.map(|v| json_value_to_scalar(&v)).transpose()?,
-                time: time.try_into()?,
+                property: property.into(),
+                aggregate: aggregate.into(),
+                operation: operation.into(),
+                value: value.map(|v| json_value_to_scalar(&v)),
+                time: time.into(),
             },
             DidEventAggregate::HistoricalCount {
                 operation,
                 value,
                 time,
             } => common::query::DidEventAggregate::HistoricalCount {
-                operation: operation.try_into()?,
+                operation: operation.into(),
                 value,
-                time: time.try_into()?,
+                time: time.into(),
             },
-        })
+        }
     }
 }
 
@@ -302,28 +294,26 @@ pub enum SegmentTime {
     },
 }
 
-impl TryInto<common::query::SegmentTime> for SegmentTime {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<common::query::SegmentTime, Self::Error> {
-        Ok(match self {
+impl Into<common::query::SegmentTime> for SegmentTime {
+    fn into(self) -> common::query::SegmentTime {
+        match self {
             SegmentTime::Between { from, to } => common::query::SegmentTime::Between { from, to },
             SegmentTime::From(v) => common::query::SegmentTime::From(v),
             SegmentTime::Last { last: n, unit } => common::query::SegmentTime::Last {
                 n,
-                unit: unit.try_into()?,
+                unit: unit.into(),
             },
             SegmentTime::AfterFirstUse { within, unit } => {
                 common::query::SegmentTime::AfterFirstUse {
                     within,
-                    unit: unit.try_into()?,
+                    unit: unit.into(),
                 }
             }
             SegmentTime::WindowEach { unit, n } => common::query::SegmentTime::Each {
                 n,
-                unit: unit.try_into()?,
+                unit: unit.into(),
             },
-        })
+        }
     }
 }
 
@@ -361,24 +351,20 @@ pub struct Segment {
     conditions: Vec<Vec<SegmentCondition>>,
 }
 
-impl TryInto<common::query::SegmentCondition> for SegmentCondition {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<common::query::SegmentCondition, Self::Error> {
-        Ok(match self {
+impl Into<common::query::SegmentCondition> for SegmentCondition {
+    fn into(self) -> common::query::SegmentCondition {
+        match self {
             SegmentCondition::HasPropertyValue {
                 property_name,
                 operation,
                 value,
             } => common::query::SegmentCondition::HasPropertyValue {
                 property_name,
-                operation: operation.try_into()?,
+                operation: operation.into(),
                 value: match value {
-                    Some(v) if !v.is_empty() => Some(
-                        v.iter()
-                            .map(json_value_to_scalar)
-                            .collect::<crate::Result<_>>()?,
-                    ),
+                    Some(v) if !v.is_empty() => {
+                        Some(v.iter().map(json_value_to_scalar).collect::<Vec<_>>())
+                    }
                     _ => None,
                 },
                 // value
@@ -400,16 +386,14 @@ impl TryInto<common::query::SegmentCondition> for SegmentCondition {
                 time,
             } => common::query::SegmentCondition::HadPropertyValue {
                 property_name,
-                operation: operation.try_into()?,
+                operation: operation.into(),
                 value: match value {
-                    Some(v) if !v.is_empty() => Some(
-                        v.iter()
-                            .map(json_value_to_scalar)
-                            .collect::<crate::Result<_>>()?,
-                    ),
+                    Some(v) if !v.is_empty() => {
+                        Some(v.iter().map(json_value_to_scalar).collect::<Vec<_>>())
+                    }
                     _ => None,
                 },
-                time: time.try_into()?,
+                time: time.into(),
             },
             SegmentCondition::DidEvent {
                 event,
@@ -417,66 +401,60 @@ impl TryInto<common::query::SegmentCondition> for SegmentCondition {
                 aggregate,
             } => common::query::SegmentCondition::DidEvent {
                 event: event.into(),
-                filters: filters
-                    .map_or_else(
-                        || None,
-                        |v| {
-                            if v.is_empty() {
-                                None
-                            } else {
-                                Some(v.iter().map(|v| v.try_into()).collect::<crate::Result<_>>())
-                            }
-                        },
-                    )
-                    .transpose()?,
-                aggregate: aggregate.try_into()?,
+                filters: filters.map_or_else(
+                    || None,
+                    |v| {
+                        if v.is_empty() {
+                            None
+                        } else {
+                            Some(v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>())
+                        }
+                    },
+                ),
+                aggregate: aggregate.into(),
             },
-        })
+        }
     }
 }
 
-impl TryInto<crate::queries::SegmentTime> for common::query::SegmentTime {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<crate::queries::SegmentTime, Self::Error> {
-        Ok(match self {
+impl Into<crate::queries::SegmentTime> for common::query::SegmentTime {
+    fn into(self) -> crate::queries::SegmentTime {
+        match self {
             common::query::SegmentTime::Between { from, to } => {
                 crate::queries::SegmentTime::Between { from, to }
             }
             common::query::SegmentTime::From(from) => crate::queries::SegmentTime::From(from),
             common::query::SegmentTime::Last { n, unit } => crate::queries::SegmentTime::Last {
                 last: n,
-                unit: unit.try_into()?,
+                unit: unit.into(),
             },
             common::query::SegmentTime::AfterFirstUse { within, unit } => {
                 crate::queries::SegmentTime::AfterFirstUse {
                     within,
-                    unit: unit.try_into()?,
+                    unit: unit.into(),
                 }
             }
             common::query::SegmentTime::Each { n, unit } => {
                 crate::queries::SegmentTime::WindowEach {
-                    unit: unit.try_into()?,
+                    unit: unit.into(),
                     n,
                 }
             }
-        })
+        }
     }
 }
 
-impl TryInto<DidEventAggregate> for common::query::DidEventAggregate {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<DidEventAggregate, Self::Error> {
-        Ok(match self {
+impl Into<DidEventAggregate> for common::query::DidEventAggregate {
+    fn into(self) -> DidEventAggregate {
+        match self {
             common::query::DidEventAggregate::Count {
                 operation,
                 value,
                 time,
             } => DidEventAggregate::Count {
-                operation: operation.try_into()?,
+                operation: operation.into(),
                 value,
-                time: time.try_into()?,
+                time: time.into(),
             },
             common::query::DidEventAggregate::RelativeCount {
                 event,
@@ -484,21 +462,19 @@ impl TryInto<DidEventAggregate> for common::query::DidEventAggregate {
                 filters,
                 time,
             } => DidEventAggregate::RelativeCount {
-                event: event.try_into()?,
-                operation: operation.try_into()?,
-                filters: filters
-                    .map_or_else(
-                        || None,
-                        |v| {
-                            if v.is_empty() {
-                                None
-                            } else {
-                                Some(v.iter().map(|v| v.try_into()).collect::<crate::Result<_>>())
-                            }
-                        },
-                    )
-                    .transpose()?,
-                time: time.try_into()?,
+                event: event.into(),
+                operation: operation.into(),
+                filters: filters.map_or_else(
+                    || None,
+                    |v| {
+                        if v.is_empty() {
+                            None
+                        } else {
+                            Some(v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>())
+                        }
+                    },
+                ),
+                time: time.into(),
             },
             common::query::DidEventAggregate::AggregateProperty {
                 property,
@@ -507,53 +483,45 @@ impl TryInto<DidEventAggregate> for common::query::DidEventAggregate {
                 value,
                 time,
             } => DidEventAggregate::AggregateProperty {
-                property: property.try_into()?,
-                aggregate: aggregate.try_into()?,
-                operation: operation.try_into()?,
-                value: value.map(|v| scalar_to_json_value(&v)).transpose()?,
-                time: time.try_into()?,
+                property: property.into(),
+                aggregate: aggregate.into(),
+                operation: operation.into(),
+                value: value.map(|v| scalar_to_json_value(&v)),
+                time: time.into(),
             },
             common::query::DidEventAggregate::HistoricalCount {
                 operation,
                 value,
                 time,
             } => DidEventAggregate::HistoricalCount {
-                operation: operation.try_into()?,
+                operation: operation.into(),
                 value,
-                time: time.try_into()?,
+                time: time.into(),
             },
-        })
+        }
     }
 }
 
-impl TryInto<SegmentCondition> for common::query::SegmentCondition {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<SegmentCondition, Self::Error> {
-        Ok(match self {
+impl Into<SegmentCondition> for common::query::SegmentCondition {
+    fn into(self) -> SegmentCondition {
+        match self {
             common::query::SegmentCondition::HasPropertyValue {
                 property_name,
                 operation,
                 value,
             } => SegmentCondition::HasPropertyValue {
                 property_name,
-                operation: operation.try_into()?,
-                value: value
-                    .map_or_else(
-                        || None,
-                        |v| {
-                            if v.is_empty() {
-                                None
-                            } else {
-                                Some(
-                                    v.iter()
-                                        .map(scalar_to_json_value)
-                                        .collect::<crate::Result<_>>(),
-                                )
-                            }
-                        },
-                    )
-                    .transpose()?,
+                operation: operation.into(),
+                value: value.map_or_else(
+                    || None,
+                    |v| {
+                        if v.is_empty() {
+                            None
+                        } else {
+                            Some(v.iter().map(scalar_to_json_value).collect::<Vec<_>>())
+                        }
+                    },
+                ),
             },
             common::query::SegmentCondition::HadPropertyValue {
                 property_name,
@@ -562,142 +530,89 @@ impl TryInto<SegmentCondition> for common::query::SegmentCondition {
                 time,
             } => SegmentCondition::HadPropertyValue {
                 property_name,
-                operation: operation.try_into()?,
-                value: value
-                    .map_or_else(
-                        || None,
-                        |v| {
-                            if v.is_empty() {
-                                None
-                            } else {
-                                Some(
-                                    v.iter()
-                                        .map(scalar_to_json_value)
-                                        .collect::<crate::Result<_>>(),
-                                )
-                            }
-                        },
-                    )
-                    .transpose()?,
-
-                time: time.try_into()?,
+                operation: operation.into(),
+                value: value.map_or_else(
+                    || None,
+                    |v| {
+                        if v.is_empty() {
+                            None
+                        } else {
+                            Some(v.iter().map(scalar_to_json_value).collect::<Vec<_>>())
+                        }
+                    },
+                ),
+                time: time.into(),
             },
             common::query::SegmentCondition::DidEvent {
                 event,
                 filters,
                 aggregate,
             } => SegmentCondition::DidEvent {
-                event: event.try_into()?,
-                filters: filters
-                    .map_or_else(
-                        || None,
-                        |v| {
-                            if v.is_empty() {
-                                None
-                            } else {
-                                Some(v.iter().map(|v| v.try_into()).collect::<crate::Result<_>>())
-                            }
-                        },
-                    )
-                    .transpose()?,
-                aggregate: aggregate.try_into()?,
+                event: event.into(),
+                filters: filters.map_or_else(
+                    || None,
+                    |v| {
+                        if v.is_empty() {
+                            None
+                        } else {
+                            Some(v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>())
+                        }
+                    },
+                ),
+                aggregate: aggregate.into(),
             },
-        })
+        }
     }
 }
 
-impl TryInto<common::query::event_segmentation::Segment> for Segment {
-    type Error = PlatformError;
-
-    fn try_into(
-        self,
-    ) -> std::result::Result<common::query::event_segmentation::Segment, Self::Error> {
-        Ok(common::query::event_segmentation::Segment {
+impl Into<common::query::Segment> for Segment {
+    fn into(self) -> common::query::Segment {
+        common::query::Segment {
             name: self.name.clone(),
             conditions: self
                 .conditions
                 .iter()
-                .map(|v| {
-                    v.iter()
-                        .map(|v| v.to_owned().try_into())
-                        .collect::<crate::Result<Vec<_>>>()
-                })
-                .collect::<crate::Result<_>>()?,
-        })
+                .map(|v| v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>())
+                .collect::<Vec<_>>(),
+        }
     }
 }
 
-impl TryInto<Segment> for common::query::event_segmentation::Segment {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<Segment, Self::Error> {
-        Ok(Segment {
+impl Into<Segment> for common::query::Segment {
+    fn into(self) -> Segment {
+        Segment {
             name: self.name.clone(),
             conditions: self
                 .conditions
                 .iter()
-                .map(|v| {
-                    v.iter()
-                        .map(|v| v.to_owned().try_into())
-                        .collect::<crate::Result<Vec<_>>>()
-                })
-                .collect::<crate::Result<_>>()?,
-        })
+                .map(|v| v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>())
+                .collect::<Vec<_>>(),
+        }
     }
 }
 
-impl TryInto<common::query::AggregateFunction> for &AggregateFunction {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<common::query::AggregateFunction, Self::Error> {
-        Ok(match self {
+impl Into<common::query::AggregateFunction> for &AggregateFunction {
+    fn into(self) -> common::query::AggregateFunction {
+        match self {
             AggregateFunction::Count => common::query::AggregateFunction::Count,
             AggregateFunction::Sum => common::query::AggregateFunction::Sum,
             AggregateFunction::Min => common::query::AggregateFunction::Min,
             AggregateFunction::Max => common::query::AggregateFunction::Max,
             AggregateFunction::Avg => common::query::AggregateFunction::Avg,
-            AggregateFunction::ApproxDistinct => common::query::AggregateFunction::ApproxDistinct,
-            AggregateFunction::ArrayAgg => common::query::AggregateFunction::ArrayAgg,
-            AggregateFunction::Variance => common::query::AggregateFunction::Variance,
-            AggregateFunction::VariancePop => common::query::AggregateFunction::VariancePop,
-            AggregateFunction::Stddev => common::query::AggregateFunction::Stddev,
-            AggregateFunction::StddevPop => common::query::AggregateFunction::StddevPop,
-            AggregateFunction::Covariance => common::query::AggregateFunction::Covariance,
-            AggregateFunction::CovariancePop => common::query::AggregateFunction::CovariancePop,
-            AggregateFunction::Correlation => common::query::AggregateFunction::Correlation,
-            AggregateFunction::ApproxPercentileCont => {
-                common::query::AggregateFunction::ApproxPercentileCont
-            }
-            AggregateFunction::ApproxMedian => common::query::AggregateFunction::ApproxMedian,
-        })
+            _ => unimplemented!("unimplemented"),
+        }
     }
 }
 
-impl TryInto<AggregateFunction> for common::query::AggregateFunction {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<AggregateFunction, Self::Error> {
-        Ok(match self {
+impl Into<AggregateFunction> for common::query::AggregateFunction {
+    fn into(self) -> AggregateFunction {
+        match self {
             common::query::AggregateFunction::Count => AggregateFunction::Count,
             common::query::AggregateFunction::Sum => AggregateFunction::Sum,
             common::query::AggregateFunction::Min => AggregateFunction::Min,
             common::query::AggregateFunction::Max => AggregateFunction::Max,
             common::query::AggregateFunction::Avg => AggregateFunction::Avg,
-            common::query::AggregateFunction::ApproxDistinct => AggregateFunction::ApproxDistinct,
-            common::query::AggregateFunction::ArrayAgg => AggregateFunction::ArrayAgg,
-            common::query::AggregateFunction::Variance => AggregateFunction::Variance,
-            common::query::AggregateFunction::VariancePop => AggregateFunction::VariancePop,
-            common::query::AggregateFunction::Stddev => AggregateFunction::Stddev,
-            common::query::AggregateFunction::StddevPop => AggregateFunction::StddevPop,
-            common::query::AggregateFunction::Covariance => AggregateFunction::Covariance,
-            common::query::AggregateFunction::CovariancePop => AggregateFunction::CovariancePop,
-            common::query::AggregateFunction::Correlation => AggregateFunction::Correlation,
-            common::query::AggregateFunction::ApproxPercentileCont => {
-                AggregateFunction::ApproxPercentileCont
-            }
-            common::query::AggregateFunction::ApproxMedian => AggregateFunction::ApproxMedian,
-            _ => return Err(PlatformError::BadRequest("unimplemented".to_string())),
-        })
+        }
     }
 }
 
@@ -706,24 +621,20 @@ impl TryInto<AggregateFunction> for common::query::AggregateFunction {
 pub enum PartitionedAggregateFunction {
     Sum,
     Avg,
-    Median,
+    // Median,
     Count,
     Min,
     Max,
-    DistinctCount,
-    Percentile25,
-    Percentile75,
-    Percentile90,
-    Percentile99,
+    // DistinctCount,
+    // Percentile25,
+    // Percentile75,
+    // Percentile90,
+    // Percentile99,
 }
 
-impl TryInto<common::query::PartitionedAggregateFunction> for &PartitionedAggregateFunction {
-    type Error = PlatformError;
-
-    fn try_into(
-        self,
-    ) -> std::result::Result<common::query::PartitionedAggregateFunction, Self::Error> {
-        Ok(match self {
+impl Into<common::query::PartitionedAggregateFunction> for &PartitionedAggregateFunction {
+    fn into(self) -> common::query::PartitionedAggregateFunction {
+        match self {
             PartitionedAggregateFunction::Count => {
                 common::query::PartitionedAggregateFunction::Count
             }
@@ -731,16 +642,13 @@ impl TryInto<common::query::PartitionedAggregateFunction> for &PartitionedAggreg
             PartitionedAggregateFunction::Avg => common::query::PartitionedAggregateFunction::Avg,
             PartitionedAggregateFunction::Min => common::query::PartitionedAggregateFunction::Min,
             PartitionedAggregateFunction::Max => common::query::PartitionedAggregateFunction::Max,
-            _ => todo!(),
-        })
+        }
     }
 }
 
-impl TryInto<PartitionedAggregateFunction> for common::query::PartitionedAggregateFunction {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<PartitionedAggregateFunction, Self::Error> {
-        Ok(match self {
+impl Into<PartitionedAggregateFunction> for common::query::PartitionedAggregateFunction {
+    fn into(self) -> PartitionedAggregateFunction {
+        match self {
             common::query::PartitionedAggregateFunction::Count => {
                 PartitionedAggregateFunction::Count
             }
@@ -748,6 +656,6 @@ impl TryInto<PartitionedAggregateFunction> for common::query::PartitionedAggrega
             common::query::PartitionedAggregateFunction::Avg => PartitionedAggregateFunction::Avg,
             common::query::PartitionedAggregateFunction::Min => PartitionedAggregateFunction::Min,
             common::query::PartitionedAggregateFunction::Max => PartitionedAggregateFunction::Max,
-        })
+        }
     }
 }

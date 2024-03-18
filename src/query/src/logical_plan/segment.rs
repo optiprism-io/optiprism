@@ -6,8 +6,8 @@ use std::sync::Arc;
 
 use common::query;
 use common::query::event_segmentation::QueryAggregate;
-use common::query::event_segmentation::SegmentTime;
 use common::query::PropValueOperation;
+use common::query::SegmentTime;
 use datafusion_common::Column;
 use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;

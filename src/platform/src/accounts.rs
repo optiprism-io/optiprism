@@ -42,19 +42,19 @@ impl Accounts {
 
         let account = self.prov.create(md_req)?;
 
-        account.try_into()
+        Ok(account.into())
     }
 
     pub async fn get_by_id(&self, ctx: Context, id: u64) -> Result<Account> {
         ctx.check_permission(Permission::ManageAccounts)?;
 
-        self.prov.get_by_id(id)?.try_into()
+        Ok(self.prov.get_by_id(id)?.into())
     }
 
     pub async fn list(&self, ctx: Context) -> Result<ListResponse<Account>> {
         ctx.check_permission(Permission::ManageAccounts)?;
         let resp = self.prov.list()?;
-        resp.try_into()
+        Ok(resp.into())
     }
 
     pub async fn update(
@@ -83,13 +83,13 @@ impl Accounts {
 
         let account = self.prov.update(account_id, md_req)?;
 
-        account.try_into()
+        Ok(account.into())
     }
 
     pub async fn delete(&self, ctx: Context, id: u64) -> Result<Account> {
         ctx.check_permission(Permission::ManageAccounts)?;
 
-        self.prov.delete(id)?.try_into()
+        Ok(self.prov.delete(id)?.into())
     }
 }
 
@@ -108,11 +108,9 @@ pub struct Account {
     pub teams: Option<Vec<(u64, Role)>>,
 }
 
-impl TryInto<Account> for metadata::accounts::Account {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<Account, Self::Error> {
-        Ok(Account {
+impl Into<Account> for metadata::accounts::Account {
+    fn into(self) -> Account {
+        Account {
             id: self.id,
             created_at: self.created_at,
             created_by: self.created_by,
@@ -124,7 +122,7 @@ impl TryInto<Account> for metadata::accounts::Account {
             organizations: self.organizations,
             projects: self.projects,
             teams: self.teams,
-        })
+        }
     }
 }
 

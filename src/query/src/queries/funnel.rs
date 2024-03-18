@@ -76,7 +76,7 @@ pub fn build(
     };
 
     let window = match req.time_window {
-        TimeWindow { n, unit } => unit.duration(n),
+        TimeWindow { n, unit } => unit.duration(n as i64),
     };
 
     let steps = {
@@ -175,7 +175,7 @@ pub fn build(
                 name: prop.column_name(),
             });
             out.push((expr, prop.column_name(), SortField {
-                data_type: prop.data_type.try_into()?,
+                data_type: prop.data_type.into(),
             }))
         }
         Some(out)

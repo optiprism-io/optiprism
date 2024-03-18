@@ -127,7 +127,7 @@ impl Auth {
 
     pub async fn get(&self, ctx: Context) -> Result<Account> {
         match self.accounts.get_by_id(ctx.account_id.unwrap()) {
-            Ok(acc) => Ok(acc.try_into()?),
+            Ok(acc) => Ok(acc.into()),
             Err(MetadataError::NotFound(_)) => {
                 Err(PlatformError::NotFound("account not found".to_string()))
             }

@@ -34,34 +34,6 @@ pub enum AggregateFunction {
     Max,
     /// avg
     Avg,
-    /// median
-    Median,
-    /// Approximate aggregate function
-    ApproxDistinct,
-    /// array_agg
-    ArrayAgg,
-    /// Variance (Sample)
-    Variance,
-    /// Variance (Population)
-    VariancePop,
-    /// Standard Deviation (Sample)
-    Stddev,
-    /// Standard Deviation (Population)
-    StddevPop,
-    /// Covariance (Sample)
-    Covariance,
-    /// Covariance (Population)
-    CovariancePop,
-    /// Correlation
-    Correlation,
-    /// Approximate continuous percentile function
-    ApproxPercentileCont,
-    /// Approximate continuous percentile function with weight
-    ApproxPercentileContWithWeight,
-    /// ApproxMedian
-    ApproxMedian,
-    /// Grouping
-    Grouping,
 }
 
 impl Display for AggregateFunction {
@@ -78,22 +50,6 @@ impl From<DFAggregateFunction> for AggregateFunction {
             DFAggregateFunction::Min => AggregateFunction::Min,
             DFAggregateFunction::Max => AggregateFunction::Max,
             DFAggregateFunction::Avg => AggregateFunction::Avg,
-            DFAggregateFunction::Median => AggregateFunction::Median,
-            DFAggregateFunction::ApproxDistinct => AggregateFunction::ApproxDistinct,
-            DFAggregateFunction::ArrayAgg => AggregateFunction::ArrayAgg,
-            DFAggregateFunction::Variance => AggregateFunction::Variance,
-            DFAggregateFunction::VariancePop => AggregateFunction::VariancePop,
-            DFAggregateFunction::Stddev => AggregateFunction::Stddev,
-            DFAggregateFunction::StddevPop => AggregateFunction::StddevPop,
-            DFAggregateFunction::Covariance => AggregateFunction::Covariance,
-            DFAggregateFunction::CovariancePop => AggregateFunction::CovariancePop,
-            DFAggregateFunction::Correlation => AggregateFunction::Correlation,
-            DFAggregateFunction::ApproxPercentileCont => AggregateFunction::ApproxPercentileCont,
-            DFAggregateFunction::ApproxPercentileContWithWeight => {
-                AggregateFunction::ApproxPercentileContWithWeight
-            }
-            DFAggregateFunction::ApproxMedian => AggregateFunction::ApproxMedian,
-            DFAggregateFunction::Grouping => AggregateFunction::Grouping,
             _ => unimplemented!(),
         }
     }
@@ -107,22 +63,6 @@ impl From<AggregateFunction> for DFAggregateFunction {
             AggregateFunction::Min => DFAggregateFunction::Min,
             AggregateFunction::Max => DFAggregateFunction::Max,
             AggregateFunction::Avg => DFAggregateFunction::Avg,
-            AggregateFunction::Median => DFAggregateFunction::Median,
-            AggregateFunction::ApproxDistinct => DFAggregateFunction::ApproxDistinct,
-            AggregateFunction::ArrayAgg => DFAggregateFunction::ArrayAgg,
-            AggregateFunction::Variance => DFAggregateFunction::Variance,
-            AggregateFunction::VariancePop => DFAggregateFunction::VariancePop,
-            AggregateFunction::Stddev => DFAggregateFunction::Stddev,
-            AggregateFunction::StddevPop => DFAggregateFunction::StddevPop,
-            AggregateFunction::Covariance => DFAggregateFunction::Covariance,
-            AggregateFunction::CovariancePop => DFAggregateFunction::CovariancePop,
-            AggregateFunction::Correlation => DFAggregateFunction::Correlation,
-            AggregateFunction::ApproxPercentileCont => DFAggregateFunction::ApproxPercentileCont,
-            AggregateFunction::ApproxPercentileContWithWeight => {
-                DFAggregateFunction::ApproxPercentileContWithWeight
-            }
-            AggregateFunction::ApproxMedian => DFAggregateFunction::ApproxMedian,
-            AggregateFunction::Grouping => DFAggregateFunction::Grouping,
         }
     }
 }

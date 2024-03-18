@@ -45,13 +45,13 @@ impl Events {
                 custom_properties: None,
             })?;
 
-        event.try_into()
+        Ok(event.into())
     }
 
     pub async fn get_by_id(&self, ctx: Context, project_id: u64, id: u64) -> Result<Event> {
         ctx.check_project_permission(project_id, ProjectPermission::ViewSchema)?;
 
-        self.prov.get_by_id(project_id, id)?.try_into()
+        Ok(self.prov.get_by_id(project_id, id)?.into())
     }
 
     pub async fn get_by_name(&self, ctx: Context, project_id: u64, name: &str) -> Result<Event> {
@@ -59,14 +59,14 @@ impl Events {
 
         let event = self.prov.get_by_name(project_id, name)?;
 
-        event.try_into()
+        Ok(event.into())
     }
 
     pub async fn list(&self, ctx: Context, project_id: u64) -> Result<ListResponse<Event>> {
         ctx.check_project_permission(project_id, ProjectPermission::ViewSchema)?;
         let resp = self.prov.list(project_id)?;
 
-        resp.try_into()
+        Ok(resp.into())
     }
 
     pub async fn update(
@@ -90,43 +90,43 @@ impl Events {
 
         let event = self.prov.update(project_id, event_id, md_req)?;
 
-        event.try_into()
+        Ok(event.into())
     }
 
     pub async fn attach_property(
         &self,
         ctx: Context,
-
         project_id: u64,
         event_id: u64,
         prop_id: u64,
     ) -> Result<Event> {
         ctx.check_project_permission(project_id, ProjectPermission::ManageSchema)?;
 
-        self.prov
+        Ok(self
+            .prov
             .attach_event_property(project_id, event_id, prop_id)?
-            .try_into()
+            .into())
     }
 
     pub async fn detach_property(
         &self,
         ctx: Context,
-
         project_id: u64,
         event_id: u64,
         prop_id: u64,
     ) -> Result<Event> {
         ctx.check_project_permission(project_id, ProjectPermission::ManageSchema)?;
 
-        self.prov
+        Ok(self
+            .prov
             .detach_event_property(project_id, event_id, prop_id)?
-            .try_into()
+            .into())
     }
 
     pub async fn delete(&self, ctx: Context, project_id: u64, id: u64) -> Result<Event> {
         ctx.check_project_permission(project_id, ProjectPermission::DeleteSchema)?;
 
-        self.prov.delete(project_id, id)?.try_into()
+        Ok(self.prov.delete(project_id, id)?.into())
     }
 }
 
@@ -174,11 +174,9 @@ pub struct Event {
     pub user_properties: Option<Vec<u64>>,
 }
 
-impl TryInto<metadata::events::Event> for Event {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<metadata::events::Event, Self::Error> {
-        Ok(metadata::events::Event {
+impl Into<metadata::events::Event> for Event {
+    fn into(self) -> metadata::events::Event {
+        metadata::events::Event {
             id: self.id,
             created_at: self.created_at,
             updated_at: self.updated_at,
@@ -194,15 +192,13 @@ impl TryInto<metadata::events::Event> for Event {
             event_properties: None,
             custom_properties: self.user_properties,
             user_properties: None,
-        })
+        }
     }
 }
 
-impl TryInto<Event> for metadata::events::Event {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<Event, Self::Error> {
-        Ok(Event {
+impl Into<Event> for metadata::events::Event {
+    fn into(self) -> Event {
+        Event {
             id: self.id,
             created_at: self.created_at,
             updated_at: self.updated_at,
@@ -217,7 +213,7 @@ impl TryInto<Event> for metadata::events::Event {
             is_system: self.is_system,
             event_properties: self.event_properties,
             user_properties: self.custom_properties,
-        })
+        }
     }
 }
 
