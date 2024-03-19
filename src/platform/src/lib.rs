@@ -171,7 +171,10 @@ pub fn array_ref_to_json_values(arr: &ArrayRef) -> Vec<Value> {
                 .map(|value| match value {
                     None => Value::Number(Number::from_f64(0.0).unwrap()),
                     Some(v) => {
+                        dbg!(11);
+                        dbg!(v);
                         let d = Decimal::from_i128_with_scale(v, DECIMAL_SCALE as u32);
+                        dbg!(12);
                         let d_f = match d.to_f64() {
                             None => {
                                 panic!("can't convert decimal to f64");

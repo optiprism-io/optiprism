@@ -14,11 +14,14 @@ use crate::queries::QueryTime;
 use crate::queries::Segment;
 use crate::queries::TimeIntervalUnit;
 use crate::EventFilter;
+use crate::EventGroupedFilterGroup;
+use crate::EventGroupedFilters;
 use crate::EventRef;
 use crate::PlatformError;
 use crate::PropertyRef;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct Funnel {
     pub time: QueryTime,
     pub group: String,
@@ -34,7 +37,7 @@ pub struct Funnel {
     pub exclude: Option<Vec<Exclude>>,
     pub breakdowns: Option<Vec<Breakdown>>,
     pub segments: Option<Vec<Segment>>,
-    pub filters: Option<Vec<EventFilter>>,
+    pub filters: Option<EventGroupedFilters>,
 }
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Step {
@@ -93,7 +96,9 @@ impl Into<Order> for common::query::funnel::Order {
 }
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Event {
+    #[serde(flatten)]
     pub event: EventRef,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub filters: Option<Vec<EventFilter>>,
 }
 
@@ -336,7 +341,7 @@ impl Into<Filter> for common::query::funnel::Filter {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub enum Touch {
     First,
     Last,
@@ -456,9 +461,13 @@ impl Into<common::query::funnel::Funnel> for Funnel {
             segments: self
                 .segments
                 .map(|s| s.iter().map(|s| s.to_owned().into()).collect::<Vec<_>>()),
-            filters: self
-                .filters
-                .map(|f| f.iter().map(|f| f.to_owned().into()).collect::<Vec<_>>()),
+            filters: self.filters.map(|v| {
+                v.groups[0]
+                    .filters
+                    .iter()
+                    .map(|f| f.to_owned().into())
+                    .collect::<Vec<_>>()
+            }),
         }
     }
 }
@@ -492,9 +501,17 @@ impl Into<Funnel> for common::query::funnel::Funnel {
             segments: self
                 .segments
                 .map(|s| s.iter().map(|s| s.to_owned().into()).collect::<Vec<_>>()),
-            filters: self
-                .filters
-                .map(|f| f.iter().map(|f| f.to_owned().into()).collect::<Vec<_>>()),
+            filters: self.filters.map(|v| {
+                let f = v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>();
+                let r = EventGroupedFilters {
+                    groups_condition: None,
+                    groups: vec![EventGroupedFilterGroup {
+                        filters_condition: Default::default(),
+                        filters: f,
+                    }],
+                };
+                r
+            }),
         }
     }
 }
@@ -535,6 +552,11 @@ pub(crate) fn validate(md: &Arc<MetadataProvider>, project_id: u64, req: &Funnel
 
             match &event.filters {
                 Some(filters) => {
+                    if filters.is_empty() {
+                        return Err(PlatformError::BadRequest(format!(
+                            "step #{step_id}, filters must not be empty"
+                        )));
+                    }
                     for (filter_id, filter) in filters.iter().enumerate() {
                         validate_event_filter(
                             md,
@@ -571,6 +593,11 @@ pub(crate) fn validate(md: &Arc<MetadataProvider>, project_id: u64, req: &Funnel
     }
 
     if let Some(exclude) = &req.exclude {
+        if exclude.is_empty() {
+            return Err(PlatformError::BadRequest(
+                "exclude must not be empty".to_string(),
+            ));
+        }
         for (exclude_id, exclude) in exclude.iter().enumerate() {
             validate_event(
                 md,
@@ -598,56 +625,81 @@ pub(crate) fn validate(md: &Arc<MetadataProvider>, project_id: u64, req: &Funnel
                 None => {}
             }
         }
-
-        match &req.breakdowns {
-            None => {}
-            Some(breakdowns) => {
-                for (idx, breakdown) in breakdowns.iter().enumerate() {
-                    match breakdown {
-                        Breakdown::Property { property } => {
-                            validate_property(
-                                md,
-                                project_id,
-                                property,
-                                format!("breakdown {idx}"),
-                            )?;
-                        }
+    }
+    match &req.breakdowns {
+        None => {}
+        Some(breakdowns) => {
+            if breakdowns.is_empty() {
+                return Err(PlatformError::BadRequest(
+                    "breakdowns must not be empty".to_string(),
+                ));
+            }
+            for (idx, breakdown) in breakdowns.iter().enumerate() {
+                match breakdown {
+                    Breakdown::Property { property } => {
+                        validate_property(md, project_id, property, format!("breakdown {idx}"))?;
                     }
                 }
-            }
-        }
-
-        if req.segments.is_some() {
-            return Err(PlatformError::Unimplemented(
-                "segments are unimplemented yet".to_string(),
-            ));
-        }
-
-        if let Some(hc) = &req.holding_constants {
-            for (idx, prop) in hc.iter().enumerate() {
-                validate_property(md, project_id, prop, format!("holding constant {idx}"))?;
-            }
-        }
-
-        if let Some(filter) = &req.filter {
-            match filter {
-                Filter::DropOffOnAnyStep => {}
-                Filter::DropOffOnStep(_) => {}
-                Filter::TimeToConvert(from, to) => {
-                    if from > to {
-                        return Err(PlatformError::BadRequest(
-                            "from time must be less than to time".to_string(),
-                        ));
-                    }
-                }
-            }
-        }
-
-        if let Some(filters) = &req.filters {
-            for (idx, filter) in filters.iter().enumerate() {
-                validate_event_filter(md, project_id, filter, idx, "".to_string())?;
             }
         }
     }
+
+    if req.segments.is_some() {
+        return Err(PlatformError::Unimplemented(
+            "segments are unimplemented yet".to_string(),
+        ));
+    }
+
+    if let Some(hc) = &req.holding_constants {
+        if hc.is_empty() {
+            return Err(PlatformError::BadRequest(
+                "holding constants field can't be empty".to_string(),
+            ));
+        }
+        for (idx, prop) in hc.iter().enumerate() {
+            validate_property(md, project_id, prop, format!("holding constant {idx}"))?;
+        }
+    }
+
+    if let Some(filter) = &req.filter {
+        match filter {
+            Filter::DropOffOnAnyStep => {}
+            Filter::DropOffOnStep(_) => {}
+            Filter::TimeToConvert(from, to) => {
+                if from > to {
+                    return Err(PlatformError::BadRequest(
+                        "from time must be less than to time".to_string(),
+                    ));
+                }
+            }
+        }
+    }
+
+    match &req.filters {
+        None => {}
+        Some(filters) => {
+            if filters.groups.is_empty() {
+                return Err(PlatformError::BadRequest(
+                    "groups field can't be empty".to_string(),
+                ));
+            }
+            for filter_group in &filters.groups {
+                if filters.groups.is_empty() {
+                    return Err(PlatformError::BadRequest(
+                        "filter_group field can't be empty".to_string(),
+                    ));
+                }
+                if filter_group.filters.is_empty() {
+                    return Err(PlatformError::BadRequest(
+                        "filters field can't be empty".to_string(),
+                    ));
+                }
+                for (filter_id, filter) in filter_group.filters.iter().enumerate() {
+                    validate_event_filter(md, project_id, filter, filter_id, "".to_string())?;
+                }
+            }
+        }
+    }
+
     Ok(())
 }

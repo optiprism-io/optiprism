@@ -69,11 +69,7 @@ pub fn build(
     }
     let input = LogicalPlan::Filter(PlanFilter::try_new(expr, Arc::new(input))?);
 
-    let (from, to) = match req.time {
-        QueryTime::Between { from, to } => (from, to),
-        QueryTime::From(_) => unimplemented!(),
-        QueryTime::Last { .. } => unimplemented!(),
-    };
+    let (from, to) = req.time.range(ctx.cur_time);
 
     let window = match req.time_window {
         TimeWindow { n, unit } => unit.duration(n as i64),

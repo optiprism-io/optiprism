@@ -90,6 +90,7 @@ impl Queries {
     ) -> Result<QueryResponse> {
         ctx.check_project_permission(project_id, ProjectPermission::ExploreReports)?;
         funnel::validate(&self.md, project_id, &req)?;
+
         let lreq = req.into();
         let cur_time = match query.timestamp {
             None => Utc::now(),

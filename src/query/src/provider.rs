@@ -232,6 +232,7 @@ impl QueryProvider {
         let plan = funnel::build(ctx, self.metadata.clone(), plan, req.clone())?;
 
         let result = self.execute(session_ctx, state, plan).await?;
+
         let duration = start.elapsed();
         debug!("elapsed: {:?}", duration);
 

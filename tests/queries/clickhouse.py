@@ -30,7 +30,7 @@ def aggregate_property_query(agg, field, group=None, distinct=False, interval="d
     if not resp.json():
         return []
 
-    ts = list(map(lambda x: x * 1000000000, resp.json()[0]))
+    ts = list(map(lambda x: x * 1000, resp.json()[0]))
 
     if group is None:
         val = list(map(lambda x: float(x), resp.json()[1]))
@@ -80,7 +80,7 @@ def partitioned_aggregate_property_query(agg, outer_agg, field, group=None, inte
                         params={"query": q})
     if len(resp.json())==0:
         return []
-    ts = list(map(lambda x: x * 1000000000, resp.json()[0]))
+    ts = list(map(lambda x: x * 1000, resp.json()[0]))
 
     if group is None:
         val = list(map(lambda x: float(x), resp.json()[1]))
@@ -115,7 +115,7 @@ def all_aggregates_query(field, group=None, interval="day", period=2, period_int
     if not resp.json():
         return []
 
-    ts = list(map(lambda x: x * 1000000000, resp.json()[0]))
+    ts = list(map(lambda x: x * 1000, resp.json()[0]))
 
     if group is None:
         val = list(map(lambda x: float(x), resp.json()[1]))
@@ -143,7 +143,7 @@ def string_filter_query(query, interval="day", period=2, period_interval="day"):
                         params={"query": q})
     if not resp.json():
         return []
-    ts = list(map(lambda x: x * 1000000000, resp.json()[0]))
+    ts = list(map(lambda x: x * 1000, resp.json()[0]))
 
     val = list(map(lambda x: float(x), resp.json()[1]))
 
@@ -166,7 +166,7 @@ def bool_filter_query(query, interval="day", period=2, period_interval="day"):
                         params={"query": q})
     if not resp.json():
         return []
-    ts = list(map(lambda x: x * 1000000000, resp.json()[0]))
+    ts = list(map(lambda x: x * 1000, resp.json()[0]))
 
     val = list(map(lambda x: float(x), resp.json()[1]))
 

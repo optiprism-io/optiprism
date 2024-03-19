@@ -13,6 +13,7 @@ use ahash::RandomState;
 use arrow::array::ArrayRef;
 use arrow::array::Int64Array;
 use arrow::array::RecordBatch;
+use arrow::compute::cast;
 use arrow::compute::concat_batches;
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
@@ -25,6 +26,8 @@ use common::types::COLUMN_PROJECT_ID;
 use common::types::COLUMN_USER_ID;
 use common::types::RESERVED_COLUMN_FUNNEL_COMPLETED;
 use common::types::RESERVED_COLUMN_FUNNEL_TOTAL;
+use common::DECIMAL_PRECISION;
+use common::DECIMAL_SCALE;
 use datafusion::execution::RecordBatchStream;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::execution::TaskContext;
@@ -49,6 +52,7 @@ use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::prelude::SessionContext;
+use datafusion_common::DataFusionError;
 use datafusion_common::Result as DFResult;
 use datafusion_common::ScalarValue;
 use futures::Stream;
@@ -545,8 +549,22 @@ impl Stream for FinalFunnelStream {
 
         // todo return multiple batches
         let result = concat_batches(&out_batches[0].schema(), &out_batches)?;
-
+        let cols = result
+            .columns()
+            .iter()
+            .zip(self.schema.fields.iter())
+            .map(|(arr, f)| {
+                if f.name().contains("time_to_convert") {
+                    cast(arr, &DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE))
+                        .map_err(|err| DataFusionError::ArrowError(err))
+                } else {
+                    Ok(arr.clone())
+                }
+            })
+            .collect::<DFResult<Vec<_>>>()?;
+        let result = RecordBatch::try_new(self.schema.clone(), cols)?;
         self.finished = true;
+        dbg!(&result);
         Poll::Ready(Some(Ok(result)))
     }
 }
@@ -653,7 +671,7 @@ mod tests {
             to: DateTime::parse_from_str("2022-08-29 22:21:57 +0000", "%Y-%m-%d %H:%M:%S %z")
                 .unwrap()
                 .with_timezone(&Utc),
-            window: Duration::milliseconds(200),
+            window: Duration::minutes(200),
             steps: vec![e1, e2, e3],
             exclude: Some(vec![ExcludeExpr {
                 expr: ex,

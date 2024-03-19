@@ -30,6 +30,7 @@ use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
 use datafusion_common::ScalarValue;
+use num_traits::FromPrimitive;
 use rust_decimal::Decimal;
 
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::evaluate_batch;
@@ -473,7 +474,6 @@ impl Funnel {
         }
         let mut row_id = 0;
         let mut batch_id = self.batch_id;
-
         loop {
             if self.skip_partition {
                 while self.cur_partition == partitions.value(row_id)
@@ -490,7 +490,6 @@ impl Funnel {
                     row_id += 1;
                 }
             }
-
             let group = if let Some(groups) = &mut self.groups {
                 groups
                     .groups
@@ -724,26 +723,42 @@ impl Funnel {
                 for (step_id, step) in bucket.steps.iter().enumerate() {
                     step_total[step_id].append_value(step.count);
                     let v = if step.count > 0 {
-                        Decimal::from_i128_with_scale(step.total_time as i128, DECIMAL_SCALE as u32)
-                            / Decimal::from_i128_with_scale(
-                                step.count as i128,
-                                DECIMAL_SCALE as u32,
-                            )
+                        dbg!(
+                            step.total_time,
+                            step.count,
+                            step.total_time as f64 / step.count as f64
+                        );
+                        step.total_time as f64 / step.count as f64
+                        // Decimal::from_i128_with_scale(step.total_time as i128, DECIMAL_SCALE as u32)
+                        // / Decimal::from_i128_with_scale(
+                        // step.count as i128,
+                        // DECIMAL_SCALE as u32,
+                        // )
                     } else {
-                        Decimal::from_i128_with_scale(0, 0)
+                        // Decimal::from_i128_with_scale(0, 0)
+                        0.
+                    };
+                    step_time_to_convert[step_id]
+                        .append_value(Decimal::from_f64(v).unwrap().mantissa());
+                    let v = if step.count > 0 {
+                        dbg!(
+                            step.total_time,
+                            step.count,
+                            step.total_time as f64 / step.count as f64
+                        );
+                        step.total_time_from_start as f64 / step.count as f64
+                        // dbg!(step.total_time_from_start);
+                        // Decimal::from_i128_with_scale(
+                        // step.total_time_from_start as i128,
+                        // DECIMAL_SCALE as u32,
+                        // ) / Decimal::from_i128_with_scale(step.count as i128, DECIMAL_SCALE as u32)
+                    } else {
+                        // Decimal::from_i128_with_scale(0, 0)
+                        0.
                     };
 
-                    step_time_to_convert[step_id].append_value(v.mantissa());
-                    let v = if step.count > 0 {
-                        Decimal::from_i128_with_scale(
-                            step.total_time_from_start as i128,
-                            DECIMAL_SCALE as u32,
-                        ) / Decimal::from_i128_with_scale(step.count as i128, DECIMAL_SCALE as u32)
-                    } else {
-                        Decimal::from_i128_with_scale(0, 0)
-                    };
                     step_time_to_convert_from_start[step_id]
-                        .append_value(v.mantissa() * 10000000000);
+                        .append_value(Decimal::from_f64(v).unwrap().mantissa());
                 }
             }
 
