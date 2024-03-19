@@ -302,14 +302,18 @@ impl AggregateExpr {
                 let rt1 = return_type(dt.to_owned(), inner_fn, schema);
                 if final_ {
                     vec![DFField::new_unqualified(
-                        RESERVED_COLUMN_AGG,
+                        RESERVED_COLUMN_AGG_PARTITIONED_AGGREGATE,
                         dt.to_owned(),
                         true,
                     )]
                 } else {
                     let rt2 = return_type(rt1, outer_fn, schema);
 
-                    vec![DFField::new_unqualified(RESERVED_COLUMN_AGG, rt2, true)]
+                    vec![DFField::new_unqualified(
+                        RESERVED_COLUMN_AGG_PARTITIONED_AGGREGATE,
+                        rt2,
+                        true,
+                    )]
                 }
             }
         };
