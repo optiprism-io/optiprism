@@ -53,6 +53,7 @@ use common::types::USER_PROPERTY_OS_VERSION_MAJOR;
 use common::types::USER_PROPERTY_OS_VERSION_MINOR;
 use common::types::USER_PROPERTY_OS_VERSION_PATCH;
 use common::types::USER_PROPERTY_OS_VERSION_PATCH_MINOR;
+use datafusion::execution::context::DataFilePaths;
 use ingester::error::IngesterError;
 use ingester::executor::Executor;
 use ingester::transformers::geo;
@@ -155,41 +156,51 @@ pub fn init_system(
 
     create_property(md, 0, CreatePropertyMainRequest {
         name: COLUMN_PROJECT_ID.to_string(),
+        display_name: Some("Project".to_string()),
         typ: Type::System,
         data_type: DType::Int64,
         nullable: false,
+        hidden: true,
         dict: None,
     })?;
 
     create_property(md, 0, CreatePropertyMainRequest {
         name: COLUMN_USER_ID.to_string(),
+        display_name: Some("User".to_string()),
         typ: Type::System,
         data_type: DType::Int64,
         nullable: false,
+        hidden: false,
         dict: None,
     })?;
 
     create_property(md, 0, CreatePropertyMainRequest {
         name: COLUMN_CREATED_AT.to_string(),
+        display_name: Some("Created At".to_string()),
         typ: Type::System,
         data_type: DType::Timestamp,
         nullable: false,
+        hidden: false,
         dict: None,
     })?;
 
     create_property(md, 0, CreatePropertyMainRequest {
         name: COLUMN_EVENT_ID.to_string(),
+        display_name: Some("Event ID".to_string()),
         typ: Type::System,
         data_type: DType::Int64,
         nullable: false,
+        hidden: true,
         dict: None,
     })?;
 
     create_property(md, 0, CreatePropertyMainRequest {
         name: COLUMN_EVENT.to_string(),
+        display_name: Some("Event".to_string()),
         typ: Type::System,
         data_type: DType::String,
         nullable: false,
+        hidden: true,
         dict: Some(DictionaryType::Int64),
     })?;
 

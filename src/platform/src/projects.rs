@@ -208,9 +208,11 @@ pub fn init_project(project_id: u64, md: &Arc<MetadataProvider>) -> error::Resul
     for prop in user_dict_props {
         create_property(md, project_id, CreatePropertyMainRequest {
             name: prop.to_string(),
+            display_name: None,
             typ: Type::User,
             data_type: DType::String,
             nullable: true,
+            hidden: false,
             dict: Some(DictionaryType::Int64),
         })?;
     }
@@ -231,18 +233,22 @@ pub fn init_project(project_id: u64, md: &Arc<MetadataProvider>) -> error::Resul
     for prop in event_str_props {
         create_property(md, project_id, CreatePropertyMainRequest {
             name: prop.to_string(),
+            display_name: None,
             typ: Type::Event,
             data_type: DType::String,
             nullable: true,
+            hidden: false,
             dict: None,
         })?;
     }
 
     create_property(md, project_id, CreatePropertyMainRequest {
         name: EVENT_PROPERTY_SESSION_LENGTH.to_string(),
+        display_name: None,
         typ: Type::Event,
         data_type: DType::Timestamp,
         nullable: true,
+        hidden: false,
         dict: None,
     })?;
 

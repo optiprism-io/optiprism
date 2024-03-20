@@ -441,6 +441,7 @@ pub mod test_util {
             typ: properties::Type::User,
             data_type: DType::String,
             status: properties::Status::Enabled,
+            hidden: false,
             is_system: false,
             nullable: false,
             is_array: false,
@@ -470,6 +471,7 @@ pub mod test_util {
             is_dictionary: false,
             dictionary_type: None,
             is_system: false,
+            hidden: false,
         })?;
 
         create_property(&md, db, proj_id, CreatePropertyRequest {
@@ -481,6 +483,7 @@ pub mod test_util {
             typ: Type::User,
             data_type: DType::Boolean,
             status: properties::Status::Enabled,
+            hidden: false,
             is_system: false,
             nullable: false,
             is_array: false,
@@ -530,6 +533,7 @@ pub mod test_util {
             is_dictionary: false,
             dictionary_type: None,
             is_system: false,
+            hidden: false,
         })?;
 
         create_property(&md, db, proj_id, CreatePropertyRequest {
@@ -546,6 +550,7 @@ pub mod test_util {
             is_dictionary: false,
             dictionary_type: None,
             is_system: false,
+            hidden: false,
         })?;
 
         Ok(())

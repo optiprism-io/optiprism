@@ -235,6 +235,7 @@ impl Properties {
             typ: req.typ,
             data_type: req.data_type.clone(),
             status: req.status,
+            hidden: req.hidden,
             nullable: req.nullable,
             is_array: req.is_array,
             is_dictionary: req.is_dictionary,
@@ -558,6 +559,7 @@ pub struct Property {
     pub status: Status,
     pub is_system: bool,
     pub nullable: bool,
+    pub hidden: bool,
     // this also defines whether property is required or not
     pub is_array: bool,
     pub is_dictionary: bool,
@@ -607,6 +609,7 @@ pub struct CreatePropertyRequest {
     pub typ: Type,
     pub data_type: DType,
     pub status: Status,
+    pub hidden: bool,
     pub is_system: bool,
     pub nullable: bool,
     pub is_array: bool,

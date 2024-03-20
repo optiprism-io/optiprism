@@ -56,9 +56,11 @@ pub fn create_event(
 
 pub struct CreatePropertyMainRequest {
     pub name: String,
+    pub display_name: Option<String>,
     pub typ: Type,
     pub data_type: DType,
     pub nullable: bool,
+    pub hidden: bool,
     pub dict: Option<DictionaryType>,
 }
 
@@ -72,10 +74,11 @@ pub fn create_property(
         tags: None,
         name: main_req.name.clone(),
         description: None,
-        display_name: None,
+        display_name: main_req.display_name,
         typ: main_req.typ.clone(),
         data_type: main_req.data_type.clone(),
         status: properties::Status::Enabled,
+        hidden: main_req.hidden,
         is_system: false,
         nullable: main_req.nullable,
         is_array: false,

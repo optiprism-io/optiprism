@@ -32,6 +32,7 @@ use crate::expr::time_expression;
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::logical_plan::expr::multi_and;
 use crate::logical_plan::expr::multi_or;
+use crate::logical_plan::rename_columns::RenameColumnsNode;
 use crate::queries::decode_filter_single_dictionary;
 use crate::Context;
 
@@ -152,11 +153,11 @@ pub fn build(
         properties.append(&mut (l));
     }
 
-    let properties = properties
+    let dict_props = properties
         .iter()
         .filter(|prop| prop.is_dictionary && !cols_hash.contains_key(&prop.column_name()))
         .collect::<Vec<_>>();
-    let decode_cols = properties
+    let decode_cols = dict_props
         .iter()
         .map(|prop| {
             let col_name = prop.column_name();
@@ -178,6 +179,16 @@ pub fn build(
     } else {
         input
     };
+
+    let mut rename = vec![];
+    for prop in properties {
+        let col_name = prop.column_name();
+        let new_name = prop.name();
+        rename.push((col_name, new_name));
+    }
+    let input = LogicalPlan::Extension(Extension {
+        node: Arc::new(RenameColumnsNode::try_new(input, rename)?),
+    });
 
     Ok(input)
 }
