@@ -29,6 +29,7 @@ use common::DECIMAL_SCALE;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
+use datafusion::sql::sqlparser::keywords::Keyword::DESC;
 use datafusion_common::ScalarValue;
 use num_traits::FromPrimitive;
 use rust_decimal::Decimal;
@@ -219,8 +220,8 @@ impl Group {
             for idx in 0..self.steps_completed {
                 b.steps[idx].count += 1;
                 if idx > 0 {
-                    b.steps[idx].total_time += self.steps[idx - 1].ts - self.steps[0].ts;
-                    b.steps[idx].total_time_from_start += self.steps[idx].ts - self.steps[0].ts;
+                    b.steps[idx].total_time += (self.steps[idx - 1].ts - self.steps[0].ts);
+                    b.steps[idx].total_time_from_start += (self.steps[idx].ts - self.steps[0].ts);
                 }
             }
         });
@@ -723,42 +724,21 @@ impl Funnel {
                 for (step_id, step) in bucket.steps.iter().enumerate() {
                     step_total[step_id].append_value(step.count);
                     let v = if step.count > 0 {
-                        dbg!(
-                            step.total_time,
-                            step.count,
-                            step.total_time as f64 / step.count as f64
-                        );
                         step.total_time as f64 / step.count as f64
-                        // Decimal::from_i128_with_scale(step.total_time as i128, DECIMAL_SCALE as u32)
-                        // / Decimal::from_i128_with_scale(
-                        // step.count as i128,
-                        // DECIMAL_SCALE as u32,
-                        // )
                     } else {
-                        // Decimal::from_i128_with_scale(0, 0)
                         0.
                     };
-                    step_time_to_convert[step_id]
-                        .append_value(Decimal::from_f64(v).unwrap().mantissa());
+                    let mut a = Decimal::from_f64(v).unwrap();
+                    a.rescale(DECIMAL_SCALE as u32);
+                    step_time_to_convert[step_id].append_value(a.mantissa());
                     let v = if step.count > 0 {
-                        dbg!(
-                            step.total_time,
-                            step.count,
-                            step.total_time as f64 / step.count as f64
-                        );
                         step.total_time_from_start as f64 / step.count as f64
-                        // dbg!(step.total_time_from_start);
-                        // Decimal::from_i128_with_scale(
-                        // step.total_time_from_start as i128,
-                        // DECIMAL_SCALE as u32,
-                        // ) / Decimal::from_i128_with_scale(step.count as i128, DECIMAL_SCALE as u32)
                     } else {
-                        // Decimal::from_i128_with_scale(0, 0)
                         0.
                     };
-
-                    step_time_to_convert_from_start[step_id]
-                        .append_value(Decimal::from_f64(v).unwrap().mantissa());
+                    let mut a = Decimal::from_f64(v).unwrap();
+                    a.rescale(DECIMAL_SCALE as u32);
+                    step_time_to_convert_from_start[step_id].append_value(a.mantissa());
                 }
             }
 

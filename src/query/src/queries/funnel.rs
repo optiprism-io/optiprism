@@ -25,13 +25,16 @@ use datafusion_common::ScalarValue;
 use datafusion_expr::and;
 use datafusion_expr::binary_expr;
 use datafusion_expr::col;
+use datafusion_expr::expr;
 use datafusion_expr::lit;
+use datafusion_expr::Expr;
 use datafusion_expr::Extension;
 use datafusion_expr::Filter as PlanFilter;
 use datafusion_expr::Limit;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::Operator;
 use datafusion_expr::Projection;
+use datafusion_expr::Sort;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
 

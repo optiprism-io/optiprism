@@ -22,6 +22,7 @@ use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
 use arrow::util::pretty::print_batches;
 use async_trait::async_trait;
+use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_PROJECT_ID;
 use common::types::COLUMN_USER_ID;
 use common::types::RESERVED_COLUMN_FUNNEL_COMPLETED;
@@ -131,6 +132,10 @@ impl ExecutionPlan for FunnelPartialExec {
             },
             PhysicalSortRequirement {
                 expr: col(COLUMN_USER_ID, &self.input.schema()).unwrap(),
+                options: None,
+            },
+            PhysicalSortRequirement {
+                expr: col(COLUMN_CREATED_AT, &self.input.schema()).unwrap(),
                 options: None,
             },
         ];
@@ -564,7 +569,6 @@ impl Stream for FinalFunnelStream {
             .collect::<DFResult<Vec<_>>>()?;
         let result = RecordBatch::try_new(self.schema.clone(), cols)?;
         self.finished = true;
-        dbg!(&result);
         Poll::Ready(Some(Ok(result)))
     }
 }
