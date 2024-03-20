@@ -248,6 +248,7 @@ pub struct Property {
     pub order: u64,
     pub data_type: DType,
     pub status: Status,
+    pub hidden: bool,
     pub is_system: bool,
     pub nullable: bool,
     // this also defines whether property is required or not
@@ -277,6 +278,7 @@ impl TryInto<metadata::properties::Property> for Property {
             status: self.status.into(),
             is_system: self.is_system,
             nullable: self.nullable,
+            hidden: self.hidden,
             is_array: self.is_array,
             is_dictionary: self.is_dictionary,
             dictionary_type: self.dictionary_type.map(|v| v.try_into()).transpose()?,
@@ -302,6 +304,7 @@ impl TryInto<Property> for metadata::properties::Property {
             display_name: self.display_name,
             data_type: self.data_type,
             status: self.status.into(),
+            hidden: self.hidden,
             is_system: self.is_system,
             nullable: self.nullable,
             is_array: self.is_array,

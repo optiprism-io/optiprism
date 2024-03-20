@@ -52,6 +52,7 @@ fn resolve_property(
         typ: typ.clone(),
         data_type,
         status: Status::Enabled,
+        hidden: false,
         is_system: false,
         nullable: true,
         is_array: false,

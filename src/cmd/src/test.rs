@@ -90,18 +90,22 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
     for (name, dt) in props {
         create_property(&md, proj_id, CreatePropertyMainRequest {
             name: name.to_string(),
+            display_name: None,
             typ: Type::System, // do this to keep property names as is
             data_type: dt,
             nullable: true,
+            hidden: false,
             dict: None,
         })?;
     }
 
     create_property(&md, proj_id, CreatePropertyMainRequest {
         name: "string_dict".to_string(),
+        display_name: None,
         typ: Type::System,
         data_type: DType::String,
         nullable: true,
+        hidden: false,
         dict: Some(DictionaryType::Int8),
     })?;
 
