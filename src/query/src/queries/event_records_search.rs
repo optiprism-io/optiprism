@@ -12,13 +12,16 @@ use datafusion_common::ScalarValue;
 use datafusion_expr::and;
 use datafusion_expr::binary_expr;
 use datafusion_expr::col;
+use datafusion_expr::expr;
 use datafusion_expr::lit;
+use datafusion_expr::Expr;
 use datafusion_expr::Extension;
 use datafusion_expr::Filter as PlanFilter;
 use datafusion_expr::Limit;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::Operator;
 use datafusion_expr::Projection;
+use datafusion_expr::Sort;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
 
@@ -27,6 +30,7 @@ use crate::expr::event_expression;
 use crate::expr::event_filters_expression;
 use crate::expr::time_expression;
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
+use crate::logical_plan::expr::multi_and;
 use crate::logical_plan::expr::multi_or;
 use crate::queries::decode_filter_single_dictionary;
 use crate::Context;
@@ -78,24 +82,22 @@ pub fn build(
         &mut cols_hash,
     )?;
 
-    let mut expr = binary_expr(
-        col(COLUMN_PROJECT_ID),
-        Operator::Eq,
-        lit(ScalarValue::from(ctx.project_id as i64)),
-    );
+    let mut filter_exprs = vec![
+        binary_expr(
+            col(COLUMN_PROJECT_ID),
+            Operator::Eq,
+            lit(ScalarValue::from(ctx.project_id as i64)),
+        ),
+        time_expression(COLUMN_CREATED_AT, input.schema(), &req.time, ctx.cur_time)?,
+    ];
 
-    let mut filter_exprs = vec![];
     if let Some(events) = &req.events
         && !events.is_empty()
     {
         let mut exprs = vec![];
         for event in events {
-            // todo add project_id filtering
-            let mut expr =
-                time_expression(COLUMN_CREATED_AT, input.schema(), &req.time, ctx.cur_time)?;
-
             // event expression
-            expr = and(expr, event_expression(&ctx, &metadata, &event.event)?);
+            let mut expr = event_expression(&ctx, &metadata, &event.event)?;
             // apply event filters
             if let Some(filters) = &event.filters
                 && !filters.is_empty()
@@ -113,17 +115,27 @@ pub fn build(
 
     if let Some(filters) = &req.filters {
         let expr = event_filters_expression(&ctx, &metadata, filters)?;
-        if filter_exprs.is_empty() {
-            filter_exprs.push(expr);
-        } else {
-            filter_exprs = vec![and(filter_exprs[0].clone(), expr)];
-        }
+        filter_exprs = vec![and(filter_exprs[0].clone(), expr)];
     }
 
-    if !filter_exprs.is_empty() {
-        expr = and(expr, filter_exprs[0].clone());
-    }
-    let input = LogicalPlan::Filter(PlanFilter::try_new(expr, Arc::new(input))?);
+    let input = LogicalPlan::Filter(PlanFilter::try_new(
+        multi_and(filter_exprs),
+        Arc::new(input),
+    )?);
+
+    let input = {
+        let s = Expr::Sort(expr::Sort {
+            expr: Box::new(col(COLUMN_CREATED_AT)),
+            asc: false,
+            nulls_first: false,
+        });
+
+        LogicalPlan::Sort(Sort {
+            expr: vec![s],
+            input: Arc::new(input),
+            fetch: None,
+        })
+    };
 
     let input = LogicalPlan::Limit(Limit {
         skip: 0,

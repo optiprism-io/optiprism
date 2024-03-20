@@ -448,25 +448,6 @@ impl LogicalPlanBuilder {
     ) -> Result<LogicalPlan> {
         let input = self.build_filter_logical_plan(input.clone(), &self.es.events[event_id])?;
 
-        // let input = {
-        // let c1 = Expr::Sort(expr::Sort {
-        // expr: Box::new(col(COLUMN_PROJECT_ID)),
-        // asc: true,
-        // nulls_first: false,
-        // });
-        //
-        // let c2 = Expr::Sort(expr::Sort {
-        // expr: Box::new(col(COLUMN_USER_ID)),
-        // asc: true,
-        // nulls_first: false,
-        // });
-        //
-        // LogicalPlan::Sort(Sort {
-        // expr: vec![c1, c2],
-        // input: Arc::new(input),
-        // fetch: None,
-        // })
-        // };
         let (mut input, group_expr) = self.build_aggregate_logical_plan(
             input,
             &self.es.events[event_id],

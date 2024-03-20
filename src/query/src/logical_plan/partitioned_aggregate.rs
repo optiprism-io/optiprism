@@ -263,9 +263,10 @@ fn return_type(dt: DataType, agg: &AggregateFunction, _schema: &DFSchema) -> Dat
             DataType::Float32 | DataType::Float64 => DataType::Float64,
             DataType::Int8 | DataType::Int16 | DataType::Int32 => DataType::Int64,
             DataType::UInt8 | DataType::UInt16 | DataType::UInt32 => DataType::UInt64,
-            DataType::Int64 | DataType::UInt64 | DataType::Decimal128(_, _) => {
-                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE)
-            }
+            DataType::Int64
+            | DataType::UInt64
+            | DataType::Decimal128(_, _)
+            | DataType::Timestamp(_, _) => DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
             _ => unimplemented!("{dt:?}"),
         },
     }
