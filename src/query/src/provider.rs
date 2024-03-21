@@ -200,7 +200,7 @@ impl QueryProvider {
             .enumerate()
             .map(|(idx, field)| {
                 let typ = match metric_cols.contains(field.name()) {
-                    true => ColumnType::MetricValue,
+                    true => ColumnType::Metric,
                     false => ColumnType::Dimension,
                 };
 

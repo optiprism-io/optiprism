@@ -291,8 +291,6 @@ impl From<ArrayRef> for StaticArray {
 pub enum ColumnType {
     Dimension,
     Metric,
-    MetricValue,
-    FunnelMetricValue,
 }
 
 #[derive(Clone, Debug)]

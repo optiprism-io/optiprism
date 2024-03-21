@@ -463,8 +463,6 @@ impl Into<EventFilter> for common::query::EventFilter {
 pub enum ColumnType {
     Dimension,
     Metric,
-    MetricValue,
-    FunnelMetricValue,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -485,8 +483,6 @@ impl From<query::ColumnType> for ColumnType {
         match value {
             query::ColumnType::Dimension => ColumnType::Dimension,
             query::ColumnType::Metric => ColumnType::Metric,
-            query::ColumnType::MetricValue => ColumnType::MetricValue,
-            query::ColumnType::FunnelMetricValue => ColumnType::FunnelMetricValue,
         }
     }
 }
