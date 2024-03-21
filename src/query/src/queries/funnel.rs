@@ -47,6 +47,7 @@ use crate::logical_plan;
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::logical_plan::expr::multi_or;
 use crate::logical_plan::funnel::FunnelNode;
+use crate::logical_plan::rename_columns::RenameColumnsNode;
 use crate::logical_plan::SortField;
 use crate::queries::decode_filter_single_dictionary;
 use crate::queries::event_records_search::Event;
@@ -151,6 +152,7 @@ pub fn build(
         }
     };
 
+    let mut rename_groups = vec![];
     let groups = if let Some(breakdowns) = &req.breakdowns {
         let mut out = vec![];
         for breakdown in breakdowns {
@@ -168,6 +170,8 @@ pub fn build(
                     PropertyRef::Custom(_) => unimplemented!(),
                 },
             };
+
+            rename_groups.push((prop.column_name(), prop.name()));
 
             let expr = col(Column {
                 relation: None,
@@ -224,6 +228,10 @@ pub fn build(
             Column::from_qualified_name(COLUMN_USER_ID),
             funnel,
         )?),
+    });
+
+    let input = LogicalPlan::Extension(Extension {
+        node: Arc::new(RenameColumnsNode::try_new(input, rename_groups)?),
     });
 
     Ok(input)

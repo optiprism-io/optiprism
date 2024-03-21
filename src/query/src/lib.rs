@@ -300,6 +300,7 @@ pub struct Column {
     pub is_nullable: bool,
     pub data_type: DataType,
     pub data: ArrayRef,
+    pub step: Option<usize>,
 }
 
 pub struct DataTable {

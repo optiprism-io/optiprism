@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
@@ -31,6 +33,7 @@ pub struct Funnel {
     pub segments: Option<Vec<Segment>>,
     pub filters: Option<Vec<EventFilter>>,
 }
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Step {
     pub events: Vec<Event>,

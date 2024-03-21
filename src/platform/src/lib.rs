@@ -518,7 +518,7 @@ impl QueryResponse {
                     is_nullable: column.is_nullable,
                     data_type: column.data_type.into(),
                     data,
-                    step: None,
+                    step: column.step,
                     compare_values: None,
                 }
             })

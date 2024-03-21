@@ -11,6 +11,7 @@ use common::query::event_segmentation::Query;
 use common::query::funnel::Funnel;
 use common::query::Breakdown;
 use common::query::EventFilter;
+use common::query::PropertyRef;
 use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_EVENT_ID;
@@ -161,6 +162,7 @@ impl QueryProvider {
                 is_nullable: field.is_nullable(),
                 data_type: field.data_type().to_owned(),
                 data: result.column(idx).to_owned(),
+                step: None,
             })
             .collect();
 
@@ -212,6 +214,7 @@ impl QueryProvider {
                     is_nullable: field.is_nullable(),
                     data_type: field.data_type().to_owned(),
                     data: arr,
+                    step: None,
                 }
             })
             .collect();
@@ -229,29 +232,90 @@ impl QueryProvider {
             .collect();
 
         let (session_ctx, state, plan) = self.initial_plan(projection).await?;
-        let plan = funnel::build(ctx, self.metadata.clone(), plan, req.clone())?;
+        let plan = funnel::build(ctx.clone(), self.metadata.clone(), plan, req.clone())?;
 
         let result = self.execute(session_ctx, state, plan).await?;
 
         let duration = start.elapsed();
         debug!("elapsed: {:?}", duration);
 
+        let breakdowns = funnel_breakdown_column_names(&req, ctx.project_id, &self.metadata)?;
         let cols = result
             .schema()
             .fields()
             .iter()
             .enumerate()
-            .map(|(idx, field)| Column {
-                name: field.name().to_owned(),
-                typ: ColumnType::Dimension,
-                is_nullable: field.is_nullable(),
-                data_type: field.data_type().to_owned(),
-                data: result.column(idx).to_owned(),
+            .map(|(idx, field)| {
+                let typ = {
+                    if breakdowns.contains(&field.name().to_string()) {
+                        ColumnType::Dimension
+                    } else {
+                        ColumnType::Metric
+                    }
+                };
+                let step = {
+                    // todo make more robust approach
+                    if field.name().starts_with("step") {
+                        Some(
+                            field
+                                .name()
+                                .split("step")
+                                .last()
+                                .unwrap()
+                                .split("_")
+                                .next()
+                                .unwrap()
+                                .parse()
+                                .unwrap(),
+                        )
+                    } else {
+                        None
+                    }
+                };
+
+                Column {
+                    name: field.name().to_owned(),
+                    typ,
+                    is_nullable: field.is_nullable(),
+                    data_type: field.data_type().to_owned(),
+                    data: result.column(idx).to_owned(),
+                    step,
+                }
             })
             .collect();
 
         Ok(DataTable::new(result.schema(), cols))
     }
+}
+
+pub fn funnel_breakdown_column_names(
+    req: &Funnel,
+    project_id: u64,
+    md: &Arc<MetadataProvider>,
+) -> Result<Vec<String>> {
+    let mut columns = vec![];
+    if let Some(breakdowns) = &req.breakdowns {
+        for breakdown in breakdowns {
+            let prop = match breakdown {
+                Breakdown::Property(prop) => match prop {
+                    PropertyRef::System(prop) => md
+                        .system_properties
+                        .get_by_name(project_id, prop.as_str())?,
+                    PropertyRef::User(prop) => {
+                        md.user_properties.get_by_name(project_id, prop.as_str())?
+                    }
+                    PropertyRef::Event(prop) => {
+                        md.event_properties.get_by_name(project_id, prop.as_str())?
+                    }
+                    PropertyRef::Custom(_) => unimplemented!(),
+                },
+            };
+            columns.push(prop.name());
+        }
+    }
+    columns.dedup();
+
+    Ok(columns)
 }
 
 fn property_values_projection(
