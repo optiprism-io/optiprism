@@ -579,7 +579,7 @@ impl Funnel {
             }
             let mut matched = false;
             match &self.steps_orders[group.cur_step] {
-                StepOrder::Sequential => {
+                StepOrder::Exact => {
                     matched = batch.steps[group.cur_step].value(row_id);
                 }
                 StepOrder::Any(pairs) => {
@@ -830,7 +830,7 @@ mod tests {
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::DebugStep;
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Funnel;
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Options;
-    use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::StepOrder::Sequential;
+    use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::StepOrder::Exact;
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::Count;
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::Count::Unique;
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::ExcludeExpr;
@@ -887,7 +887,7 @@ mod tests {
                     groups: None,
                     ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::minutes(15),
-                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+                    steps: event_eq!(schema, "e1" Exact, "e2" Exact, "e3" Exact),
                     exclude: None,
                     constants: None,
                     count: Count::Unique,
@@ -938,7 +938,7 @@ asd
                     groups: None,
                     ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::minutes(15),
-                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+                    steps: event_eq!(schema, "e1" Exact, "e2" Exact, "e3" Exact),
                     exclude: None,
                     constants: None,
                     count: Count::Unique,
@@ -990,7 +990,7 @@ asd
                     groups: None,
                     ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::minutes(15),
-                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+                    steps: event_eq!(schema, "e1" Exact, "e2" Exact, "e3" Exact),
                     exclude: None,
                     constants: None,
                     count: Count::NonUnique,
@@ -1037,7 +1037,7 @@ asd
                     groups: None,
                     ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::seconds(15),
-                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+                    steps: event_eq!(schema, "e1" Exact, "e2" Exact, "e3" Exact),
                     exclude: None,
                     constants: None,
                     count: Count::Unique,
@@ -1077,7 +1077,7 @@ asd
                     groups: None,
                     ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::seconds(15),
-                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+                    steps: event_eq!(schema, "e1" Exact, "e2" Exact, "e3" Exact),
                     exclude: None,
                     constants: None,
                     count: Count::Unique,
@@ -1117,7 +1117,7 @@ asd
                     groups: None,
                     ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::seconds(15),
-                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+                    steps: event_eq!(schema, "e1" Exact, "e2" Exact, "e3" Exact),
                     exclude: None,
                     constants: Some(vec![Arc::new(
                         Column::new_with_schema("const", &schema).unwrap(),
@@ -1158,7 +1158,7 @@ asd
                     groups: None,
                     ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::seconds(15),
-                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+                    steps: event_eq!(schema, "e1" Exact, "e2" Exact, "e3" Exact),
                     exclude: None,
                     constants: Some(vec![Arc::new(
                         Column::new_with_schema("const", &schema).unwrap(),
@@ -1200,7 +1200,7 @@ asd
                     groups: None,
                     ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::seconds(15),
-                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+                    steps: event_eq!(schema, "e1" Exact, "e2" Exact, "e3" Exact),
                     exclude: None,
                     constants: Some(vec![Arc::new(
                         Column::new_with_schema("const", &schema).unwrap(),
@@ -1249,7 +1249,7 @@ asd
                     groups: None,
                     ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::seconds(15),
-                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+                    steps: event_eq!(schema, "e1" Exact, "e2" Exact, "e3" Exact),
                     exclude: Some(vec![ExcludeExpr {
                         expr: {
                             let l = Column::new_with_schema("event", &schema).unwrap();
@@ -1354,7 +1354,7 @@ asd
                     ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::seconds(15),
                     steps: vec![
-                        event_eq_(&schema, "e1", Sequential),
+                        event_eq_(&schema, "e1", Exact),
                         event_eq_(&schema, "e2", Any(vec![(0, 2)])),
                         event_eq_(&schema, "e3", Any(vec![(1, 2)])),
                     ],
@@ -1399,7 +1399,7 @@ asd
                     groups: None,
                     ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::seconds(15),
-                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+                    steps: event_eq!(schema, "e1" Exact, "e2" Exact, "e3" Exact),
                     exclude: None,
                     constants: None,
                     count: Count::Unique,
@@ -1449,7 +1449,7 @@ asd
                     groups: None,
                     ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::seconds(15),
-                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+                    steps: event_eq!(schema, "e1" Exact, "e2" Exact, "e3" Exact),
                     exclude: None,
                     constants: None,
                     count: Count::Unique,
@@ -1493,7 +1493,7 @@ asd
                     groups: None,
                     ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::seconds(15),
-                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+                    steps: event_eq!(schema, "e1" Exact, "e2" Exact, "e3" Exact),
                     exclude: None,
                     constants: None,
                     count: Count::Unique,
@@ -1530,7 +1530,7 @@ asd
                     groups: None,
                     ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::seconds(15),
-                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+                    steps: event_eq!(schema, "e1" Exact, "e2" Exact, "e3" Exact),
                     exclude: None,
                     constants: None,
                     count: Count::Unique,
@@ -1599,19 +1599,19 @@ asd
             let l = Column::new_with_schema("v", &schema).unwrap();
             let r = Literal::new(ScalarValue::Int64(Some(1)));
             let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
-            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Exact)
         };
         let e2 = {
             let l = Column::new_with_schema("v", &schema).unwrap();
             let r = Literal::new(ScalarValue::Int64(Some(2)));
             let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
-            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Exact)
         };
         let e3 = {
             let l = Column::new_with_schema("v", &schema).unwrap();
             let r = Literal::new(ScalarValue::Int64(Some(3)));
             let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
-            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Exact)
         };
 
         let ex = {
@@ -1683,19 +1683,19 @@ asd
             let l = Column::new_with_schema("v", &schema).unwrap();
             let r = Literal::new(ScalarValue::Int64(Some(1)));
             let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
-            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Exact)
         };
         let e2 = {
             let l = Column::new_with_schema("v", &schema).unwrap();
             let r = Literal::new(ScalarValue::Int64(Some(2)));
             let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
-            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Exact)
         };
         let e3 = {
             let l = Column::new_with_schema("v", &schema).unwrap();
             let r = Literal::new(ScalarValue::Int64(Some(3)));
             let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
-            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Exact)
         };
 
         let ex = {
@@ -1771,19 +1771,19 @@ asd
             let l = Column::new_with_schema("v", &schema).unwrap();
             let r = Literal::new(ScalarValue::Int64(Some(1)));
             let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
-            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Exact)
         };
         let e2 = {
             let l = Column::new_with_schema("v", &schema).unwrap();
             let r = Literal::new(ScalarValue::Int64(Some(2)));
             let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
-            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Exact)
         };
         let e3 = {
             let l = Column::new_with_schema("v", &schema).unwrap();
             let r = Literal::new(ScalarValue::Int64(Some(3)));
             let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
-            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Exact)
         };
 
         let ex = {
@@ -1856,19 +1856,19 @@ asd
             let l = Column::new_with_schema("v", &schema).unwrap();
             let r = Literal::new(ScalarValue::Int64(Some(1)));
             let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
-            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Exact)
         };
         let e2 = {
             let l = Column::new_with_schema("v", &schema).unwrap();
             let r = Literal::new(ScalarValue::Int64(Some(2)));
             let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
-            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Exact)
         };
         let e3 = {
             let l = Column::new_with_schema("v", &schema).unwrap();
             let r = Literal::new(ScalarValue::Int64(Some(3)));
             let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
-            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Exact)
         };
 
         let ex = {

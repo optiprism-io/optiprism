@@ -81,8 +81,6 @@ impl Into<QueryTime> for common::query::QueryTime {
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum TimeIntervalUnit {
-    Second,
-    Minute,
     Hour,
     Day,
     Week,
@@ -93,8 +91,6 @@ pub enum TimeIntervalUnit {
 impl Into<common::query::TimeIntervalUnit> for TimeIntervalUnit {
     fn into(self) -> common::query::TimeIntervalUnit {
         match self {
-            TimeIntervalUnit::Second => common::query::TimeIntervalUnit::Second,
-            TimeIntervalUnit::Minute => common::query::TimeIntervalUnit::Minute,
             TimeIntervalUnit::Hour => common::query::TimeIntervalUnit::Hour,
             TimeIntervalUnit::Day => common::query::TimeIntervalUnit::Day,
             TimeIntervalUnit::Week => common::query::TimeIntervalUnit::Week,
@@ -107,8 +103,6 @@ impl Into<common::query::TimeIntervalUnit> for TimeIntervalUnit {
 impl Into<TimeIntervalUnit> for common::query::TimeIntervalUnit {
     fn into(self) -> TimeIntervalUnit {
         match self {
-            common::query::TimeIntervalUnit::Second => TimeIntervalUnit::Second,
-            common::query::TimeIntervalUnit::Minute => TimeIntervalUnit::Minute,
             common::query::TimeIntervalUnit::Hour => TimeIntervalUnit::Hour,
             common::query::TimeIntervalUnit::Day => TimeIntervalUnit::Day,
             common::query::TimeIntervalUnit::Week => TimeIntervalUnit::Week,

@@ -639,19 +639,19 @@ mod tests {
             let l = Column::new_with_schema("v", &schema).unwrap();
             let r = Literal::new(ScalarValue::Int64(Some(1)));
             let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
-            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Exact)
         };
         let e2 = {
             let l = Column::new_with_schema("v", &schema).unwrap();
             let r = Literal::new(ScalarValue::Int64(Some(2)));
             let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
-            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Exact)
         };
         let e3 = {
             let l = Column::new_with_schema("v", &schema).unwrap();
             let r = Literal::new(ScalarValue::Int64(Some(3)));
             let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
-            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Exact)
         };
 
         let ex = {

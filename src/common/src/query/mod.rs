@@ -386,8 +386,6 @@ impl QueryTime {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum TimeIntervalUnit {
-    Second,
-    Minute,
     Hour,
     Day,
     Week,
@@ -398,8 +396,6 @@ pub enum TimeIntervalUnit {
 impl TimeIntervalUnit {
     pub fn duration(&self, n: i64) -> Duration {
         match self {
-            TimeIntervalUnit::Second => Duration::seconds(n),
-            TimeIntervalUnit::Minute => Duration::minutes(n),
             TimeIntervalUnit::Hour => Duration::hours(n),
             TimeIntervalUnit::Day => Duration::days(n),
             TimeIntervalUnit::Week => Duration::weeks(n),
@@ -409,8 +405,6 @@ impl TimeIntervalUnit {
     }
     pub fn relative_duration(&self, n: i64) -> RelativeDuration {
         match self {
-            TimeIntervalUnit::Second => RelativeDuration::seconds(n),
-            TimeIntervalUnit::Minute => RelativeDuration::minutes(n),
             TimeIntervalUnit::Hour => RelativeDuration::hours(n),
             TimeIntervalUnit::Day => RelativeDuration::days(n),
             TimeIntervalUnit::Week => RelativeDuration::weeks(n),
@@ -421,8 +415,6 @@ impl TimeIntervalUnit {
 
     pub fn as_str(&self) -> &str {
         match self {
-            TimeIntervalUnit::Second => "second",
-            TimeIntervalUnit::Minute => "minute",
             TimeIntervalUnit::Hour => "hour",
             TimeIntervalUnit::Day => "day",
             TimeIntervalUnit::Week => "week",
@@ -440,8 +432,6 @@ pub fn time_columns(
     let from = date_trunc(granularity, from).unwrap();
     let to = date_trunc(granularity, to).unwrap();
     let rule = match granularity {
-        TimeIntervalUnit::Second => DateRule::secondly(from),
-        TimeIntervalUnit::Minute => DateRule::minutely(from),
         TimeIntervalUnit::Hour => DateRule::hourly(from),
         TimeIntervalUnit::Day => DateRule::daily(from),
         TimeIntervalUnit::Week => DateRule::weekly(from),
@@ -457,8 +447,6 @@ pub fn time_columns(
 pub fn date_trunc(granularity: &TimeIntervalUnit, value: DateTime<Utc>) -> Result<DateTime<Utc>> {
     let value = Some(value);
     let value = match granularity {
-        TimeIntervalUnit::Second => value,
-        TimeIntervalUnit::Minute => value.and_then(|d| d.with_second(0)),
         TimeIntervalUnit::Hour => value
             .and_then(|d| d.with_second(0))
             .and_then(|d| d.with_minute(0)),

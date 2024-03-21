@@ -21,7 +21,7 @@ pub mod funnel;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum StepOrder {
-    Sequential,
+    Exact,
     Any(Vec<(usize, usize)>), // any of the steps
 }
 

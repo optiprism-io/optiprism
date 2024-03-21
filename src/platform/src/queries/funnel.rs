@@ -31,7 +31,6 @@ pub struct Funnel {
     pub count: Count,
     pub filter: Option<Filter>,
     pub touch: Touch,
-    pub step_order: StepOrder,
     pub attribution: Option<Touch>,
     pub holding_constants: Option<Vec<PropertyRef>>,
     pub exclude: Option<Vec<Exclude>>,
@@ -150,8 +149,6 @@ impl Into<TimeWindow> for common::query::funnel::TimeWindow {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum TimeIntervalUnitSession {
-    Second,
-    Minute,
     Hour,
     Day,
     Week,
@@ -163,12 +160,6 @@ pub enum TimeIntervalUnitSession {
 impl Into<common::query::funnel::TimeIntervalUnitSession> for TimeIntervalUnitSession {
     fn into(self) -> common::query::funnel::TimeIntervalUnitSession {
         match self {
-            TimeIntervalUnitSession::Second => {
-                common::query::funnel::TimeIntervalUnitSession::Second
-            }
-            TimeIntervalUnitSession::Minute => {
-                common::query::funnel::TimeIntervalUnitSession::Minute
-            }
             TimeIntervalUnitSession::Hour => common::query::funnel::TimeIntervalUnitSession::Hour,
             TimeIntervalUnitSession::Day => common::query::funnel::TimeIntervalUnitSession::Day,
             TimeIntervalUnitSession::Week => common::query::funnel::TimeIntervalUnitSession::Week,
@@ -184,12 +175,6 @@ impl Into<common::query::funnel::TimeIntervalUnitSession> for TimeIntervalUnitSe
 impl Into<TimeIntervalUnitSession> for common::query::funnel::TimeIntervalUnitSession {
     fn into(self) -> TimeIntervalUnitSession {
         match self {
-            common::query::funnel::TimeIntervalUnitSession::Second => {
-                TimeIntervalUnitSession::Second
-            }
-            common::query::funnel::TimeIntervalUnitSession::Minute => {
-                TimeIntervalUnitSession::Minute
-            }
             common::query::funnel::TimeIntervalUnitSession::Hour => TimeIntervalUnitSession::Hour,
             common::query::funnel::TimeIntervalUnitSession::Day => TimeIntervalUnitSession::Day,
             common::query::funnel::TimeIntervalUnitSession::Week => TimeIntervalUnitSession::Week,
@@ -204,14 +189,14 @@ impl Into<TimeIntervalUnitSession> for common::query::funnel::TimeIntervalUnitSe
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum StepOrder {
-    Sequential,
+    Exact,
     Any { steps: Vec<(usize, usize)> }, // any of the steps
 }
 
 impl Into<common::query::funnel::StepOrder> for StepOrder {
     fn into(self) -> common::query::funnel::StepOrder {
         match self {
-            StepOrder::Sequential => common::query::funnel::StepOrder::Sequential,
+            StepOrder::Exact => common::query::funnel::StepOrder::Exact,
             StepOrder::Any { steps } => common::query::funnel::StepOrder::Any(steps),
         }
     }
@@ -220,7 +205,7 @@ impl Into<common::query::funnel::StepOrder> for StepOrder {
 impl Into<StepOrder> for common::query::funnel::StepOrder {
     fn into(self) -> StepOrder {
         match self {
-            common::query::funnel::StepOrder::Sequential => StepOrder::Sequential,
+            common::query::funnel::StepOrder::Exact => StepOrder::Exact,
             common::query::funnel::StepOrder::Any(steps) => StepOrder::Any { steps },
         }
     }
@@ -345,7 +330,7 @@ impl Into<Filter> for common::query::funnel::Filter {
 pub enum Touch {
     First,
     Last,
-    Step(usize),
+    Step { step: usize },
 }
 
 impl Into<common::query::funnel::Touch> for Touch {
@@ -353,7 +338,7 @@ impl Into<common::query::funnel::Touch> for Touch {
         match self {
             Touch::First => common::query::funnel::Touch::First,
             Touch::Last => common::query::funnel::Touch::Last,
-            Touch::Step(step) => common::query::funnel::Touch::Step(step),
+            Touch::Step { step } => common::query::funnel::Touch::Step { step },
         }
     }
 }
@@ -363,7 +348,7 @@ impl Into<Touch> for common::query::funnel::Touch {
         match self {
             common::query::funnel::Touch::First => Touch::First,
             common::query::funnel::Touch::Last => Touch::Last,
-            common::query::funnel::Touch::Step(step) => Touch::Step(step),
+            common::query::funnel::Touch::Step { step } => Touch::Step { step },
         }
     }
 }
@@ -447,7 +432,6 @@ impl Into<common::query::funnel::Funnel> for Funnel {
             count: self.count.into(),
             filter: self.filter.map(|f| f.into()),
             touch: self.touch.into(),
-            step_order: self.step_order.into(),
             attribution: self.attribution.map(|attr| attr.into()),
             holding_constants: self
                 .holding_constants
@@ -487,7 +471,6 @@ impl Into<Funnel> for common::query::funnel::Funnel {
             count: self.count.into(),
             filter: self.filter.map(|f| f.into()),
             touch: self.touch.into(),
-            step_order: self.step_order.into(),
             attribution: self.attribution.map(|attr| attr.into()),
             holding_constants: self
                 .holding_constants
@@ -570,26 +553,26 @@ pub(crate) fn validate(md: &Arc<MetadataProvider>, project_id: u64, req: &Funnel
                 None => {}
             }
         }
-    }
 
-    match &req.step_order {
-        StepOrder::Sequential => {}
-        StepOrder::Any { steps } => steps
-            .iter()
-            .map(|(from, to)| {
-                if *from >= req.steps.len() {
-                    return Err(PlatformError::BadRequest(
-                        "step_order: from step index out of range".to_string(),
-                    ));
-                }
-                if *to >= req.steps.len() {
-                    return Err(PlatformError::BadRequest(
-                        "step_order: to step index out of range".to_string(),
-                    ));
-                }
-                Ok(())
-            })
-            .collect::<Result<_>>()?,
+        match &step.order {
+            StepOrder::Exact => {}
+            StepOrder::Any { steps } => steps
+                .iter()
+                .map(|(from, to)| {
+                    if *from >= req.steps.len() {
+                        return Err(PlatformError::BadRequest(
+                            "step_order: from step index out of range".to_string(),
+                        ));
+                    }
+                    if *to >= req.steps.len() {
+                        return Err(PlatformError::BadRequest(
+                            "step_order: to step index out of range".to_string(),
+                        ));
+                    }
+                    Ok(())
+                })
+                .collect::<Result<_>>()?,
+        }
     }
 
     if let Some(exclude) = &req.exclude {

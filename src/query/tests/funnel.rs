@@ -66,14 +66,14 @@ mod tests {
                                         * value: Some(vec![ScalarValue::Boolean(Some(true))]),
                                         * }]), */
                     }],
-                    order: StepOrder::Sequential,
+                    order: StepOrder::Exact,
                 },
                 Step {
                     events: vec![Event {
                         event: EventRef::RegularName("Buy Product".to_string()),
                         filters: None,
                     }],
-                    order: StepOrder::Sequential,
+                    order: StepOrder::Exact,
                 },
             ],
             time_window: TimeWindow {
@@ -84,7 +84,7 @@ mod tests {
             count: Count::Unique,
             filter: None,
             touch: Touch::First,
-            step_order: StepOrder::Sequential,
+            step_order: StepOrder::Exact,
             attribution: Some(Touch::First),
             holding_constants: None, // Some(vec![PropertyRef::User("Is Premium".to_string())])
             exclude: None,           /* Some(vec![Exclude {

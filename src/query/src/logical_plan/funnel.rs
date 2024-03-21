@@ -95,7 +95,7 @@ impl Funnel {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum StepOrder {
-    Sequential,
+    Exact,
     Any(Vec<(usize, usize)>), // any of the steps
 }
 

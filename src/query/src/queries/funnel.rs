@@ -91,7 +91,7 @@ pub fn build(
             }
 
             let order = match &step.order {
-                StepOrder::Sequential => logical_plan::funnel::StepOrder::Sequential,
+                StepOrder::Exact => logical_plan::funnel::StepOrder::Exact,
                 StepOrder::Any(order) => logical_plan::funnel::StepOrder::Any(order.to_vec()),
             };
             steps.push((multi_or(exprs), order))
@@ -208,7 +208,7 @@ pub fn build(
         touch: match req.touch {
             Touch::First => logical_plan::funnel::Touch::First,
             Touch::Last => logical_plan::funnel::Touch::Last,
-            Touch::Step(n) => logical_plan::funnel::Touch::Step(n),
+            Touch::Step { step } => logical_plan::funnel::Touch::Step(step),
         },
         partition_col: col(Column {
             relation: None,

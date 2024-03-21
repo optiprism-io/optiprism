@@ -24,7 +24,6 @@ pub struct Funnel {
     pub count: Count,
     pub filter: Option<Filter>,
     pub touch: Touch,
-    pub step_order: StepOrder,
     pub attribution: Option<Touch>,
     pub holding_constants: Option<Vec<PropertyRef>>,
     pub exclude: Option<Vec<Exclude>>,
@@ -55,8 +54,6 @@ pub struct TimeWindow {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum TimeIntervalUnitSession {
-    Second,
-    Minute,
     Hour,
     Day,
     Week,
@@ -68,8 +65,6 @@ pub enum TimeIntervalUnitSession {
 impl TimeIntervalUnitSession {
     pub fn duration(&self, n: i64) -> Duration {
         match self {
-            TimeIntervalUnitSession::Second => Duration::seconds(n),
-            TimeIntervalUnitSession::Minute => Duration::minutes(n),
             TimeIntervalUnitSession::Hour => Duration::hours(n),
             TimeIntervalUnitSession::Day => Duration::days(n),
             TimeIntervalUnitSession::Week => Duration::weeks(n),
@@ -80,8 +75,6 @@ impl TimeIntervalUnitSession {
     }
     pub fn relative_duration(&self, n: i64) -> RelativeDuration {
         match self {
-            TimeIntervalUnitSession::Second => RelativeDuration::seconds(n),
-            TimeIntervalUnitSession::Minute => RelativeDuration::minutes(n),
             TimeIntervalUnitSession::Hour => RelativeDuration::hours(n),
             TimeIntervalUnitSession::Day => RelativeDuration::days(n),
             TimeIntervalUnitSession::Week => RelativeDuration::weeks(n),
@@ -93,8 +86,6 @@ impl TimeIntervalUnitSession {
 
     pub fn as_str(&self) -> &str {
         match self {
-            TimeIntervalUnitSession::Second => "second",
-            TimeIntervalUnitSession::Minute => "minute",
             TimeIntervalUnitSession::Hour => "hour",
             TimeIntervalUnitSession::Day => "day",
             TimeIntervalUnitSession::Week => "week",
@@ -107,7 +98,7 @@ impl TimeIntervalUnitSession {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum StepOrder {
-    Sequential,
+    Exact,
     Any(Vec<(usize, usize)>), // any of the steps
 }
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -140,7 +131,7 @@ pub enum Filter {
 pub enum Touch {
     First,
     Last,
-    Step(usize),
+    Step { step: usize },
 }
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum ChartType {

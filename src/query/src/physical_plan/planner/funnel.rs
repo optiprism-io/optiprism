@@ -59,7 +59,7 @@ pub(crate) fn build_funnel(
         .map(|(expr, order)| {
             let expr = create_physical_expr(&expr, &dfschema, &schema, &execution_props).unwrap();
             let order = match order {
-                logical_plan::funnel::StepOrder::Sequential => StepOrder::Sequential,
+                logical_plan::funnel::StepOrder::Exact => StepOrder::Exact,
                 logical_plan::funnel::StepOrder::Any(v) => StepOrder::Any(v.to_vec()),
             };
             (expr, order)
