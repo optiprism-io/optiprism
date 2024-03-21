@@ -247,7 +247,9 @@ impl QueryProvider {
             .enumerate()
             .map(|(idx, field)| {
                 let typ = {
-                    if breakdowns.contains(&field.name().to_string()) {
+                    if breakdowns.contains(&field.name().to_string())
+                        || field.name().to_owned() == "segment".to_string()
+                    {
                         ColumnType::Dimension
                     } else {
                         ColumnType::Metric
