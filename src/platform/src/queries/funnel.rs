@@ -202,17 +202,17 @@ impl Into<TimeIntervalUnitSession> for common::query::funnel::TimeIntervalUnitSe
     }
 }
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub enum StepOrder {
     Sequential,
-    Any(Vec<(usize, usize)>), // any of the steps
+    Any { steps: Vec<(usize, usize)> }, // any of the steps
 }
 
 impl Into<common::query::funnel::StepOrder> for StepOrder {
     fn into(self) -> common::query::funnel::StepOrder {
         match self {
             StepOrder::Sequential => common::query::funnel::StepOrder::Sequential,
-            StepOrder::Any(steps) => common::query::funnel::StepOrder::Any(steps),
+            StepOrder::Any { steps } => common::query::funnel::StepOrder::Any(steps),
         }
     }
 }
@@ -221,22 +221,22 @@ impl Into<StepOrder> for common::query::funnel::StepOrder {
     fn into(self) -> StepOrder {
         match self {
             common::query::funnel::StepOrder::Sequential => StepOrder::Sequential,
-            common::query::funnel::StepOrder::Any(steps) => StepOrder::Any(steps),
+            common::query::funnel::StepOrder::Any(steps) => StepOrder::Any { steps },
         }
     }
 }
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub enum ExcludeSteps {
     All,
-    Between(usize, usize),
+    Between { from: usize, to: usize },
 }
 
 impl Into<common::query::funnel::ExcludeSteps> for ExcludeSteps {
     fn into(self) -> common::query::funnel::ExcludeSteps {
         match self {
             ExcludeSteps::All => common::query::funnel::ExcludeSteps::All,
-            ExcludeSteps::Between(from, to) => {
+            ExcludeSteps::Between { from, to } => {
                 common::query::funnel::ExcludeSteps::Between(from, to)
             }
         }
@@ -248,7 +248,7 @@ impl Into<ExcludeSteps> for common::query::funnel::ExcludeSteps {
         match self {
             common::query::funnel::ExcludeSteps::All => ExcludeSteps::All,
             common::query::funnel::ExcludeSteps::Between(from, to) => {
-                ExcludeSteps::Between(from, to)
+                ExcludeSteps::Between { from, to }
             }
         }
     }
@@ -574,7 +574,7 @@ pub(crate) fn validate(md: &Arc<MetadataProvider>, project_id: u64, req: &Funnel
 
     match &req.step_order {
         StepOrder::Sequential => {}
-        StepOrder::Any(v) => v
+        StepOrder::Any { steps } => steps
             .iter()
             .map(|(from, to)| {
                 if *from >= req.steps.len() {
@@ -608,7 +608,7 @@ pub(crate) fn validate(md: &Arc<MetadataProvider>, project_id: u64, req: &Funnel
             )?;
             match &exclude.steps {
                 Some(steps) => match steps {
-                    ExcludeSteps::Between(from, to) => {
+                    ExcludeSteps::Between { from, to } => {
                         if *from >= req.steps.len() {
                             return Err(PlatformError::BadRequest(
                                 "exclude: from step index out of range".to_string(),
