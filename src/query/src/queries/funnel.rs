@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Duration;
 
+use chrono::Duration;
+// use std::time::Duration;
 use common::query::funnel::ChartType;
 use common::query::funnel::Count;
 use common::query::funnel::ExcludeSteps;
@@ -218,7 +219,7 @@ pub fn build(
             relation: None,
             name: COLUMN_USER_ID.to_string(),
         }),
-        bucket_size,
+        time_interval: req.time_interval,
         groups,
     };
     let input = LogicalPlan::Extension(Extension {

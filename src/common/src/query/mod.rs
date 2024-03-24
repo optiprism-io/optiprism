@@ -384,7 +384,7 @@ impl QueryTime {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum TimeIntervalUnit {
     Hour,
     Day,

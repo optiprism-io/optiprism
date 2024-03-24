@@ -11,6 +11,7 @@ use arrow::datatypes::TimeUnit;
 use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
+use common::query::TimeIntervalUnit;
 use common::types::TIME_UNIT;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
@@ -41,7 +42,7 @@ pub struct Funnel {
     pub filter: Option<Filter>,
     pub touch: Touch,
     pub partition_col: Expr,
-    pub bucket_size: Duration,
+    pub time_interval: Option<TimeIntervalUnit>,
     pub groups: Option<Vec<(Expr, String, SortField)>>,
 }
 

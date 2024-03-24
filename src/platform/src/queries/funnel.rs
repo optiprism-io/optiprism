@@ -27,6 +27,8 @@ pub struct Funnel {
     pub group: String,
     pub steps: Vec<Step>,
     pub time_window: TimeWindow,
+    pub time_interval: Option<TimeIntervalUnit>,
+    pub time_interval_n: Option<i64>,
     pub chart_type: ChartType,
     pub count: Count,
     pub filter: Option<Filter>,
@@ -428,6 +430,7 @@ impl Into<common::query::funnel::Funnel> for Funnel {
                 .map(|step| step.to_owned().into())
                 .collect::<Vec<_>>(),
             time_window: self.time_window.into(),
+            time_interval: self.time_interval.into(),
             chart_type: self.chart_type.into(),
             count: self.count.into(),
             filter: self.filter.map(|f| f.into()),
@@ -467,6 +470,8 @@ impl Into<Funnel> for common::query::funnel::Funnel {
                 .map(|step| step.to_owned().into())
                 .collect::<Vec<_>>(),
             time_window: self.time_window.into(),
+            time_interval: self.time_interval.into(),
+            time_interval_n: self.time_interval_n.clone(),
             chart_type: self.chart_type.into(),
             count: self.count.into(),
             filter: self.filter.map(|f| f.into()),

@@ -23,6 +23,8 @@ use chrono::Duration;
 use chrono::DurationRound;
 use chrono::NaiveDateTime;
 use chrono::Utc;
+use common::query::date_trunc;
+use common::query::TimeIntervalUnit;
 use common::types::TIME_UNIT;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
@@ -84,6 +86,7 @@ struct BucketResult {
     total_funnels: i64,
     completed_funnels: i64,
     steps: Vec<StepResult>,
+    ts: i64,
 }
 
 #[derive(Debug)]
@@ -103,10 +106,10 @@ struct Group {
 
 impl Group {
     // predefine buckets for each timestamp
-    fn new(steps_len: usize, buckets: &[i64]) -> Self {
-        let buckets = buckets
+    fn new(steps_len: usize, ts: &[i64]) -> Self {
+        let buckets = ts
             .iter()
-            .map(|v| {
+            .map(|ts| {
                 let b = BucketResult {
                     total_funnels: 0,
                     completed_funnels: 0,
@@ -117,8 +120,9 @@ impl Group {
                             total_time_from_start: 0,
                         })
                         .collect::<Vec<_>>(),
+                    ts: *ts,
                 };
-                (*v, b)
+                (*ts, b)
             })
             .collect::<HashMap<_, _, RandomState>>();
 
@@ -181,7 +185,11 @@ impl Group {
         true
     }
 
-    pub fn push_result(&mut self, filter: &Option<Filter>, bucket_size: Duration) -> bool {
+    pub fn push_result(
+        &mut self,
+        filter: &Option<Filter>,
+        time_unit: &Option<TimeIntervalUnit>,
+    ) -> bool {
         if self.steps_completed == 0 {
             return false;
         }
@@ -205,10 +213,13 @@ impl Group {
                 }
             },
         };
-
-        let ts = NaiveDateTime::from_timestamp_millis(self.steps[0].ts).unwrap();
-        let ts = ts.duration_trunc(bucket_size).unwrap();
-        let k = ts.timestamp_millis();
+        let k = if let Some(time_unit) = time_unit {
+            let dt = chrono::DateTime::from_timestamp_millis(self.steps[0].ts).unwrap();
+            let ts = date_trunc(time_unit, dt).unwrap();
+            ts.timestamp_millis()
+        } else {
+            *self.buckets.iter().next().unwrap().0
+        };
 
         // increment counters in bucket. Assume that bucket exist
         self.buckets.entry(k).and_modify(|b| {
@@ -271,7 +282,7 @@ pub struct Funnel {
     #[cfg(test)]
     debug: Dbg,
     buckets: Vec<i64>,
-    bucket_size: Duration,
+    time_interval: Option<TimeIntervalUnit>,
     // groups when group by
     groups: Option<Groups<Group>>,
     cur_partition: i64,
@@ -288,6 +299,7 @@ pub struct Options {
     pub ts_col: PhysicalExprRef,
     pub from: DateTime<Utc>,
     pub to: DateTime<Utc>,
+    pub time_interval: Option<TimeIntervalUnit>,
     pub window: Duration,
     pub steps: Vec<(PhysicalExprRef, StepOrder)>,
     pub exclude: Option<Vec<ExcludeExpr>>,
@@ -296,29 +308,32 @@ pub struct Options {
     pub filter: Option<Filter>,
     pub touch: Touch,
     pub partition_col: PhysicalExprRef,
-    pub bucket_size: Duration,
     pub groups: Option<Vec<(PhysicalExprRef, String, SortField)>>,
 }
 
 impl Funnel {
     pub fn try_new(opts: Options) -> crate::error::Result<Self> {
-        let from = opts
-            .from
-            .duration_trunc(opts.bucket_size)
-            .unwrap()
-            .timestamp_millis();
-        let to = opts
-            .to
-            .duration_trunc(opts.bucket_size)
-            .unwrap()
-            .timestamp_millis();
-        let mut buckets = (from..=to)
-            .step_by(opts.bucket_size.num_milliseconds() as usize)
-            .collect::<Vec<i64>>();
-        // case where bucket size is bigger than time range
-        if buckets.is_empty() {
-            buckets.push(from);
-        }
+        let buckets = if opts.time_interval.is_some() {
+            let from = date_trunc(&opts.time_interval.clone().unwrap(), opts.from)?;
+            let to = date_trunc(&opts.time_interval.clone().unwrap(), opts.to)?;
+            dbg!(opts.from, opts.to, from, to);
+            let mut buckets = (from.timestamp_millis()..=to.timestamp_millis())
+                .step_by(
+                    opts.time_interval
+                        .clone()
+                        .unwrap()
+                        .duration(1)
+                        .num_milliseconds() as usize,
+                )
+                .collect::<Vec<i64>>();
+            // case where bucket size is bigger than time range
+            if buckets.is_empty() {
+                buckets.push(from.timestamp_millis());
+            }
+            buckets
+        } else {
+            vec![opts.from.timestamp_millis()]
+        };
 
         Ok(Self {
             input_schema: opts.schema,
@@ -346,7 +361,7 @@ impl Funnel {
             #[cfg(test)]
             debug: Dbg::new(),
             buckets: buckets.clone(),
-            bucket_size: opts.bucket_size,
+            time_interval: opts.time_interval.clone(),
             groups: Groups::maybe_from(opts.groups)?,
             cur_partition: 0,
             skip_partition: false,
@@ -530,7 +545,7 @@ impl Funnel {
                 }
 
                 if cur_ts - group.steps[0].ts > self.window.num_milliseconds() {
-                    group.push_result(&self.filter, self.bucket_size);
+                    group.push_result(&self.filter, &self.time_interval);
                     #[cfg(test)]
                     self.debug.push(batch_id, row_id, DebugStep::OutOfWindow);
                     group.steps[0] = group.steps[group.cur_step].clone();
@@ -564,7 +579,7 @@ impl Funnel {
             }
 
             if batch_id == self.batch_id && partitions.value(row_id) != group.cur_partition {
-                group.push_result(&self.filter, self.bucket_size);
+                group.push_result(&self.filter, &self.time_interval);
                 #[cfg(test)]
                 self.debug.push(batch_id, row_id, DebugStep::NewPartition);
                 group.cur_partition = partitions.value(row_id);
@@ -607,7 +622,7 @@ impl Funnel {
                     #[cfg(test)]
                     self.debug.push(batch_id, row_id, DebugStep::Complete);
 
-                    let is_completed = group.push_result(&self.filter, self.bucket_size);
+                    let is_completed = group.push_result(&self.filter, &self.time_interval);
                     if is_completed && self.count == Count::Unique {
                         self.skip_partition = true;
                     }
@@ -657,7 +672,7 @@ impl Funnel {
             #[cfg(test)]
             debug: Dbg::new(),
             buckets: self.buckets.clone(),
-            bucket_size: self.bucket_size,
+            time_interval: self.time_interval.clone(),
             groups,
             cur_partition: 0,
             skip_partition: false,
@@ -675,7 +690,7 @@ impl Funnel {
             let mut rows: Vec<arrow_row::Row> = Vec::with_capacity(groups.groups.len());
             for (row, group) in &mut groups.groups {
                 rows.push(row.row());
-                group.push_result(&self.filter, self.bucket_size);
+                group.push_result(&self.filter, &self.time_interval);
             }
             let group_arrs = groups.row_converter.convert_rows(rows)?;
 
@@ -688,7 +703,7 @@ impl Funnel {
             (Some(group_arrs), buckets)
         } else {
             self.single_group
-                .push_result(&self.filter, self.bucket_size);
+                .push_result(&self.filter, &self.time_interval);
             (None, vec![&self.single_group.buckets])
         };
 
@@ -816,6 +831,7 @@ mod tests {
     use chrono::DateTime;
     use chrono::Duration;
     use chrono::Utc;
+    use common::query::TimeIntervalUnit;
     use datafusion::physical_expr::expressions::BinaryExpr;
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_expr::expressions::Literal;
@@ -894,7 +910,7 @@ mod tests {
                     filter: None,
                     touch: Touch::First,
                     partition_col: Arc::new(Column::new("user_id", 0)),
-                    bucket_size: Duration::minutes(10),
+                    time_interval: None,
                 },
                 exp_debug: vec![
                     (0, 0, DebugStep::Step),
@@ -945,7 +961,7 @@ asd
                     filter: None,
                     touch: Touch::First,
                     partition_col: Arc::new(Column::new("user_id", 0)),
-                    bucket_size: Duration::minutes(10),
+                    time_interval: None,
                 },
                 exp_debug: vec![
                     (0, 0, DebugStep::Step),
@@ -997,7 +1013,7 @@ asd
                     filter: None,
                     touch: Touch::First,
                     partition_col: Arc::new(Column::new("user_id", 0)),
-                    bucket_size: Duration::minutes(10),
+                    time_interval: None,
                 },
                 exp_debug: vec![
                     (0, 0, DebugStep::Step),
@@ -1044,7 +1060,7 @@ asd
                     filter: None,
                     touch: Touch::First,
                     partition_col: Arc::new(Column::new("user_id", 0)),
-                    bucket_size: Duration::minutes(10),
+                    time_interval: None,
                 },
                 exp_debug: vec![
                     (0, 0, DebugStep::Step),
@@ -1073,7 +1089,8 @@ asd
                     schema: schema.clone(),
                     from: DateTime::from_timestamp(0, 0).unwrap(),
                     to: DateTime::from_timestamp(2, 0).unwrap(),
-                    bucket_size: Duration::minutes(10),
+                    time_interval: None,
+
                     groups: None,
                     ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::seconds(15),
@@ -1113,7 +1130,8 @@ asd
                     schema: schema.clone(),
                     from: DateTime::from_timestamp(0, 0).unwrap(),
                     to: DateTime::from_timestamp(2, 0).unwrap(),
-                    bucket_size: Duration::minutes(10),
+                    time_interval: None,
+
                     groups: None,
                     ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::seconds(15),
@@ -1154,7 +1172,8 @@ asd
                     schema: schema.clone(),
                     from: DateTime::from_timestamp(0, 0).unwrap(),
                     to: DateTime::from_timestamp(2, 0).unwrap(),
-                    bucket_size: Duration::minutes(10),
+                    time_interval: None,
+
                     groups: None,
                     ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::seconds(15),
@@ -1196,7 +1215,8 @@ asd
                     schema: schema.clone(),
                     from: DateTime::from_timestamp(0, 0).unwrap(),
                     to: DateTime::from_timestamp(4, 0).unwrap(),
-                    bucket_size: Duration::minutes(10),
+                    time_interval: None,
+
                     groups: None,
                     ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::seconds(15),
@@ -1245,7 +1265,8 @@ asd
                     schema: schema.clone(),
                     from: DateTime::from_timestamp(0, 0).unwrap(),
                     to: DateTime::from_timestamp(5, 0).unwrap(),
-                    bucket_size: Duration::minutes(10),
+                    time_interval: None,
+
                     groups: None,
                     ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::seconds(15),
@@ -1303,7 +1324,7 @@ asd
             // schema: schema.clone(),
             // from: DateTime::from_timestamp(0, 0).unwrap(),
             // to: DateTime::from_timestamp(8, 0).unwrap(),
-            // bucket_size: Duration::minutes(10),
+            // bucket_size: TimeIntervalUnit::Hour,
             // groups: None,
             // ts_col: Arc::new(Column::new("ts", 1)),
             // window: Duration::milliseconds(3),
@@ -1349,7 +1370,8 @@ asd
                     schema: schema.clone(),
                     from: DateTime::from_timestamp(0, 0).unwrap(),
                     to: DateTime::from_timestamp(2, 0).unwrap(),
-                    bucket_size: Duration::minutes(10),
+                    time_interval: None,
+
                     groups: None,
                     ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::seconds(15),
@@ -1395,7 +1417,8 @@ asd
                     schema: schema.clone(),
                     from: DateTime::from_timestamp(0, 0).unwrap(),
                     to: DateTime::from_timestamp(2, 0).unwrap(),
-                    bucket_size: Duration::minutes(10),
+                    time_interval: None,
+
                     groups: None,
                     ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::seconds(15),
@@ -1445,7 +1468,8 @@ asd
                     schema: schema.clone(),
                     from: DateTime::from_timestamp(0, 0).unwrap(),
                     to: DateTime::from_timestamp(2, 0).unwrap(),
-                    bucket_size: Duration::minutes(10),
+                    time_interval: None,
+
                     groups: None,
                     ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::seconds(15),
@@ -1489,7 +1513,8 @@ asd
                     schema: schema.clone(),
                     from: DateTime::from_timestamp(0, 0).unwrap(),
                     to: DateTime::from_timestamp(2, 0).unwrap(),
-                    bucket_size: Duration::minutes(10),
+                    time_interval: None,
+
                     groups: None,
                     ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::seconds(15),
@@ -1526,7 +1551,8 @@ asd
                     schema: schema.clone(),
                     from: DateTime::from_timestamp(0, 0).unwrap(),
                     to: DateTime::from_timestamp(2, 0).unwrap(),
-                    bucket_size: Duration::minutes(10),
+                    time_interval: None,
+
                     groups: None,
                     ts_col: Arc::new(Column::new("ts", 1)),
                     window: Duration::seconds(15),
@@ -1643,7 +1669,8 @@ asd
             filter: None,
             touch: Touch::First,
             partition_col: Arc::new(Column::new_with_schema("u", &schema).unwrap()),
-            bucket_size: Duration::minutes(1),
+            time_interval: None,
+
             groups: None,
         };
         let mut f = Funnel::try_new(opts).unwrap();
@@ -1727,7 +1754,8 @@ asd
             filter: None,
             touch: Touch::First,
             partition_col: Arc::new(Column::new_with_schema("u", &schema).unwrap()),
-            bucket_size: Duration::minutes(1),
+            time_interval: None,
+
             groups: None,
         };
         let mut f = Funnel::try_new(opts).unwrap();
@@ -1820,7 +1848,7 @@ asd
             filter: None,
             touch: Touch::First,
             partition_col: Arc::new(Column::new_with_schema("u", &schema).unwrap()),
-            bucket_size: Duration::days(2),
+            time_interval: Some(TimeIntervalUnit::Day),
             groups: Some(groups),
         };
         let mut f = Funnel::try_new(opts).unwrap();
@@ -1839,14 +1867,14 @@ asd
         let data = r#"
 | u(i64) | ts(ts)              | device(utf8) | v(i64) | c(i64) |
 |--------|---------------------|--------------|--------|--------|
-| 1      | 2020-04-12 22:10:57 | iphone       | 1      | 1      |
-| 1      | 2020-04-12 22:11:57 | iphone       | 2      | 1      |
-| 1      | 2020-04-12 22:12:57 | iphone       | 3      | 1      |
+| 1      | 2020-04-12 01:10:57 | iphone       | 1      | 1      |
+| 1      | 2020-04-12 02:11:57 | iphone       | 2      | 1      |
+| 1      | 2020-04-12 03:12:57 | iphone       | 3      | 1      |
 |        |                     |              |        |        |
-| 1      | 2020-04-12 22:13:57 | android      | 1      | 1      |
-| 1      | 2020-04-12 22:15:57 | android      | 2      | 1      |
-| 1      | 2020-04-12 22:17:57 | android      | 3      | 1      |
-| 3      | 2020-04-12 22:18:57 | android      | 1      | 1      |
+| 1      | 2020-04-12 04:13:57 | android      | 1      | 1      |
+| 1      | 2020-04-12 05:15:57 | android      | 2      | 1      |
+| 1      | 2020-04-12 06:17:57 | android      | 3      | 1      |
+| 3      | 2020-04-12 07:18:57 | android      | 1      | 1      |
 "#;
         let res = parse_markdown_tables(data).unwrap();
         let schema = res[0].schema();
@@ -1886,10 +1914,10 @@ asd
         let opts = Options {
             schema: schema.clone(),
             ts_col: Arc::new(Column::new_with_schema("ts", &schema).unwrap()),
-            from: DateTime::parse_from_str("2020-04-12 22:10:57 +0000", "%Y-%m-%d %H:%M:%S %z")
+            from: DateTime::parse_from_str("2020-04-12 01:10:57 +0000", "%Y-%m-%d %H:%M:%S %z")
                 .unwrap()
                 .with_timezone(&Utc),
-            to: DateTime::parse_from_str("2020-04-12 22:21:57 +0000", "%Y-%m-%d %H:%M:%S %z")
+            to: DateTime::parse_from_str("2020-04-12 07:21:57 +0000", "%Y-%m-%d %H:%M:%S %z")
                 .unwrap()
                 .with_timezone(&Utc),
             window: Duration::milliseconds(1200),
@@ -1905,7 +1933,8 @@ asd
             filter: None,
             touch: Touch::First,
             partition_col: Arc::new(Column::new_with_schema("u", &schema).unwrap()),
-            bucket_size: Duration::minutes(1),
+            time_interval: None,
+
             groups: Some(groups),
         };
         let mut f = Funnel::try_new(opts).unwrap();

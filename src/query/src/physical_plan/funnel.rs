@@ -592,6 +592,7 @@ mod tests {
     use chrono::DateTime;
     use chrono::Duration;
     use chrono::Utc;
+    use common::query::TimeIntervalUnit;
     use datafusion::physical_expr::expressions::BinaryExpr;
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_expr::expressions::Literal;
@@ -688,7 +689,7 @@ mod tests {
             filter: None,
             touch: Touch::First,
             partition_col: Arc::new(Column::new_with_schema("u", &schema).unwrap()),
-            bucket_size: Duration::minutes(10),
+            time_interval: Some(TimeIntervalUnit::Hour),
             groups: Some(groups),
         };
         let mut f = Funnel::try_new(opts).unwrap();

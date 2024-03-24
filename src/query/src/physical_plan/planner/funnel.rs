@@ -137,7 +137,7 @@ pub(crate) fn build_funnel(
             logical_plan::funnel::Touch::Step(n) => Touch::Step(n),
         },
         partition_col: Arc::new(partition_col.clone()),
-        bucket_size: f.bucket_size,
+        time_interval: f.time_interval,
         groups: groups.clone(),
     };
     let partial = FunnelPartialExec::try_new(
