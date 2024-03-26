@@ -1933,9 +1933,8 @@ asd
             filter: None,
             touch: Touch::First,
             partition_col: Arc::new(Column::new_with_schema("u", &schema).unwrap()),
-            // time_interval: Some(TimeIntervalUnit::Hour),
-            time_interval: None,
-
+            time_interval: Some(TimeIntervalUnit::Hour),
+            // time_interval: None,
             groups: Some(groups),
         };
         let mut f = Funnel::try_new(opts).unwrap();
