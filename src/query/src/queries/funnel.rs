@@ -145,14 +145,6 @@ pub fn build(
         None
     };
 
-    let bucket_size = {
-        match req.chart_type {
-            ChartType::Steps => to - from,
-            ChartType::ConversionOverTime { n, interval_unit } => interval_unit.duration(1),
-            _ => unimplemented!(),
-        }
-    };
-
     let mut rename_groups = vec![];
     let groups = if let Some(breakdowns) = &req.breakdowns {
         let mut out = vec![];
@@ -219,7 +211,7 @@ pub fn build(
             relation: None,
             name: COLUMN_USER_ID.to_string(),
         }),
-        time_interval: req.time_interval,
+        time_interval: req.chart_type.time_interval(),
         groups,
     };
     let input = LogicalPlan::Extension(Extension {

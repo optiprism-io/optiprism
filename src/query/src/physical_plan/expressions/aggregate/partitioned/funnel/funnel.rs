@@ -231,8 +231,8 @@ impl Group {
             for idx in 0..self.steps_completed {
                 b.steps[idx].count += 1;
                 if idx > 0 {
-                    b.steps[idx].total_time += (self.steps[idx - 1].ts - self.steps[0].ts);
-                    b.steps[idx].total_time_from_start += (self.steps[idx].ts - self.steps[0].ts);
+                    b.steps[idx].total_time += self.steps[idx].ts - self.steps[idx - 1].ts;
+                    b.steps[idx].total_time_from_start += self.steps[idx].ts - self.steps[0].ts;
                 }
             }
         });
@@ -316,7 +316,6 @@ impl Funnel {
         let buckets = if opts.time_interval.is_some() {
             let from = date_trunc(&opts.time_interval.clone().unwrap(), opts.from)?;
             let to = date_trunc(&opts.time_interval.clone().unwrap(), opts.to)?;
-            dbg!(opts.from, opts.to, from, to);
             let mut buckets = (from.timestamp_millis()..=to.timestamp_millis())
                 .step_by(
                     opts.time_interval
@@ -848,6 +847,7 @@ mod tests {
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Options;
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::StepOrder::Exact;
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::Count;
+    use crate::physical_plan::expressions::aggregate::partitioned::funnel::Count::NonUnique;
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::Count::Unique;
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::ExcludeExpr;
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::Filter;
@@ -1872,9 +1872,9 @@ asd
 | 1      | 2020-04-12 03:12:57 | iphone       | 3      | 1      |
 |        |                     |              |        |        |
 | 1      | 2020-04-12 04:13:57 | android      | 1      | 1      |
-| 1      | 2020-04-12 05:15:57 | android      | 2      | 1      |
-| 1      | 2020-04-12 06:17:57 | android      | 3      | 1      |
-| 3      | 2020-04-12 07:18:57 | android      | 1      | 1      |
+| 1      | 2020-04-12 05:14:57 | android      | 2      | 1      |
+| 1      | 2020-04-12 06:15:57 | android      | 3      | 1      |
+| 3      | 2020-04-12 07:16:57 | android      | 1      | 1      |
 "#;
         let res = parse_markdown_tables(data).unwrap();
         let schema = res[0].schema();
@@ -1920,7 +1920,7 @@ asd
             to: DateTime::parse_from_str("2020-04-12 07:21:57 +0000", "%Y-%m-%d %H:%M:%S %z")
                 .unwrap()
                 .with_timezone(&Utc),
-            window: Duration::milliseconds(1200),
+            window: Duration::hours(4),
             steps: vec![e1, e2, e3],
             exclude: Some(vec![ExcludeExpr {
                 expr: ex,
@@ -1929,10 +1929,11 @@ asd
             // exclude: None,
             constants: None,
             // constants: Some(vec![Column::new_with_schema("c", &schema).unwrap()]),
-            count: Unique,
+            count: NonUnique,
             filter: None,
             touch: Touch::First,
             partition_col: Arc::new(Column::new_with_schema("u", &schema).unwrap()),
+            // time_interval: Some(TimeIntervalUnit::Hour),
             time_interval: None,
 
             groups: Some(groups),

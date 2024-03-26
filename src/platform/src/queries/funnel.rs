@@ -27,8 +27,6 @@ pub struct Funnel {
     pub group: String,
     pub steps: Vec<Step>,
     pub time_window: TimeWindow,
-    pub time_interval: Option<TimeIntervalUnit>,
-    pub time_interval_n: Option<i64>,
     pub chart_type: ChartType,
     pub count: Count,
     pub filter: Option<Filter>,
@@ -294,22 +292,22 @@ impl Into<Exclude> for common::query::funnel::Exclude {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub enum Filter {
     // funnel should fail on any step
     DropOffOnAnyStep,
     // funnel should fail on certain step
-    DropOffOnStep(usize),
-    TimeToConvert(i64, i64), // conversion should be within certain window
+    DropOffOnStep { step: usize },
+    TimeToConvert { from: i64, to: i64 }, // conversion should be within certain window
 }
 
 impl Into<common::query::funnel::Filter> for Filter {
     fn into(self) -> common::query::funnel::Filter {
         match self {
             Filter::DropOffOnAnyStep => common::query::funnel::Filter::DropOffOnAnyStep,
-            Filter::DropOffOnStep(step) => common::query::funnel::Filter::DropOffOnStep(step),
-            Filter::TimeToConvert(min, max) => {
-                common::query::funnel::Filter::TimeToConvert(min, max)
+            Filter::DropOffOnStep { step } => common::query::funnel::Filter::DropOffOnStep(step),
+            Filter::TimeToConvert { from, to } => {
+                common::query::funnel::Filter::TimeToConvert(from, to)
             }
         }
     }
@@ -319,16 +317,16 @@ impl Into<Filter> for common::query::funnel::Filter {
     fn into(self) -> Filter {
         match self {
             common::query::funnel::Filter::DropOffOnAnyStep => Filter::DropOffOnAnyStep,
-            common::query::funnel::Filter::DropOffOnStep(step) => Filter::DropOffOnStep(step),
-            common::query::funnel::Filter::TimeToConvert(min, max) => {
-                Filter::TimeToConvert(min, max)
+            common::query::funnel::Filter::DropOffOnStep(step) => Filter::DropOffOnStep { step },
+            common::query::funnel::Filter::TimeToConvert(from, to) => {
+                Filter::TimeToConvert { from, to }
             }
         }
     }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub enum Touch {
     First,
     Last,
@@ -359,10 +357,11 @@ impl Into<Touch> for common::query::funnel::Touch {
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum ChartType {
     Steps,
+    #[serde(rename_all = "camelCase")]
     ConversionOverTime {
-        n: usize,
         interval_unit: TimeIntervalUnit,
     },
+    #[serde(rename_all = "camelCase")]
     TimeToConvert {
         interval_unit: TimeIntervalUnit,
         min_interval: i64,
@@ -371,13 +370,22 @@ pub enum ChartType {
     Frequency,
 }
 
+impl ChartType {
+    pub fn time_interval(self) -> Option<TimeIntervalUnit> {
+        match self {
+            ChartType::Steps => None,
+            ChartType::ConversionOverTime { interval_unit } => Some(interval_unit),
+            ChartType::TimeToConvert { interval_unit, .. } => Some(interval_unit),
+            ChartType::Frequency => None,
+        }
+    }
+}
 impl Into<common::query::funnel::ChartType> for ChartType {
     fn into(self) -> common::query::funnel::ChartType {
         match self {
             ChartType::Steps => common::query::funnel::ChartType::Steps,
-            ChartType::ConversionOverTime { n, interval_unit } => {
+            ChartType::ConversionOverTime { interval_unit } => {
                 common::query::funnel::ChartType::ConversionOverTime {
-                    n,
                     interval_unit: interval_unit.into(),
                 }
             }
@@ -399,9 +407,8 @@ impl Into<ChartType> for common::query::funnel::ChartType {
     fn into(self) -> ChartType {
         match self {
             common::query::funnel::ChartType::Steps => ChartType::Steps,
-            common::query::funnel::ChartType::ConversionOverTime { n, interval_unit } => {
+            common::query::funnel::ChartType::ConversionOverTime { interval_unit } => {
                 ChartType::ConversionOverTime {
-                    n,
                     interval_unit: interval_unit.into(),
                 }
             }
@@ -430,7 +437,6 @@ impl Into<common::query::funnel::Funnel> for Funnel {
                 .map(|step| step.to_owned().into())
                 .collect::<Vec<_>>(),
             time_window: self.time_window.into(),
-            time_interval: self.time_interval.into(),
             chart_type: self.chart_type.into(),
             count: self.count.into(),
             filter: self.filter.map(|f| f.into()),
@@ -470,8 +476,6 @@ impl Into<Funnel> for common::query::funnel::Funnel {
                 .map(|step| step.to_owned().into())
                 .collect::<Vec<_>>(),
             time_window: self.time_window.into(),
-            time_interval: self.time_interval.into(),
-            time_interval_n: self.time_interval_n.clone(),
             chart_type: self.chart_type.into(),
             count: self.count.into(),
             filter: self.filter.map(|f| f.into()),
@@ -652,8 +656,8 @@ pub(crate) fn validate(md: &Arc<MetadataProvider>, project_id: u64, req: &Funnel
     if let Some(filter) = &req.filter {
         match filter {
             Filter::DropOffOnAnyStep => {}
-            Filter::DropOffOnStep(_) => {}
-            Filter::TimeToConvert(from, to) => {
+            Filter::DropOffOnStep { .. } => {}
+            Filter::TimeToConvert { from, to } => {
                 if from > to {
                     return Err(PlatformError::BadRequest(
                         "from time must be less than to time".to_string(),

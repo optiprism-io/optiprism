@@ -22,8 +22,6 @@ pub struct Funnel {
     pub group: String,
     pub steps: Vec<Step>,
     pub time_window: TimeWindow,
-    pub time_interval: Option<TimeIntervalUnit>,
-    pub time_interval_n: Option<i64>,
     pub chart_type: ChartType,
     pub count: Count,
     pub filter: Option<Filter>,
@@ -142,7 +140,6 @@ pub enum Touch {
 pub enum ChartType {
     Steps,
     ConversionOverTime {
-        n: usize,
         interval_unit: TimeIntervalUnit,
     },
     TimeToConvert {
@@ -151,4 +148,15 @@ pub enum ChartType {
         max_interval: i64,
     },
     Frequency,
+}
+
+impl ChartType {
+    pub fn time_interval(self) -> Option<TimeIntervalUnit> {
+        match self {
+            ChartType::Steps => None,
+            ChartType::ConversionOverTime { interval_unit } => Some(interval_unit),
+            ChartType::TimeToConvert { interval_unit, .. } => Some(interval_unit),
+            ChartType::Frequency => None,
+        }
+    }
 }
