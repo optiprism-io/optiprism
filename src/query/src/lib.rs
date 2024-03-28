@@ -299,8 +299,8 @@ pub struct Column {
     pub typ: ColumnType,
     pub is_nullable: bool,
     pub data_type: DataType,
+    pub hidden: bool,
     pub data: ArrayRef,
-    pub step: Option<usize>,
 }
 
 pub struct DataTable {
@@ -310,6 +310,29 @@ pub struct DataTable {
 
 impl DataTable {
     pub fn new(schema: SchemaRef, columns: Vec<Column>) -> Self {
+        Self { schema, columns }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct FunnelColumn {
+    pub name: String,
+    pub typ: ColumnType,
+    pub is_nullable: bool,
+    pub data_type: DataType,
+    pub hidden: bool,
+    pub data: ArrayRef,
+    pub step: Option<String>,
+    pub step_id: Option<usize>,
+}
+
+pub struct FunnelDataTable {
+    pub schema: SchemaRef,
+    pub columns: Vec<FunnelColumn>,
+}
+
+impl FunnelDataTable {
+    pub fn new(schema: SchemaRef, columns: Vec<FunnelColumn>) -> Self {
         Self { schema, columns }
     }
 }

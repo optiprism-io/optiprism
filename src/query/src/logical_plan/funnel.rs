@@ -52,6 +52,22 @@ impl Funnel {
             DFField::new_unqualified("ts", DataType::Timestamp(TIME_UNIT, None), false),
             DFField::new_unqualified("total", DataType::Int64, false),
             DFField::new_unqualified("completed", DataType::Int64, false),
+            DFField::new_unqualified(
+                "conversion_ratio",
+                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                false,
+            ),
+            DFField::new_unqualified(
+                "avg_time_to_convert",
+                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                false,
+            ),
+            DFField::new_unqualified("dropped_off", DataType::Int64, false),
+            DFField::new_unqualified(
+                "drop_off_ratio",
+                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                false,
+            ),
         ];
 
         if let Some(groups) = &self.groups {
@@ -72,6 +88,31 @@ impl Funnel {
                     DFField::new_unqualified(
                         format!("step{}_total", step_id).as_str(),
                         DataType::Int64,
+                        true,
+                    ),
+                    DFField::new_unqualified(
+                        format!("step{}_completed", step_id).as_str(),
+                        DataType::Int64,
+                        true,
+                    ),
+                    DFField::new_unqualified(
+                        format!("step{}_conversion_ratio", step_id).as_str(),
+                        DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                        true,
+                    ),
+                    DFField::new_unqualified(
+                        format!("step{}_avg_time_to_convert", step_id).as_str(),
+                        DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                        true,
+                    ),
+                    DFField::new_unqualified(
+                        format!("step{}_dropped_off", step_id).as_str(),
+                        DataType::Int64,
+                        true,
+                    ),
+                    DFField::new_unqualified(
+                        format!("step{}_drop_off_ratio", step_id).as_str(),
+                        DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
                         true,
                     ),
                     DFField::new_unqualified(

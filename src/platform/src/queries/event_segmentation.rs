@@ -575,7 +575,6 @@ impl Into<common::query::event_segmentation::EventSegmentation> for EventSegment
                     .filters
                     .iter()
                     .map(|f| {
-                        dbg!(f.to_owned());
                         f.to_owned().into()
                     })
                     .collect::<Vec<_>>()

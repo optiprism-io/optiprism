@@ -25,7 +25,11 @@ use async_trait::async_trait;
 use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_PROJECT_ID;
 use common::types::COLUMN_USER_ID;
+use common::types::RESERVED_COLUMN_FUNNEL_AVG_TIME_TO_CONVERT;
 use common::types::RESERVED_COLUMN_FUNNEL_COMPLETED;
+use common::types::RESERVED_COLUMN_FUNNEL_CONVERSION_RATIO;
+use common::types::RESERVED_COLUMN_FUNNEL_DROPPED_OFF;
+use common::types::RESERVED_COLUMN_FUNNEL_DROP_OFF_RATIO;
 use common::types::RESERVED_COLUMN_FUNNEL_TOTAL;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
@@ -489,9 +493,94 @@ impl Stream for FinalFunnelStream {
                 .data_type()
                 .clone(),
         )) as Arc<dyn DFAggregateExpr>);
-
+        aggs.push(Arc::new(Sum::new(
+            col(RESERVED_COLUMN_FUNNEL_CONVERSION_RATIO, &self.schema).unwrap(),
+            RESERVED_COLUMN_FUNNEL_CONVERSION_RATIO,
+            self.schema
+                .field_with_name(RESERVED_COLUMN_FUNNEL_CONVERSION_RATIO)
+                .unwrap()
+                .data_type()
+                .clone(),
+        )) as Arc<dyn DFAggregateExpr>);
+        aggs.push(Arc::new(Sum::new(
+            col(RESERVED_COLUMN_FUNNEL_AVG_TIME_TO_CONVERT, &self.schema).unwrap(),
+            RESERVED_COLUMN_FUNNEL_AVG_TIME_TO_CONVERT,
+            self.schema
+                .field_with_name(RESERVED_COLUMN_FUNNEL_AVG_TIME_TO_CONVERT)
+                .unwrap()
+                .data_type()
+                .clone(),
+        )) as Arc<dyn DFAggregateExpr>);
+        aggs.push(Arc::new(Sum::new(
+            col(RESERVED_COLUMN_FUNNEL_DROPPED_OFF, &self.schema).unwrap(),
+            RESERVED_COLUMN_FUNNEL_DROPPED_OFF,
+            self.schema
+                .field_with_name(RESERVED_COLUMN_FUNNEL_DROPPED_OFF)
+                .unwrap()
+                .data_type()
+                .clone(),
+        )) as Arc<dyn DFAggregateExpr>);
+        aggs.push(Arc::new(Sum::new(
+            col(RESERVED_COLUMN_FUNNEL_DROP_OFF_RATIO, &self.schema).unwrap(),
+            RESERVED_COLUMN_FUNNEL_DROP_OFF_RATIO,
+            self.schema
+                .field_with_name(RESERVED_COLUMN_FUNNEL_DROP_OFF_RATIO)
+                .unwrap()
+                .data_type()
+                .clone(),
+        )) as Arc<dyn DFAggregateExpr>);
         for i in 0..self.steps {
             let cname = format!("step{}_total", i);
+            aggs.push(Arc::new(Sum::new(
+                col(&cname, &self.schema).unwrap(),
+                cname.clone(),
+                self.schema
+                    .field_with_name(&cname)
+                    .unwrap()
+                    .data_type()
+                    .clone(),
+            )) as Arc<dyn DFAggregateExpr>);
+            let cname = format!("step{}_completed", i);
+            aggs.push(Arc::new(Sum::new(
+                col(&cname, &self.schema).unwrap(),
+                cname.clone(),
+                self.schema
+                    .field_with_name(&cname)
+                    .unwrap()
+                    .data_type()
+                    .clone(),
+            )) as Arc<dyn DFAggregateExpr>);
+            let cname = format!("step{}_conversion_ratio", i);
+            aggs.push(Arc::new(Sum::new(
+                col(&cname, &self.schema).unwrap(),
+                cname.clone(),
+                self.schema
+                    .field_with_name(&cname)
+                    .unwrap()
+                    .data_type()
+                    .clone(),
+            )) as Arc<dyn DFAggregateExpr>);
+            let cname = format!("step{}_avg_time_to_convert", i);
+            aggs.push(Arc::new(Sum::new(
+                col(&cname, &self.schema).unwrap(),
+                cname.clone(),
+                self.schema
+                    .field_with_name(&cname)
+                    .unwrap()
+                    .data_type()
+                    .clone(),
+            )) as Arc<dyn DFAggregateExpr>);
+            let cname = format!("step{}_dropped_off", i);
+            aggs.push(Arc::new(Sum::new(
+                col(&cname, &self.schema).unwrap(),
+                cname.clone(),
+                self.schema
+                    .field_with_name(&cname)
+                    .unwrap()
+                    .data_type()
+                    .clone(),
+            )) as Arc<dyn DFAggregateExpr>);
+            let cname = format!("step{}_drop_off_ratio", i);
             aggs.push(Arc::new(Sum::new(
                 col(&cname, &self.schema).unwrap(),
                 cname.clone(),
@@ -559,7 +648,7 @@ impl Stream for FinalFunnelStream {
             .iter()
             .zip(self.schema.fields.iter())
             .map(|(arr, f)| {
-                if f.name().contains("time_to_convert") {
+                if f.name().contains("time_to_convert") || f.name().contains("ratio") {
                     cast(arr, &DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE))
                         .map_err(|err| DataFusionError::ArrowError(err))
                 } else {

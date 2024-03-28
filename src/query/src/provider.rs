@@ -11,6 +11,7 @@ use common::query::event_segmentation::Query;
 use common::query::funnel::Funnel;
 use common::query::Breakdown;
 use common::query::EventFilter;
+use common::query::EventRef;
 use common::query::PropertyRef;
 use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
@@ -45,6 +46,8 @@ use crate::Column;
 use crate::ColumnType;
 use crate::Context;
 use crate::DataTable;
+use crate::FunnelColumn;
+use crate::FunnelDataTable;
 use crate::Result;
 
 pub struct QueryProvider {
@@ -161,8 +164,8 @@ impl QueryProvider {
                 typ: ColumnType::Dimension,
                 is_nullable: field.is_nullable(),
                 data_type: field.data_type().to_owned(),
+                hidden: false,
                 data: result.column(idx).to_owned(),
-                step: None,
             })
             .collect();
 
@@ -213,8 +216,8 @@ impl QueryProvider {
                     typ,
                     is_nullable: field.is_nullable(),
                     data_type: field.data_type().to_owned(),
+                    hidden: false,
                     data: arr,
-                    step: None,
                 }
             })
             .collect();
@@ -222,7 +225,7 @@ impl QueryProvider {
         Ok(DataTable::new(result.schema(), cols))
     }
 
-    pub async fn funnel(&self, ctx: Context, req: Funnel) -> Result<DataTable> {
+    pub async fn funnel(&self, ctx: Context, req: Funnel) -> Result<FunnelDataTable> {
         let start = Instant::now();
         let schema = self.db.schema1(TABLE_EVENTS)?;
         let projection = funnel_projection(&ctx, &req, &self.metadata)?;
@@ -255,38 +258,47 @@ impl QueryProvider {
                         ColumnType::Metric
                     }
                 };
-                let step = {
+                let (name, step_id) = {
                     // todo make more robust approach
                     if field.name().starts_with("step") {
-                        Some(
-                            field
-                                .name()
-                                .split("step")
-                                .last()
-                                .unwrap()
-                                .split("_")
-                                .next()
-                                .unwrap()
-                                .parse()
-                                .unwrap(),
-                        )
+                        let s = field.name().split("step").last().unwrap();
+                        let id = s.split("_").next().unwrap().parse::<usize>().unwrap();
+                        let (_, next) = s.split_once("_").unwrap();
+                        (next.to_string(), Some(id))
                     } else {
-                        None
+                        (field.name().to_string(), None)
                     }
                 };
 
-                Column {
+                let hidden = match name.as_str() {
+                    // todo fix this
+                    "conversion_ratio" | "total" | "completed" | "avg_time_to_convert" => false,
+                    _ => true,
+                };
+
+                let step = if let Some(step_id) = step_id {
+                    match &req.steps[step_id].events[0].event {
+                        EventRef::RegularName(name) => Some(name.to_owned()),
+                        _ => unimplemented!(),
+                    }
+                } else {
+                    None
+                };
+
+                FunnelColumn {
                     name: field.name().to_owned(),
                     typ,
                     is_nullable: field.is_nullable(),
                     data_type: field.data_type().to_owned(),
+                    hidden,
                     data: result.column(idx).to_owned(),
                     step,
+                    step_id,
                 }
             })
             .collect();
 
-        Ok(DataTable::new(result.schema(), cols))
+        Ok(FunnelDataTable::new(result.schema(), cols))
     }
 }
 

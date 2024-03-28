@@ -19,6 +19,7 @@ use crate::queries::property_values::ListPropertyValuesRequest;
 use crate::queries::QueryParams;
 use crate::queries::QueryResponseFormat;
 use crate::Context;
+use crate::FunnelQueryResponse;
 use crate::ListResponse;
 use crate::QueryResponse;
 use crate::Result;
@@ -71,10 +72,10 @@ impl Queries {
             data.columns = vec![];
         }
         let resp = match query.format {
-            None => QueryResponse::try_new_json(data.columns),
-            Some(QueryResponseFormat::Json) => QueryResponse::try_new_json(data.columns),
+            None => QueryResponse::columns_to_json(data.columns),
+            Some(QueryResponseFormat::Json) => QueryResponse::columns_to_json(data.columns),
             Some(QueryResponseFormat::JsonCompact) => {
-                QueryResponse::try_new_json_compact(data.columns)
+                QueryResponse::columns_to_json_compact(data.columns)
             }
         }?;
 
@@ -87,7 +88,7 @@ impl Queries {
         project_id: u64,
         req: Funnel,
         query: QueryParams,
-    ) -> Result<QueryResponse> {
+    ) -> Result<FunnelQueryResponse> {
         ctx.check_project_permission(project_id, ProjectPermission::ExploreReports)?;
         funnel::validate(&self.md, project_id, &req)?;
 
@@ -118,10 +119,10 @@ impl Queries {
             data.columns = vec![];
         }
         let resp = match query.format {
-            None => QueryResponse::try_new_json(data.columns),
-            Some(QueryResponseFormat::Json) => QueryResponse::try_new_json(data.columns),
+            None => FunnelQueryResponse::columns_to_json(data.columns),
+            Some(QueryResponseFormat::Json) => FunnelQueryResponse::columns_to_json(data.columns),
             Some(QueryResponseFormat::JsonCompact) => {
-                QueryResponse::try_new_json_compact(data.columns)
+                FunnelQueryResponse::columns_to_json_compact(data.columns)
             }
         }?;
 
@@ -164,10 +165,10 @@ impl Queries {
             data.columns = vec![];
         }
         let resp = match query.format {
-            None => QueryResponse::try_new_json(data.columns),
-            Some(QueryResponseFormat::Json) => QueryResponse::try_new_json(data.columns),
+            None => QueryResponse::columns_to_json(data.columns),
+            Some(QueryResponseFormat::Json) => QueryResponse::columns_to_json(data.columns),
             Some(QueryResponseFormat::JsonCompact) => {
-                QueryResponse::try_new_json_compact(data.columns)
+                QueryResponse::columns_to_json_compact(data.columns)
             }
         }?;
 

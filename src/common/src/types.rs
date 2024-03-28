@@ -83,6 +83,10 @@ pub const EVENT_SESSION_END: &str = "Session End";
 
 pub const RESERVED_COLUMN_FUNNEL_TOTAL: &str = "total";
 pub const RESERVED_COLUMN_FUNNEL_COMPLETED: &str = "completed";
+pub const RESERVED_COLUMN_FUNNEL_CONVERSION_RATIO: &str = "conversion_ratio";
+pub const RESERVED_COLUMN_FUNNEL_AVG_TIME_TO_CONVERT: &str = "avg_time_to_convert";
+pub const RESERVED_COLUMN_FUNNEL_DROPPED_OFF: &str = "dropped_off";
+pub const RESERVED_COLUMN_FUNNEL_DROP_OFF_RATIO: &str = "drop_off_ratio";
 pub const RESERVED_COLUMN_AGG_PARTITIONED_AGGREGATE: &str = "partitioned_agg";
 pub const RESERVED_COLUMN_AGG_PARTITIONED_COUNT: &str = "partitioned_count";
 pub const RESERVED_COLUMN_AGG: &str = "agg";

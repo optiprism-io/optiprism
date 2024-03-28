@@ -4,6 +4,7 @@ use std::result;
 use std::sync::Arc;
 
 use ahash::RandomState;
+use arrow::array::ArrayBuilder;
 use arrow::array::ArrayRef;
 use arrow::array::Decimal128Builder;
 use arrow::array::Int64Array;
@@ -77,14 +78,16 @@ struct Row {
 #[derive(Debug, Clone, Eq, PartialEq)]
 struct StepResult {
     count: i64,
-    total_time: i64,
-    total_time_from_start: i64,
+    completed: i64,
+    total_time_to_convert: i64,
+    total_time_to_convert_from_start: i64,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 struct BucketResult {
     total_funnels: i64,
     completed_funnels: i64,
+    time_to_convert: i64,
     steps: Vec<StepResult>,
     ts: i64,
 }
@@ -113,11 +116,13 @@ impl Group {
                 let b = BucketResult {
                     total_funnels: 0,
                     completed_funnels: 0,
+                    time_to_convert: 0,
                     steps: (0..steps_len)
                         .map(|_| StepResult {
                             count: 0,
-                            total_time: 0,
-                            total_time_from_start: 0,
+                            completed: 0,
+                            total_time_to_convert: 0,
+                            total_time_to_convert_from_start: 0,
                         })
                         .collect::<Vec<_>>(),
                     ts: *ts,
@@ -226,13 +231,19 @@ impl Group {
             b.total_funnels += 1;
             if is_completed {
                 b.completed_funnels += 1;
+                b.time_to_convert += self.steps[self.steps_completed - 1].ts - self.steps[0].ts
             }
 
-            for idx in 0..self.steps_completed {
+            for idx in 0..self.steps.len() {
                 b.steps[idx].count += 1;
-                if idx > 0 {
-                    b.steps[idx].total_time += self.steps[idx].ts - self.steps[idx - 1].ts;
-                    b.steps[idx].total_time_from_start += self.steps[idx].ts - self.steps[0].ts;
+                if idx < self.steps_completed {
+                    b.steps[idx].completed += 1;
+                    if idx > 0 {
+                        b.steps[idx].total_time_to_convert +=
+                            self.steps[idx].ts - self.steps[idx - 1].ts;
+                        b.steps[idx].total_time_to_convert_from_start +=
+                            self.steps[idx].ts - self.steps[0].ts;
+                    }
                 }
             }
         });
@@ -393,9 +404,25 @@ impl Funnel {
 
     pub fn fields(&self) -> Vec<Field> {
         let mut fields = vec![
-            Field::new("ts", DataType::Timestamp(TIME_UNIT, None), true),
-            Field::new("total", DataType::Int64, true),
-            Field::new("completed", DataType::Int64, true),
+            Field::new("ts", DataType::Timestamp(TIME_UNIT, None), false),
+            Field::new("total", DataType::Int64, false),
+            Field::new("completed", DataType::Int64, false),
+            Field::new(
+                "conversion_ratio",
+                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                false,
+            ),
+            Field::new(
+                "avg_time_to_convert",
+                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                false,
+            ),
+            Field::new("dropped_off", DataType::Int64, false),
+            Field::new(
+                "drop_off_ratio",
+                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                false,
+            ),
         ];
 
         // prepend group fields if we have grouping
@@ -421,6 +448,23 @@ impl Funnel {
             .flat_map(|step_id| {
                 let fields = vec![
                     Field::new(format!("step{}_total", step_id), DataType::Int64, true),
+                    Field::new(format!("step{}_completed", step_id), DataType::Int64, true),
+                    Field::new(
+                        format!("step{}_conversion_ratio", step_id),
+                        DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                        false,
+                    ),
+                    Field::new(
+                        format!("step{}_avg_time_to_convert", step_id),
+                        DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                        false,
+                    ),
+                    Field::new(format!("step{step_id}_dropped_off"), DataType::Int64, false),
+                    Field::new(
+                        format!("step{step_id}_drop_off_ratio"),
+                        DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                        false,
+                    ),
                     Field::new(
                         format!("step{}_time_to_convert", step_id),
                         DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
@@ -720,9 +764,29 @@ impl Funnel {
             let mut total = Int64Builder::with_capacity(arr_len);
             // completed col
             let mut completed = Int64Builder::with_capacity(arr_len);
+            let mut conversion_ratio = Decimal128Builder::with_capacity(arr_len);
+            let mut avg_time_to_convert = Decimal128Builder::with_capacity(arr_len);
+            let mut dropped_off = Int64Builder::with_capacity(arr_len);
+            let mut drop_off_ratio = Decimal128Builder::with_capacity(arr_len);
+
             // step total col
             let mut step_total = (0..steps)
                 .map(|_| Int64Builder::with_capacity(arr_len))
+                .collect::<Vec<_>>();
+            let mut step_completed = (0..steps)
+                .map(|_| Int64Builder::with_capacity(arr_len))
+                .collect::<Vec<_>>();
+            let mut step_conversion_ratio = (0..steps)
+                .map(|_| Decimal128Builder::with_capacity(arr_len))
+                .collect::<Vec<_>>();
+            let mut step_avg_time_to_convert = (0..steps)
+                .map(|_| Decimal128Builder::with_capacity(arr_len))
+                .collect::<Vec<_>>();
+            let mut step_dropped_off = (0..steps)
+                .map(|_| Int64Builder::with_capacity(arr_len))
+                .collect::<Vec<_>>();
+            let mut step_drop_off_ratio = (0..steps)
+                .map(|_| Decimal128Builder::with_capacity(arr_len))
                 .collect::<Vec<_>>();
             let mut step_time_to_convert = (0..steps)
                 .map(|_| Decimal128Builder::with_capacity(arr_len))
@@ -735,10 +799,66 @@ impl Funnel {
             for (ts, bucket) in buckets {
                 total.append_value(bucket.total_funnels);
                 completed.append_value(bucket.completed_funnels);
+                let mut v = Decimal::from_f64(if bucket.total_funnels > 0 {
+                    bucket.completed_funnels as f64 / bucket.total_funnels as f64 * 100.
+                } else {
+                    0.
+                })
+                .unwrap();
+                v.rescale(DECIMAL_SCALE as u32);
+                conversion_ratio.append_value(v.mantissa());
+
+                let mut v = Decimal::from_f64(if bucket.completed_funnels > 0 {
+                    bucket.time_to_convert as f64 / bucket.completed_funnels as f64 * 100.
+                } else {
+                    0.
+                })
+                .unwrap();
+                v.rescale(DECIMAL_SCALE as u32);
+                avg_time_to_convert.append_value(v.mantissa());
+                dropped_off.append_value(bucket.total_funnels - bucket.completed_funnels);
+                let mut v = Decimal::from_f64(if bucket.total_funnels > 0 {
+                    (bucket.total_funnels - bucket.completed_funnels) as f64
+                        / bucket.total_funnels as f64
+                        * 100.
+                } else {
+                    0.
+                })
+                .unwrap();
+                v.rescale(DECIMAL_SCALE as u32);
+                drop_off_ratio.append_value(v.mantissa());
                 for (step_id, step) in bucket.steps.iter().enumerate() {
                     step_total[step_id].append_value(step.count);
+                    step_completed[step_id].append_value(step.completed);
+                    let mut v = Decimal::from_f64(if step.count > 0 {
+                        step.completed as f64 / step.count as f64 * 100.
+                    } else {
+                        0.
+                    })
+                    .unwrap();
+                    v.rescale(DECIMAL_SCALE as u32);
+                    step_conversion_ratio[step_id].append_value(v.mantissa());
+
+                    let v = if step.completed > 0 {
+                        step.total_time_to_convert as f64 / step.completed as f64
+                    } else {
+                        0.
+                    };
+
+                    let mut a = Decimal::from_f64(v).unwrap();
+                    a.rescale(DECIMAL_SCALE as u32);
+                    step_avg_time_to_convert[step_id].append_value(a.mantissa());
+                    step_dropped_off[step_id].append_value(step.count - step.completed);
+                    let mut v = Decimal::from_f64(if step.count > 0 {
+                        (step.count - step.completed) as f64 / step.count as f64 * 100.
+                    } else {
+                        0.
+                    })
+                    .unwrap();
+                    v.rescale(DECIMAL_SCALE as u32);
+                    step_drop_off_ratio[step_id].append_value(v.mantissa());
                     let v = if step.count > 0 {
-                        step.total_time as f64 / step.count as f64
+                        step.total_time_to_convert as f64 / step.count as f64
                     } else {
                         0.
                     };
@@ -746,7 +866,7 @@ impl Funnel {
                     a.rescale(DECIMAL_SCALE as u32);
                     step_time_to_convert[step_id].append_value(a.mantissa());
                     let v = if step.count > 0 {
-                        step.total_time_from_start as f64 / step.count as f64
+                        step.total_time_to_convert_from_start as f64 / step.count as f64
                     } else {
                         0.
                     };
@@ -760,6 +880,25 @@ impl Funnel {
                 Arc::new(ts),
                 Arc::new(total.finish()),
                 Arc::new(completed.finish()),
+                Arc::new(
+                    conversion_ratio
+                        .finish()
+                        .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)
+                        .unwrap(),
+                ),
+                Arc::new(
+                    avg_time_to_convert
+                        .finish()
+                        .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)
+                        .unwrap(),
+                ),
+                Arc::new(dropped_off.finish()),
+                Arc::new(
+                    drop_off_ratio
+                        .finish()
+                        .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)
+                        .unwrap(),
+                ),
             ];
             // make groups
             if let Some(g) = &group_arrs {
@@ -778,6 +917,26 @@ impl Funnel {
                 .flat_map(|idx| {
                     let arrs = vec![
                         Arc::new(step_total[idx].finish()) as ArrayRef,
+                        Arc::new(step_completed[idx].finish()) as ArrayRef,
+                        Arc::new(
+                            step_conversion_ratio[idx]
+                                .finish()
+                                .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)
+                                .unwrap(),
+                        ) as ArrayRef,
+                        Arc::new(
+                            step_avg_time_to_convert[idx]
+                                .finish()
+                                .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)
+                                .unwrap(),
+                        ) as ArrayRef,
+                        Arc::new(step_dropped_off[idx].finish()) as ArrayRef,
+                        Arc::new(
+                            step_drop_off_ratio[idx]
+                                .finish()
+                                .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)
+                                .unwrap(),
+                        ) as ArrayRef,
                         Arc::new(
                             step_time_to_convert[idx]
                                 .finish()
@@ -1875,6 +2034,91 @@ asd
 | 1      | 2020-04-12 05:14:57 | android      | 2      | 1      |
 | 1      | 2020-04-12 06:15:57 | android      | 3      | 1      |
 | 3      | 2020-04-12 07:16:57 | android      | 1      | 1      |
+"#;
+        let res = parse_markdown_tables(data).unwrap();
+        let schema = res[0].schema();
+        let hash = HashMap::from_iter([(1, ())]);
+
+        let e1 = {
+            let l = Column::new_with_schema("v", &schema).unwrap();
+            let r = Literal::new(ScalarValue::Int64(Some(1)));
+            let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Exact)
+        };
+        let e2 = {
+            let l = Column::new_with_schema("v", &schema).unwrap();
+            let r = Literal::new(ScalarValue::Int64(Some(2)));
+            let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Exact)
+        };
+        let e3 = {
+            let l = Column::new_with_schema("v", &schema).unwrap();
+            let r = Literal::new(ScalarValue::Int64(Some(3)));
+            let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Exact)
+        };
+
+        let ex = {
+            let l = Column::new_with_schema("v", &schema).unwrap();
+            let r = Literal::new(ScalarValue::Int64(Some(4)));
+            let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
+            Arc::new(expr) as PhysicalExprRef
+        };
+
+        let groups = vec![(
+            Arc::new(Column::new_with_schema("device", &schema).unwrap()) as PhysicalExprRef,
+            "device".to_string(),
+            SortField::new(DataType::Utf8),
+        )];
+        let opts = Options {
+            schema: schema.clone(),
+            ts_col: Arc::new(Column::new_with_schema("ts", &schema).unwrap()),
+            from: DateTime::parse_from_str("2020-04-12 01:10:57 +0000", "%Y-%m-%d %H:%M:%S %z")
+                .unwrap()
+                .with_timezone(&Utc),
+            to: DateTime::parse_from_str("2020-04-12 07:21:57 +0000", "%Y-%m-%d %H:%M:%S %z")
+                .unwrap()
+                .with_timezone(&Utc),
+            window: Duration::hours(4),
+            steps: vec![e1, e2, e3],
+            exclude: Some(vec![ExcludeExpr {
+                expr: ex,
+                steps: None,
+            }]),
+            // exclude: None,
+            constants: None,
+            // constants: Some(vec![Column::new_with_schema("c", &schema).unwrap()]),
+            count: NonUnique,
+            filter: None,
+            touch: Touch::First,
+            partition_col: Arc::new(Column::new_with_schema("u", &schema).unwrap()),
+            time_interval: Some(TimeIntervalUnit::Hour),
+            // time_interval: None,
+            groups: Some(groups),
+        };
+        let mut f = Funnel::try_new(opts).unwrap();
+        for b in res {
+            f.evaluate(&b, Some(&hash)).unwrap();
+        }
+
+        let res = f.finalize().unwrap();
+
+        let b = RecordBatch::try_new(f.schema(), res).unwrap();
+        print_batches(&[b]).unwrap();
+    }
+
+    #[test]
+    fn test_all() {
+        let data = r#"
+| u(i64) | ts(ts)              | v(i64) | c(i64) |
+|--------|---------------------|--------|--------|
+| 1      | 2020-04-12 01:10:57 | 1      | 1      |
+| 1      | 2020-04-12 02:11:57 | 2      | 1      |
+| 1      | 2020-04-12 03:12:57 | 3      | 1      |
+| 1      | 2020-04-12 01:10:57 | 1      | 1      |
+| 1      | 2020-04-12 02:11:57 | 2      | 1      |
+| 1      | 2020-04-12 03:12:57 | 3      | 1      |
+
 "#;
         let res = parse_markdown_tables(data).unwrap();
         let schema = res[0].schema();

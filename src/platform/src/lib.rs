@@ -473,8 +473,22 @@ pub struct Column {
     pub name: String,
     pub is_nullable: bool,
     pub data_type: DType,
-    pub step: Option<usize>,
     pub data: Vec<Value>,
+    pub compare_values: Option<Vec<Value>>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct FunnelColumn {
+    #[serde(rename = "type")]
+    pub typ: ColumnType,
+    pub name: String,
+    pub is_nullable: bool,
+    pub data_type: DType,
+    pub hidden: bool,
+    pub data: Vec<Value>,
+    pub step: Option<String>,
+    pub step_id: Option<usize>,
     pub compare_values: Option<Vec<Value>>,
 }
 
@@ -495,6 +509,55 @@ pub struct JSONQueryResponse {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
+pub struct JSONFunnelQueryResponse {
+    columns: Vec<FunnelColumn>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+#[serde(untagged)]
+pub enum FunnelQueryResponse {
+    JSON(JSONFunnelQueryResponse),
+    JSONCompact(JSONCompactQueryResponse),
+}
+
+impl FunnelQueryResponse {
+    pub fn columns_to_json(columns: Vec<query::FunnelColumn>) -> Result<Self> {
+        let columns = columns
+            .iter()
+            .cloned()
+            .map(|column| {
+                let data = array_ref_to_json_values(&column.data);
+                FunnelColumn {
+                    typ: column.typ.into(),
+                    name: column.name,
+                    is_nullable: column.is_nullable,
+                    data_type: column.data_type.into(),
+                    hidden: column.hidden,
+                    data,
+                    step: column.step.clone(),
+                    step_id: column.step_id.clone(),
+                    compare_values: None,
+                }
+            })
+            .collect::<Vec<_>>();
+
+        Ok(Self::JSON(JSONFunnelQueryResponse { columns }))
+    }
+
+    pub fn columns_to_json_compact(columns: Vec<query::FunnelColumn>) -> Result<Self> {
+        let data = columns
+            .iter()
+            .cloned()
+            .map(|column| array_ref_to_json_values(&column.data))
+            .collect::<Vec<_>>();
+
+        Ok(Self::JSONCompact(JSONCompactQueryResponse(data)))
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct JSONCompactQueryResponse(Vec<Vec<Value>>);
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -506,7 +569,7 @@ pub enum QueryResponse {
 }
 
 impl QueryResponse {
-    pub fn try_new_json(columns: Vec<query::Column>) -> Result<Self> {
+    pub fn columns_to_json(columns: Vec<query::Column>) -> Result<Self> {
         let columns = columns
             .iter()
             .cloned()
@@ -518,7 +581,6 @@ impl QueryResponse {
                     is_nullable: column.is_nullable,
                     data_type: column.data_type.into(),
                     data,
-                    step: column.step,
                     compare_values: None,
                 }
             })
@@ -527,7 +589,7 @@ impl QueryResponse {
         Ok(Self::JSON(JSONQueryResponse { columns }))
     }
 
-    pub fn try_new_json_compact(columns: Vec<query::Column>) -> Result<Self> {
+    pub fn columns_to_json_compact(columns: Vec<query::Column>) -> Result<Self> {
         let data = columns
             .iter()
             .cloned()
