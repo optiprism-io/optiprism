@@ -48,27 +48,11 @@ pub struct Funnel {
 
 impl Funnel {
     pub fn schema(&self, schema: &DFSchemaRef) -> DFSchemaRef {
-        let mut fields = vec![
-            DFField::new_unqualified("ts", DataType::Timestamp(TIME_UNIT, None), false),
-            DFField::new_unqualified("total", DataType::Int64, false),
-            DFField::new_unqualified("completed", DataType::Int64, false),
-            DFField::new_unqualified(
-                "conversion_ratio",
-                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
-                false,
-            ),
-            DFField::new_unqualified(
-                "avg_time_to_convert",
-                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
-                false,
-            ),
-            DFField::new_unqualified("dropped_off", DataType::Int64, false),
-            DFField::new_unqualified(
-                "drop_off_ratio",
-                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
-                false,
-            ),
-        ];
+        let mut fields = vec![DFField::new_unqualified(
+            "ts",
+            DataType::Timestamp(TIME_UNIT, None),
+            false,
+        )];
 
         if let Some(groups) = &self.groups {
             let group_fields = groups
@@ -117,12 +101,12 @@ impl Funnel {
                     ),
                     DFField::new_unqualified(
                         format!("step{}_time_to_convert", step_id).as_str(),
-                        DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                        DataType::Int64,
                         true,
                     ),
                     DFField::new_unqualified(
                         format!("step{}_time_to_convert_from_start", step_id).as_str(),
-                        DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                        DataType::Int64,
                         true,
                     ),
                 ];

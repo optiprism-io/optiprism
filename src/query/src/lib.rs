@@ -53,6 +53,7 @@ use arrow2::array::Int128Array;
 use common::query::PropertyRef;
 pub use context::Context;
 pub use error::Result;
+use indexmap::IndexMap;
 use metadata::MetadataProvider;
 pub use provider::QueryProvider;
 
@@ -310,29 +311,6 @@ pub struct DataTable {
 
 impl DataTable {
     pub fn new(schema: SchemaRef, columns: Vec<Column>) -> Self {
-        Self { schema, columns }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct FunnelColumn {
-    pub name: String,
-    pub typ: ColumnType,
-    pub is_nullable: bool,
-    pub data_type: DataType,
-    pub hidden: bool,
-    pub data: ArrayRef,
-    pub step: Option<String>,
-    pub step_id: Option<usize>,
-}
-
-pub struct FunnelDataTable {
-    pub schema: SchemaRef,
-    pub columns: Vec<FunnelColumn>,
-}
-
-impl FunnelDataTable {
-    pub fn new(schema: SchemaRef, columns: Vec<FunnelColumn>) -> Self {
         Self { schema, columns }
     }
 }

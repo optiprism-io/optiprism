@@ -1,9 +1,18 @@
+use std::collections::VecDeque;
+use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Instant;
 
+use arrow::array::Array;
+use arrow::array::ArrayAccessor;
 use arrow::array::ArrayRef;
+use arrow::array::Decimal128Array;
+use arrow::array::Int64Array;
 use arrow::array::StringArray;
 use arrow::array::StringBuilder;
+use arrow::array::TimestampMillisecondArray;
+use arrow::compute::cast;
+use arrow::datatypes::DataType;
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
 use common::query::event_segmentation::EventSegmentation;
@@ -19,8 +28,10 @@ use common::types::COLUMN_EVENT_ID;
 use common::types::COLUMN_PROJECT_ID;
 use common::types::COLUMN_USER_ID;
 use common::types::TABLE_EVENTS;
+use common::DECIMAL_SCALE;
 use datafusion::execution::context::SessionState;
 use datafusion::execution::runtime_env::RuntimeEnv;
+use datafusion::parquet::basic::ConvertedType::NONE;
 use datafusion::physical_plan::coalesce_batches::concat_batches;
 use datafusion::physical_plan::collect;
 use datafusion::physical_plan::display::DisplayableExecutionPlan;
@@ -29,6 +40,7 @@ use datafusion::prelude::SessionContext;
 use datafusion_expr::Extension;
 use datafusion_expr::LogicalPlan;
 use metadata::MetadataProvider;
+use rust_decimal::Decimal;
 use storage::db::OptiDBImpl;
 use tracing::debug;
 
@@ -40,14 +52,13 @@ use crate::queries::event_records_search::EventRecordsSearch;
 use crate::queries::event_segmentation;
 use crate::queries::event_segmentation::logical_plan_builder::COL_AGG_NAME;
 use crate::queries::funnel;
+use crate::queries::funnel::StepData;
 use crate::queries::property_values;
 use crate::queries::property_values::PropertyValues;
 use crate::Column;
 use crate::ColumnType;
 use crate::Context;
 use crate::DataTable;
-use crate::FunnelColumn;
-use crate::FunnelDataTable;
 use crate::Result;
 
 pub struct QueryProvider {
@@ -225,7 +236,7 @@ impl QueryProvider {
         Ok(DataTable::new(result.schema(), cols))
     }
 
-    pub async fn funnel(&self, ctx: Context, req: Funnel) -> Result<FunnelDataTable> {
+    pub async fn funnel(&self, ctx: Context, req: Funnel) -> Result<funnel::Response> {
         let start = Instant::now();
         let schema = self.db.schema1(TABLE_EVENTS)?;
         let projection = funnel_projection(&ctx, &req, &self.metadata)?;
@@ -238,98 +249,108 @@ impl QueryProvider {
         let plan = funnel::build(ctx.clone(), self.metadata.clone(), plan, req.clone())?;
 
         let result = self.execute(session_ctx, state, plan).await?;
-
         let duration = start.elapsed();
         debug!("elapsed: {:?}", duration);
 
-        let breakdowns = funnel_breakdown_column_names(&req, ctx.project_id, &self.metadata)?;
-        let cols = result
-            .schema()
-            .fields()
-            .iter()
-            .enumerate()
-            .map(|(idx, field)| {
-                let typ = {
-                    if breakdowns.contains(&field.name().to_string())
-                        || field.name().to_owned() == "segment".to_string()
-                    {
-                        ColumnType::Dimension
-                    } else {
-                        ColumnType::Metric
-                    }
-                };
-                let (name, step_id) = {
-                    // todo make more robust approach
-                    if field.name().starts_with("step") {
-                        let s = field.name().split("step").last().unwrap();
-                        let id = s.split("_").next().unwrap().parse::<usize>().unwrap();
-                        let (_, next) = s.split_once("_").unwrap();
-                        (next.to_string(), Some(id))
-                    } else {
-                        (field.name().to_string(), None)
-                    }
-                };
+        let mut group_cols: Vec<StringArray> = vec![];
+        let mut ts_col = {
+            let idx = result.schema().index_of("ts").unwrap();
+            result
+                .column(idx)
+                .as_any()
+                .downcast_ref::<TimestampMillisecondArray>()
+                .unwrap()
+        };
 
-                let hidden = match name.as_str() {
-                    // todo fix this
-                    "conversion_ratio" | "total" | "completed" | "avg_time_to_convert" => false,
-                    _ => true,
-                };
-
-                let step = if let Some(step_id) = step_id {
-                    match &req.steps[step_id].events[0].event {
-                        EventRef::RegularName(name) => Some(name.to_owned()),
-                        _ => unimplemented!(),
-                    }
-                } else {
-                    None
-                };
-
-                FunnelColumn {
-                    name: field.name().to_owned(),
-                    typ,
-                    is_nullable: field.is_nullable(),
-                    data_type: field.data_type().to_owned(),
-                    hidden,
-                    data: result.column(idx).to_owned(),
-                    step,
-                    step_id,
-                }
-            })
-            .collect();
-
-        Ok(FunnelDataTable::new(result.schema(), cols))
-    }
-}
-
-pub fn funnel_breakdown_column_names(
-    req: &Funnel,
-    project_id: u64,
-    md: &Arc<MetadataProvider>,
-) -> Result<Vec<String>> {
-    let mut columns = vec![];
-    if let Some(breakdowns) = &req.breakdowns {
-        for breakdown in breakdowns {
-            let prop = match breakdown {
-                Breakdown::Property(prop) => match prop {
-                    PropertyRef::System(prop) => md
-                        .system_properties
-                        .get_by_name(project_id, prop.as_str())?,
-                    PropertyRef::User(prop) => {
-                        md.user_properties.get_by_name(project_id, prop.as_str())?
-                    }
-                    PropertyRef::Event(prop) => {
-                        md.event_properties.get_by_name(project_id, prop.as_str())?
-                    }
-                    PropertyRef::Custom(_) => unimplemented!(),
-                },
-            };
-            columns.push(prop.name());
+        // segment
+        let col = cast(&result.column(0), &DataType::Utf8)?
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap()
+            .to_owned();
+        group_cols.push(col);
+        if let Some(breakdowns) = &req.breakdowns {
+            for idx in 0..=breakdowns.len() {
+                let col = result
+                    .column(idx)
+                    .as_any()
+                    .downcast_ref::<StringArray>()
+                    .unwrap()
+                    .to_owned();
+                group_cols.push(col);
+            }
         }
-    }
-    columns.dedup();
 
-    Ok(columns)
+        let mut int_val_cols = vec![];
+        let mut dec_val_cols = vec![];
+
+        for idx in 0..(result.schema().fields().len() - group_cols.len() - 1) {
+            let arr = result.column(group_cols.len() + 1 + idx).to_owned();
+            match arr.data_type() {
+                DataType::Int64 => int_val_cols.push(
+                    arr.as_any()
+                        .downcast_ref::<Int64Array>()
+                        .unwrap()
+                        .to_owned(),
+                ),
+                DataType::Decimal128(_, _) => dec_val_cols.push(
+                    arr.as_any()
+                        .downcast_ref::<Decimal128Array>()
+                        .unwrap()
+                        .to_owned(),
+                ),
+                _ => panic!("unexpected data type"),
+            }
+        }
+
+        let mut steps = vec![];
+        for step_id in 0..req.steps.len() {
+            let name = schema.fields()[group_cols.len() + 1 + step_id * 8]
+                .name()
+                .to_string();
+            let mut step = funnel::Step {
+                step: name.clone(),
+                data: vec![],
+            };
+            for idx in 0..result.num_rows() {
+                let groups = if group_cols.is_empty() {
+                    None
+                } else {
+                    Some(
+                        group_cols
+                            .iter()
+                            .map(|col| col.value(idx).to_string())
+                            .collect::<Vec<_>>(),
+                    )
+                };
+                let step_data = funnel::StepData {
+                    groups,
+                    ts: ts_col.value(idx),
+                    total: int_val_cols[step_id * 5].value(idx) as i64,
+                    completed: int_val_cols[step_id * 5 + 1].value(idx) as i64,
+                    conversion_ratio: Decimal::from_i128_with_scale(
+                        dec_val_cols[step_id * 3].value(idx) as i128,
+                        DECIMAL_SCALE as u32,
+                    ),
+                    avg_time_to_convert: Decimal::from_i128_with_scale(
+                        dec_val_cols[step_id * 3 + 1].value(idx) as i128,
+                        DECIMAL_SCALE as u32,
+                    ),
+                    dropped_off: int_val_cols[step_id * 5 + 2].value(idx) as i64,
+                    drop_off_ratio: Decimal::from_i128_with_scale(
+                        int_val_cols[step_id * 5 + 2].value(idx) as i128,
+                        DECIMAL_SCALE as u32,
+                    ),
+                    time_to_convert: int_val_cols[step_id * 5 + 3].value(idx) as i64,
+                    time_to_convert_from_start: int_val_cols[step_id * 5 + 4].value(idx) as i64,
+                };
+                step.data.push(step_data);
+            }
+            steps.push(step);
+        }
+
+        Ok(funnel::Response { steps })
+    }
 }
 
 fn property_values_projection(

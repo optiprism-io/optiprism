@@ -477,21 +477,6 @@ pub struct Column {
     pub compare_values: Option<Vec<Value>>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct FunnelColumn {
-    #[serde(rename = "type")]
-    pub typ: ColumnType,
-    pub name: String,
-    pub is_nullable: bool,
-    pub data_type: DType,
-    pub hidden: bool,
-    pub data: Vec<Value>,
-    pub step: Option<String>,
-    pub step_id: Option<usize>,
-    pub compare_values: Option<Vec<Value>>,
-}
-
 impl From<query::ColumnType> for ColumnType {
     fn from(value: query::ColumnType) -> Self {
         match value {
@@ -505,55 +490,6 @@ impl From<query::ColumnType> for ColumnType {
 #[serde(rename_all = "camelCase")]
 pub struct JSONQueryResponse {
     columns: Vec<Column>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct JSONFunnelQueryResponse {
-    columns: Vec<FunnelColumn>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-#[serde(untagged)]
-pub enum FunnelQueryResponse {
-    JSON(JSONFunnelQueryResponse),
-    JSONCompact(JSONCompactQueryResponse),
-}
-
-impl FunnelQueryResponse {
-    pub fn columns_to_json(columns: Vec<query::FunnelColumn>) -> Result<Self> {
-        let columns = columns
-            .iter()
-            .cloned()
-            .map(|column| {
-                let data = array_ref_to_json_values(&column.data);
-                FunnelColumn {
-                    typ: column.typ.into(),
-                    name: column.name,
-                    is_nullable: column.is_nullable,
-                    data_type: column.data_type.into(),
-                    hidden: column.hidden,
-                    data,
-                    step: column.step.clone(),
-                    step_id: column.step_id.clone(),
-                    compare_values: None,
-                }
-            })
-            .collect::<Vec<_>>();
-
-        Ok(Self::JSON(JSONFunnelQueryResponse { columns }))
-    }
-
-    pub fn columns_to_json_compact(columns: Vec<query::FunnelColumn>) -> Result<Self> {
-        let data = columns
-            .iter()
-            .cloned()
-            .map(|column| array_ref_to_json_values(&column.data))
-            .collect::<Vec<_>>();
-
-        Ok(Self::JSONCompact(JSONCompactQueryResponse(data)))
-    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -598,6 +534,30 @@ impl QueryResponse {
 
         Ok(Self::JSONCompact(JSONCompactQueryResponse(data)))
     }
+}
+#[derive(Serialize, Deserialize, Debug)]
+pub struct FunnelStepData {
+    pub groups: Option<Vec<String>>,
+    pub ts: i64,
+    pub total: i64,
+    pub completed: i64,
+    pub conversion_ratio: Decimal,
+    pub avg_time_to_convert: Decimal,
+    pub dropped_off: i64,
+    pub drop_off_ratio: Decimal,
+    pub time_to_convert: i64,
+    pub time_to_convert_from_start: i64,
+}
+#[derive(Serialize, Deserialize, Debug)]
+pub struct FunnelStep {
+    pub step: String,
+    pub data: Vec<FunnelStepData>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct FunnelResponse {
+    pub steps: Vec<FunnelStep>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Default, Debug, PartialEq, Eq)]

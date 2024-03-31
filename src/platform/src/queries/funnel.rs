@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use metadata::MetadataProvider;
+use rust_decimal::Decimal;
 use serde::Deserialize;
 use serde::Serialize;
 

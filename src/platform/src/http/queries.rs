@@ -15,7 +15,7 @@ use crate::queries::property_values::ListPropertyValuesRequest;
 use crate::queries::Queries;
 use crate::queries::QueryParams;
 use crate::Context;
-use crate::FunnelQueryResponse;
+use crate::FunnelResponse;
 use crate::ListResponse;
 use crate::QueryResponse;
 use crate::Result;
@@ -39,7 +39,7 @@ async fn funnel(
     Path(project_id): Path<u64>,
     Query(query): Query<QueryParams>,
     Json(request): Json<Funnel>,
-) -> Result<Json<FunnelQueryResponse>> {
+) -> Result<Json<FunnelResponse>> {
     Ok(Json(
         provider.funnel(ctx, project_id, request, query).await?,
     ))

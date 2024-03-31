@@ -5,6 +5,7 @@ edition = "2021"
 authors = ["Optiprism <dev@optiprism.io>"]
 
 [dependencies]
+indexmap = "2.2.6"
 metrics-util = "0.16.0"
 metrics = "0.22.0"
 ahash = { version = "0.8.8", default-features = false }

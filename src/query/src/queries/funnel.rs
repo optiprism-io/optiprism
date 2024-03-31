@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use chrono::DateTime;
 use chrono::Duration;
+use chrono::Utc;
 // use std::time::Duration;
 use common::query::funnel::ChartType;
 use common::query::funnel::Count;
@@ -38,6 +40,7 @@ use datafusion_expr::Projection;
 use datafusion_expr::Sort;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
+use rust_decimal::Decimal;
 
 use crate::error::Result;
 use crate::expr::event_expression;
@@ -266,4 +269,26 @@ fn decode_filter_dictionaries(
     Ok(LogicalPlan::Extension(Extension {
         node: Arc::new(DictionaryDecodeNode::try_new(input, decode_cols.clone())?),
     }))
+}
+#[derive(Clone, Debug)]
+pub struct StepData {
+    pub groups: Option<Vec<String>>,
+    pub ts: i64,
+    pub total: i64,
+    pub completed: i64,
+    pub conversion_ratio: Decimal,
+    pub avg_time_to_convert: Decimal,
+    pub dropped_off: i64,
+    pub drop_off_ratio: Decimal,
+    pub time_to_convert: i64,
+    pub time_to_convert_from_start: i64,
+}
+#[derive(Clone, Debug)]
+pub struct Step {
+    pub step: String,
+    pub data: Vec<StepData>,
+}
+#[derive(Clone, Debug)]
+pub struct Response {
+    pub steps: Vec<Step>,
 }

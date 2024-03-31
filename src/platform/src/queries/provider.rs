@@ -6,6 +6,7 @@ use chrono::Utc;
 use common::rbac::ProjectPermission;
 use metadata::MetadataProvider;
 use query::context::Format;
+use query::queries::funnel::StepData;
 use query::QueryProvider;
 use serde_json::Value;
 
@@ -19,7 +20,9 @@ use crate::queries::property_values::ListPropertyValuesRequest;
 use crate::queries::QueryParams;
 use crate::queries::QueryResponseFormat;
 use crate::Context;
-use crate::FunnelQueryResponse;
+use crate::FunnelResponse;
+use crate::FunnelStep;
+use crate::FunnelStepData;
 use crate::ListResponse;
 use crate::QueryResponse;
 use crate::Result;
@@ -88,7 +91,7 @@ impl Queries {
         project_id: u64,
         req: Funnel,
         query: QueryParams,
-    ) -> Result<FunnelQueryResponse> {
+    ) -> Result<FunnelResponse> {
         ctx.check_project_permission(project_id, ProjectPermission::ExploreReports)?;
         funnel::validate(&self.md, project_id, &req)?;
 
@@ -112,20 +115,35 @@ impl Queries {
             cur_time,
         };
 
-        let mut data = self.query.funnel(ctx, lreq).await?;
+        let mut qdata = self.query.funnel(ctx, lreq).await?;
 
-        // do empty response so it will be [] instead of [[],[],[],...]
-        if !data.columns.is_empty() && data.columns[0].data.is_empty() {
-            data.columns = vec![];
-        }
-        let resp = match query.format {
-            None => FunnelQueryResponse::columns_to_json(data.columns),
-            Some(QueryResponseFormat::Json) => FunnelQueryResponse::columns_to_json(data.columns),
-            Some(QueryResponseFormat::JsonCompact) => {
-                FunnelQueryResponse::columns_to_json_compact(data.columns)
-            }
-        }?;
-
+        let steps = qdata
+            .steps
+            .iter()
+            .map(|step| {
+                let data = step
+                    .data
+                    .iter()
+                    .map(|data| FunnelStepData {
+                        groups: data.groups.clone(),
+                        ts: data.ts.clone(),
+                        total: data.total.clone(),
+                        completed: data.completed.clone(),
+                        conversion_ratio: data.conversion_ratio.clone(),
+                        avg_time_to_convert: data.avg_time_to_convert.clone(),
+                        dropped_off: data.dropped_off.clone(),
+                        drop_off_ratio: data.drop_off_ratio.clone(),
+                        time_to_convert: data.time_to_convert.clone(),
+                        time_to_convert_from_start: data.time_to_convert_from_start.clone(),
+                    })
+                    .collect::<Vec<_>>();
+                FunnelStep {
+                    step: step.step.clone(),
+                    data,
+                }
+            })
+            .collect::<Vec<_>>();
+        let resp = FunnelResponse { steps };
         Ok(resp)
     }
 

@@ -403,27 +403,11 @@ impl Funnel {
     }
 
     pub fn fields(&self) -> Vec<Field> {
-        let mut fields = vec![
-            Field::new("ts", DataType::Timestamp(TIME_UNIT, None), false),
-            Field::new("total", DataType::Int64, false),
-            Field::new("completed", DataType::Int64, false),
-            Field::new(
-                "conversion_ratio",
-                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
-                false,
-            ),
-            Field::new(
-                "avg_time_to_convert",
-                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
-                false,
-            ),
-            Field::new("dropped_off", DataType::Int64, false),
-            Field::new(
-                "drop_off_ratio",
-                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
-                false,
-            ),
-        ];
+        let mut fields = vec![Field::new(
+            "ts",
+            DataType::Timestamp(TIME_UNIT, None),
+            false,
+        )];
 
         // prepend group fields if we have grouping
         if let Some(groups) = &self.groups {
@@ -467,12 +451,12 @@ impl Funnel {
                     ),
                     Field::new(
                         format!("step{}_time_to_convert", step_id),
-                        DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                        DataType::Int64,
                         true,
                     ),
                     Field::new(
                         format!("step{}_time_to_convert_from_start", step_id),
-                        DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                        DataType::Int64,
                         true,
                     ),
                 ];
@@ -760,14 +744,6 @@ impl Funnel {
             let ts = TimestampMillisecondArray::from(
                 buckets.iter().map(|(k, _)| *k).collect::<Vec<_>>(),
             );
-            // total col
-            let mut total = Int64Builder::with_capacity(arr_len);
-            // completed col
-            let mut completed = Int64Builder::with_capacity(arr_len);
-            let mut conversion_ratio = Decimal128Builder::with_capacity(arr_len);
-            let mut avg_time_to_convert = Decimal128Builder::with_capacity(arr_len);
-            let mut dropped_off = Int64Builder::with_capacity(arr_len);
-            let mut drop_off_ratio = Decimal128Builder::with_capacity(arr_len);
 
             // step total col
             let mut step_total = (0..steps)
@@ -789,44 +765,14 @@ impl Funnel {
                 .map(|_| Decimal128Builder::with_capacity(arr_len))
                 .collect::<Vec<_>>();
             let mut step_time_to_convert = (0..steps)
-                .map(|_| Decimal128Builder::with_capacity(arr_len))
+                .map(|_| Int64Builder::with_capacity(arr_len))
                 .collect::<Vec<_>>();
             let mut step_time_to_convert_from_start = (0..steps)
-                .map(|_| Decimal128Builder::with_capacity(arr_len))
+                .map(|_| Int64Builder::with_capacity(arr_len))
                 .collect::<Vec<_>>();
 
             // iterate over buckets and fill values to builders
             for (ts, bucket) in buckets {
-                total.append_value(bucket.total_funnels);
-                completed.append_value(bucket.completed_funnels);
-                let mut v = Decimal::from_f64(if bucket.total_funnels > 0 {
-                    bucket.completed_funnels as f64 / bucket.total_funnels as f64 * 100.
-                } else {
-                    0.
-                })
-                .unwrap();
-                v.rescale(DECIMAL_SCALE as u32);
-                conversion_ratio.append_value(v.mantissa());
-
-                let mut v = Decimal::from_f64(if bucket.completed_funnels > 0 {
-                    bucket.time_to_convert as f64 / bucket.completed_funnels as f64 * 100.
-                } else {
-                    0.
-                })
-                .unwrap();
-                v.rescale(DECIMAL_SCALE as u32);
-                avg_time_to_convert.append_value(v.mantissa());
-                dropped_off.append_value(bucket.total_funnels - bucket.completed_funnels);
-                let mut v = Decimal::from_f64(if bucket.total_funnels > 0 {
-                    (bucket.total_funnels - bucket.completed_funnels) as f64
-                        / bucket.total_funnels as f64
-                        * 100.
-                } else {
-                    0.
-                })
-                .unwrap();
-                v.rescale(DECIMAL_SCALE as u32);
-                drop_off_ratio.append_value(v.mantissa());
                 for (step_id, step) in bucket.steps.iter().enumerate() {
                     step_total[step_id].append_value(step.count);
                     step_completed[step_id].append_value(step.completed);
@@ -857,49 +803,13 @@ impl Funnel {
                     .unwrap();
                     v.rescale(DECIMAL_SCALE as u32);
                     step_drop_off_ratio[step_id].append_value(v.mantissa());
-                    let v = if step.count > 0 {
-                        step.total_time_to_convert as f64 / step.count as f64
-                    } else {
-                        0.
-                    };
-                    let mut a = Decimal::from_f64(v).unwrap();
-                    a.rescale(DECIMAL_SCALE as u32);
-                    step_time_to_convert[step_id].append_value(a.mantissa());
-                    let v = if step.count > 0 {
-                        step.total_time_to_convert_from_start as f64 / step.count as f64
-                    } else {
-                        0.
-                    };
-                    let mut a = Decimal::from_f64(v).unwrap();
-                    a.rescale(DECIMAL_SCALE as u32);
-                    step_time_to_convert_from_start[step_id].append_value(a.mantissa());
+                    step_time_to_convert[step_id].append_value(step.total_time_to_convert);
+                    step_time_to_convert_from_start[step_id]
+                        .append_value(step.total_time_to_convert_from_start);
                 }
             }
 
-            let mut arrs: Vec<ArrayRef> = vec![
-                Arc::new(ts),
-                Arc::new(total.finish()),
-                Arc::new(completed.finish()),
-                Arc::new(
-                    conversion_ratio
-                        .finish()
-                        .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)
-                        .unwrap(),
-                ),
-                Arc::new(
-                    avg_time_to_convert
-                        .finish()
-                        .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)
-                        .unwrap(),
-                ),
-                Arc::new(dropped_off.finish()),
-                Arc::new(
-                    drop_off_ratio
-                        .finish()
-                        .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)
-                        .unwrap(),
-                ),
-            ];
+            let mut arrs: Vec<ArrayRef> = vec![Arc::new(ts)];
             // make groups
             if let Some(g) = &group_arrs {
                 let garr = g
@@ -937,18 +847,8 @@ impl Funnel {
                                 .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)
                                 .unwrap(),
                         ) as ArrayRef,
-                        Arc::new(
-                            step_time_to_convert[idx]
-                                .finish()
-                                .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)
-                                .unwrap(),
-                        ) as ArrayRef,
-                        Arc::new(
-                            step_time_to_convert_from_start[idx]
-                                .finish()
-                                .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)
-                                .unwrap(),
-                        ) as ArrayRef,
+                        Arc::new(step_time_to_convert[idx].finish()) as ArrayRef,
+                        Arc::new(step_time_to_convert_from_start[idx].finish()) as ArrayRef,
                     ];
                     arrs
                 })

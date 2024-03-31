@@ -574,9 +574,7 @@ impl Into<common::query::event_segmentation::EventSegmentation> for EventSegment
                 v.groups[0]
                     .filters
                     .iter()
-                    .map(|f| {
-                        f.to_owned().into()
-                    })
+                    .map(|f| f.to_owned().into())
                     .collect::<Vec<_>>()
             }),
             breakdowns: self.breakdowns.map_or_else(
