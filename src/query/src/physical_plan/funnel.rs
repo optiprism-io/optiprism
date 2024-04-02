@@ -4,14 +4,20 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::pin::Pin;
+use std::result;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::task::Context;
 use std::task::Poll;
 
 use ahash::RandomState;
+use arrow::array::Array;
 use arrow::array::ArrayRef;
+use arrow::array::Datum;
+use arrow::array::Decimal128Array;
+use arrow::array::Decimal128Builder;
 use arrow::array::Int64Array;
+use arrow::array::Int64Builder;
 use arrow::array::RecordBatch;
 use arrow::compute::cast;
 use arrow::compute::concat_batches;
@@ -21,6 +27,10 @@ use arrow::datatypes::FieldRef;
 use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
 use arrow::util::pretty::print_batches;
+use arrow_row::OwnedRow;
+use arrow_row::Row;
+use arrow_row::RowConverter;
+use arrow_row::SortField;
 use async_trait::async_trait;
 use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_PROJECT_ID;
@@ -45,6 +55,7 @@ use datafusion::physical_expr::AggregateExpr;
 use datafusion::physical_expr::Distribution;
 use datafusion::physical_expr::Partitioning;
 use datafusion::physical_expr::PhysicalExpr;
+use datafusion::physical_expr::PhysicalExprRef;
 use datafusion::physical_expr::PhysicalSortExpr;
 use datafusion::physical_expr::PhysicalSortRequirement;
 use datafusion::physical_plan::aggregates::AggregateExec as DFAggregateExec;
@@ -67,6 +78,211 @@ use crate::error::QueryError;
 use crate::error::Result;
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Funnel;
 
+#[derive(Debug, Clone)]
+enum Agg {
+    Sum(i128),
+    Avg(i128, i128),
+}
+
+impl Agg {
+    pub fn result(&self) -> i128 {
+        match self {
+            Agg::Sum(sum) => *sum,
+            Agg::Avg(sum, count) => *sum / *count,
+        }
+    }
+}
+struct Group {
+    aggs: Vec<Agg>,
+}
+
+enum StaticArray {
+    Int64(Int64Array),
+    Decimal(Decimal128Array),
+}
+
+enum StaticArrayBuilder {
+    Int64(Int64Builder),
+    Decimal(Decimal128Builder),
+}
+fn aggregate(
+    batch: &RecordBatch,
+    mut groups: Vec<(PhysicalExprRef, SortField)>,
+    aggs: Vec<(PhysicalExprRef, Agg)>,
+) -> Result<Vec<ArrayRef>> {
+    print_batches(&[batch.clone()]).unwrap();
+    let is_groups = !groups.is_empty();
+    let groups = groups
+        .iter()
+        .map(|(e, s)| {
+            (
+                e.evaluate(batch)
+                    .unwrap()
+                    .into_array(batch.num_rows())
+                    .unwrap(),
+                s.to_owned(),
+            )
+        })
+        .collect::<Vec<_>>();
+    let row_converter = RowConverter::new(groups.iter().map(|(_, s)| s.clone()).collect())?;
+    let mut groups_hash: HashMap<OwnedRow, Group> = HashMap::default();
+    let mut single_group = Group {
+        aggs: aggs
+            .iter()
+            .map(|(_, agg)| agg.to_owned())
+            .collect::<Vec<_>>(),
+    };
+
+    let mut rows = if is_groups {
+        let arrs = groups.iter().map(|(a, _)| a.to_owned()).collect::<Vec<_>>();
+
+        Some(row_converter.convert_columns(&arrs)?)
+    } else {
+        None
+    };
+
+    let arrs = aggs
+        .iter()
+        .map(|(arr, agg)| {
+            arr.evaluate(batch)
+                .unwrap()
+                .into_array(batch.num_rows())
+                .unwrap()
+        })
+        .collect::<Vec<_>>();
+    // avoid downcast on each row
+    let mut static_arrs = arrs
+        .iter()
+        .map(|arr| match arr.data_type() {
+            DataType::Int64 => StaticArray::Int64(
+                arr.as_any()
+                    .downcast_ref::<Int64Array>()
+                    .unwrap()
+                    .to_owned(),
+            ),
+
+            DataType::Decimal128(_, _) => StaticArray::Decimal(
+                arr.as_any()
+                    .downcast_ref::<Decimal128Array>()
+                    .unwrap()
+                    .to_owned(),
+            ),
+            _ => unreachable!(),
+        })
+        .collect::<Vec<_>>();
+
+    let mut builders = arrs
+        .iter()
+        .map(|arr| match arr.data_type() {
+            DataType::Int64 => {
+                StaticArrayBuilder::Int64(Int64Builder::with_capacity(batch.num_rows()))
+            }
+
+            DataType::Decimal128(_, _) => {
+                StaticArrayBuilder::Decimal(Decimal128Builder::with_capacity(batch.num_rows()))
+            }
+            _ => unreachable!(),
+        })
+        .collect::<Vec<_>>();
+
+    for row_id in 0..batch.num_rows() {
+        let group = if let Some(rows) = rows.as_ref() {
+            groups_hash
+                .entry(rows.row(row_id).owned())
+                .or_insert_with(|| {
+                    let bucket = Group {
+                        aggs: aggs
+                            .iter()
+                            .map(|(_, agg)| agg.to_owned())
+                            .collect::<Vec<_>>(),
+                    };
+                    bucket
+                })
+        } else {
+            &mut single_group
+        };
+        for (agg, arr) in group.aggs.iter_mut().zip(static_arrs.iter().map(|arr| arr)) {
+            match arr {
+                StaticArray::Int64(arr) => match agg {
+                    Agg::Sum(sum) => {
+                        *sum += arr.value(row_id) as i128;
+                    }
+                    Agg::Avg(sum, count) => {
+                        *sum += arr.value(row_id) as i128;
+                        *count += 1;
+                    }
+                },
+                StaticArray::Decimal(arr) => match agg {
+                    Agg::Sum(sum) => {
+                        *sum += arr.value(row_id);
+                    }
+                    Agg::Avg(sum, count) => {
+                        *sum += arr.value(row_id);
+                        *count += 1;
+                    }
+                },
+            }
+        }
+    }
+
+    let cols = if let Some(rows) = &mut rows {
+        let mut rows: Vec<Row> = Vec::with_capacity(groups_hash.len());
+        for (row, group) in groups_hash.iter_mut() {
+            rows.push(row.row());
+            for (idx, agg) in group.aggs.iter().enumerate() {
+                match &mut builders[idx] {
+                    StaticArrayBuilder::Int64(b) => {
+                        b.append_value(agg.result() as i64);
+                    }
+                    StaticArrayBuilder::Decimal(b) => {
+                        b.append_value(agg.result());
+                    }
+                }
+            }
+        }
+
+        let cols = builders
+            .iter_mut()
+            .map(|b| match b {
+                StaticArrayBuilder::Int64(b) => Arc::new(b.finish()) as ArrayRef,
+                StaticArrayBuilder::Decimal(b) => Arc::new(
+                    b.finish()
+                        .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)
+                        .unwrap(),
+                ) as ArrayRef,
+            })
+            .collect::<Vec<_>>();
+
+        let group_col = row_converter.convert_rows(rows)?;
+        vec![group_col, cols].concat()
+    } else {
+        for (idx, agg) in single_group.aggs.iter().enumerate() {
+            match &mut builders[idx] {
+                StaticArrayBuilder::Int64(b) => {
+                    b.append_value(agg.result() as i64);
+                }
+                StaticArrayBuilder::Decimal(b) => {
+                    b.append_value(agg.result());
+                }
+            }
+        }
+        let cols = builders
+            .iter_mut()
+            .map(|b| match b {
+                StaticArrayBuilder::Int64(b) => Arc::new(b.finish()) as ArrayRef,
+                StaticArrayBuilder::Decimal(b) => Arc::new(
+                    b.finish()
+                        .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)
+                        .unwrap(),
+                ) as ArrayRef,
+            })
+            .collect::<Vec<_>>();
+
+        cols
+    };
+
+    Ok(cols)
+}
 #[derive(Eq, PartialEq, Clone, Debug)]
 enum Stage {
     CollectSegments,
@@ -465,144 +681,51 @@ impl Stream for FinalFunnelStream {
             }
         }
 
-        let groups = self
-            .schema
-            .fields()
-            .iter()
-            .take(self.groups + 2) // segment+ts
-            .map(|f| (col(f.name(), &self.schema).unwrap(), f.name().to_owned()))
-            .collect::<Vec<_>>();
         // merge
 
         let mut aggs = vec![];
         for i in 0..self.steps {
             let cname = format!("step{}_total", i);
-            aggs.push(Arc::new(Sum::new(
-                col(&cname, &self.schema).unwrap(),
-                cname.clone(),
-                self.schema
-                    .field_with_name(&cname)
-                    .unwrap()
-                    .data_type()
-                    .clone(),
-            )) as Arc<dyn DFAggregateExpr>);
+            aggs.push((col(&cname, &self.schema).unwrap(), Agg::Sum(0)));
+
             let cname = format!("step{}_completed", i);
-            aggs.push(Arc::new(Sum::new(
-                col(&cname, &self.schema).unwrap(),
-                cname.clone(),
-                self.schema
-                    .field_with_name(&cname)
-                    .unwrap()
-                    .data_type()
-                    .clone(),
-            )) as Arc<dyn DFAggregateExpr>);
+            aggs.push((col(&cname, &self.schema).unwrap(), Agg::Sum(0)));
+
             let cname = format!("step{}_conversion_ratio", i);
-            aggs.push(Arc::new(Sum::new(
-                col(&cname, &self.schema).unwrap(),
-                cname.clone(),
-                self.schema
-                    .field_with_name(&cname)
-                    .unwrap()
-                    .data_type()
-                    .clone(),
-            )) as Arc<dyn DFAggregateExpr>);
+            aggs.push((col(&cname, &self.schema).unwrap(), Agg::Avg(0, 0)));
+
             let cname = format!("step{}_avg_time_to_convert", i);
-            aggs.push(Arc::new(Sum::new(
-                col(&cname, &self.schema).unwrap(),
-                cname.clone(),
-                self.schema
-                    .field_with_name(&cname)
-                    .unwrap()
-                    .data_type()
-                    .clone(),
-            )) as Arc<dyn DFAggregateExpr>);
+            aggs.push((col(&cname, &self.schema).unwrap(), Agg::Avg(0, 0)));
+
             let cname = format!("step{}_dropped_off", i);
-            aggs.push(Arc::new(Sum::new(
-                col(&cname, &self.schema).unwrap(),
-                cname.clone(),
-                self.schema
-                    .field_with_name(&cname)
-                    .unwrap()
-                    .data_type()
-                    .clone(),
-            )) as Arc<dyn DFAggregateExpr>);
+            aggs.push((col(&cname, &self.schema).unwrap(), Agg::Sum(0)));
+
             let cname = format!("step{}_drop_off_ratio", i);
-            aggs.push(Arc::new(Sum::new(
-                col(&cname, &self.schema).unwrap(),
-                cname.clone(),
-                self.schema
-                    .field_with_name(&cname)
-                    .unwrap()
-                    .data_type()
-                    .clone(),
-            )) as Arc<dyn DFAggregateExpr>);
+            aggs.push((col(&cname, &self.schema).unwrap(), Agg::Avg(0, 0)));
+
             let cname = format!("step{}_time_to_convert", i);
-            aggs.push(Arc::new(Sum::new(
-                col(&cname, &self.schema).unwrap(),
-                cname.clone(),
-                self.schema
-                    .field_with_name(&cname)
-                    .unwrap()
-                    .data_type()
-                    .clone(),
-            )) as Arc<dyn DFAggregateExpr>);
+            aggs.push((col(&cname, &self.schema).unwrap(), Agg::Sum(0)));
             let cname = format!("step{}_time_to_convert_from_start", i);
-            aggs.push(Arc::new(Sum::new(
-                col(&cname, &self.schema).unwrap(),
-                cname.clone(),
-                self.schema
-                    .field_with_name(&cname)
-                    .unwrap()
-                    .data_type()
-                    .clone(),
-            )) as Arc<dyn DFAggregateExpr>);
+            aggs.push((col(&cname, &self.schema).unwrap(), Agg::Sum(0)));
         }
-        let session_ctx = SessionContext::new();
-        let task_ctx = session_ctx.task_ctx();
-        let group_by = PhysicalGroupBy::new_single(groups);
-        let input = Arc::new(MemoryExec::try_new(
-            &[self.final_batches.borrow().clone()],
-            self.schema.clone(),
-            None,
-        )?);
-        let partial_aggregate = Arc::new(DFAggregateExec::try_new(
-            AggregateMode::Final,
-            group_by,
-            aggs,
-            vec![None],
-            vec![None],
-            input,
-            self.schema.clone(),
-        )?);
-
-        let mut stream = partial_aggregate.execute(0, task_ctx)?;
-        let mut out_batches = vec![];
-
-        loop {
-            match stream.poll_next_unpin(cx) {
-                Poll::Ready(Some(Ok(batch))) => out_batches.push(batch),
-                Poll::Pending => {}
-                Poll::Ready(None) => break,
-                other => return other,
-            }
-        }
-
-        // todo return multiple batches
-        let result = concat_batches(&out_batches[0].schema(), &out_batches)?;
-        let cols = result
-            .columns()
+        let groups = self
+            .schema
+            .fields()
             .iter()
-            .zip(self.schema.fields.iter())
-            .map(|(arr, f)| {
-                if f.name().contains("avg") || f.name().contains("ratio") {
-                    cast(arr, &DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE))
-                        .map_err(|err| DataFusionError::ArrowError(err))
-                } else {
-                    Ok(arr.clone())
-                }
+            .take(self.groups + 2) // segment+ts
+            .map(|f| {
+                (
+                    col(f.name(), &self.schema).unwrap(),
+                    SortField::new(f.data_type().to_owned()),
+                )
             })
-            .collect::<DFResult<Vec<_>>>()?;
-        let result = RecordBatch::try_new(self.schema.clone(), cols)?;
+            .collect::<Vec<_>>();
+
+        let final_batch = concat_batches(&self.schema, &self.final_batches.borrow().to_vec())?;
+        let agg_arrs = aggregate(&final_batch, groups, aggs)
+            .map_err(QueryError::into_datafusion_execution_error)?;
+        let result = RecordBatch::try_new(self.schema.clone(), agg_arrs)?;
+
         self.finished = true;
         Poll::Ready(Some(Ok(result)))
     }
@@ -747,17 +870,18 @@ mod tests {
     #[tokio::test]
     async fn test_final() {
         let p1 = r#"
-|segment(i64)  | device(utf8)  | ts(ts)                  | total(i64) | completed(i64) | step0_total(i64) | step0_time_to_convert(decimal) | step0_time_to_convert_from_start(decimal) | step1_total(i64) | step1_time_to_convert(decimal) | step1_time_to_convert_from_start(decimal) |
-|--------------|---------------|-------------------------|------------|----------------|------------------|--------------------------------|-------------------------------------------|------------------|--------------------------------|-------------------------------------------|
-|1             | iphone        | 1                       | 1          | 1              | 1                | 1                              | 1                                         | 1                | 1                              |      1                                    |
-|1             | android       | 1                       | 1          | 1              | 1                | 1                              | 1                                         | 1                | 1                              |      1                                    |
+| segment(i64) | device(utf8) | ts(ts) | step0_total(i64) | step0_completed(i64) | step0_conversion_ratio(decimal) | step0_avg_time_to_convert(decimal) | step0_dropped_off(i64) | step0_drop_off_ratio(decimal) | step0_time_to_convert(i64) | step0_time_to_convert_from_start(decimal) | step1_total(i64) | step1_completed(i64) | step1_conversion_ratio(decimal) | step1_avg_time_to_convert(decimal) | step1_dropped_off(i64) | step1_drop_off_ratio(decimal) | step1_time_to_convert(i64) | step1_time_to_convert_from_start(decimal) |
+|--------------|--------------|--------|------------------|----------------------|---------------------------------|------------------------------------|------------------------|-------------------------------|----------------------------|-------------------------------------------|------------------|----------------------|---------------------------------|------------------------------------|------------------------|-------------------------------|----------------------------|-------------------------------------------|
+| 1            | iphone       | 1      | 2                | 2                    | 2                               | 2                                  | 2                      | 2                             | 2                          | 2                                         | 2                | 2                    | 2                               | 2                                  | 2                      | 2                             | 2                          | 2                                         |
+| 1            | android      | 1      | 2                | 2                    | 2                               | 2                                  | 2                      | 2                             | 2                          | 2                                         | 2                | 2                    | 2                               | 2                                  | 2                      | 2                             | 2                          | 2                                         |
+| 1            | android      | 1      | 1                | 1                    | 1                               | 1                                  | 1                      | 1                             | 1                          | 1                                         | 1                | 1                    | 1                               | 1                                  | 1                      | 1                             | 1                          | 1                                         |
 "#;
 
         let p2 = r#"
-|segment(i64)   | device(utf8)  | ts(ts)                  | total(i64) | completed(i64) | step0_total(i64) | step0_time_to_convert(decimal) | step0_time_to_convert_from_start(decimal) | step1_total(i64) | step1_time_to_convert(decimal) | step1_time_to_convert_from_start(decimal) |
-|---------------|---------------|-------------------------|------------|----------------|------------------|--------------------------------|-------------------------------------------|------------------|--------------------------------|-------------------------------------------|
-|1              | iphone        | 1                       | 1          | 1              | 1                | 1                              | 1                                         | 1                | 1                              |      1                                    |
-|1              | ios           | 1                       | 1          | 1              | 1                | 1                              | 1                                         | 1                | 1                              |      1                                    |
+| segment(i64) | device(utf8) | ts(ts) | step0_total(i64) | step0_completed(i64) | step0_conversion_ratio(decimal) | step0_avg_time_to_convert(decimal) | step0_dropped_off(i64) | step0_drop_off_ratio(decimal) | step0_time_to_convert(i64) | step0_time_to_convert_from_start(decimal) | step1_total(i64) | step1_completed(i64) | step1_conversion_ratio(decimal) | step1_avg_time_to_convert(decimal) | step1_dropped_off(i64) | step1_drop_off_ratio(decimal) | step1_time_to_convert(i64) | step1_time_to_convert_from_start(decimal) |
+|--------------|--------------|--------|------------------|----------------------|---------------------------------|------------------------------------|------------------------|-------------------------------|----------------------------|-------------------------------------------|------------------|----------------------|---------------------------------|------------------------------------|------------------------|-------------------------------|----------------------------|-------------------------------------------|
+| 1            | iphone       | 1      | 1                | 1                    | 1                               | 1                                  | 1                      | 1                             | 1                          | 1                                         | 1                | 1                    | 1                               | 1                                  | 1                      | 1                             | 1                          | 1                                         |
+| 1            | android      | 1      | 1                | 1                    | 1                               | 1                                  | 1                      | 1                             | 1                          | 1                                         | 1                | 1                    | 1                               | 1                                  | 1                      | 1                             | 1                          | 1                                         |
 "#;
         let res1 = parse_markdown_tables(p1).unwrap();
         let schema = res1[0].schema();

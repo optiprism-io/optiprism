@@ -776,7 +776,7 @@ impl Funnel {
                 for (step_id, step) in bucket.steps.iter().enumerate() {
                     step_total[step_id].append_value(step.count);
                     step_completed[step_id].append_value(step.completed);
-                    let mut v = Decimal::from_f64(if step.count > 0 {
+                    let mut v = Decimal::from_f64(if step.completed > 0 {
                         step.completed as f64 / step.count as f64 * 100.
                     } else {
                         0.
@@ -795,12 +795,13 @@ impl Funnel {
                     a.rescale(DECIMAL_SCALE as u32);
                     step_avg_time_to_convert[step_id].append_value(a.mantissa());
                     step_dropped_off[step_id].append_value(step.count - step.completed);
-                    let mut v = Decimal::from_f64(if step.count > 0 {
-                        (step.count - step.completed) as f64 / step.count as f64 * 100.
-                    } else {
-                        0.
-                    })
-                    .unwrap();
+                    let mut v =
+                        Decimal::from_f64(if step.count > 0 && step.count - step.completed > 0 {
+                            step.count as f64 / (step.count - step.completed) as f64 * 100.
+                        } else {
+                            0.
+                        })
+                        .unwrap();
                     v.rescale(DECIMAL_SCALE as u32);
                     step_drop_off_ratio[step_id].append_value(v.mantissa());
                     step_time_to_convert[step_id].append_value(step.total_time_to_convert);
@@ -1672,6 +1673,10 @@ asd
 | 1      | 2020-04-12 22:10:57      | 1      | 1      |
 | 1      | 2020-04-12 22:11:57      | 2      | 1      |
 | 1      | 2020-04-12 22:12:57      | 3      | 1      |
+| 1      | 2020-04-12 22:10:57      | 1      | 1      |
+| 1      | 2020-04-12 22:11:57      | 2      | 1      |
+| 1      | 2020-04-12 22:12:57      | 1      | 1      |
+| 1      | 2020-04-12 22:12:57      | 2      | 1      |
 | 1      | 2020-04-12 22:13:57      | 1      | 1      |
 | 1      | 2020-04-12 22:14:57      | 2      | 1      |
 | 1      | 2020-04-12 22:15:57      | 3      | 1      |
@@ -1724,7 +1729,7 @@ asd
             // exclude: None,
             constants: None,
             // constants: Some(vec![Column::new_with_schema("c", &schema).unwrap()]),
-            count: Unique,
+            count: NonUnique,
             filter: None,
             touch: Touch::First,
             partition_col: Arc::new(Column::new_with_schema("u", &schema).unwrap()),

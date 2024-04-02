@@ -53,6 +53,7 @@ use crate::error::Result;
 use crate::physical_plan::expressions::check_filter;
 use crate::physical_plan::expressions::segmentation::aggregate::AggregateFunction;
 
+pub mod aggregate;
 pub mod count;
 pub mod partitioned;
 
