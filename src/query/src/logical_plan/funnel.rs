@@ -75,11 +75,6 @@ impl Funnel {
                         true,
                     ),
                     DFField::new_unqualified(
-                        format!("step{}_completed", step_id).as_str(),
-                        DataType::Int64,
-                        true,
-                    ),
-                    DFField::new_unqualified(
                         format!("step{}_conversion_ratio", step_id).as_str(),
                         DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
                         true,

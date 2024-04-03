@@ -15,6 +15,7 @@ use arrow::compute::cast;
 use arrow::datatypes::DataType;
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
+use arrow::util::pretty::print_batches;
 use common::query::event_segmentation::EventSegmentation;
 use common::query::event_segmentation::Query;
 use common::query::funnel::Funnel;
@@ -251,7 +252,7 @@ impl QueryProvider {
         let result = self.execute(session_ctx, state, plan).await?;
         let duration = start.elapsed();
         debug!("elapsed: {:?}", duration);
-
+        print_batches(&[result.clone()]).unwrap();
         let mut group_cols: Vec<StringArray> = vec![];
         let mut ts_col = {
             let idx = result.schema().index_of("ts").unwrap();
@@ -280,6 +281,7 @@ impl QueryProvider {
                 group_cols.push(col);
             }
         }
+        group_cols.dedup();
 
         let mut int_val_cols = vec![];
         let mut dec_val_cols = vec![];
@@ -305,7 +307,7 @@ impl QueryProvider {
 
         let mut steps = vec![];
         for step_id in 0..req.steps.len() {
-            let name = schema.fields()[group_cols.len() + 1 + step_id * 8]
+            let name = schema.fields()[group_cols.len() + 1 + step_id * 7]
                 .name()
                 .to_string();
             let mut step = funnel::Step {
@@ -326,8 +328,7 @@ impl QueryProvider {
                 let step_data = funnel::StepData {
                     groups,
                     ts: ts_col.value(idx),
-                    total: int_val_cols[step_id * 5].value(idx) as i64,
-                    completed: int_val_cols[step_id * 5 + 1].value(idx) as i64,
+                    total: int_val_cols[step_id * 4].value(idx) as i64,
                     conversion_ratio: Decimal::from_i128_with_scale(
                         dec_val_cols[step_id * 3].value(idx) as i128,
                         DECIMAL_SCALE as u32,
@@ -336,13 +337,13 @@ impl QueryProvider {
                         dec_val_cols[step_id * 3 + 1].value(idx) as i128,
                         DECIMAL_SCALE as u32,
                     ),
-                    dropped_off: int_val_cols[step_id * 5 + 2].value(idx) as i64,
+                    dropped_off: int_val_cols[step_id * 4 + 1].value(idx) as i64,
                     drop_off_ratio: Decimal::from_i128_with_scale(
-                        int_val_cols[step_id * 5 + 2].value(idx) as i128,
+                        dec_val_cols[step_id * 3 + 2].value(idx) as i128,
                         DECIMAL_SCALE as u32,
                     ),
-                    time_to_convert: int_val_cols[step_id * 5 + 3].value(idx) as i64,
-                    time_to_convert_from_start: int_val_cols[step_id * 5 + 4].value(idx) as i64,
+                    time_to_convert: int_val_cols[step_id * 4 + 2].value(idx) as i64,
+                    time_to_convert_from_start: int_val_cols[step_id * 4 + 3].value(idx) as i64,
                 };
                 step.data.push(step_data);
             }

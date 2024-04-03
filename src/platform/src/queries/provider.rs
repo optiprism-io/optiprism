@@ -128,7 +128,6 @@ impl Queries {
                         groups: data.groups.clone(),
                         ts: data.ts.clone(),
                         total: data.total.clone(),
-                        completed: data.completed.clone(),
                         conversion_ratio: data.conversion_ratio.clone(),
                         avg_time_to_convert: data.avg_time_to_convert.clone(),
                         dropped_off: data.dropped_off.clone(),

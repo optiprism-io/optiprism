@@ -77,17 +77,14 @@ struct Row {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 struct StepResult {
-    count: i64,
-    completed: i64,
+    total: i64,
+    dropped_off: i64,
     total_time_to_convert: i64,
     total_time_to_convert_from_start: i64,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 struct BucketResult {
-    total_funnels: i64,
-    completed_funnels: i64,
-    time_to_convert: i64,
     steps: Vec<StepResult>,
     ts: i64,
 }
@@ -114,13 +111,10 @@ impl Group {
             .iter()
             .map(|ts| {
                 let b = BucketResult {
-                    total_funnels: 0,
-                    completed_funnels: 0,
-                    time_to_convert: 0,
                     steps: (0..steps_len)
                         .map(|_| StepResult {
-                            count: 0,
-                            completed: 0,
+                            total: 0,
+                            dropped_off: 0,
                             total_time_to_convert: 0,
                             total_time_to_convert_from_start: 0,
                         })
@@ -228,23 +222,18 @@ impl Group {
 
         // increment counters in bucket. Assume that bucket exist
         self.buckets.entry(k).and_modify(|b| {
-            b.total_funnels += 1;
-            if is_completed {
-                b.completed_funnels += 1;
-                b.time_to_convert += self.steps[self.steps_completed - 1].ts - self.steps[0].ts
+            for idx in 0..self.steps_completed {
+                b.steps[idx].total += 1;
+                if idx > 0 {
+                    b.steps[idx].total_time_to_convert +=
+                        self.steps[idx].ts - self.steps[idx - 1].ts;
+                    b.steps[idx].total_time_to_convert_from_start +=
+                        self.steps[idx].ts - self.steps[0].ts;
+                }
             }
 
-            for idx in 0..self.steps.len() {
-                b.steps[idx].count += 1;
-                if idx < self.steps_completed {
-                    b.steps[idx].completed += 1;
-                    if idx > 0 {
-                        b.steps[idx].total_time_to_convert +=
-                            self.steps[idx].ts - self.steps[idx - 1].ts;
-                        b.steps[idx].total_time_to_convert_from_start +=
-                            self.steps[idx].ts - self.steps[0].ts;
-                    }
-                }
+            for idx in 1..self.steps.len() {
+                b.steps[idx].dropped_off = b.steps[idx - 1].total - b.steps[idx].total;
             }
         });
 
@@ -432,7 +421,6 @@ impl Funnel {
             .flat_map(|step_id| {
                 let fields = vec![
                     Field::new(format!("step{}_total", step_id), DataType::Int64, true),
-                    Field::new(format!("step{}_completed", step_id), DataType::Int64, true),
                     Field::new(
                         format!("step{}_conversion_ratio", step_id),
                         DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
@@ -749,9 +737,6 @@ impl Funnel {
             let mut step_total = (0..steps)
                 .map(|_| Int64Builder::with_capacity(arr_len))
                 .collect::<Vec<_>>();
-            let mut step_completed = (0..steps)
-                .map(|_| Int64Builder::with_capacity(arr_len))
-                .collect::<Vec<_>>();
             let mut step_conversion_ratio = (0..steps)
                 .map(|_| Decimal128Builder::with_capacity(arr_len))
                 .collect::<Vec<_>>();
@@ -774,19 +759,21 @@ impl Funnel {
             // iterate over buckets and fill values to builders
             for (ts, bucket) in buckets {
                 for (step_id, step) in bucket.steps.iter().enumerate() {
-                    step_total[step_id].append_value(step.count);
-                    step_completed[step_id].append_value(step.completed);
-                    let mut v = Decimal::from_f64(if step.completed > 0 {
-                        step.completed as f64 / step.count as f64 * 100.
+                    let completed = step.total - step.dropped_off;
+                    dbg!(completed);
+                    step_total[step_id].append_value(step.total);
+                    let mut v = Decimal::from_f64(if completed > 0 {
+                        completed as f64 / step.total as f64 * 100.
                     } else {
                         0.
                     })
                     .unwrap();
+                    dbg!(&v);
                     v.rescale(DECIMAL_SCALE as u32);
                     step_conversion_ratio[step_id].append_value(v.mantissa());
 
-                    let v = if step.completed > 0 {
-                        step.total_time_to_convert as f64 / step.completed as f64
+                    let v = if completed > 0 {
+                        step.total_time_to_convert as f64 / completed as f64
                     } else {
                         0.
                     };
@@ -794,14 +781,13 @@ impl Funnel {
                     let mut a = Decimal::from_f64(v).unwrap();
                     a.rescale(DECIMAL_SCALE as u32);
                     step_avg_time_to_convert[step_id].append_value(a.mantissa());
-                    step_dropped_off[step_id].append_value(step.count - step.completed);
-                    let mut v =
-                        Decimal::from_f64(if step.count > 0 && step.count - step.completed > 0 {
-                            step.count as f64 / (step.count - step.completed) as f64 * 100.
-                        } else {
-                            0.
-                        })
-                        .unwrap();
+                    step_dropped_off[step_id].append_value(step.dropped_off);
+                    let mut v = Decimal::from_f64(if step.total > 0 && step.dropped_off > 0 {
+                        step.dropped_off as f64 / step.total as f64 * 100.
+                    } else {
+                        0.
+                    })
+                    .unwrap();
                     v.rescale(DECIMAL_SCALE as u32);
                     step_drop_off_ratio[step_id].append_value(v.mantissa());
                     step_time_to_convert[step_id].append_value(step.total_time_to_convert);
@@ -828,7 +814,6 @@ impl Funnel {
                 .flat_map(|idx| {
                     let arrs = vec![
                         Arc::new(step_total[idx].finish()) as ArrayRef,
-                        Arc::new(step_completed[idx].finish()) as ArrayRef,
                         Arc::new(
                             step_conversion_ratio[idx]
                                 .finish()
@@ -1675,11 +1660,10 @@ asd
 | 1      | 2020-04-12 22:12:57      | 3      | 1      |
 | 1      | 2020-04-12 22:10:57      | 1      | 1      |
 | 1      | 2020-04-12 22:11:57      | 2      | 1      |
-| 1      | 2020-04-12 22:12:57      | 1      | 1      |
-| 1      | 2020-04-12 22:12:57      | 2      | 1      |
-| 1      | 2020-04-12 22:13:57      | 1      | 1      |
-| 1      | 2020-04-12 22:14:57      | 2      | 1      |
-| 1      | 2020-04-12 22:15:57      | 3      | 1      |
+| 1      | 2020-04-12 22:12:57      | 3      | 1      |
+| 1      | 2020-04-12 22:10:57      | 1      | 1      |
+| 1      | 2020-04-12 22:11:57      | 2      | 1      |
+
 "#;
         let res = parse_markdown_tables(data).unwrap();
         let schema = res[0].schema();
@@ -1720,12 +1704,9 @@ asd
             to: DateTime::parse_from_str("2020-04-12 22:21:57 +0000", "%Y-%m-%d %H:%M:%S %z")
                 .unwrap()
                 .with_timezone(&Utc),
-            window: Duration::milliseconds(200),
+            window: Duration::seconds(200),
             steps: vec![e1, e2, e3],
-            exclude: Some(vec![ExcludeExpr {
-                expr: ex,
-                steps: None,
-            }]),
+            exclude: None,
             // exclude: None,
             constants: None,
             // constants: Some(vec![Column::new_with_schema("c", &schema).unwrap()]),

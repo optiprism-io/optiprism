@@ -540,7 +540,6 @@ pub struct FunnelStepData {
     pub groups: Option<Vec<String>>,
     pub ts: i64,
     pub total: i64,
-    pub completed: i64,
     pub conversion_ratio: Decimal,
     pub avg_time_to_convert: Decimal,
     pub dropped_off: i64,

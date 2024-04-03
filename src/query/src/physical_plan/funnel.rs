@@ -110,7 +110,6 @@ fn aggregate(
     mut groups: Vec<(PhysicalExprRef, SortField)>,
     aggs: Vec<(PhysicalExprRef, Agg)>,
 ) -> Result<Vec<ArrayRef>> {
-    print_batches(&[batch.clone()]).unwrap();
     let is_groups = !groups.is_empty();
     let groups = groups
         .iter()
@@ -688,9 +687,6 @@ impl Stream for FinalFunnelStream {
             let cname = format!("step{}_total", i);
             aggs.push((col(&cname, &self.schema).unwrap(), Agg::Sum(0)));
 
-            let cname = format!("step{}_completed", i);
-            aggs.push((col(&cname, &self.schema).unwrap(), Agg::Sum(0)));
-
             let cname = format!("step{}_conversion_ratio", i);
             aggs.push((col(&cname, &self.schema).unwrap(), Agg::Avg(0, 0)));
 
@@ -722,6 +718,7 @@ impl Stream for FinalFunnelStream {
             .collect::<Vec<_>>();
 
         let final_batch = concat_batches(&self.schema, &self.final_batches.borrow().to_vec())?;
+        print_batches(&[final_batch.clone()]).unwrap();
         let agg_arrs = aggregate(&final_batch, groups, aggs)
             .map_err(QueryError::into_datafusion_execution_error)?;
         let result = RecordBatch::try_new(self.schema.clone(), agg_arrs)?;
@@ -870,18 +867,18 @@ mod tests {
     #[tokio::test]
     async fn test_final() {
         let p1 = r#"
-| segment(i64) | device(utf8) | ts(ts) | step0_total(i64) | step0_completed(i64) | step0_conversion_ratio(decimal) | step0_avg_time_to_convert(decimal) | step0_dropped_off(i64) | step0_drop_off_ratio(decimal) | step0_time_to_convert(i64) | step0_time_to_convert_from_start(decimal) | step1_total(i64) | step1_completed(i64) | step1_conversion_ratio(decimal) | step1_avg_time_to_convert(decimal) | step1_dropped_off(i64) | step1_drop_off_ratio(decimal) | step1_time_to_convert(i64) | step1_time_to_convert_from_start(decimal) |
-|--------------|--------------|--------|------------------|----------------------|---------------------------------|------------------------------------|------------------------|-------------------------------|----------------------------|-------------------------------------------|------------------|----------------------|---------------------------------|------------------------------------|------------------------|-------------------------------|----------------------------|-------------------------------------------|
-| 1            | iphone       | 1      | 2                | 2                    | 2                               | 2                                  | 2                      | 2                             | 2                          | 2                                         | 2                | 2                    | 2                               | 2                                  | 2                      | 2                             | 2                          | 2                                         |
-| 1            | android      | 1      | 2                | 2                    | 2                               | 2                                  | 2                      | 2                             | 2                          | 2                                         | 2                | 2                    | 2                               | 2                                  | 2                      | 2                             | 2                          | 2                                         |
-| 1            | android      | 1      | 1                | 1                    | 1                               | 1                                  | 1                      | 1                             | 1                          | 1                                         | 1                | 1                    | 1                               | 1                                  | 1                      | 1                             | 1                          | 1                                         |
+| segment(i64) | device(utf8) | ts(ts) | step0_total(i64) | step0_conversion_ratio(decimal) | step0_avg_time_to_convert(decimal) | step0_dropped_off(i64) | step0_drop_off_ratio(decimal) | step0_time_to_convert(i64) | step0_time_to_convert_from_start(decimal) | step1_total(i64) | step1_conversion_ratio(decimal) | step1_avg_time_to_convert(decimal) | step1_dropped_off(i64) | step1_drop_off_ratio(decimal) | step1_time_to_convert(i64) | step1_time_to_convert_from_start(decimal) |
+|--------------|--------------|--------|------------------|---------------------------------|------------------------------------|------------------------|-------------------------------|----------------------------|-------------------------------------------|------------------|---------------------------------|------------------------------------|------------------------|-------------------------------|----------------------------|-------------------------------------------|
+| 1            | iphone       | 1      | 2                | 2                               | 2                                  | 2                      | 2                             | 2                          | 2                                         | 2                | 2                               | 2                                  | 2                      | 2                             | 2                          | 2                                         |
+| 1            | android      | 1      | 2                | 2                               | 2                                  | 2                      | 2                             | 2                          | 2                                         | 2                | 2                               | 2                                  | 2                      | 2                             | 2                          | 2                                         |
+| 1            | android      | 1      | 1                | 1                               | 1                                  | 1                      | 1                             | 1                          | 1                                         | 1                | 1                               | 1                                  | 1                      | 1                             | 1                          | 1                                         |
 "#;
 
         let p2 = r#"
-| segment(i64) | device(utf8) | ts(ts) | step0_total(i64) | step0_completed(i64) | step0_conversion_ratio(decimal) | step0_avg_time_to_convert(decimal) | step0_dropped_off(i64) | step0_drop_off_ratio(decimal) | step0_time_to_convert(i64) | step0_time_to_convert_from_start(decimal) | step1_total(i64) | step1_completed(i64) | step1_conversion_ratio(decimal) | step1_avg_time_to_convert(decimal) | step1_dropped_off(i64) | step1_drop_off_ratio(decimal) | step1_time_to_convert(i64) | step1_time_to_convert_from_start(decimal) |
-|--------------|--------------|--------|------------------|----------------------|---------------------------------|------------------------------------|------------------------|-------------------------------|----------------------------|-------------------------------------------|------------------|----------------------|---------------------------------|------------------------------------|------------------------|-------------------------------|----------------------------|-------------------------------------------|
-| 1            | iphone       | 1      | 1                | 1                    | 1                               | 1                                  | 1                      | 1                             | 1                          | 1                                         | 1                | 1                    | 1                               | 1                                  | 1                      | 1                             | 1                          | 1                                         |
-| 1            | android      | 1      | 1                | 1                    | 1                               | 1                                  | 1                      | 1                             | 1                          | 1                                         | 1                | 1                    | 1                               | 1                                  | 1                      | 1                             | 1                          | 1                                         |
+| segment(i64) | device(utf8) | ts(ts) | step0_total(i64) | step0_conversion_ratio(decimal) | step0_avg_time_to_convert(decimal) | step0_dropped_off(i64) | step0_drop_off_ratio(decimal) | step0_time_to_convert(i64) | step0_time_to_convert_from_start(decimal) | step1_total(i64) | step1_conversion_ratio(decimal) | step1_avg_time_to_convert(decimal) | step1_dropped_off(i64) | step1_drop_off_ratio(decimal) | step1_time_to_convert(i64) | step1_time_to_convert_from_start(decimal) |
+|--------------|--------------|--------|------------------|---------------------------------|------------------------------------|------------------------|-------------------------------|----------------------------|-------------------------------------------|------------------|---------------------------------|------------------------------------|------------------------|-------------------------------|----------------------------|-------------------------------------------|
+| 1            | iphone       | 1      | 1                | 1                               | 1                                  | 1                      | 1                             | 1                          | 1                                         | 1                | 1                               | 1                                  | 1                      | 1                             | 1                          | 1                                         |
+| 1            | android      | 1      | 1                | 1                               | 1                                  | 1                      | 1                             | 1                          | 1                                         | 1                | 1                               | 1                                  | 1                      | 1                             | 1                          | 1                                         |
 "#;
         let res1 = parse_markdown_tables(p1).unwrap();
         let schema = res1[0].schema();
