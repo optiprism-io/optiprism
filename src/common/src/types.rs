@@ -25,12 +25,12 @@ pub const COLUMN_EVENT_ID: &str = "event_id";
 pub const COLUMN_EVENT: &str = "event";
 pub const COLUMN_SEGMENT: &str = "segment";
 
-pub const EVENT_PROPERTY_A_NAME: &str = "A Name";
-pub const EVENT_PROPERTY_A_HREF: &str = "A Href";
-pub const EVENT_PROPERTY_A_ID: &str = "A ID";
-pub const EVENT_PROPERTY_A_CLASS: &str = "A Class";
-pub const EVENT_PROPERTY_A_STYLE: &str = "A Style";
-
+pub const EVENT_PROPERTY_NAME: &str = "Name";
+pub const EVENT_PROPERTY_HREF: &str = "Href";
+pub const EVENT_PROPERTY_ID: &str = "ID";
+pub const EVENT_PROPERTY_CLASS: &str = "Class";
+pub const EVENT_PROPERTY_TEXT: &str = "Text";
+pub const EVENT_PROPERTY_ELEMENT: &str = "Element";
 pub const EVENT_PROPERTY_PAGE_PATH: &str = "Page Path";
 pub const EVENT_PROPERTY_PAGE_REFERER: &str = "Page Referer";
 pub const EVENT_PROPERTY_PAGE_SEARCH: &str = "Page Search";

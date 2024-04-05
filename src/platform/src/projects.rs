@@ -8,17 +8,18 @@ use common::types::DType;
 use common::types::OptionalProperty;
 use common::types::EVENT_CLICK;
 use common::types::EVENT_PAGE;
-use common::types::EVENT_PROPERTY_A_CLASS;
-use common::types::EVENT_PROPERTY_A_HREF;
-use common::types::EVENT_PROPERTY_A_ID;
-use common::types::EVENT_PROPERTY_A_NAME;
-use common::types::EVENT_PROPERTY_A_STYLE;
+use common::types::EVENT_PROPERTY_CLASS;
+use common::types::EVENT_PROPERTY_ELEMENT;
+use common::types::EVENT_PROPERTY_HREF;
+use common::types::EVENT_PROPERTY_ID;
+use common::types::EVENT_PROPERTY_NAME;
 use common::types::EVENT_PROPERTY_PAGE_PATH;
 use common::types::EVENT_PROPERTY_PAGE_REFERER;
 use common::types::EVENT_PROPERTY_PAGE_SEARCH;
 use common::types::EVENT_PROPERTY_PAGE_TITLE;
 use common::types::EVENT_PROPERTY_PAGE_URL;
 use common::types::EVENT_PROPERTY_SESSION_LENGTH;
+use common::types::EVENT_PROPERTY_TEXT;
 use common::types::EVENT_SCREEN;
 use common::types::EVENT_SESSION_BEGIN;
 use common::types::EVENT_SESSION_END;
@@ -137,21 +138,23 @@ pub struct Project {
     pub created_by: u64,
     pub updated_by: Option<u64>,
     pub tags: Option<Vec<String>>,
+    pub sdk_token: String,
     pub name: String,
     pub description: Option<String>,
     pub session_duration_seconds: u64,
     pub events_count: usize,
 }
 
-impl From<metadata::projects::Project> for crate::projects::Project {
+impl From<metadata::projects::Project> for Project {
     fn from(value: metadata::projects::Project) -> Self {
-        crate::projects::Project {
+        Project {
             id: value.id,
             created_at: value.created_at,
             updated_at: value.updated_at,
             created_by: value.created_by,
             updated_by: value.updated_by,
             tags: value.tags,
+            sdk_token: value.token,
             name: value.name,
             description: value.description,
             session_duration_seconds: value.session_duration_seconds,
@@ -218,11 +221,12 @@ pub fn init_project(project_id: u64, md: &Arc<MetadataProvider>) -> error::Resul
     }
 
     let event_str_props = vec![
-        EVENT_PROPERTY_A_NAME,
-        EVENT_PROPERTY_A_HREF,
-        EVENT_PROPERTY_A_ID,
-        EVENT_PROPERTY_A_CLASS,
-        EVENT_PROPERTY_A_STYLE,
+        EVENT_PROPERTY_NAME,
+        EVENT_PROPERTY_HREF,
+        EVENT_PROPERTY_ID,
+        EVENT_PROPERTY_CLASS,
+        EVENT_PROPERTY_TEXT,
+        EVENT_PROPERTY_ELEMENT,
         EVENT_PROPERTY_PAGE_PATH,
         EVENT_PROPERTY_PAGE_REFERER,
         EVENT_PROPERTY_PAGE_SEARCH,

@@ -43,54 +43,6 @@ async fn track(
 }
 
 #[debug_handler]
-async fn click(
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    Extension(app): Extension<App>,
-    Path(token): Path<String>,
-    Json(request): Json<TrackRequest>,
-) -> Result<StatusCode> {
-    let ctx = RequestContext {
-        project_id: None,
-        client_ip: addr.ip(),
-        token,
-    };
-    app.click(&ctx, request)?;
-    Ok(StatusCode::CREATED)
-}
-
-#[debug_handler]
-async fn page(
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    Extension(app): Extension<App>,
-    Path(token): Path<String>,
-    Json(request): Json<TrackRequest>,
-) -> Result<StatusCode> {
-    let ctx = RequestContext {
-        project_id: None,
-        client_ip: addr.ip(),
-        token,
-    };
-    app.page(&ctx, request)?;
-    Ok(StatusCode::CREATED)
-}
-
-#[debug_handler]
-async fn screen(
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    Extension(app): Extension<App>,
-    Path(token): Path<String>,
-    Json(request): Json<TrackRequest>,
-) -> Result<StatusCode> {
-    let ctx = RequestContext {
-        project_id: None,
-        client_ip: addr.ip(),
-        token,
-    };
-    app.screen(&ctx, request)?;
-    Ok(StatusCode::CREATED)
-}
-
-#[debug_handler]
 async fn identify(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Extension(app): Extension<App>,
@@ -158,21 +110,6 @@ impl App {
         self.track.lock().unwrap().execute(ctx, track)
     }
 
-    pub fn click(&self, ctx: &RequestContext, mut req: TrackRequest) -> Result<()> {
-        req.event = Some(EVENT_CLICK.to_string());
-        self.track(ctx, req)
-    }
-
-    pub fn page(&self, ctx: &RequestContext, mut req: TrackRequest) -> Result<()> {
-        req.event = Some(EVENT_PAGE.to_string());
-        self.track(ctx, req)
-    }
-
-    pub fn screen(&self, ctx: &RequestContext, mut req: TrackRequest) -> Result<()> {
-        req.event = Some(EVENT_SCREEN.to_string());
-        self.track(ctx, req)
-    }
-
     pub fn identify(&self, ctx: &RequestContext, req: IdentifyRequest) -> Result<()> {
         let context = Context {
             library: req.context.library.map(|lib| crate::Library {
@@ -228,9 +165,6 @@ pub fn attach_routes(
 
     router
         .route("/v1/ingest/:token/track", routing::post(track))
-        .route("/v1/ingest/:token/click", routing::post(click))
-        .route("/v1/ingest/:token/page", routing::post(page))
-        .route("/v1/ingest/:token/screen", routing::post(screen))
         .route("/v1/ingest/:token/identify", routing::post(identify))
         .layer(ServiceBuilder::new().layer(Extension(cors)))
         .layer(Extension(app))

@@ -99,7 +99,10 @@ pub async fn start(cfg: Config) -> Result<()> {
     if just_initialized {
         info!("email: admin@admin.com, password: admin, (DON'T FORGET TO CHANGE)");
     }
-    Ok(axum::serve(TcpListener::bind(&cfg.host).await?, router)
-        .with_graceful_shutdown(signal)
-        .await?)
+    let listener = tokio::net::TcpListener::bind(cfg.host).await?;
+    Ok(axum::serve(
+        listener,
+        router.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await?)
 }
