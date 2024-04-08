@@ -120,8 +120,10 @@ async fn track(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Extension(app): Extension<App>,
     Path(token): Path<String>,
-    common::http::Json(request): common::http::Json<TrackRequest>,
+    body: String,
+    // common::http::Json(request): common::http::Json<TrackRequest>,
 ) -> Result<StatusCode> {
+    let request: TrackRequest = serde_json::from_str(&body)?;
     let ctx = RequestContext {
         project_id: None,
         client_ip: addr.ip(),

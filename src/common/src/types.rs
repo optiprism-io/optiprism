@@ -13,7 +13,7 @@ use crate::error::CommonError;
 pub const DECIMAL_PRECISION: u8 = 28;
 pub const DECIMAL_SCALE: i8 = 16;
 pub const DECIMAL_MULTIPLIER: i128 = 10i128.pow(DECIMAL_SCALE as u32);
-pub const TIME_UNIT: TimeUnit = TimeUnit::Nanosecond;
+pub const TIME_UNIT: TimeUnit = TimeUnit::Millisecond;
 
 pub const TABLE_EVENTS: &str = "events";
 pub const TABLE_USERS: &str = "users";
@@ -192,7 +192,9 @@ impl TryFrom<DType> for DataType2 {
                 DataType2::Decimal(DECIMAL_PRECISION as usize, DECIMAL_SCALE as usize)
             }
             DType::Boolean => DataType2::Boolean,
-            DType::Timestamp => DataType2::Timestamp(arrow2::datatypes::TimeUnit::Nanosecond, None),
+            DType::Timestamp => {
+                DataType2::Timestamp(arrow2::datatypes::TimeUnit::Millisecond, None)
+            }
             DType::List(dt) => match dt.as_ref() {
                 DType::String => DataType2::Utf8,
                 DType::Int8 => DataType2::Int8,
@@ -204,7 +206,7 @@ impl TryFrom<DType> for DataType2 {
                 }
                 DType::Boolean => DataType2::Boolean,
                 DType::Timestamp => {
-                    DataType2::Timestamp(arrow2::datatypes::TimeUnit::Nanosecond, None)
+                    DataType2::Timestamp(arrow2::datatypes::TimeUnit::Millisecond, None)
                 }
                 _ => return Err(CommonError::General("Unsupported type4".to_string())),
             },

@@ -52,7 +52,6 @@ use common::types::USER_PROPERTY_OS_VERSION_MAJOR;
 use common::types::USER_PROPERTY_OS_VERSION_MINOR;
 use common::types::USER_PROPERTY_OS_VERSION_PATCH;
 use common::types::USER_PROPERTY_OS_VERSION_PATCH_MINOR;
-use datafusion::execution::context::DataFilePaths;
 use ingester::error::IngesterError;
 use ingester::executor::Executor;
 use ingester::transformers::geo;
@@ -197,8 +196,9 @@ pub fn init_system(
         name: COLUMN_EVENT.to_string(),
         display_name: Some("Event".to_string()),
         typ: Type::System,
-        data_type: DType::String,
+        data_type: DType::Int64,
         nullable: false,
+        dict: None,
         hidden: true,
         dict: Some(DictionaryType::Int64),
     })?;
