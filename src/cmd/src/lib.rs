@@ -200,7 +200,6 @@ pub fn init_system(
         nullable: false,
         dict: None,
         hidden: true,
-        dict: Some(DictionaryType::Int64),
     })?;
 
     Ok(())

@@ -3,6 +3,7 @@ use std::net::IpAddr;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::time::Instant;
 
 use axum::extract::ConnectInfo;
 use axum::extract::Path;
@@ -18,6 +19,8 @@ use common::http::print_request_response;
 use common::types::EVENT_CLICK;
 use common::types::EVENT_PAGE;
 use common::types::EVENT_SCREEN;
+use metrics::counter;
+use metrics::histogram;
 use rust_decimal::Decimal;
 use serde::Deserialize;
 use tower::ServiceBuilder;
@@ -28,8 +31,6 @@ use tower_http::trace::TraceLayer;
 use crate::error::Result;
 use crate::executor::Executor;
 use crate::RequestContext;
-
-pub mod service;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -123,6 +124,7 @@ async fn track(
     body: String,
     // common::http::Json(request): common::http::Json<TrackRequest>,
 ) -> Result<StatusCode> {
+    let init_time = Instant::now();
     let request: TrackRequest = serde_json::from_str(&body)?;
     let ctx = RequestContext {
         project_id: None,
@@ -130,6 +132,10 @@ async fn track(
         token,
     };
     app.track(&ctx, request)?;
+
+    counter!("ingester.tracked_total").increment(1);
+    histogram!("ingester.track_time_seconds").record(init_time.elapsed());
+
     Ok(StatusCode::CREATED)
 }
 
