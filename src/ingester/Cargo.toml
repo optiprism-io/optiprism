@@ -30,7 +30,7 @@ axum = { version = "0.7.4" }
 axum-macros = "0.4.1"
 tower = "0.4.13"
 tower-cookies = { version = "0.10.0", features = ["axum-core"] }
-tower-http = { version = "0.5.1", features = ["fs", "trace","cors"] }
+tower-http = { version = "0.5.1", features = ["fs", "trace", "cors"] }
 log = "0.4.20"
 common = { path = "../common" }
 storage = { path = "../storage" }
@@ -39,3 +39,5 @@ clap = { version = "4.5.0", features = ["derive"] }
 service = { path = "../service" }
 anyhow = "1.0.75"
 hyper = "0.14.27"
+metrics-util = "0.16.0"
+metrics = "0.22.0"
