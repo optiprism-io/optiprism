@@ -1406,7 +1406,7 @@ pub(crate) fn fix_types(
                                                 if let ScalarValue::Decimal128(Some(ts), _, _) =
                                                     value
                                                 {
-                                                    let sv = ScalarValue::TimestampNanosecond(
+                                                    let sv = ScalarValue::TimestampMillisecond(
                                                         Some(*ts as i64),
                                                         None,
                                                     );

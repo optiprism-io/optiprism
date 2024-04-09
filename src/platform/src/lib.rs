@@ -33,6 +33,7 @@ use arrow::array::Int32Array;
 use arrow::array::Int64Array;
 use arrow::array::Int8Array;
 use arrow::array::StringArray;
+use arrow::array::TimestampMillisecondArray;
 use arrow::array::TimestampNanosecondArray;
 use arrow::array::UInt16Array;
 use arrow::array::UInt32Array;
@@ -163,8 +164,8 @@ pub fn array_ref_to_json_values(arr: &ArrayRef) -> Result<Vec<Value>> {
         arrow::datatypes::DataType::Float64 => int_arr_to_json_values!(arr, Float64Array),
         arrow::datatypes::DataType::Boolean => arr_to_json_values!(arr, BooleanArray),
         arrow::datatypes::DataType::Utf8 => arr_to_json_values!(arr, StringArray),
-        arrow::datatypes::DataType::Timestamp(TimeUnit::Nanosecond, _) => {
-            arr_to_json_values!(arr, TimestampNanosecondArray)
+        arrow::datatypes::DataType::Timestamp(TimeUnit::Millisecond, _) => {
+            arr_to_json_values!(arr, TimestampMillisecondArray)
         }
         arrow::datatypes::DataType::Decimal128(_, _s) => {
             let arr = arr.as_any().downcast_ref::<Decimal128Array>().unwrap();

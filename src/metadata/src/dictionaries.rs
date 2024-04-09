@@ -82,8 +82,7 @@ impl Dictionaries {
         let store_key = make_key_key(project_id, dict, key);
         match tx.get(store_key.as_slice())? {
             None => Err(MetadataError::NotFound(format!(
-                "dictionary value for key {} not found",
-                key
+                "project {project_id}, dict {dict}, value for key {key} not found"
             ))),
             Some(value) => Ok(String::from_utf8(value)?),
         }

@@ -24,6 +24,8 @@ pub enum IngesterError {
     Store(#[from] StoreError),
     #[error("maxmind: {0:?}")]
     Maxmind(#[from] MaxMindDBError),
+    #[error("serde: {0:?}")]
+    Serde(#[from] serde_json::Error),
 }
 
 impl IntoResponse for IngesterError {
@@ -40,6 +42,7 @@ impl IntoResponse for IngesterError {
             IngesterError::Maxmind(err) => ApiError::internal(err).into_response(),
             IngesterError::BadRequest(err) => ApiError::bad_request(err).into_response(),
             IngesterError::Store(err) => ApiError::internal(err).into_response(),
+            IngesterError::Serde(err) => ApiError::bad_request(err).into_response(),
         }
     }
 }

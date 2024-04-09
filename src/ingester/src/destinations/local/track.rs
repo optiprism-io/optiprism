@@ -144,7 +144,7 @@ impl Destination<Track> for Local {
             ),
             NamedValue::new(
                 COLUMN_CREATED_AT.to_string(),
-                Value::Timestamp(Some(req.timestamp.timestamp())),
+                Value::Timestamp(Some(req.timestamp.timestamp_millis())),
             ),
             NamedValue::new(
                 COLUMN_EVENT_ID.to_string(),
@@ -177,6 +177,8 @@ impl Destination<Track> for Local {
             let value = property_to_value(ctx, prop, &self.md.dictionaries)?;
             values.push(NamedValue::new(prop.property.column_name(), value));
         }
+
+        dbg!(&values);
         self.db.insert("events", values)?;
         Ok(())
     }

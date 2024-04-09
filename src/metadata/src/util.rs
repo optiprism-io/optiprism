@@ -48,8 +48,6 @@ pub fn create_event(
             user_properties: None,
             custom_properties: None,
         })?;
-    md.dictionaries
-        .get_key_or_create(proj_id, COLUMN_EVENT, name.as_str())?;
 
     Ok(e)
 }

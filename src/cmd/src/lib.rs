@@ -23,11 +23,10 @@ use common::types::COLUMN_PROJECT_ID;
 use common::types::COLUMN_USER_ID;
 use common::types::EVENT_CLICK;
 use common::types::EVENT_PAGE;
-use common::types::EVENT_PROPERTY_A_CLASS;
-use common::types::EVENT_PROPERTY_A_HREF;
-use common::types::EVENT_PROPERTY_A_ID;
-use common::types::EVENT_PROPERTY_A_NAME;
-use common::types::EVENT_PROPERTY_A_STYLE;
+use common::types::EVENT_PROPERTY_CLASS;
+use common::types::EVENT_PROPERTY_HREF;
+use common::types::EVENT_PROPERTY_ID;
+use common::types::EVENT_PROPERTY_NAME;
 use common::types::EVENT_PROPERTY_PAGE_PATH;
 use common::types::EVENT_PROPERTY_PAGE_REFERER;
 use common::types::EVENT_PROPERTY_PAGE_SEARCH;
@@ -53,7 +52,6 @@ use common::types::USER_PROPERTY_OS_VERSION_MAJOR;
 use common::types::USER_PROPERTY_OS_VERSION_MINOR;
 use common::types::USER_PROPERTY_OS_VERSION_PATCH;
 use common::types::USER_PROPERTY_OS_VERSION_PATCH_MINOR;
-use datafusion::execution::context::DataFilePaths;
 use ingester::error::IngesterError;
 use ingester::executor::Executor;
 use ingester::transformers::geo;
@@ -198,8 +196,9 @@ pub fn init_system(
         name: COLUMN_EVENT.to_string(),
         display_name: Some("Event".to_string()),
         typ: Type::System,
-        data_type: DType::String,
+        data_type: DType::Int64,
         nullable: false,
+        dict: None,
         hidden: true,
         dict: Some(DictionaryType::Int64),
     })?;

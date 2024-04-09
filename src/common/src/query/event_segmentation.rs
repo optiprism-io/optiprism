@@ -322,7 +322,7 @@ pub struct EventSegmentation {
 impl EventSegmentation {
     pub fn time_columns(&self, cur_time: DateTime<Utc>) -> Vec<String> {
         let (from, to) = self.time.range(cur_time);
-
+        dbg!(&from, &to);
         time_columns(from, to, &self.interval_unit)
     }
 

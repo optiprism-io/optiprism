@@ -233,9 +233,12 @@ pub async fn start(args: &Store) -> Result<()> {
             _=sig_term.recv()=>info!("SIGTERM received"),
         }
     };
-    Ok(axum::serve(TcpListener::bind(&args.host).await?, router)
-        .with_graceful_shutdown(signal)
-        .await?)
+    let listener = tokio::net::TcpListener::bind(cfg.host).await?;
+    Ok(axum::serve(
+        listener,
+        router.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await?)
 }
 
 pub fn gen<R>(md: Arc<MetadataProvider>, db: Arc<OptiDBImpl>, cfg: Config<R>) -> Result<()>

@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
+use maxminddb::MaxMindDBError;
 use metadata::properties::Properties;
 
+use crate::error::IngesterError;
 use crate::error::Result;
 use crate::transformers::geo::resolve_properties;
 use crate::RequestContext;
@@ -32,16 +34,27 @@ impl Transformer<Track> for Geo {
         } else {
             vec![]
         };
-        user_props = resolve_properties(
+
+        match resolve_properties(
             ctx,
             &req.context,
             user_props,
             &self.user_properties,
             &self.city_rdr,
-        )?;
-        if !user_props.is_empty() {
-            req.resolved_user_properties = Some(user_props);
-        }
+        ) {
+            Ok(user_props) => {
+                if !user_props.is_empty() {
+                    req.resolved_user_properties = Some(user_props);
+                }
+            }
+            Err(e) => match e {
+                IngesterError::Maxmind(e) => match e {
+                    MaxMindDBError::AddressNotFoundError(_) => {}
+                    other => return Err(other.into()),
+                },
+                other => return Err(other),
+            },
+        };
 
         Ok(req)
     }

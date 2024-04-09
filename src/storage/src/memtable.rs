@@ -75,7 +75,7 @@ impl Column {
                     })
                     .collect::<Vec<_>>();
                 MutablePrimitiveArray::<i64>::from(vals)
-                    .to(DataType::Timestamp(TimeUnit::Nanosecond, None))
+                    .to(DataType::Timestamp(TimeUnit::Millisecond, None))
                     .as_box()
             }
             DataType::Utf8 => {

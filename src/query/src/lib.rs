@@ -363,7 +363,7 @@ pub mod test_util {
             Field::new("user_id", DataType::Int64, false),
             Field::new(
                 "created_at",
-                DataType::Timestamp(TimeUnit::Nanosecond, None),
+                DataType::Timestamp(TimeUnit::Millisecond, None),
                 false,
             ),
             Field::new("event", DataType::Int64, true),

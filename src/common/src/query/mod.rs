@@ -404,6 +404,7 @@ pub fn time_columns(
 ) -> Vec<String> {
     let from = date_trunc(granularity, from).unwrap();
     let to = date_trunc(granularity, to).unwrap();
+    dbg!(&from, &to);
     let rule = match granularity {
         TimeIntervalUnit::Second => DateRule::secondly(from),
         TimeIntervalUnit::Minute => DateRule::minutely(from),
@@ -414,7 +415,7 @@ pub fn time_columns(
         TimeIntervalUnit::Year => DateRule::yearly(from),
     };
 
-    rule.with_end(to + granularity.relative_duration(1))
+    rule.with_end(to)
         .map(|dt| dt.naive_utc().format("%Y-%m-%dT%H:%M:%S").to_string())
         .collect()
 }

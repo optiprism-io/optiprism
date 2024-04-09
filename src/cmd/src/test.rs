@@ -154,7 +154,7 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
                     ));
                     vals.push(NamedValue::new(
                         "created_at".to_string(),
-                        Value::Timestamp(Some(event_time.timestamp_nanos_opt().unwrap())),
+                        Value::Timestamp(Some(event_time.timestamp_millis())),
                     ));
                     vals.push(NamedValue::new(
                         "event".to_string(),

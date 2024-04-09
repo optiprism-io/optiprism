@@ -7,12 +7,14 @@ use std::sync::Mutex;
 use axum::extract::ConnectInfo;
 use axum::extract::Path;
 use axum::http::StatusCode;
+use axum::middleware;
 use axum::routing;
 use axum::Extension;
 use axum::Router;
 use axum_macros::debug_handler;
 use chrono::DateTime;
 use chrono::Utc;
+use common::http::print_request_response;
 use common::types::EVENT_CLICK;
 use common::types::EVENT_PAGE;
 use common::types::EVENT_SCREEN;
@@ -21,6 +23,7 @@ use serde::Deserialize;
 use tower::ServiceBuilder;
 use tower_http::cors::Any;
 use tower_http::cors::CorsLayer;
+use tower_http::trace::TraceLayer;
 
 use crate::error::Result;
 use crate::executor::Executor;
@@ -117,62 +120,16 @@ async fn track(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Extension(app): Extension<App>,
     Path(token): Path<String>,
-    common::http::Json(request): common::http::Json<TrackRequest>,
+    body: String,
+    // common::http::Json(request): common::http::Json<TrackRequest>,
 ) -> Result<StatusCode> {
+    let request: TrackRequest = serde_json::from_str(&body)?;
     let ctx = RequestContext {
         project_id: None,
         client_ip: addr.ip(),
         token,
     };
     app.track(&ctx, request)?;
-    Ok(StatusCode::CREATED)
-}
-
-#[debug_handler]
-async fn click(
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    Extension(app): Extension<App>,
-    Path(token): Path<String>,
-    common::http::Json(request): common::http::Json<TrackRequest>,
-) -> Result<StatusCode> {
-    let ctx = RequestContext {
-        project_id: None,
-        client_ip: addr.ip(),
-        token,
-    };
-    app.click(&ctx, request)?;
-    Ok(StatusCode::CREATED)
-}
-
-#[debug_handler]
-async fn page(
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    Extension(app): Extension<App>,
-    Path(token): Path<String>,
-    common::http::Json(request): common::http::Json<TrackRequest>,
-) -> Result<StatusCode> {
-    let ctx = RequestContext {
-        project_id: None,
-        client_ip: addr.ip(),
-        token,
-    };
-    app.page(&ctx, request)?;
-    Ok(StatusCode::CREATED)
-}
-
-#[debug_handler]
-async fn screen(
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    Extension(app): Extension<App>,
-    Path(token): Path<String>,
-    common::http::Json(request): common::http::Json<TrackRequest>,
-) -> Result<StatusCode> {
-    let ctx = RequestContext {
-        project_id: None,
-        client_ip: addr.ip(),
-        token,
-    };
-    app.screen(&ctx, request)?;
     Ok(StatusCode::CREATED)
 }
 
@@ -244,21 +201,6 @@ impl App {
         self.track.lock().unwrap().execute(ctx, track)
     }
 
-    pub fn click(&self, ctx: &RequestContext, mut req: TrackRequest) -> Result<()> {
-        req.event = Some(EVENT_CLICK.to_string());
-        self.track(ctx, req)
-    }
-
-    pub fn page(&self, ctx: &RequestContext, mut req: TrackRequest) -> Result<()> {
-        req.event = Some(EVENT_PAGE.to_string());
-        self.track(ctx, req)
-    }
-
-    pub fn screen(&self, ctx: &RequestContext, mut req: TrackRequest) -> Result<()> {
-        req.event = Some(EVENT_SCREEN.to_string());
-        self.track(ctx, req)
-    }
-
     pub fn identify(&self, ctx: &RequestContext, req: IdentifyRequest) -> Result<()> {
         let context = crate::Context {
             library: req.context.library.map(|lib| crate::Library {
@@ -310,13 +252,12 @@ pub fn attach_routes(
         .allow_headers(Any);
 
     router
-        .route("/v1/ingest/:token/track", routing::post(track))
-        .route("/v1/ingest/:token/click", routing::post(click))
-        .route("/v1/ingest/:token/page", routing::post(page))
-        .route("/v1/ingest/:token/screen", routing::post(screen))
-        .route("/v1/ingest/:token/identify", routing::post(identify))
+        .route("/api/v1/ingest/:token/track", routing::post(track))
+        .route("/api/v1/ingest/:token/identify", routing::post(identify))
         .layer(cors)
         .layer(Extension(app))
+        .layer(Extension(TraceLayer::new_for_http()))
+        .layer(middleware::from_fn(print_request_response))
 }
 
 #[cfg(test)]

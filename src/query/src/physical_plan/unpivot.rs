@@ -24,6 +24,8 @@ use arrow::array::Int64Builder;
 use arrow::array::Int8Array;
 use arrow::array::Int8Builder;
 use arrow::array::StringBuilder;
+use arrow::array::TimestampMillisecondArray;
+use arrow::array::TimestampMillisecondBuilder;
 use arrow::array::TimestampNanosecondArray;
 use arrow::array::TimestampNanosecondBuilder;
 use arrow::array::UInt16Builder;
@@ -397,9 +399,9 @@ pub fn unpivot(
                 build_group_arr!(
                     batch_col_idx,
                     arr,
-                    TimestampNanosecondArray,
+                    TimestampMillisecondArray,
                     unpivot_cols_len,
-                    TimestampNanosecondBuilder
+                    TimestampMillisecondBuilder
                 )
             }
             DataType::Decimal128(p, s) => {
