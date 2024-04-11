@@ -71,7 +71,7 @@ impl Accounts {
         let data = serialize(&account)?;
         tx.put(make_data_value_key(NAMESPACE, account.id), &data)?;
 
-        insert_index(&tx, idx_keys.as_ref(), &data)?;
+        insert_index(&tx, idx_keys.as_ref(), account.id)?;
         tx.commit()?;
         Ok(account)
     }
@@ -83,12 +83,12 @@ impl Accounts {
 
     pub fn get_by_email(&self, email: &str) -> Result<Account> {
         let tx = self.db.transaction();
-        let data = get_index(
+        let id = get_index(
             &tx,
             make_index_key(NAMESPACE, IDX_EMAIL, email),
             format!("account with email \"{}\" not found", email).as_str(),
         )?;
-        Ok(deserialize(&data)?)
+        self.get_by_id_(&tx, id)
     }
 
     pub fn list(&self) -> Result<ListResponse<Account>> {
@@ -132,7 +132,7 @@ impl Accounts {
         let data = serialize(&account)?;
         tx.put(make_data_value_key(NAMESPACE, account.id), &data)?;
 
-        update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)?;
+        update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), account_id)?;
         tx.commit()?;
         Ok(account)
     }

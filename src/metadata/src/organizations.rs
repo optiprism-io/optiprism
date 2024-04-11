@@ -76,7 +76,7 @@ impl Organizations {
         let data = serialize(&org)?;
         tx.put(make_data_value_key(NAMESPACE, id), &data)?;
 
-        insert_index(&tx, idx_keys.as_ref(), &data)?;
+        insert_index(&tx, idx_keys.as_ref(), org.id)?;
         tx.commit()?;
         Ok(org)
     }
@@ -116,7 +116,7 @@ impl Organizations {
         let data = serialize(&org)?;
         tx.put(make_data_value_key(NAMESPACE, org.id), &data)?;
 
-        update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)?;
+        update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), org.id)?;
         tx.commit()?;
         Ok(org)
     }

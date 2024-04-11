@@ -173,7 +173,7 @@ impl Events {
             &data,
         )?;
 
-        insert_index(tx, idx_keys.as_ref(), &data)?;
+        insert_index(tx, idx_keys.as_ref(), event.id)?;
 
         Ok(event)
     }
@@ -184,13 +184,13 @@ impl Events {
         project_id: u64,
         name: &str,
     ) -> Result<Event> {
-        let data = get_index(
+        let id = get_index(
             tx,
             make_index_key(project_ns(project_id, NAMESPACE).as_slice(), IDX_NAME, name),
             format!("event with name \"{}\" not found", name).as_str(),
         )?;
 
-        Ok(deserialize(&data)?)
+        self.get_by_id_(&tx, project_id, id)
     }
 
     pub fn create(&self, project_id: u64, req: CreateEventRequest) -> Result<Event> {
@@ -278,7 +278,7 @@ impl Events {
             &data,
         )?;
 
-        update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)?;
+        update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), event_id)?;
         tx.commit()?;
         Ok(event)
     }

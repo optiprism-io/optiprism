@@ -92,7 +92,7 @@ impl Projects {
         let data = serialize(&project)?;
         tx.put(make_data_value_key(NAMESPACE, project.id), &data)?;
 
-        insert_index(&tx, idx_keys.as_ref(), &data)?;
+        insert_index(&tx, idx_keys.as_ref(), project.id)?;
         tx.commit()?;
         Ok(project)
     }
@@ -104,12 +104,12 @@ impl Projects {
 
     pub fn get_by_token(&self, token: &str) -> Result<Project> {
         let tx = self.db.transaction();
-        let data = get_index(
+        let id = get_index(
             &tx,
             index_token_key(token).unwrap(),
             "project can't be found by token",
         )?;
-        Ok(deserialize::<Project>(&data)?)
+        self.get_by_id_(&tx, id)
     }
 
     pub fn list(&self, _organization_id: Option<u64>) -> Result<ListResponse<Project>> {
@@ -150,7 +150,7 @@ impl Projects {
         let data = serialize(&project)?;
         tx.put(make_data_value_key(NAMESPACE, project_id), &data)?;
 
-        update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)?;
+        update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), project_id)?;
         tx.commit()?;
         Ok(project)
     }

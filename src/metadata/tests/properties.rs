@@ -47,6 +47,7 @@ fn test_properties() -> Result<()> {
         typ: Type::Event,
         data_type: DType::String,
         status: Status::Enabled,
+        hidden: false,
         is_system: false,
         nullable: false,
         is_array: false,
@@ -65,14 +66,14 @@ fn test_properties() -> Result<()> {
         .get_or_create(1, create_prop_req.clone())?;
     assert_eq!(res.id, 1);
 
-    assert_eq!(res.column_name(), "str_0".to_string());
+    assert_eq!(res.column_name(), "e_str_0".to_string());
     assert_eq!(res.order, 0);
 
     let mut create_prop2 = create_prop_req.clone();
     create_prop2.name = "prop2".to_string();
     let res = md.event_properties.create(1, create_prop2.clone())?;
     assert_eq!(res.id, 2);
-    assert_eq!(res.column_name(), "str_1".to_string());
+    assert_eq!(res.column_name(), "e_str_1".to_string());
     assert_eq!(res.order, 1);
     let mut create_prop3 = create_prop_req.clone();
     create_prop3.name = "prop3".to_string();

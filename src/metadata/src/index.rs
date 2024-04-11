@@ -12,7 +12,7 @@ pub fn check_insert_constraints(
     keys: &[Option<Vec<u8>>],
 ) -> Result<()> {
     for key in keys.iter().flatten() {
-        if (tx.get(key)?).is_some() {
+        if tx.get(key)?.is_some() {
             return Err(MetadataError::AlreadyExists(String::from_utf8(
                 key.to_owned(),
             )?));
@@ -21,13 +21,13 @@ pub fn check_insert_constraints(
     Ok(())
 }
 
-pub fn insert_index<V: AsRef<[u8]>>(
+pub fn insert_index(
     tx: &Transaction<TransactionDB>,
     keys: &[Option<Vec<u8>>],
-    value: V,
+    id: u64,
 ) -> Result<()> {
     for key in keys.iter().flatten() {
-        tx.put(key, value.as_ref())?;
+        tx.put(key, id.to_le_bytes())?;
     }
     Ok(())
 }
@@ -50,11 +50,11 @@ pub fn check_update_constraints(
     Ok(())
 }
 
-pub fn update_index<V: AsRef<[u8]>>(
+pub fn update_index(
     tx: &Transaction<TransactionDB>,
     keys: &[Option<Vec<u8>>],
     prev_keys: &[Option<Vec<u8>>],
-    value: V,
+    value: u64,
 ) -> Result<()> {
     for (key, prev_key) in keys.iter().zip(prev_keys) {
         if key != prev_key {
@@ -64,7 +64,7 @@ pub fn update_index<V: AsRef<[u8]>>(
         }
 
         if let Some(key) = key {
-            tx.put(key, value.as_ref())?;
+            tx.put(key, value.to_le_bytes())?;
         }
     }
 
@@ -82,13 +82,13 @@ pub fn get_index<K>(
     tx: &Transaction<TransactionDB>,
     key: K,
     err_key: impl ToString,
-) -> Result<Vec<u8>>
+) -> Result<u64>
 where
     K: AsRef<[u8]>,
 {
     match tx.get(key.as_ref())? {
         None => Err(MetadataError::NotFound(format!("{}", err_key.to_string()))),
-        Some(v) => Ok(v),
+        Some(v) => Ok(u64::from_le_bytes(v.try_into().unwrap())),
     }
 }
 
