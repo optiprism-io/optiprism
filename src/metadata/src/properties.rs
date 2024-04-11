@@ -156,13 +156,13 @@ impl Properties {
             IDX_NAME,
             name,
         );
-        let data = get_index(
+        let id = get_index(
             tx,
             idx_key,
             format!("property with name \"{}\" not found", name).as_str(),
         )?;
 
-        Ok(deserialize(&data)?)
+        self.get_by_id_(&tx, project_id, id)
     }
 
     fn get_by_id_(
@@ -259,7 +259,7 @@ impl Properties {
         let data = serialize(&prop)?;
         tx.put(idx_key, &data)?;
 
-        insert_index(tx, idx_keys.as_ref(), &data)?;
+        insert_index(tx, idx_keys.as_ref(), prop.id)?;
 
         let dt = if let Some(dt) = &req.dictionary_type {
             match dt {
@@ -458,7 +458,7 @@ impl Properties {
         let data = serialize(&prop)?;
         tx.put(idx_key, &data)?;
 
-        update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)?;
+        update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), property_id)?;
         tx.commit()?;
         Ok(prop)
     }

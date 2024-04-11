@@ -96,7 +96,7 @@ impl Teams {
             &data,
         )?;
 
-        insert_index(&tx, idx_keys.as_ref(), &data)?;
+        insert_index(&tx, idx_keys.as_ref(), team.id)?;
         tx.commit()?;
         Ok(team)
     }
@@ -143,7 +143,7 @@ impl Teams {
             &data,
         )?;
 
-        update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)?;
+        update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), team_id)?;
         tx.commit()?;
         Ok(team)
     }
