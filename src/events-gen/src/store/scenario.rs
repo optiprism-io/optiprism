@@ -323,7 +323,7 @@ impl Scenario {
         let event_id = *self.events_map.get(&event).unwrap();
         let mut rec = EventRecord {
             user_id: state.user_id,
-            created_at: state.cur_timestamp * 10i64.pow(9),
+            created_at: state.cur_timestamp * 10i64.pow(3),
             event: event_id as i64,
             page_path: "".to_string(),
             page_search: "".to_string(),
