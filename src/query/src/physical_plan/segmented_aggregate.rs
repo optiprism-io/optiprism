@@ -439,7 +439,6 @@ impl Stream for PartialAggregateStream {
             loop {
                 match self.stream.poll_next_unpin(cx) {
                     Poll::Ready(Some(Ok(batch))) => {
-                        dbg!(&batch);
                         for segment in 0..segments_count {
                             for aggm in self.agg_expr[segment].iter() {
                                 let mut agg = aggm.lock().unwrap();

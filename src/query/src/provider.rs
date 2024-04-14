@@ -190,7 +190,6 @@ impl QueryProvider {
         debug!("elapsed: {:?}", duration);
 
         let metric_cols = req.time_columns(ctx.cur_time);
-        dbg!(&ctx.cur_time, &metric_cols);
         let cols = result
             .schema()
             .fields()
@@ -214,7 +213,6 @@ impl QueryProvider {
             })
             .collect();
 
-        dbg!(&cols);
         Ok(DataTable::new(result.schema(), cols))
     }
 }
