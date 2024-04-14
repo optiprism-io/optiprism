@@ -482,7 +482,6 @@ impl Stream for ScanStream {
             }
             Some(chunk) => {
                 let chunk = chunk?;
-                dbg!(&chunk);
                 Poll::Ready(Some(Ok(chunk)))
             }
         }
