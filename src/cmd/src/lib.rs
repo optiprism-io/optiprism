@@ -199,9 +199,9 @@ pub fn init_system(
         name: COLUMN_EVENT.to_string(),
         display_name: Some("Event".to_string()),
         typ: Type::System,
-        data_type: DType::Int64,
+        data_type: DType::String,
         nullable: false,
-        dict: None,
+        dict: Some(DictionaryType::Int64),
         hidden: true,
     })?;
 

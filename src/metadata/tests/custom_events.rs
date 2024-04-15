@@ -9,6 +9,7 @@ use metadata::custom_events::Event;
 use metadata::custom_events::Status;
 use metadata::custom_events::UpdateCustomEventRequest;
 use metadata::custom_events::MAX_EVENTS_LEVEL;
+use metadata::dictionaries::Dictionaries;
 use metadata::error::MetadataError;
 use metadata::error::Result;
 use metadata::events;
@@ -20,7 +21,10 @@ fn get_providers(max_events_level: usize) -> (Arc<Events>, Arc<CustomEvents>) {
     let mut path = temp_dir();
     path.push(format!("{}.db", Uuid::new_v4()));
     let db = Arc::new(metadata::rocksdb::new(path).unwrap());
-    let events_prov = Arc::new(events::Events::new(db.clone()));
+    let events_prov = Arc::new(events::Events::new(
+        db.clone(),
+        Arc::new(Dictionaries::new(db.clone())),
+    ));
     let custom_events = Arc::new(
         CustomEvents::new(db, events_prov.clone()).with_max_events_level(max_events_level),
     );

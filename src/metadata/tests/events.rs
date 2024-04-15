@@ -14,7 +14,7 @@ fn test_events() -> Result<()> {
     path.push(format!("{}.db", Uuid::new_v4()));
 
     let db = Arc::new(metadata::rocksdb::new(path).unwrap());
-    let events: Box<Events> = Box::new(Events::new(db.clone()));
+    let events: Box<Events> = Box::new(Events::new(db.clone(), Arc::new(metadata::dictionaries::Dictionaries::new(db.clone()));
     let create_event_req = CreateEventRequest {
         created_by: 0,
         tags: Some(vec![]),

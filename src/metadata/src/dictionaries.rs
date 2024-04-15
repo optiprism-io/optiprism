@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use byteorder::ByteOrder;
 use byteorder::LittleEndian;
+use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 
 use crate::error::MetadataError;
@@ -55,8 +56,13 @@ impl Debug for Dictionaries {
 }
 
 impl Dictionaries {
-    pub fn get_key_or_create(&self, project_id: u64, dict: &str, value: &str) -> Result<u64> {
-        let tx = self.db.transaction();
+    pub fn _get_key_or_create(
+        &self,
+        tx: &Transaction<TransactionDB>,
+        project_id: u64,
+        dict: &str,
+        value: &str,
+    ) -> Result<u64> {
         let res = match tx.get(make_value_key(project_id, dict, value))? {
             None => {
                 let id = next_seq(
@@ -73,8 +79,15 @@ impl Dictionaries {
             }
             Some(key) => Ok(LittleEndian::read_u64(key.as_slice())),
         };
-        tx.commit()?;
+
         res
+    }
+
+    pub fn get_key_or_create(&self, project_id: u64, dict: &str, value: &str) -> Result<u64> {
+        let tx = self.db.transaction();
+        let key = self._get_key_or_create(&tx, project_id, dict, value)?;
+        tx.commit()?;
+        Ok(key)
     }
 
     pub fn get_value(&self, project_id: u64, dict: &str, key: u64) -> Result<String> {
