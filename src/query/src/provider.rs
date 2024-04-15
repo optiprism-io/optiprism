@@ -12,6 +12,7 @@ use common::query::event_segmentation::Query;
 use common::query::EventFilter;
 use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
+use common::types::COLUMN_EVENT_ID;
 use common::types::COLUMN_PROJECT_ID;
 use common::types::COLUMN_USER_ID;
 use common::types::TABLE_EVENTS;
@@ -242,6 +243,7 @@ fn event_records_search(
         COLUMN_USER_ID.to_string(),
         COLUMN_CREATED_AT.to_string(),
         COLUMN_EVENT.to_string(),
+        COLUMN_EVENT_ID.to_string(),
     ];
     if let Some(filters) = &req.filters {
         for filter in filters {

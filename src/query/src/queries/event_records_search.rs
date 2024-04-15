@@ -45,10 +45,20 @@ pub fn build(
 ) -> Result<LogicalPlan> {
     let mut properties = vec![];
     let input = if let Some(props) = &req.properties {
-        let mut exprs = vec![col(Column {
-            relation: None,
-            name: COLUMN_PROJECT_ID.to_string(),
-        })];
+        let mut prop_names = vec![];
+        let mut exprs = vec![
+            col(Column {
+                relation: None,
+                name: COLUMN_PROJECT_ID.to_string(),
+            }),
+            col(Column {
+                relation: None,
+                name: COLUMN_EVENT_ID.to_string(),
+            }),
+        ];
+        prop_names.push(COLUMN_PROJECT_ID.to_string());
+        prop_names.push(COLUMN_EVENT_ID.to_string());
+
         for prop in props {
             let p = match prop {
                 PropertyRef::System(n) => metadata
@@ -62,6 +72,10 @@ pub fn build(
                     .get_by_name(ctx.project_id, n.as_ref())?,
                 PropertyRef::Custom(_) => unimplemented!(),
             };
+            if prop_names.contains(&p.column_name()) {
+                continue;
+            }
+            prop_names.push(p.column_name());
             properties.push(p.clone());
             exprs.push(col(Column {
                 relation: None,
@@ -125,19 +139,19 @@ pub fn build(
         Arc::new(input),
     )?);
 
-    let input = {
-        let s = Expr::Sort(expr::Sort {
-            expr: Box::new(col(COLUMN_EVENT_ID)),
-            asc: false,
-            nulls_first: false,
-        });
-
-        LogicalPlan::Sort(Sort {
-            expr: vec![s],
-            input: Arc::new(input),
-            fetch: None,
-        })
-    };
+    // let input = {
+    //     let s = Expr::Sort(expr::Sort {
+    //         expr: Box::new(col(COLUMN_EVENT_ID)),
+    //         asc: false,
+    //         nulls_first: false,
+    //     });
+    //
+    //     LogicalPlan::Sort(Sort {
+    //         expr: vec![s],
+    //         input: Arc::new(input),
+    //         fetch: None,
+    //     })
+    // };
 
     let input = LogicalPlan::Limit(Limit {
         skip: 0,
