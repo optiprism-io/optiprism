@@ -211,9 +211,9 @@ pub async fn print_request_response(
     let req = Request::from_parts(parts, Body::from(bytes));
 
     let res = next.run(req).await;
-    let (parts, body) = res.into_parts();
-    let bytes = buffer_and_print("response", body).await?;
-    let res = Response::from_parts(parts, Body::from(bytes));
+    // let (parts, body) = res.into_parts();
+    // let bytes = buffer_and_print("response", body).await?;
+    // let res = Response::from_parts(parts, Body::from(bytes));
 
     Ok(res)
 }

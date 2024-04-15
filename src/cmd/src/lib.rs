@@ -80,6 +80,9 @@ use platform::auth;
 use platform::auth::password::make_password_hash;
 use platform::PlatformProvider;
 use query::QueryProvider;
+use rand::distributions::Alphanumeric;
+use rand::distributions::DistString;
+use rand::thread_rng;
 use tracing::info;
 use uaparser::UserAgentParser;
 
@@ -196,9 +199,9 @@ pub fn init_system(
         name: COLUMN_EVENT.to_string(),
         display_name: Some("Event".to_string()),
         typ: Type::System,
-        data_type: DType::Int64,
+        data_type: DType::String,
         nullable: false,
-        dict: None,
+        dict: Some(DictionaryType::Int64),
         hidden: true,
     })?;
 
@@ -373,19 +376,22 @@ fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<u
         Err(_err) => md.organizations.get_by_id(1)?,
     };
 
+    let token = Alphanumeric.sample_string(&mut thread_rng(), 64);
+
     let proj = match md.projects.create(CreateProjectRequest {
         created_by: admin.id,
         organization_id: org.id,
         name: "My Project".to_string(),
         description: None,
         tags: None,
+        token: token.clone(),
         session_duration_seconds: 60 * 60 * 24,
     }) {
         Ok(proj) => proj,
         Err(_err) => md.projects.get_by_id(1)?,
     };
 
-    info!("token: {}", proj.token);
+    info!("token: {}", token);
     let _user = match md.accounts.create(CreateAccountRequest {
         created_by: Some(admin.id),
         password_hash: make_password_hash("test")?,

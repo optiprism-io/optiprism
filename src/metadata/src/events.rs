@@ -5,11 +5,13 @@ use bincode::serialize;
 use chrono::DateTime;
 use chrono::Utc;
 use common::types::OptionalProperty;
+use common::types::COLUMN_EVENT;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::dictionaries::Dictionaries;
 use crate::error::MetadataError;
 use crate::index::check_insert_constraints;
 use crate::index::check_update_constraints;
@@ -111,11 +113,12 @@ macro_rules! detach_property {
 
 pub struct Events {
     db: Arc<TransactionDB>,
+    dicts: Arc<Dictionaries>,
 }
 
 impl Events {
-    pub fn new(db: Arc<TransactionDB>) -> Self {
-        Events { db }
+    pub fn new(db: Arc<TransactionDB>, dicts: Arc<Dictionaries>) -> Self {
+        Events { db, dicts }
     }
 
     fn get_by_id_(
@@ -175,6 +178,8 @@ impl Events {
 
         insert_index(tx, idx_keys.as_ref(), event.id)?;
 
+        self.dicts
+            ._get_key_or_create(tx, project_id, COLUMN_EVENT, event.name.as_str())?;
         Ok(event)
     }
 
