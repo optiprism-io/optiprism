@@ -168,17 +168,17 @@ impl Destination<Track> for Local {
         }
 
         let user_props = req
-            .resolved_properties
+            .resolved_user_properties
             .as_ref()
             .cloned()
             .unwrap_or_else(Vec::new);
 
         for prop in &user_props {
+            dbg!(prop);
             let value = property_to_value(ctx, prop, &self.md.dictionaries)?;
             values.push(NamedValue::new(prop.property.column_name(), value));
         }
 
-        dbg!(&values);
         self.db.insert("events", values)?;
         Ok(())
     }

@@ -45,6 +45,9 @@ use metadata::util::create_event;
 use metadata::util::create_property;
 use metadata::util::CreatePropertyMainRequest;
 use metadata::MetadataProvider;
+use rand::distributions::Alphanumeric;
+use rand::distributions::DistString;
+use rand::thread_rng;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -65,6 +68,8 @@ impl Projects {
     pub async fn create(&self, ctx: Context, request: CreateProjectRequest) -> Result<Project> {
         ctx.check_organization_permission(OrganizationPermission::ManageProjects)?;
 
+        let token = Alphanumeric.sample_string(&mut thread_rng(), 64);
+
         let md = metadata::projects::CreateProjectRequest {
             created_by: ctx.account_id.unwrap(),
             tags: request.tags,
@@ -74,6 +79,7 @@ impl Projects {
                 .session_duration_seconds
                 .unwrap_or(self.cfg.project_default_session_duration.num_seconds() as u64),
             organization_id: ctx.organization_id,
+            token,
         };
 
         let project = self.md.projects.create(md)?;
@@ -115,6 +121,7 @@ impl Projects {
             name: req.name,
             description: req.description,
             session_duration_seconds: req.session_duration_seconds,
+            token: req.token,
         };
 
         let project = self.md.projects.update(project_id, md_req)?;
@@ -177,6 +184,8 @@ pub struct CreateProjectRequest {
 pub struct UpdateProjectRequest {
     #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
     pub tags: OptionalProperty<Option<Vec<String>>>,
+    #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
+    pub token: OptionalProperty<String>,
     #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
     pub name: OptionalProperty<String>,
     #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]

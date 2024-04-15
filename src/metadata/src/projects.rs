@@ -66,9 +66,7 @@ impl Projects {
 
     pub fn create(&self, req: CreateProjectRequest) -> Result<Project> {
         let tx = self.db.transaction();
-        let token = Alphanumeric.sample_string(&mut thread_rng(), 64);
-
-        let idx_keys = index_keys(&req.name, token.as_str());
+        let idx_keys = index_keys(&req.name, req.token.as_str());
 
         check_insert_constraints(&tx, idx_keys.as_ref())?;
 
@@ -85,7 +83,7 @@ impl Projects {
             name: req.name,
             description: req.description,
             tags: req.tags,
-            token,
+            token: req.token,
             session_duration_seconds: req.session_duration_seconds,
             events_count: 0,
         };
@@ -131,7 +129,11 @@ impl Projects {
             idx_prev_keys.push(index_name_key(prev_project.name.as_str()));
             project.name = name.to_owned();
         }
-
+        if let OptionalProperty::Some(token) = &req.token {
+            idx_keys.push(index_token_key(token.as_str()));
+            idx_prev_keys.push(index_token_key(prev_project.token.as_str()));
+            project.token = token.to_owned();
+        }
         check_update_constraints(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref())?;
 
         project.updated_at = Some(Utc::now());
@@ -203,6 +205,7 @@ pub struct CreateProjectRequest {
     pub name: String,
     pub description: Option<String>,
     pub tags: Option<Vec<String>>,
+    pub token: String,
     pub session_duration_seconds: u64,
 }
 
@@ -213,5 +216,6 @@ pub struct UpdateProjectRequest {
     pub name: OptionalProperty<String>,
     pub description: OptionalProperty<Option<String>>,
     pub tags: OptionalProperty<Option<Vec<String>>>,
+    pub token: OptionalProperty<String>,
     pub session_duration_seconds: OptionalProperty<u64>,
 }

@@ -6,6 +6,7 @@ use common::query::EventRef;
 use common::query::PropertyRef;
 use common::query::QueryTime;
 use common::types::COLUMN_CREATED_AT;
+use common::types::COLUMN_EVENT_ID;
 use common::types::COLUMN_PROJECT_ID;
 use datafusion_common::Column;
 use datafusion_common::ScalarValue;
@@ -126,7 +127,7 @@ pub fn build(
 
     let input = {
         let s = Expr::Sort(expr::Sort {
-            expr: Box::new(col(COLUMN_CREATED_AT)),
+            expr: Box::new(col(COLUMN_EVENT_ID)),
             asc: false,
             nulls_first: false,
         });
