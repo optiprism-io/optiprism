@@ -252,7 +252,6 @@ impl QueryProvider {
         let result = self.execute(session_ctx, state, plan).await?;
         let duration = start.elapsed();
         debug!("elapsed: {:?}", duration);
-        print_batches(&[result.clone()]).unwrap();
         let mut group_cols: Vec<StringArray> = vec![];
         let mut ts_col = {
             let idx = result.schema().index_of("ts").unwrap();

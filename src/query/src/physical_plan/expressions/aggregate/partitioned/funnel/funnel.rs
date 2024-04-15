@@ -229,12 +229,14 @@ impl Group {
                         self.steps[idx].ts - self.steps[idx - 1].ts;
                     b.steps[idx].total_time_to_convert_from_start +=
                         self.steps[idx].ts - self.steps[0].ts;
+
+                    b.steps[idx].dropped_off = b.steps[idx - 1].total - b.steps[idx].total;
                 }
             }
 
-            for idx in 1..self.steps.len() {
-                b.steps[idx].dropped_off = b.steps[idx - 1].total - b.steps[idx].total;
-            }
+            // for idx in 1..self.steps.len() {
+            //     b.steps[idx].dropped_off = b.steps[idx - 1].total - b.steps[idx].total;
+            // }
         });
 
         is_completed
@@ -760,7 +762,6 @@ impl Funnel {
             for (ts, bucket) in buckets {
                 for (step_id, step) in bucket.steps.iter().enumerate() {
                     let completed = step.total - step.dropped_off;
-                    dbg!(completed);
                     step_total[step_id].append_value(step.total);
                     let mut v = Decimal::from_f64(if completed > 0 {
                         completed as f64 / step.total as f64 * 100.
@@ -768,7 +769,6 @@ impl Funnel {
                         0.
                     })
                     .unwrap();
-                    dbg!(&v);
                     v.rescale(DECIMAL_SCALE as u32);
                     step_conversion_ratio[step_id].append_value(v.mantissa());
 
