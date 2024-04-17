@@ -119,6 +119,11 @@ pub fn validate_filter_property(
             }
         }
         Some(values) => {
+            if values.is_empty() {
+                return Err(PlatformError::BadRequest(format!(
+                    "{err_prefix}values cannot be empty"
+                )));
+            }
             for (vid, value) in values.iter().enumerate() {
                 match value {
                     Value::Null => {
