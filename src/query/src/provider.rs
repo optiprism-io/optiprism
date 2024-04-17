@@ -305,10 +305,12 @@ impl QueryProvider {
         }
 
         let mut steps = vec![];
-        for step_id in 0..req.steps.len() {
-            let name = schema.fields()[group_cols.len() + 1 + step_id * 7]
-                .name()
-                .to_string();
+        for (step_id, step) in req.steps.iter().enumerate() {
+            let name = match &step.events[0].event {
+                EventRef::RegularName(n) => n.clone(),
+                EventRef::Regular(id) => self.metadata.events.get_by_id(ctx.project_id, *id)?.name,
+                EventRef::Custom(_) => unimplemented!(),
+            };
             let mut step = funnel::Step {
                 step: name.clone(),
                 data: vec![],

@@ -536,6 +536,7 @@ impl QueryResponse {
     }
 }
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct FunnelStepData {
     pub groups: Option<Vec<String>>,
     pub ts: i64,
@@ -548,6 +549,7 @@ pub struct FunnelStepData {
     pub time_to_convert_from_start: i64,
 }
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct FunnelStep {
     pub step: String,
     pub data: Vec<FunnelStepData>,
