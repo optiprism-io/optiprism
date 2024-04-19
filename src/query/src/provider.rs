@@ -1,23 +1,38 @@
+use std::collections::VecDeque;
+use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Instant;
 
+use arrow::array::Array;
+use arrow::array::ArrayAccessor;
 use arrow::array::ArrayRef;
+use arrow::array::Decimal128Array;
+use arrow::array::Int64Array;
 use arrow::array::StringArray;
 use arrow::array::StringBuilder;
+use arrow::array::TimestampMillisecondArray;
+use arrow::compute::cast;
+use arrow::datatypes::DataType;
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
-use common::query::event_segmentation::Breakdown;
+use arrow::util::pretty::print_batches;
 use common::query::event_segmentation::EventSegmentation;
 use common::query::event_segmentation::Query;
+use common::query::funnel::Funnel;
+use common::query::Breakdown;
 use common::query::EventFilter;
+use common::query::EventRef;
+use common::query::PropertyRef;
 use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_EVENT_ID;
 use common::types::COLUMN_PROJECT_ID;
 use common::types::COLUMN_USER_ID;
 use common::types::TABLE_EVENTS;
+use common::DECIMAL_SCALE;
 use datafusion::execution::context::SessionState;
 use datafusion::execution::runtime_env::RuntimeEnv;
+use datafusion::parquet::basic::ConvertedType::NONE;
 use datafusion::physical_plan::coalesce_batches::concat_batches;
 use datafusion::physical_plan::collect;
 use datafusion::physical_plan::display::DisplayableExecutionPlan;
@@ -26,6 +41,7 @@ use datafusion::prelude::SessionContext;
 use datafusion_expr::Extension;
 use datafusion_expr::LogicalPlan;
 use metadata::MetadataProvider;
+use rust_decimal::Decimal;
 use storage::db::OptiDBImpl;
 use tracing::debug;
 
@@ -36,6 +52,8 @@ use crate::queries::event_records_search;
 use crate::queries::event_records_search::EventRecordsSearch;
 use crate::queries::event_segmentation;
 use crate::queries::event_segmentation::logical_plan_builder::COL_AGG_NAME;
+use crate::queries::funnel;
+use crate::queries::funnel::StepData;
 use crate::queries::property_values;
 use crate::queries::property_values::PropertyValues;
 use crate::Column;
@@ -132,7 +150,7 @@ impl QueryProvider {
         let start = Instant::now();
         let schema = self.db.schema1(TABLE_EVENTS)?;
         let projection = if req.properties.is_some() {
-            let projection = event_records_search(&ctx, &req, &self.metadata)?;
+            let projection = event_records_search_projection(&ctx, &req, &self.metadata)?;
             projection
                 .iter()
                 .map(|x| schema.index_of(x).unwrap())
@@ -158,6 +176,7 @@ impl QueryProvider {
                 typ: ColumnType::Dimension,
                 is_nullable: field.is_nullable(),
                 data_type: field.data_type().to_owned(),
+                hidden: false,
                 data: result.column(idx).to_owned(),
             })
             .collect();
@@ -198,7 +217,7 @@ impl QueryProvider {
             .enumerate()
             .map(|(idx, field)| {
                 let typ = match metric_cols.contains(field.name()) {
-                    true => ColumnType::MetricValue,
+                    true => ColumnType::Metric,
                     false => ColumnType::Dimension,
                 };
 
@@ -209,12 +228,130 @@ impl QueryProvider {
                     typ,
                     is_nullable: field.is_nullable(),
                     data_type: field.data_type().to_owned(),
+                    hidden: false,
                     data: arr,
                 }
             })
             .collect();
 
         Ok(DataTable::new(result.schema(), cols))
+    }
+
+    pub async fn funnel(&self, ctx: Context, req: Funnel) -> Result<funnel::Response> {
+        let start = Instant::now();
+        let schema = self.db.schema1(TABLE_EVENTS)?;
+        let projection = funnel_projection(&ctx, &req, &self.metadata)?;
+        let projection = projection
+            .iter()
+            .map(|x| schema.index_of(x).unwrap())
+            .collect();
+
+        let (session_ctx, state, plan) = self.initial_plan(projection).await?;
+        let plan = funnel::build(ctx.clone(), self.metadata.clone(), plan, req.clone())?;
+
+        let result = self.execute(session_ctx, state, plan).await?;
+        let duration = start.elapsed();
+        debug!("elapsed: {:?}", duration);
+        let mut group_cols: Vec<StringArray> = vec![];
+        let mut ts_col = {
+            let idx = result.schema().index_of("ts").unwrap();
+            result
+                .column(idx)
+                .as_any()
+                .downcast_ref::<TimestampMillisecondArray>()
+                .unwrap()
+        };
+
+        // segment
+        let col = cast(&result.column(0), &DataType::Utf8)?
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap()
+            .to_owned();
+        group_cols.push(col);
+        if let Some(breakdowns) = &req.breakdowns {
+            for idx in 0..=breakdowns.len() {
+                let col = result
+                    .column(idx)
+                    .as_any()
+                    .downcast_ref::<StringArray>()
+                    .unwrap()
+                    .to_owned();
+                group_cols.push(col);
+            }
+        }
+        group_cols.dedup();
+
+        let mut int_val_cols = vec![];
+        let mut dec_val_cols = vec![];
+
+        for idx in 0..(result.schema().fields().len() - group_cols.len() - 1) {
+            let arr = result.column(group_cols.len() + 1 + idx).to_owned();
+            match arr.data_type() {
+                DataType::Int64 => int_val_cols.push(
+                    arr.as_any()
+                        .downcast_ref::<Int64Array>()
+                        .unwrap()
+                        .to_owned(),
+                ),
+                DataType::Decimal128(_, _) => dec_val_cols.push(
+                    arr.as_any()
+                        .downcast_ref::<Decimal128Array>()
+                        .unwrap()
+                        .to_owned(),
+                ),
+                _ => panic!("unexpected data type"),
+            }
+        }
+
+        let mut steps = vec![];
+        for (step_id, step) in req.steps.iter().enumerate() {
+            let name = match &step.events[0].event {
+                EventRef::RegularName(n) => n.clone(),
+                EventRef::Regular(id) => self.metadata.events.get_by_id(ctx.project_id, *id)?.name,
+                EventRef::Custom(_) => unimplemented!(),
+            };
+            let mut step = funnel::Step {
+                step: name.clone(),
+                data: vec![],
+            };
+            for idx in 0..result.num_rows() {
+                let groups = if group_cols.is_empty() {
+                    None
+                } else {
+                    Some(
+                        group_cols
+                            .iter()
+                            .map(|col| col.value(idx).to_string())
+                            .collect::<Vec<_>>(),
+                    )
+                };
+                let step_data = funnel::StepData {
+                    groups,
+                    ts: ts_col.value(idx),
+                    total: int_val_cols[step_id * 4].value(idx) as i64,
+                    conversion_ratio: Decimal::from_i128_with_scale(
+                        dec_val_cols[step_id * 3].value(idx) as i128,
+                        DECIMAL_SCALE as u32,
+                    ),
+                    avg_time_to_convert: Decimal::from_i128_with_scale(
+                        dec_val_cols[step_id * 3 + 1].value(idx) as i128,
+                        DECIMAL_SCALE as u32,
+                    ),
+                    dropped_off: int_val_cols[step_id * 4 + 1].value(idx) as i64,
+                    drop_off_ratio: Decimal::from_i128_with_scale(
+                        dec_val_cols[step_id * 3 + 2].value(idx) as i128,
+                        DECIMAL_SCALE as u32,
+                    ),
+                    time_to_convert: int_val_cols[step_id * 4 + 2].value(idx) as i64,
+                    time_to_convert_from_start: int_val_cols[step_id * 4 + 3].value(idx) as i64,
+                };
+                step.data.push(step_data);
+            }
+            steps.push(step);
+        }
+
+        Ok(funnel::Response { steps })
     }
 }
 
@@ -233,7 +370,7 @@ fn property_values_projection(
     Ok(fields)
 }
 
-fn event_records_search(
+fn event_records_search_projection(
     ctx: &Context,
     req: &EventRecordsSearch,
     md: &Arc<MetadataProvider>,
@@ -328,5 +465,71 @@ fn event_segmentation_projection(
 
     fields.dedup();
 
+    Ok(fields)
+}
+
+fn funnel_projection(
+    ctx: &Context,
+    req: &Funnel,
+    md: &Arc<MetadataProvider>,
+) -> Result<Vec<String>> {
+    let mut fields = vec![
+        COLUMN_PROJECT_ID.to_string(),
+        COLUMN_USER_ID.to_string(),
+        COLUMN_CREATED_AT.to_string(),
+        COLUMN_EVENT.to_string(),
+    ];
+
+    for step in &req.steps {
+        for event in &step.events {
+            if let Some(filters) = &event.filters {
+                for filter in filters {
+                    match filter {
+                        EventFilter::Property { property, .. } => {
+                            fields.push(col_name(ctx, property, md)?)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(c) = &req.holding_constants {
+        for constant in c {
+            fields.push(col_name(ctx, constant, md)?);
+        }
+    }
+
+    if let Some(exclude) = &req.exclude {
+        for e in exclude {
+            if let Some(filters) = &e.event.filters {
+                for filter in filters {
+                    match filter {
+                        EventFilter::Property { property, .. } => {
+                            fields.push(col_name(ctx, property, md)?)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(filters) = &req.filters {
+        for filter in filters {
+            match filter {
+                EventFilter::Property { property, .. } => fields.push(col_name(ctx, property, md)?),
+            }
+        }
+    }
+
+    if let Some(breakdowns) = &req.breakdowns {
+        for breakdown in breakdowns {
+            match breakdown {
+                Breakdown::Property(property) => fields.push(col_name(ctx, property, md)?),
+            }
+        }
+    }
+
+    fields.dedup();
     Ok(fields)
 }

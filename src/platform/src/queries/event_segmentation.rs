@@ -12,74 +12,24 @@ use serde_json::Value;
 
 use crate::error::Result;
 use crate::json_value_to_scalar;
+use crate::queries::validation::validate_event;
 use crate::queries::validation::validate_event_filter;
+use crate::queries::validation::validate_property;
 use crate::queries::AggregateFunction;
+use crate::queries::Breakdown;
 use crate::queries::PartitionedAggregateFunction;
 use crate::queries::QueryTime;
+use crate::queries::Segment;
 use crate::queries::TimeIntervalUnit;
 use crate::scalar_to_json_value;
 use crate::Context;
 use crate::EventFilter;
+use crate::EventGroupedFilterGroup;
 use crate::EventGroupedFilters;
 use crate::EventRef;
 use crate::PlatformError;
 use crate::PropValueOperation;
 use crate::PropertyRef;
-
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-#[serde(tag = "type", rename_all = "camelCase")]
-pub enum SegmentTime {
-    Between {
-        from: DateTime<Utc>,
-        to: DateTime<Utc>,
-    },
-    From(DateTime<Utc>),
-    Last {
-        last: i64,
-        unit: TimeIntervalUnit,
-    },
-    AfterFirstUse {
-        within: i64,
-        unit: TimeIntervalUnit,
-    },
-    WindowEach {
-        unit: TimeIntervalUnit,
-        n: i64,
-    },
-}
-
-impl TryInto<common::query::event_segmentation::SegmentTime> for SegmentTime {
-    type Error = PlatformError;
-
-    fn try_into(
-        self,
-    ) -> std::result::Result<common::query::event_segmentation::SegmentTime, Self::Error> {
-        Ok(match self {
-            SegmentTime::Between { from, to } => {
-                common::query::event_segmentation::SegmentTime::Between { from, to }
-            }
-            SegmentTime::From(v) => common::query::event_segmentation::SegmentTime::From(v),
-            SegmentTime::Last { last: n, unit } => {
-                common::query::event_segmentation::SegmentTime::Last {
-                    n,
-                    unit: unit.try_into()?,
-                }
-            }
-            SegmentTime::AfterFirstUse { within, unit } => {
-                common::query::event_segmentation::SegmentTime::AfterFirstUse {
-                    within,
-                    unit: unit.try_into()?,
-                }
-            }
-            SegmentTime::WindowEach { unit, n } => {
-                common::query::event_segmentation::SegmentTime::Each {
-                    n,
-                    unit: unit.try_into()?,
-                }
-            }
-        })
-    }
-}
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -89,29 +39,23 @@ pub enum ChartType {
     Pie,
 }
 
-impl TryInto<common::query::event_segmentation::ChartType> for ChartType {
-    type Error = PlatformError;
-
-    fn try_into(
-        self,
-    ) -> std::result::Result<common::query::event_segmentation::ChartType, Self::Error> {
-        Ok(match self {
+impl Into<common::query::event_segmentation::ChartType> for ChartType {
+    fn into(self) -> common::query::event_segmentation::ChartType {
+        match self {
             ChartType::Line => common::query::event_segmentation::ChartType::Line,
             ChartType::Column => common::query::event_segmentation::ChartType::Column,
             ChartType::Pie => common::query::event_segmentation::ChartType::Pie,
-        })
+        }
     }
 }
 
-impl TryInto<ChartType> for common::query::event_segmentation::ChartType {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<ChartType, Self::Error> {
-        Ok(match self {
+impl Into<ChartType> for common::query::event_segmentation::ChartType {
+    fn into(self) -> ChartType {
+        match self {
             common::query::event_segmentation::ChartType::Line => ChartType::Line,
             common::query::event_segmentation::ChartType::Column => ChartType::Column,
             common::query::event_segmentation::ChartType::Pie => ChartType::Pie,
-        })
+        }
     }
 }
 
@@ -127,41 +71,35 @@ pub enum Analysis {
     Cumulative,
 }
 
-impl TryInto<common::query::event_segmentation::Analysis> for Analysis {
-    type Error = PlatformError;
-
-    fn try_into(
-        self,
-    ) -> std::result::Result<common::query::event_segmentation::Analysis, Self::Error> {
-        Ok(match self {
+impl Into<common::query::event_segmentation::Analysis> for Analysis {
+    fn into(self) -> common::query::event_segmentation::Analysis {
+        match self {
             Analysis::Linear => common::query::event_segmentation::Analysis::Linear,
             Analysis::RollingAverage { window, unit } => {
                 common::query::event_segmentation::Analysis::RollingAverage {
                     window,
-                    unit: unit.try_into()?,
+                    unit: unit.into(),
                 }
             }
             Analysis::Logarithmic => common::query::event_segmentation::Analysis::Logarithmic,
             Analysis::Cumulative => common::query::event_segmentation::Analysis::Cumulative,
-        })
+        }
     }
 }
 
-impl TryInto<Analysis> for common::query::event_segmentation::Analysis {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<Analysis, Self::Error> {
-        Ok(match self {
+impl Into<Analysis> for common::query::event_segmentation::Analysis {
+    fn into(self) -> Analysis {
+        match self {
             common::query::event_segmentation::Analysis::Linear => Analysis::Linear,
             common::query::event_segmentation::Analysis::RollingAverage { window, unit } => {
                 Analysis::RollingAverage {
                     window,
-                    unit: unit.try_into()?,
+                    unit: unit.into(),
                 }
             }
             common::query::event_segmentation::Analysis::Logarithmic => Analysis::Logarithmic,
             common::query::event_segmentation::Analysis::Cumulative => Analysis::Cumulative,
-        })
+        }
     }
 }
 
@@ -172,27 +110,21 @@ pub struct Compare {
     pub unit: TimeIntervalUnit,
 }
 
-impl TryInto<common::query::event_segmentation::Compare> for Compare {
-    type Error = PlatformError;
-
-    fn try_into(
-        self,
-    ) -> std::result::Result<common::query::event_segmentation::Compare, Self::Error> {
-        Ok(common::query::event_segmentation::Compare {
+impl Into<common::query::event_segmentation::Compare> for Compare {
+    fn into(self) -> common::query::event_segmentation::Compare {
+        common::query::event_segmentation::Compare {
             offset: self.offset,
-            unit: self.unit.try_into()?,
-        })
+            unit: self.unit.into(),
+        }
     }
 }
 
-impl TryInto<Compare> for common::query::event_segmentation::Compare {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<Compare, Self::Error> {
-        Ok(Compare {
+impl Into<Compare> for common::query::event_segmentation::Compare {
+    fn into(self) -> Compare {
+        Compare {
             offset: self.offset,
-            unit: self.unit.try_into()?,
-        })
+            unit: self.unit.into(),
+        }
     }
 }
 
@@ -211,13 +143,9 @@ pub enum QueryAggregate {
     Percentile99,
 }
 
-impl TryInto<common::query::event_segmentation::QueryAggregate> for QueryAggregate {
-    type Error = PlatformError;
-
-    fn try_into(
-        self,
-    ) -> std::result::Result<common::query::event_segmentation::QueryAggregate, Self::Error> {
-        Ok(match self {
+impl Into<common::query::event_segmentation::QueryAggregate> for QueryAggregate {
+    fn into(self) -> common::query::event_segmentation::QueryAggregate {
+        match self {
             QueryAggregate::Min => common::query::event_segmentation::QueryAggregate::Min,
             QueryAggregate::Max => common::query::event_segmentation::QueryAggregate::Max,
             QueryAggregate::Sum => common::query::event_segmentation::QueryAggregate::Sum,
@@ -238,15 +166,13 @@ impl TryInto<common::query::event_segmentation::QueryAggregate> for QueryAggrega
             QueryAggregate::Percentile99 => {
                 common::query::event_segmentation::QueryAggregate::Percentile99th
             }
-        })
+        }
     }
 }
 
-impl TryInto<QueryAggregate> for common::query::event_segmentation::QueryAggregate {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<QueryAggregate, Self::Error> {
-        Ok(match self {
+impl Into<QueryAggregate> for common::query::event_segmentation::QueryAggregate {
+    fn into(self) -> QueryAggregate {
+        match self {
             common::query::event_segmentation::QueryAggregate::Min => QueryAggregate::Min,
             common::query::event_segmentation::QueryAggregate::Max => QueryAggregate::Max,
             common::query::event_segmentation::QueryAggregate::Sum => QueryAggregate::Sum,
@@ -267,7 +193,7 @@ impl TryInto<QueryAggregate> for common::query::event_segmentation::QueryAggrega
             common::query::event_segmentation::QueryAggregate::Percentile99th => {
                 QueryAggregate::Percentile99
             }
-        })
+        }
     }
 }
 
@@ -282,14 +208,9 @@ pub enum QueryAggregatePerGroup {
     DistinctCount,
 }
 
-impl TryInto<common::query::event_segmentation::QueryAggregatePerGroup> for QueryAggregatePerGroup {
-    type Error = PlatformError;
-
-    fn try_into(
-        self,
-    ) -> std::result::Result<common::query::event_segmentation::QueryAggregatePerGroup, Self::Error>
-    {
-        Ok(match self {
+impl Into<common::query::event_segmentation::QueryAggregatePerGroup> for QueryAggregatePerGroup {
+    fn into(self) -> common::query::event_segmentation::QueryAggregatePerGroup {
+        match self {
             QueryAggregatePerGroup::Min => {
                 common::query::event_segmentation::QueryAggregatePerGroup::Min
             }
@@ -308,7 +229,7 @@ impl TryInto<common::query::event_segmentation::QueryAggregatePerGroup> for Quer
             QueryAggregatePerGroup::DistinctCount => {
                 common::query::event_segmentation::QueryAggregatePerGroup::DistinctCount
             }
-        })
+        }
     }
 }
 
@@ -318,17 +239,13 @@ pub enum QueryPerGroup {
     CountEvents,
 }
 
-impl TryInto<common::query::event_segmentation::QueryPerGroup> for QueryPerGroup {
-    type Error = PlatformError;
-
-    fn try_into(
-        self,
-    ) -> std::result::Result<common::query::event_segmentation::QueryPerGroup, Self::Error> {
-        Ok(match self {
+impl Into<common::query::event_segmentation::QueryPerGroup> for QueryPerGroup {
+    fn into(self) -> common::query::event_segmentation::QueryPerGroup {
+        match self {
             QueryPerGroup::CountEvents => {
                 common::query::event_segmentation::QueryPerGroup::CountEvents
             }
-        })
+        }
     }
 }
 
@@ -361,13 +278,9 @@ pub enum Query {
     },
 }
 
-impl TryInto<common::query::event_segmentation::Query> for &Query {
-    type Error = PlatformError;
-
-    fn try_into(
-        self,
-    ) -> std::result::Result<common::query::event_segmentation::Query, Self::Error> {
-        Ok(match self {
+impl Into<common::query::event_segmentation::Query> for &Query {
+    fn into(self) -> common::query::event_segmentation::Query {
+        match self {
             Query::CountEvents => common::query::event_segmentation::Query::CountEvents,
             Query::CountUniqueGroups => common::query::event_segmentation::Query::CountUniqueGroups,
             Query::DailyActiveGroups => common::query::event_segmentation::Query::DailyActiveGroups,
@@ -379,7 +292,7 @@ impl TryInto<common::query::event_segmentation::Query> for &Query {
             }
             Query::CountPerGroup { aggregate } => {
                 common::query::event_segmentation::Query::CountPerGroup {
-                    aggregate: aggregate.try_into()?,
+                    aggregate: aggregate.into(),
                 }
             }
             Query::AggregatePropertyPerGroup {
@@ -387,29 +300,27 @@ impl TryInto<common::query::event_segmentation::Query> for &Query {
                 aggregate_per_group,
                 aggregate,
             } => common::query::event_segmentation::Query::AggregatePropertyPerGroup {
-                property: property.to_owned().try_into()?,
-                aggregate_per_group: aggregate_per_group.try_into()?,
-                aggregate: aggregate.try_into()?,
+                property: property.to_owned().into(),
+                aggregate_per_group: aggregate_per_group.into(),
+                aggregate: aggregate.into(),
             },
             Query::AggregateProperty {
                 property,
                 aggregate,
             } => common::query::event_segmentation::Query::AggregateProperty {
-                property: property.to_owned().try_into()?,
-                aggregate: aggregate.try_into()?,
+                property: property.to_owned().into(),
+                aggregate: aggregate.into(),
             },
             Query::Formula { formula } => common::query::event_segmentation::Query::QueryFormula {
                 formula: formula.clone(),
             },
-        })
+        }
     }
 }
 
-impl TryInto<Query> for common::query::event_segmentation::Query {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<Query, Self::Error> {
-        Ok(match self {
+impl Into<Query> for common::query::event_segmentation::Query {
+    fn into(self) -> Query {
+        match self {
             common::query::event_segmentation::Query::CountEvents => Query::CountEvents,
             common::query::event_segmentation::Query::CountUniqueGroups => Query::CountUniqueGroups,
             common::query::event_segmentation::Query::DailyActiveGroups => Query::DailyActiveGroups,
@@ -421,7 +332,7 @@ impl TryInto<Query> for common::query::event_segmentation::Query {
             }
             common::query::event_segmentation::Query::CountPerGroup { aggregate } => {
                 Query::CountPerGroup {
-                    aggregate: aggregate.try_into()?,
+                    aggregate: aggregate.into(),
                 }
             }
             common::query::event_segmentation::Query::AggregatePropertyPerGroup {
@@ -429,60 +340,21 @@ impl TryInto<Query> for common::query::event_segmentation::Query {
                 aggregate_per_group,
                 aggregate,
             } => Query::AggregatePropertyPerGroup {
-                property: property.try_into()?,
-                aggregate_per_group: aggregate_per_group.try_into()?,
-                aggregate: aggregate.try_into()?,
+                property: property.into(),
+                aggregate_per_group: aggregate_per_group.into(),
+                aggregate: aggregate.into(),
             },
             common::query::event_segmentation::Query::AggregateProperty {
                 property,
                 aggregate,
             } => Query::AggregateProperty {
-                property: property.try_into()?,
-                aggregate: aggregate.try_into()?,
+                property: property.into(),
+                aggregate: aggregate.into(),
             },
             common::query::event_segmentation::Query::QueryFormula { formula } => {
                 Query::Formula { formula }
             }
-        })
-    }
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-#[serde(tag = "type", rename_all = "camelCase")]
-pub enum Breakdown {
-    Property {
-        #[serde(flatten)]
-        property: PropertyRef,
-    },
-}
-
-impl TryInto<common::query::event_segmentation::Breakdown> for &Breakdown {
-    type Error = PlatformError;
-
-    fn try_into(
-        self,
-    ) -> std::result::Result<common::query::event_segmentation::Breakdown, Self::Error> {
-        Ok(match self {
-            Breakdown::Property { property } => {
-                common::query::event_segmentation::Breakdown::Property(
-                    property.to_owned().try_into()?,
-                )
-            }
-        })
-    }
-}
-
-impl TryInto<Breakdown> for &common::query::event_segmentation::Breakdown {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<Breakdown, Self::Error> {
-        Ok(match self {
-            common::query::event_segmentation::Breakdown::Property(property) => {
-                Breakdown::Property {
-                    property: property.to_owned().try_into()?,
-                }
-            }
-        })
+        }
     }
 }
 
@@ -505,225 +377,74 @@ pub struct Event {
     pub queries: Vec<Query>,
 }
 
-impl TryInto<common::query::event_segmentation::Event> for &Event {
-    type Error = PlatformError;
-
-    fn try_into(
-        self,
-    ) -> std::result::Result<common::query::event_segmentation::Event, Self::Error> {
-        Ok(common::query::event_segmentation::Event {
+impl Into<common::query::event_segmentation::Event> for &Event {
+    fn into(self) -> common::query::event_segmentation::Event {
+        common::query::event_segmentation::Event {
             event: self.event.to_owned().into(),
-            filters: self
-                .filters
-                .as_ref()
-                .map_or_else(
-                    || None,
-                    |v| {
-                        if v.is_empty() {
-                            None
-                        } else {
-                            Some(v.iter().map(|v| v.try_into()).collect::<Result<_>>())
-                        }
-                    },
-                )
-                .transpose()?,
-            breakdowns: self
-                .breakdowns
-                .as_ref()
-                .map_or_else(
-                    || None,
-                    |v| {
-                        if v.is_empty() {
-                            None
-                        } else {
-                            Some(v.iter().map(|v| v.try_into()).collect::<Result<_>>())
-                        }
-                    },
-                )
-                .transpose()?,
+            filters: self.filters.as_ref().map_or_else(
+                || None,
+                |v| {
+                    if v.is_empty() {
+                        None
+                    } else {
+                        Some(v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>())
+                    }
+                },
+            ),
+            breakdowns: self.breakdowns.as_ref().map_or_else(
+                || None,
+                |v| {
+                    if v.is_empty() {
+                        None
+                    } else {
+                        Some(v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>())
+                    }
+                },
+            ),
             queries: self
                 .queries
                 .iter()
-                .map(|v| v.try_into())
-                .collect::<std::result::Result<Vec<common::query::event_segmentation::Query>, _>>()?
+                .map(|v| v.into())
+                .collect::<Vec<common::query::event_segmentation::Query>>()
                 .iter()
                 .enumerate()
                 .map(|(idx, v)| NamedQuery::new(v.clone(), Some(self.event.name(idx))))
                 .collect(),
-        })
+        }
     }
 }
 
-impl TryInto<Event> for &common::query::event_segmentation::Event {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<Event, Self::Error> {
-        Ok(Event {
-            event: self.event.to_owned().try_into()?,
-            filters: self
-                .filters
-                .as_ref()
-                .map_or_else(
-                    || None,
-                    |v| {
-                        if v.is_empty() {
-                            None
-                        } else {
-                            Some(v.iter().map(|v| v.try_into()).collect::<Result<_>>())
-                        }
-                    },
-                )
-                .transpose()?,
-            breakdowns: self
-                .breakdowns
-                .as_ref()
-                .map_or_else(
-                    || None,
-                    |v| {
-                        if v.is_empty() {
-                            None
-                        } else {
-                            Some(v.iter().map(|v| v.try_into()).collect::<Result<_>>())
-                        }
-                    },
-                )
-                .transpose()?,
+impl Into<Event> for &common::query::event_segmentation::Event {
+    fn into(self) -> Event {
+        Event {
+            event: self.event.to_owned().into(),
+            filters: self.filters.as_ref().map_or_else(
+                || None,
+                |v| {
+                    if v.is_empty() {
+                        None
+                    } else {
+                        Some(v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>())
+                    }
+                },
+            ),
+            breakdowns: self.breakdowns.as_ref().map_or_else(
+                || None,
+                |v| {
+                    if v.is_empty() {
+                        None
+                    } else {
+                        Some(v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>())
+                    }
+                },
+            ),
             queries: self
                 .queries
                 .iter()
-                .map(|v| v.agg.clone().try_into())
-                .collect::<std::result::Result<Vec<Query>, _>>()?,
-        })
+                .map(|v| v.agg.clone().into())
+                .collect::<Vec<Query>>(),
+        }
     }
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-#[serde(tag = "type", rename_all = "camelCase")]
-pub enum DidEventAggregate {
-    Count {
-        operation: PropValueOperation,
-        value: i64,
-        time: SegmentTime,
-    },
-    RelativeCount {
-        #[serde(flatten)]
-        event: EventRef,
-        operation: PropValueOperation,
-        filters: Option<Vec<EventFilter>>,
-        time: SegmentTime,
-    },
-    AggregateProperty {
-        #[serde(flatten)]
-        property: PropertyRef,
-        aggregate: QueryAggregate,
-        operation: PropValueOperation,
-        value: Option<Value>,
-        time: SegmentTime,
-    },
-    HistoricalCount {
-        operation: PropValueOperation,
-        value: u64,
-        time: SegmentTime,
-    },
-}
-
-impl TryInto<common::query::event_segmentation::DidEventAggregate> for DidEventAggregate {
-    type Error = PlatformError;
-
-    fn try_into(
-        self,
-    ) -> std::result::Result<common::query::event_segmentation::DidEventAggregate, Self::Error>
-    {
-        Ok(match self {
-            DidEventAggregate::Count {
-                operation,
-                value,
-                time,
-            } => common::query::event_segmentation::DidEventAggregate::Count {
-                operation: operation.try_into()?,
-                value,
-                time: time.try_into()?,
-            },
-            DidEventAggregate::RelativeCount {
-                event,
-                operation,
-                filters,
-                time,
-            } => common::query::event_segmentation::DidEventAggregate::RelativeCount {
-                event: event.into(),
-                operation: operation.try_into()?,
-                filters: filters
-                    .map_or_else(
-                        || None,
-                        |v| {
-                            if v.is_empty() {
-                                None
-                            } else {
-                                Some(v.iter().map(|v| v.try_into()).collect::<Result<_>>())
-                            }
-                        },
-                    )
-                    .transpose()?,
-                time: time.try_into()?,
-            },
-            DidEventAggregate::AggregateProperty {
-                property,
-                aggregate,
-                operation,
-                value,
-                time,
-            } => common::query::event_segmentation::DidEventAggregate::AggregateProperty {
-                property: property.try_into()?,
-                aggregate: aggregate.try_into()?,
-                operation: operation.try_into()?,
-                value: value.map(|v| json_value_to_scalar(&v)).transpose()?,
-                time: time.try_into()?,
-            },
-            DidEventAggregate::HistoricalCount {
-                operation,
-                value,
-                time,
-            } => common::query::event_segmentation::DidEventAggregate::HistoricalCount {
-                operation: operation.try_into()?,
-                value,
-                time: time.try_into()?,
-            },
-        })
-    }
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-#[serde(tag = "type", rename_all = "camelCase")]
-pub enum SegmentCondition {
-    #[serde(rename_all = "camelCase")]
-    HasPropertyValue {
-        property_name: String,
-        operation: PropValueOperation,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        value: Option<Vec<Value>>,
-    },
-    #[serde(rename_all = "camelCase")]
-    HadPropertyValue {
-        property_name: String,
-        operation: PropValueOperation,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        value: Option<Vec<Value>>,
-        time: SegmentTime,
-    },
-    #[serde(rename_all = "camelCase")]
-    DidEvent {
-        #[serde(flatten)]
-        event: EventRef,
-        filters: Option<Vec<EventFilter>>,
-        aggregate: DidEventAggregate,
-    },
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct Segment {
-    name: String,
-    conditions: Vec<Vec<SegmentCondition>>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -743,281 +464,6 @@ pub struct EventSegmentation {
     pub breakdowns: Option<Vec<Breakdown>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub segments: Option<Vec<Segment>>,
-}
-
-impl TryInto<common::query::event_segmentation::SegmentCondition> for SegmentCondition {
-    type Error = PlatformError;
-
-    fn try_into(
-        self,
-    ) -> std::result::Result<common::query::event_segmentation::SegmentCondition, Self::Error> {
-        Ok(match self {
-            SegmentCondition::HasPropertyValue {
-                property_name,
-                operation,
-                value,
-            } => common::query::event_segmentation::SegmentCondition::HasPropertyValue {
-                property_name,
-                operation: operation.try_into()?,
-                value: match value {
-                    Some(v) if !v.is_empty() => {
-                        Some(v.iter().map(json_value_to_scalar).collect::<Result<_>>()?)
-                    }
-                    _ => None,
-                },
-                // value
-                // .map(|v| {
-                // if v.is_empty() {
-                // None
-                // } else {
-                // v.iter()
-                // .map(|v| json_value_to_scalar(v))
-                // .collect::<Result<_>>()
-                // }
-                // })
-                // .transpose()?,
-            },
-            SegmentCondition::HadPropertyValue {
-                property_name,
-                operation,
-                value,
-                time,
-            } => common::query::event_segmentation::SegmentCondition::HadPropertyValue {
-                property_name,
-                operation: operation.try_into()?,
-                value: match value {
-                    Some(v) if !v.is_empty() => {
-                        Some(v.iter().map(json_value_to_scalar).collect::<Result<_>>()?)
-                    }
-                    _ => None,
-                },
-                time: time.try_into()?,
-            },
-            SegmentCondition::DidEvent {
-                event,
-                filters,
-                aggregate,
-            } => common::query::event_segmentation::SegmentCondition::DidEvent {
-                event: event.into(),
-                filters: filters
-                    .map_or_else(
-                        || None,
-                        |v| {
-                            if v.is_empty() {
-                                None
-                            } else {
-                                Some(v.iter().map(|v| v.try_into()).collect::<Result<_>>())
-                            }
-                        },
-                    )
-                    .transpose()?,
-                aggregate: aggregate.try_into()?,
-            },
-        })
-    }
-}
-
-impl TryInto<SegmentTime> for common::query::event_segmentation::SegmentTime {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<SegmentTime, Self::Error> {
-        Ok(match self {
-            common::query::event_segmentation::SegmentTime::Between { from, to } => {
-                SegmentTime::Between { from, to }
-            }
-            common::query::event_segmentation::SegmentTime::From(from) => SegmentTime::From(from),
-            common::query::event_segmentation::SegmentTime::Last { n, unit } => SegmentTime::Last {
-                last: n,
-                unit: unit.try_into()?,
-            },
-            common::query::event_segmentation::SegmentTime::AfterFirstUse { within, unit } => {
-                SegmentTime::AfterFirstUse {
-                    within,
-                    unit: unit.try_into()?,
-                }
-            }
-            common::query::event_segmentation::SegmentTime::Each { n, unit } => {
-                SegmentTime::WindowEach {
-                    unit: unit.try_into()?,
-                    n,
-                }
-            }
-        })
-    }
-}
-
-impl TryInto<DidEventAggregate> for common::query::event_segmentation::DidEventAggregate {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<DidEventAggregate, Self::Error> {
-        Ok(match self {
-            common::query::event_segmentation::DidEventAggregate::Count {
-                operation,
-                value,
-                time,
-            } => DidEventAggregate::Count {
-                operation: operation.try_into()?,
-                value,
-                time: time.try_into()?,
-            },
-            common::query::event_segmentation::DidEventAggregate::RelativeCount {
-                event,
-                operation,
-                filters,
-                time,
-            } => DidEventAggregate::RelativeCount {
-                event: event.try_into()?,
-                operation: operation.try_into()?,
-                filters: filters
-                    .map_or_else(
-                        || None,
-                        |v| {
-                            if v.is_empty() {
-                                None
-                            } else {
-                                Some(v.iter().map(|v| v.try_into()).collect::<Result<_>>())
-                            }
-                        },
-                    )
-                    .transpose()?,
-                time: time.try_into()?,
-            },
-            common::query::event_segmentation::DidEventAggregate::AggregateProperty {
-                property,
-                aggregate,
-                operation,
-                value,
-                time,
-            } => DidEventAggregate::AggregateProperty {
-                property: property.try_into()?,
-                aggregate: aggregate.try_into()?,
-                operation: operation.try_into()?,
-                value: value.map(|v| scalar_to_json_value(&v)).transpose()?,
-                time: time.try_into()?,
-            },
-            common::query::event_segmentation::DidEventAggregate::HistoricalCount {
-                operation,
-                value,
-                time,
-            } => DidEventAggregate::HistoricalCount {
-                operation: operation.try_into()?,
-                value,
-                time: time.try_into()?,
-            },
-        })
-    }
-}
-
-impl TryInto<SegmentCondition> for common::query::event_segmentation::SegmentCondition {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<SegmentCondition, Self::Error> {
-        Ok(match self {
-            common::query::event_segmentation::SegmentCondition::HasPropertyValue {
-                property_name,
-                operation,
-                value,
-            } => SegmentCondition::HasPropertyValue {
-                property_name,
-                operation: operation.try_into()?,
-                value: value
-                    .map_or_else(
-                        || None,
-                        |v| {
-                            if v.is_empty() {
-                                None
-                            } else {
-                                Some(v.iter().map(scalar_to_json_value).collect::<Result<_>>())
-                            }
-                        },
-                    )
-                    .transpose()?,
-            },
-            common::query::event_segmentation::SegmentCondition::HadPropertyValue {
-                property_name,
-                operation,
-                value,
-                time,
-            } => SegmentCondition::HadPropertyValue {
-                property_name,
-                operation: operation.try_into()?,
-                value: value
-                    .map_or_else(
-                        || None,
-                        |v| {
-                            if v.is_empty() {
-                                None
-                            } else {
-                                Some(v.iter().map(scalar_to_json_value).collect::<Result<_>>())
-                            }
-                        },
-                    )
-                    .transpose()?,
-
-                time: time.try_into()?,
-            },
-            common::query::event_segmentation::SegmentCondition::DidEvent {
-                event,
-                filters,
-                aggregate,
-            } => SegmentCondition::DidEvent {
-                event: event.try_into()?,
-                filters: filters
-                    .map_or_else(
-                        || None,
-                        |v| {
-                            if v.is_empty() {
-                                None
-                            } else {
-                                Some(v.iter().map(|v| v.try_into()).collect::<Result<_>>())
-                            }
-                        },
-                    )
-                    .transpose()?,
-                aggregate: aggregate.try_into()?,
-            },
-        })
-    }
-}
-
-impl TryInto<common::query::event_segmentation::Segment> for Segment {
-    type Error = PlatformError;
-
-    fn try_into(
-        self,
-    ) -> std::result::Result<common::query::event_segmentation::Segment, Self::Error> {
-        Ok(common::query::event_segmentation::Segment {
-            name: self.name.clone(),
-            conditions: self
-                .conditions
-                .iter()
-                .map(|v| {
-                    v.iter()
-                        .map(|v| v.to_owned().try_into())
-                        .collect::<Result<Vec<_>>>()
-                })
-                .collect::<Result<_>>()?,
-        })
-    }
-}
-
-impl TryInto<Segment> for common::query::event_segmentation::Segment {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<Segment, Self::Error> {
-        Ok(Segment {
-            name: self.name.clone(),
-            conditions: self
-                .conditions
-                .iter()
-                .map(|v| {
-                    v.iter()
-                        .map(|v| v.to_owned().try_into())
-                        .collect::<Result<Vec<_>>>()
-                })
-                .collect::<Result<_>>()?,
-        })
-    }
 }
 
 // impl TryInto<common::query::event_segmentation::SegmentCondition> for SegmentCondition {
@@ -1114,116 +560,82 @@ impl TryInto<Segment> for common::query::event_segmentation::Segment {
 // }
 // }
 
-impl TryInto<common::query::event_segmentation::EventSegmentation> for EventSegmentation {
-    type Error = PlatformError;
-
-    fn try_into(
-        self,
-    ) -> std::result::Result<common::query::event_segmentation::EventSegmentation, Self::Error>
-    {
-        Ok(common::query::event_segmentation::EventSegmentation {
-            time: self.time.try_into()?,
+impl Into<common::query::event_segmentation::EventSegmentation> for EventSegmentation {
+    fn into(self) -> common::query::event_segmentation::EventSegmentation {
+        common::query::event_segmentation::EventSegmentation {
+            time: self.time.into(),
             group: self.group,
-            interval_unit: self.interval_unit.try_into()?,
-            chart_type: self.chart_type.try_into()?,
-            analysis: self.analysis.try_into()?,
-            compare: self.compare.map(|v| v.try_into()).transpose()?,
-            events: self
-                .events
-                .iter()
-                .map(|v| v.try_into())
-                .collect::<std::result::Result<_, _>>()?,
+            interval_unit: self.interval_unit.into(),
+            chart_type: self.chart_type.into(),
+            analysis: self.analysis.into(),
+            compare: self.compare.map(|v| v.into()),
+            events: self.events.iter().map(|v| v.into()).collect::<Vec<_>>(),
             filters: self.filters.map(|v| {
                 v.groups[0]
                     .filters
                     .iter()
-                    .map(|f| {
-                        dbg!(f.to_owned());
-                        f.try_into().unwrap()
-                    })
+                    .map(|f| f.to_owned().into())
                     .collect::<Vec<_>>()
             }),
-            breakdowns: self
-                .breakdowns
-                .map_or_else(
-                    || None,
-                    |v| {
-                        if v.is_empty() {
-                            None
-                        } else {
-                            Some(v.iter().map(|v| v.try_into()).collect::<Result<_>>())
-                        }
-                    },
-                )
-                .transpose()?,
-            segments: self
-                .segments
-                .map_or_else(
-                    || None,
-                    |v| {
-                        if v.is_empty() {
-                            None
-                        } else {
-                            Some(
-                                v.iter()
-                                    .map(|v| v.to_owned().try_into())
-                                    .collect::<Result<_>>(),
-                            )
-                        }
-                    },
-                )
-                .transpose()?,
-        })
+            breakdowns: self.breakdowns.map_or_else(
+                || None,
+                |v| {
+                    if v.is_empty() {
+                        None
+                    } else {
+                        Some(v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>())
+                    }
+                },
+            ),
+            segments: self.segments.map_or_else(
+                || None,
+                |v| {
+                    if v.is_empty() {
+                        None
+                    } else {
+                        Some(v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>())
+                    }
+                },
+            ),
+        }
     }
 }
 
-impl TryInto<EventSegmentation> for common::query::event_segmentation::EventSegmentation {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<EventSegmentation, Self::Error> {
-        Ok(EventSegmentation {
-            time: self.time.try_into()?,
+impl Into<EventSegmentation> for common::query::event_segmentation::EventSegmentation {
+    fn into(self) -> EventSegmentation {
+        EventSegmentation {
+            time: self.time.into(),
             group: self.group,
-            interval_unit: self.interval_unit.try_into()?,
-            chart_type: self.chart_type.try_into()?,
-            analysis: self.analysis.try_into()?,
-            compare: self.compare.map(|v| v.try_into()).transpose()?,
-            events: self
-                .events
-                .iter()
-                .map(|v| v.try_into())
-                .collect::<std::result::Result<_, _>>()?,
-            filters: None,
-            // filters: self
-            //     .filters
-            //     .map(|v| {
-            //         v.iter()
-            //             .map(|v| v.try_into())
-            //             .collect::<std::result::Result<_, _>>()
-            //     })
-            //     .transpose()?,
-            breakdowns: self
-                .breakdowns
-                .map_or_else(
-                    || None,
-                    |v| {
-                        if v.is_empty() {
-                            None
-                        } else {
-                            Some(v.iter().map(|v| v.try_into()).collect::<Result<_>>())
-                        }
-                    },
-                )
-                .transpose()?,
+            interval_unit: self.interval_unit.into(),
+            chart_type: self.chart_type.into(),
+            analysis: self.analysis.into(),
+            compare: self.compare.map(|v| v.into()),
+            events: self.events.iter().map(|v| v.into()).collect::<Vec<_>>(),
+            filters: self.filters.map(|v| {
+                let f = v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>();
+                let r = EventGroupedFilters {
+                    groups_condition: None,
+                    groups: vec![EventGroupedFilterGroup {
+                        filters_condition: Default::default(),
+                        filters: f,
+                    }],
+                };
+                r
+            }),
+            breakdowns: self.breakdowns.map_or_else(
+                || None,
+                |v| {
+                    if v.is_empty() {
+                        None
+                    } else {
+                        Some(v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>())
+                    }
+                },
+            ),
             segments: self
                 .segments
-                .map(|v| {
-                    v.iter()
-                        .map(|v| v.to_owned().try_into())
-                        .collect::<std::result::Result<_, _>>()
-                })
-                .transpose()?,
-        })
+                .map(|v| v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>()),
+        }
     }
 }
 
@@ -1255,18 +667,7 @@ pub(crate) fn validate(
         ));
     }
     for (event_id, event) in req.events.iter().enumerate() {
-        match &event.event {
-            EventRef::Regular { event_name } => {
-                md.events
-                    .get_by_name(project_id, &event_name)
-                    .map_err(|err| PlatformError::BadRequest(format!("event {event_id}: {err}")))?;
-            }
-            EventRef::Custom { event_id } => {
-                md.custom_events
-                    .get_by_id(project_id, *event_id)
-                    .map_err(|err| PlatformError::BadRequest(format!("event {event_id}: {err}")))?;
-            }
-        }
+        validate_event(md, project_id, &event.event, event_id, "".to_string())?;
 
         match &event.filters {
             Some(filters) => {
@@ -1322,31 +723,7 @@ pub(crate) fn validate(
             for (idx, breakdown) in breakdowns.iter().enumerate() {
                 match breakdown {
                     Breakdown::Property { property } => {
-                        match property {
-                            PropertyRef::User { property_name } => md
-                                .user_properties
-                                .get_by_name(project_id, &property_name)
-                                .map_err(|err| {
-                                    PlatformError::BadRequest(format!("breakdown {idx}: {err}"))
-                                })?,
-                            PropertyRef::Event { property_name } => md
-                                .event_properties
-                                .get_by_name(project_id, &property_name)
-                                .map_err(|err| {
-                                    PlatformError::BadRequest(format!("breakdown {idx}: {err}"))
-                                })?,
-                            PropertyRef::System { property_name } => md
-                                .system_properties
-                                .get_by_name(project_id, &property_name)
-                                .map_err(|err| {
-                                    PlatformError::BadRequest(format!("breakdown {idx}: {err}"))
-                                })?,
-                            PropertyRef::Custom { .. } => {
-                                return Err(PlatformError::Unimplemented(
-                                    "custom property is unimplemented".to_string(),
-                                ));
-                            }
-                        };
+                        validate_property(md, project_id, property, format!("breakdown {idx}"))?;
                     }
                 }
             }
@@ -1566,7 +943,7 @@ mod tests {
             segments: None,
         };
 
-        let _qes: common::query::event_segmentation::EventSegmentation = es.clone().try_into()?;
+        let _qes: common::query::event_segmentation::EventSegmentation = es.clone().into();
         let j = serde_json::to_string_pretty(&es).unwrap();
         print!("1 {}", j);
 

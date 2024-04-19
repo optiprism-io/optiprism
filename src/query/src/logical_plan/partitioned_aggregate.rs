@@ -13,6 +13,10 @@ use chrono::Duration;
 use chrono::Utc;
 use common::query;
 use common::query::PartitionedAggregateFunction;
+use common::types::RESERVED_COLUMN_AGG;
+use common::types::RESERVED_COLUMN_AGG_PARTITIONED_AGGREGATE;
+use common::types::RESERVED_COLUMN_AGG_PARTITIONED_COUNT;
+use common::types::RESERVED_COLUMN_COUNT;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 use datafusion_common::Column;
@@ -25,6 +29,7 @@ use datafusion_expr::UserDefinedLogicalNode;
 use datafusion_expr::UserDefinedLogicalNodeCore;
 
 use crate::error::QueryError;
+use crate::logical_plan::SortField;
 use crate::Result;
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -60,63 +65,6 @@ impl From<&query::PartitionedAggregateFunction> for AggregateFunction {
         }
     }
 }
-pub mod funnel {
-    use chrono::Duration;
-    use datafusion_expr::Expr;
-
-    #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-    pub enum StepOrder {
-        Sequential,
-        Any(Vec<(usize, usize)>), // any of the steps
-    }
-
-    #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-    pub struct ExcludeSteps {
-        pub from: usize,
-        pub to: usize,
-    }
-
-    #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-    pub struct ExcludeExpr {
-        pub expr: Expr,
-        pub steps: Option<Vec<ExcludeSteps>>,
-    }
-
-    #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-    pub enum Count {
-        Unique,
-        NonUnique,
-        Session,
-    }
-
-    #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-    pub enum Order {
-        Any,
-        Asc,
-    }
-
-    #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-    pub enum Filter {
-        DropOffOnAnyStep,
-        // funnel should fail on any step
-        DropOffOnStep(usize),
-        // funnel should fail on certain step
-        TimeToConvert(Duration, Duration), // conversion should be within certain window
-    }
-
-    #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-    pub enum Touch {
-        First,
-        Last,
-        Step(usize),
-    }
-}
-
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub struct SortField {
-    pub data_type: DataType,
-}
-
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum AggregateExpr {
     Count {
@@ -148,21 +96,21 @@ pub enum AggregateExpr {
         groups: Option<Vec<(Expr, SortField)>>,
         partition_col: Column,
     },
-    Funnel {
-        ts_col: Column,
-        from: DateTime<Utc>,
-        to: DateTime<Utc>,
-        window: Duration,
-        steps: Vec<(Expr, funnel::StepOrder)>,
-        exclude: Option<Vec<funnel::ExcludeExpr>>,
-        constants: Option<Vec<Column>>,
-        count: funnel::Count,
-        filter: Option<funnel::Filter>,
-        touch: funnel::Touch,
-        partition_col: Column,
-        bucket_size: Duration,
-        groups: Option<Vec<(Expr, SortField)>>,
-    },
+    // Funnel {
+    // ts_col: Column,
+    // from: DateTime<Utc>,
+    // to: DateTime<Utc>,
+    // window: Duration,
+    // steps: Vec<(Expr, funnel::StepOrder)>,
+    // exclude: Option<Vec<funnel::ExcludeExpr>>,
+    // constants: Option<Vec<Column>>,
+    // count: funnel::Count,
+    // filter: Option<funnel::Filter>,
+    // touch: funnel::Touch,
+    // partition_col: Column,
+    // bucket_size: Duration,
+    // groups: Option<Vec<(Expr, SortField)>>,
+    // },
 }
 
 impl AggregateExpr {
@@ -222,38 +170,39 @@ impl AggregateExpr {
                 groups,
                 partition_col,
             },
-            AggregateExpr::Funnel {
-                ts_col,
-                from,
-                to,
-                window,
-                steps,
-                exclude,
-                constants,
-                count,
-                filter,
-                touch,
-                partition_col: _,
-                bucket_size,
-                groups,
-            } => AggregateExpr::Funnel {
-                ts_col,
-                from,
-                to,
-                window,
-                steps,
-                exclude,
-                constants,
-                count,
-                filter,
-                touch,
-                partition_col,
-                bucket_size,
-                groups,
-            },
+            // AggregateExpr::Funnel {
+            // ts_col,
+            // from,
+            // to,
+            // window,
+            // steps,
+            // exclude,
+            // constants,
+            // count,
+            // filter,
+            // touch,
+            // partition_col: _,
+            // bucket_size,
+            // groups,
+            // } => AggregateExpr::Funnel {
+            // ts_col,
+            // from,
+            // to,
+            // window,
+            // steps,
+            // exclude,
+            // constants,
+            // count,
+            // filter,
+            // touch,
+            // partition_col,
+            // bucket_size,
+            // groups,
+            // },
         }
     }
 }
+
 fn return_type(dt: DataType, agg: &AggregateFunction, _schema: &DFSchema) -> DataType {
     match agg {
         AggregateFunction::Avg => DataType::Float64,
@@ -279,7 +228,7 @@ impl AggregateExpr {
             AggregateExpr::Aggregate { groups, .. } => groups,
             AggregateExpr::PartitionedCount { groups, .. } => groups,
             AggregateExpr::PartitionedAggregate { groups, .. } => groups,
-            AggregateExpr::Funnel { groups, .. } => groups,
+            // AggregateExpr::Funnel { groups, .. } => groups,
         };
 
         if let Some(groups) = groups {
@@ -291,28 +240,35 @@ impl AggregateExpr {
 
     pub fn field_names(&self) -> Vec<String> {
         match self {
-            AggregateExpr::Count { .. } => vec!["count".to_string()],
-            AggregateExpr::Aggregate { .. } => vec!["agg".to_string()],
-            AggregateExpr::PartitionedCount { .. } => vec!["partitioned_count".to_string()],
-            AggregateExpr::PartitionedAggregate { .. } => vec!["partitioned_agg".to_string()],
-            AggregateExpr::Funnel { .. } => unimplemented!(),
+            AggregateExpr::Count { .. } => vec![RESERVED_COLUMN_COUNT.to_string()],
+            AggregateExpr::Aggregate { .. } => vec![RESERVED_COLUMN_AGG.to_string()],
+            AggregateExpr::PartitionedCount { .. } => {
+                vec![RESERVED_COLUMN_AGG_PARTITIONED_COUNT.to_string()]
+            }
+            AggregateExpr::PartitionedAggregate { .. } => {
+                vec![RESERVED_COLUMN_AGG_PARTITIONED_AGGREGATE.to_string()]
+            } // AggregateExpr::Funnel { .. } => unimplemented!(),
         }
     }
     pub fn fields(&self, schema: &DFSchema, final_: bool) -> Result<Vec<DFField>> {
         let fields = match self {
             AggregateExpr::Count { .. } => {
-                vec![DFField::new_unqualified("count", DataType::Int64, true)]
+                vec![DFField::new_unqualified(
+                    RESERVED_COLUMN_COUNT,
+                    DataType::Int64,
+                    true,
+                )]
             }
             AggregateExpr::Aggregate { predicate, agg, .. } => {
                 if final_ {
                     vec![DFField::new_unqualified(
-                        "agg",
+                        RESERVED_COLUMN_AGG,
                         schema.field_from_column(predicate)?.data_type().to_owned(),
                         true,
                     )]
                 } else {
                     vec![DFField::new_unqualified(
-                        "agg",
+                        RESERVED_COLUMN_AGG,
                         return_type(
                             schema.field_from_column(predicate)?.data_type().to_owned(),
                             agg,
@@ -330,7 +286,11 @@ impl AggregateExpr {
                     _ => Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
                 };
 
-                vec![DFField::new_unqualified("partitioned_count", dt, true)]
+                vec![DFField::new_unqualified(
+                    RESERVED_COLUMN_AGG_PARTITIONED_COUNT,
+                    dt,
+                    true,
+                )]
             }
             AggregateExpr::PartitionedAggregate {
                 predicate,
@@ -342,68 +302,19 @@ impl AggregateExpr {
                 let rt1 = return_type(dt.to_owned(), inner_fn, schema);
                 if final_ {
                     vec![DFField::new_unqualified(
-                        "partitioned_agg",
+                        RESERVED_COLUMN_AGG_PARTITIONED_AGGREGATE,
                         dt.to_owned(),
                         true,
                     )]
                 } else {
                     let rt2 = return_type(rt1, outer_fn, schema);
 
-                    vec![DFField::new_unqualified("partitioned_agg", rt2, true)]
-                }
-            }
-            AggregateExpr::Funnel { groups, steps, .. } => {
-                let mut fields = vec![
-                    DFField::new_unqualified(
-                        "ts",
-                        DataType::Timestamp(TimeUnit::Millisecond, None),
+                    vec![DFField::new_unqualified(
+                        RESERVED_COLUMN_AGG_PARTITIONED_AGGREGATE,
+                        rt2,
                         true,
-                    ),
-                    DFField::new_unqualified("total", DataType::Int64, true),
-                    DFField::new_unqualified("completed", DataType::Int64, true),
-                ];
-
-                // prepend group fields if we have grouping
-                if let Some(groups) = &groups {
-                    let group_fields = groups
-                        .iter()
-                        .map(|(expr, _)| {
-                            schema
-                                .field_with_unqualified_name(expr.display_name().unwrap().as_str())
-                                .unwrap()
-                                .to_owned()
-                        })
-                        .collect::<Vec<_>>();
-
-                    fields = [group_fields, fields].concat();
+                    )]
                 }
-
-                // add fields for each step
-                let mut step_fields = (0..steps.len())
-                    .flat_map(|step_id| {
-                        let fields = vec![
-                            DFField::new_unqualified(
-                                format!("step{}_total", step_id).as_str(),
-                                DataType::Int64,
-                                true,
-                            ),
-                            DFField::new_unqualified(
-                                format!("step{}_time_to_convert", step_id).as_str(),
-                                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
-                                true,
-                            ),
-                            DFField::new_unqualified(
-                                format!("step{}_time_to_convert_from_start", step_id).as_str(),
-                                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
-                                true,
-                            ),
-                        ];
-                        fields
-                    })
-                    .collect::<Vec<_>>();
-                fields.append(&mut step_fields);
-
-                fields
             }
         };
 

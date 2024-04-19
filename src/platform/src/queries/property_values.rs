@@ -36,47 +36,33 @@ pub struct ListPropertyValuesRequest {
     pub filter: Option<Filter>,
 }
 
-impl TryInto<query::queries::property_values::PropertyValues> for ListPropertyValuesRequest {
-    type Error = PlatformError;
-
-    fn try_into(
-        self,
-    ) -> std::result::Result<query::queries::property_values::PropertyValues, Self::Error> {
-        Ok(query::queries::property_values::PropertyValues {
-            property: self.property.try_into()?,
+impl Into<query::queries::property_values::PropertyValues> for ListPropertyValuesRequest {
+    fn into(self) -> query::queries::property_values::PropertyValues {
+        query::queries::property_values::PropertyValues {
+            property: self.property.into(),
             event: self.event.map(|event| event.into()),
-            filter: self.filter.map(|filter| filter.try_into()).transpose()?,
-        })
+            filter: self.filter.map(|filter| filter.into()),
+        }
     }
 }
 
-impl TryInto<query::queries::property_values::Filter> for Filter {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<query::queries::property_values::Filter, Self::Error> {
-        Ok(query::queries::property_values::Filter {
-            operation: self.operation.try_into()?,
+impl Into<query::queries::property_values::Filter> for Filter {
+    fn into(self) -> query::queries::property_values::Filter {
+        query::queries::property_values::Filter {
+            operation: self.operation.into(),
             value: self
                 .value
-                .map(|values| {
-                    values
-                        .iter()
-                        .map(json_value_to_scalar)
-                        .collect::<Result<_>>()
-                })
-                .transpose()?,
-        })
+                .map(|values| values.iter().map(json_value_to_scalar).collect::<Vec<_>>()),
+        }
     }
 }
 
-impl TryInto<ListResponse<Value>> for ArrayRef {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<ListResponse<Value>, Self::Error> {
-        Ok(ListResponse {
-            data: array_ref_to_json_values(&self)?,
+impl Into<ListResponse<Value>> for ArrayRef {
+    fn into(self) -> ListResponse<Value> {
+        ListResponse {
+            data: array_ref_to_json_values(&self),
             meta: ResponseMetadata { next: None },
-        })
+        }
     }
 }
 

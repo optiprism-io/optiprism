@@ -15,9 +15,11 @@ use serde::Serialize;
 
 use crate::error::CommonError;
 use crate::error::Result;
+use crate::query::event_segmentation::QueryAggregate;
 use crate::scalar::ScalarValueRef;
 
 pub mod event_segmentation;
+pub mod funnel;
 
 /// Enum of all built-in aggregate functions
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -32,34 +34,6 @@ pub enum AggregateFunction {
     Max,
     /// avg
     Avg,
-    /// median
-    Median,
-    /// Approximate aggregate function
-    ApproxDistinct,
-    /// array_agg
-    ArrayAgg,
-    /// Variance (Sample)
-    Variance,
-    /// Variance (Population)
-    VariancePop,
-    /// Standard Deviation (Sample)
-    Stddev,
-    /// Standard Deviation (Population)
-    StddevPop,
-    /// Covariance (Sample)
-    Covariance,
-    /// Covariance (Population)
-    CovariancePop,
-    /// Correlation
-    Correlation,
-    /// Approximate continuous percentile function
-    ApproxPercentileCont,
-    /// Approximate continuous percentile function with weight
-    ApproxPercentileContWithWeight,
-    /// ApproxMedian
-    ApproxMedian,
-    /// Grouping
-    Grouping,
 }
 
 impl Display for AggregateFunction {
@@ -76,22 +50,6 @@ impl From<DFAggregateFunction> for AggregateFunction {
             DFAggregateFunction::Min => AggregateFunction::Min,
             DFAggregateFunction::Max => AggregateFunction::Max,
             DFAggregateFunction::Avg => AggregateFunction::Avg,
-            DFAggregateFunction::Median => AggregateFunction::Median,
-            DFAggregateFunction::ApproxDistinct => AggregateFunction::ApproxDistinct,
-            DFAggregateFunction::ArrayAgg => AggregateFunction::ArrayAgg,
-            DFAggregateFunction::Variance => AggregateFunction::Variance,
-            DFAggregateFunction::VariancePop => AggregateFunction::VariancePop,
-            DFAggregateFunction::Stddev => AggregateFunction::Stddev,
-            DFAggregateFunction::StddevPop => AggregateFunction::StddevPop,
-            DFAggregateFunction::Covariance => AggregateFunction::Covariance,
-            DFAggregateFunction::CovariancePop => AggregateFunction::CovariancePop,
-            DFAggregateFunction::Correlation => AggregateFunction::Correlation,
-            DFAggregateFunction::ApproxPercentileCont => AggregateFunction::ApproxPercentileCont,
-            DFAggregateFunction::ApproxPercentileContWithWeight => {
-                AggregateFunction::ApproxPercentileContWithWeight
-            }
-            DFAggregateFunction::ApproxMedian => AggregateFunction::ApproxMedian,
-            DFAggregateFunction::Grouping => AggregateFunction::Grouping,
             _ => unimplemented!(),
         }
     }
@@ -105,22 +63,6 @@ impl From<AggregateFunction> for DFAggregateFunction {
             AggregateFunction::Min => DFAggregateFunction::Min,
             AggregateFunction::Max => DFAggregateFunction::Max,
             AggregateFunction::Avg => DFAggregateFunction::Avg,
-            AggregateFunction::Median => DFAggregateFunction::Median,
-            AggregateFunction::ApproxDistinct => DFAggregateFunction::ApproxDistinct,
-            AggregateFunction::ArrayAgg => DFAggregateFunction::ArrayAgg,
-            AggregateFunction::Variance => DFAggregateFunction::Variance,
-            AggregateFunction::VariancePop => DFAggregateFunction::VariancePop,
-            AggregateFunction::Stddev => DFAggregateFunction::Stddev,
-            AggregateFunction::StddevPop => DFAggregateFunction::StddevPop,
-            AggregateFunction::Covariance => DFAggregateFunction::Covariance,
-            AggregateFunction::CovariancePop => DFAggregateFunction::CovariancePop,
-            AggregateFunction::Correlation => DFAggregateFunction::Correlation,
-            AggregateFunction::ApproxPercentileCont => DFAggregateFunction::ApproxPercentileCont,
-            AggregateFunction::ApproxPercentileContWithWeight => {
-                DFAggregateFunction::ApproxPercentileContWithWeight
-            }
-            AggregateFunction::ApproxMedian => DFAggregateFunction::ApproxMedian,
-            AggregateFunction::Grouping => DFAggregateFunction::Grouping,
         }
     }
 }
@@ -315,6 +257,11 @@ impl TryInto<DFOperator> for PropValueOperation {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub enum Breakdown {
+    Property(PropertyRef),
+}
+
 #[serde_with::serde_as]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum EventFilter {
@@ -324,6 +271,94 @@ pub enum EventFilter {
         #[serde_as(as = "Option<Vec<ScalarValueRef>>")]
         value: Option<Vec<ScalarValue>>,
     },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub enum SegmentTime {
+    Between {
+        from: DateTime<Utc>,
+        to: DateTime<Utc>,
+    },
+    From(DateTime<Utc>),
+    Last {
+        n: i64,
+        unit: TimeIntervalUnit,
+    },
+    AfterFirstUse {
+        within: i64,
+        unit: TimeIntervalUnit,
+    },
+    Each {
+        n: i64,
+        unit: TimeIntervalUnit,
+    },
+}
+
+impl SegmentTime {
+    pub fn try_window(&self) -> Option<i64> {
+        match self {
+            SegmentTime::Each { n, unit } => Some(unit.duration(*n).num_milliseconds()),
+            _ => None,
+        }
+    }
+}
+
+#[serde_with::serde_as]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub enum DidEventAggregate {
+    Count {
+        operation: PropValueOperation,
+        value: i64,
+        time: SegmentTime,
+    },
+    RelativeCount {
+        event: EventRef,
+        operation: PropValueOperation,
+        filters: Option<Vec<EventFilter>>,
+        time: SegmentTime,
+    },
+    AggregateProperty {
+        property: PropertyRef,
+        aggregate: QueryAggregate,
+        operation: PropValueOperation,
+        #[serde_as(as = "Option<ScalarValueRef>")]
+        value: Option<ScalarValue>,
+        time: SegmentTime,
+    },
+    HistoricalCount {
+        operation: PropValueOperation,
+        value: u64,
+        time: SegmentTime,
+    },
+}
+
+#[serde_with::serde_as]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub enum SegmentCondition {
+    HasPropertyValue {
+        property_name: String,
+        operation: PropValueOperation,
+        #[serde_as(as = "Option<Vec<ScalarValueRef>>")]
+        value: Option<Vec<ScalarValue>>,
+    },
+    HadPropertyValue {
+        property_name: String,
+        operation: PropValueOperation,
+        #[serde_as(as = "Option<Vec<ScalarValueRef>>")]
+        value: Option<Vec<ScalarValue>>,
+        time: SegmentTime,
+    },
+    DidEvent {
+        event: EventRef,
+        filters: Option<Vec<EventFilter>>,
+        aggregate: DidEventAggregate,
+    },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct Segment {
+    pub name: String,
+    pub conditions: Vec<Vec<SegmentCondition>>, // Or<And<SegmentCondition>>
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -349,10 +384,8 @@ impl QueryTime {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum TimeIntervalUnit {
-    Second,
-    Minute,
     Hour,
     Day,
     Week,
@@ -363,8 +396,6 @@ pub enum TimeIntervalUnit {
 impl TimeIntervalUnit {
     pub fn duration(&self, n: i64) -> Duration {
         match self {
-            TimeIntervalUnit::Second => Duration::seconds(n),
-            TimeIntervalUnit::Minute => Duration::minutes(n),
             TimeIntervalUnit::Hour => Duration::hours(n),
             TimeIntervalUnit::Day => Duration::days(n),
             TimeIntervalUnit::Week => Duration::weeks(n),
@@ -374,8 +405,6 @@ impl TimeIntervalUnit {
     }
     pub fn relative_duration(&self, n: i64) -> RelativeDuration {
         match self {
-            TimeIntervalUnit::Second => RelativeDuration::seconds(n),
-            TimeIntervalUnit::Minute => RelativeDuration::minutes(n),
             TimeIntervalUnit::Hour => RelativeDuration::hours(n),
             TimeIntervalUnit::Day => RelativeDuration::days(n),
             TimeIntervalUnit::Week => RelativeDuration::weeks(n),
@@ -386,8 +415,6 @@ impl TimeIntervalUnit {
 
     pub fn as_str(&self) -> &str {
         match self {
-            TimeIntervalUnit::Second => "second",
-            TimeIntervalUnit::Minute => "minute",
             TimeIntervalUnit::Hour => "hour",
             TimeIntervalUnit::Day => "day",
             TimeIntervalUnit::Week => "week",
@@ -405,8 +432,6 @@ pub fn time_columns(
     let from = date_trunc(granularity, from).unwrap();
     let to = date_trunc(granularity, to).unwrap();
     let rule = match granularity {
-        TimeIntervalUnit::Second => DateRule::secondly(from),
-        TimeIntervalUnit::Minute => DateRule::minutely(from),
         TimeIntervalUnit::Hour => DateRule::hourly(from),
         TimeIntervalUnit::Day => DateRule::daily(from),
         TimeIntervalUnit::Week => DateRule::weekly(from),
@@ -422,26 +447,29 @@ pub fn time_columns(
 pub fn date_trunc(granularity: &TimeIntervalUnit, value: DateTime<Utc>) -> Result<DateTime<Utc>> {
     let value = Some(value);
     let value = match granularity {
-        TimeIntervalUnit::Second => value,
-        TimeIntervalUnit::Minute => value.and_then(|d| d.with_second(0)),
         TimeIntervalUnit::Hour => value
+            .and_then(|d| d.with_nanosecond(0))
             .and_then(|d| d.with_second(0))
             .and_then(|d| d.with_minute(0)),
         TimeIntervalUnit::Day => value
+            .and_then(|d| d.with_nanosecond(0))
             .and_then(|d| d.with_second(0))
             .and_then(|d| d.with_minute(0))
             .and_then(|d| d.with_hour(0)),
         TimeIntervalUnit::Week => value
+            .and_then(|d| d.with_nanosecond(0))
             .and_then(|d| d.with_second(0))
             .and_then(|d| d.with_minute(0))
             .and_then(|d| d.with_hour(0))
             .map(|d| d - Duration::seconds(60 * 60 * 24 * d.weekday() as i64)),
         TimeIntervalUnit::Month => value
+            .and_then(|d| d.with_nanosecond(0))
             .and_then(|d| d.with_second(0))
             .and_then(|d| d.with_minute(0))
             .and_then(|d| d.with_hour(0))
             .and_then(|d| d.with_day0(0)),
         TimeIntervalUnit::Year => value
+            .and_then(|d| d.with_nanosecond(0))
             .and_then(|d| d.with_second(0))
             .and_then(|d| d.with_minute(0))
             .and_then(|d| d.with_hour(0))

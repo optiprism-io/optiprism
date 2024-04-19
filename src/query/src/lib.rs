@@ -53,6 +53,7 @@ use arrow2::array::Int128Array;
 use common::query::PropertyRef;
 pub use context::Context;
 pub use error::Result;
+use indexmap::IndexMap;
 use metadata::MetadataProvider;
 pub use provider::QueryProvider;
 
@@ -291,8 +292,6 @@ impl From<ArrayRef> for StaticArray {
 pub enum ColumnType {
     Dimension,
     Metric,
-    MetricValue,
-    FunnelMetricValue,
 }
 
 #[derive(Clone, Debug)]
@@ -301,6 +300,7 @@ pub struct Column {
     pub typ: ColumnType,
     pub is_nullable: bool,
     pub data_type: DataType,
+    pub hidden: bool,
     pub data: ArrayRef,
 }
 
@@ -330,6 +330,7 @@ pub mod test_util {
     use common::types::COLUMN_EVENT;
     use common::types::COLUMN_PROJECT_ID;
     use common::types::COLUMN_USER_ID;
+    use common::types::TIME_UNIT;
     use common::DECIMAL_PRECISION;
     use common::DECIMAL_SCALE;
     use datafusion::datasource::listing::ListingTable;
@@ -359,14 +360,14 @@ pub mod test_util {
 
     pub async fn events_provider(db: Arc<OptiDBImpl>, _proj_id: u64) -> Result<LogicalPlan> {
         let schema = Schema::new(vec![
-            Field::new("project_id", DataType::Int64, false),
-            Field::new("user_id", DataType::Int64, false),
+            Field::new(COLUMN_PROJECT_ID, DataType::Int64, false),
+            Field::new(COLUMN_USER_ID, DataType::Int64, false),
             Field::new(
-                "created_at",
-                DataType::Timestamp(TimeUnit::Millisecond, None),
+                COLUMN_CREATED_AT,
+                DataType::Timestamp(TIME_UNIT, None),
                 false,
             ),
-            Field::new("event", DataType::Int64, true),
+            Field::new(COLUMN_EVENT, DataType::Int64, true),
             Field::new("user_country", DataType::Int64, true),
             Field::new("user_device", DataType::Utf8, true),
             Field::new("user_is_premium", DataType::Boolean, true),

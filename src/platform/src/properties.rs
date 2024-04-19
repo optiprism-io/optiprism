@@ -29,7 +29,7 @@ impl Properties {
     pub async fn get_by_id(&self, ctx: Context, project_id: u64, id: u64) -> Result<Property> {
         ctx.check_project_permission(project_id, ProjectPermission::ViewSchema)?;
 
-        self.prov.get_by_id(project_id, id)?.try_into()
+        Ok(self.prov.get_by_id(project_id, id)?.into())
     }
 
     pub async fn get_by_name(&self, ctx: Context, project_id: u64, name: &str) -> Result<Property> {
@@ -37,14 +37,14 @@ impl Properties {
 
         let event = self.prov.get_by_name(project_id, name)?;
 
-        event.try_into()
+        Ok(event.into())
     }
 
     pub async fn list(&self, ctx: Context, project_id: u64) -> Result<ListResponse<Property>> {
         ctx.check_project_permission(project_id, ProjectPermission::ViewSchema)?;
         let resp = self.prov.list(project_id)?;
 
-        resp.try_into()
+        Ok(resp.into())
     }
 
     pub async fn update(
@@ -70,13 +70,13 @@ impl Properties {
 
         let prop = self.prov.update(project_id, property_id, md_req)?;
 
-        prop.try_into()
+        Ok(prop.into())
     }
 
     pub async fn delete(&self, ctx: Context, project_id: u64, id: u64) -> Result<Property> {
         ctx.check_project_permission(project_id, ProjectPermission::DeleteSchema)?;
 
-        self.prov.delete(project_id, id)?.try_into()
+        Ok(self.prov.delete(project_id, id)?.into())
     }
 }
 
@@ -204,29 +204,25 @@ pub enum DictionaryType {
     Int64,
 }
 
-impl TryInto<properties::DictionaryType> for DictionaryType {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<properties::DictionaryType, Self::Error> {
-        Ok(match self {
+impl Into<properties::DictionaryType> for DictionaryType {
+    fn into(self) -> properties::DictionaryType {
+        match self {
             DictionaryType::Int8 => properties::DictionaryType::Int8,
             DictionaryType::Int16 => properties::DictionaryType::Int16,
             DictionaryType::Int32 => properties::DictionaryType::Int32,
             DictionaryType::Int64 => properties::DictionaryType::Int64,
-        })
+        }
     }
 }
 
-impl TryInto<DictionaryType> for properties::DictionaryType {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<DictionaryType, Self::Error> {
-        Ok(match self {
+impl Into<DictionaryType> for properties::DictionaryType {
+    fn into(self) -> DictionaryType {
+        match self {
             properties::DictionaryType::Int8 => DictionaryType::Int8,
             properties::DictionaryType::Int16 => DictionaryType::Int16,
             properties::DictionaryType::Int32 => DictionaryType::Int32,
             properties::DictionaryType::Int64 => DictionaryType::Int64,
-        })
+        }
     }
 }
 
@@ -257,11 +253,9 @@ pub struct Property {
     pub dictionary_type: Option<DictionaryType>,
 }
 
-impl TryInto<metadata::properties::Property> for Property {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<metadata::properties::Property, Self::Error> {
-        Ok(metadata::properties::Property {
+impl Into<metadata::properties::Property> for Property {
+    fn into(self) -> metadata::properties::Property {
+        metadata::properties::Property {
             id: self.id,
             created_at: self.created_at,
             updated_at: self.updated_at,
@@ -281,16 +275,14 @@ impl TryInto<metadata::properties::Property> for Property {
             hidden: self.hidden,
             is_array: self.is_array,
             is_dictionary: self.is_dictionary,
-            dictionary_type: self.dictionary_type.map(|v| v.try_into()).transpose()?,
-        })
+            dictionary_type: self.dictionary_type.map(|v| v.into()),
+        }
     }
 }
 
-impl TryInto<Property> for metadata::properties::Property {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<Property, Self::Error> {
-        Ok(Property {
+impl Into<Property> for metadata::properties::Property {
+    fn into(self) -> Property {
+        Property {
             id: self.id,
             created_at: self.created_at,
             updated_at: self.updated_at,
@@ -309,10 +301,10 @@ impl TryInto<Property> for metadata::properties::Property {
             nullable: self.nullable,
             is_array: self.is_array,
             is_dictionary: self.is_dictionary,
-            dictionary_type: self.dictionary_type.map(|v| v.try_into()).transpose()?,
+            dictionary_type: self.dictionary_type.map(|v| v.into()),
             typ: self.typ.into(),
             order: self.order,
-        })
+        }
     }
 }
 

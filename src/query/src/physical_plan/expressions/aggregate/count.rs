@@ -25,6 +25,8 @@ use arrow::datatypes::Field;
 use arrow::record_batch::RecordBatch;
 use arrow::row::Row;
 use arrow::row::SortField;
+use common::types::RESERVED_COLUMN_AGG_PARTITIONED_AGGREGATE;
+use common::types::RESERVED_COLUMN_COUNT;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
@@ -33,7 +35,6 @@ use crate::error::Result;
 use crate::physical_plan::expressions::aggregate::Groups;
 use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
 use crate::physical_plan::expressions::check_filter;
-
 #[derive(Debug)]
 struct Group {
     count: i64,
@@ -91,7 +92,7 @@ macro_rules! count {
             }
 
             fn fields(&self) -> Vec<Field> {
-                let field = Field::new("count", DataType::Int64, true);
+                let field = Field::new(RESERVED_COLUMN_COUNT, DataType::Int64, true);
                 vec![field]
             }
 
@@ -293,6 +294,8 @@ mod tests {
 
     use arrow::datatypes::DataType;
     use arrow::row::SortField;
+    use common::DECIMAL_PRECISION;
+    use common::DECIMAL_SCALE;
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_expr::PhysicalExprRef;
     use storage::test_util::parse_markdown_tables;

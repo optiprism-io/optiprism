@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use common::query::event_segmentation::Breakdown;
-use common::query::event_segmentation::DidEventAggregate;
 use common::query::event_segmentation::Event;
 use common::query::event_segmentation::EventSegmentation;
 use common::query::event_segmentation::Query;
-use common::query::event_segmentation::SegmentCondition;
 use common::query::time_columns;
+use common::query::Breakdown;
+use common::query::DidEventAggregate;
 use common::query::PropertyRef;
+use common::query::SegmentCondition;
 use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_PROJECT_ID;
@@ -50,7 +50,6 @@ use crate::logical_plan::partitioned_aggregate;
 use crate::logical_plan::partitioned_aggregate::AggregateExpr;
 use crate::logical_plan::partitioned_aggregate::PartitionedAggregateFinalNode;
 use crate::logical_plan::partitioned_aggregate::PartitionedAggregatePartialNode;
-use crate::logical_plan::partitioned_aggregate::SortField;
 use crate::logical_plan::pivot::PivotNode;
 use crate::logical_plan::rename_column_rows::RenameColumnRowsNode;
 use crate::logical_plan::rename_columns::RenameColumnsNode;
@@ -59,6 +58,7 @@ use crate::logical_plan::segment;
 use crate::logical_plan::segment::SegmentExpr;
 use crate::logical_plan::segment::SegmentNode;
 use crate::logical_plan::unpivot::UnpivotNode;
+use crate::logical_plan::SortField;
 use crate::queries::decode_filter_single_dictionary;
 use crate::Context;
 

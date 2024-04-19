@@ -12,6 +12,7 @@ use crate::Context;
 
 pub mod event_records_search;
 pub mod event_segmentation;
+pub mod funnel;
 pub mod property_values;
 
 pub fn decode_filter_single_dictionary(

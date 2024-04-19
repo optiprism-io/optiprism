@@ -37,7 +37,7 @@ mod tests {
         create_entities(md.clone(), &db, proj_id).await?;
         let input = events_provider(db, proj_id).await?;
 
-        let to = DateTime::parse_from_rfc3339("2021-09-08T15:42:29.190855+00:00")
+        let to = DateTime::parse_from_rfc3339("2022-08-29T15:42:29.190855+00:00")
             .unwrap()
             .with_timezone(&Utc);
         let req = EventRecordsSearch {

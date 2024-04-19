@@ -34,7 +34,6 @@ use arrow::array::Int64Array;
 use arrow::array::Int8Array;
 use arrow::array::StringArray;
 use arrow::array::TimestampMillisecondArray;
-use arrow::array::TimestampNanosecondArray;
 use arrow::array::UInt16Array;
 use arrow::array::UInt32Array;
 use arrow::array::UInt64Array;
@@ -42,6 +41,7 @@ use arrow::array::UInt8Array;
 use arrow::datatypes::TimeUnit;
 use common::config::Config;
 use common::types::DType;
+use common::types::TIME_UNIT;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 pub use context::Context;
@@ -116,7 +116,7 @@ impl PlatformProvider {
 macro_rules! arr_to_json_values {
     ($array_ref:expr,$array_type:ident) => {{
         let arr = $array_ref.as_any().downcast_ref::<$array_type>().unwrap();
-        Ok(arr.iter().map(|value| json!(value)).collect())
+        arr.iter().map(|value| json!(value)).collect()
     }};
 }
 
@@ -124,17 +124,16 @@ macro_rules! arr_to_json_values {
 macro_rules! int_arr_to_json_values {
     ($array_ref:expr,$array_type:ident) => {{
         let arr = $array_ref.as_any().downcast_ref::<$array_type>().unwrap();
-        Ok(arr
-            .iter()
+        arr.iter()
             .map(|value| match value {
                 None => Value::Number(Number::from_f64(0.0).unwrap()),
                 Some(v) => json!(v),
             })
-            .collect())
+            .collect()
     }};
 }
 
-pub fn array_ref_to_json_values(arr: &ArrayRef) -> Result<Vec<Value>> {
+pub fn array_ref_to_json_values(arr: &ArrayRef) -> Vec<Value> {
     match arr.data_type() {
         arrow::datatypes::DataType::Int8 => int_arr_to_json_values!(arr, Int8Array),
         arrow::datatypes::DataType::Int16 => int_arr_to_json_values!(arr, Int16Array),
@@ -146,8 +145,7 @@ pub fn array_ref_to_json_values(arr: &ArrayRef) -> Result<Vec<Value>> {
         arrow::datatypes::DataType::UInt64 => int_arr_to_json_values!(arr, UInt64Array),
         arrow::datatypes::DataType::Float32 => {
             let arr = arr.as_any().downcast_ref::<Float32Array>().unwrap();
-            Ok(arr
-                .iter()
+            arr.iter()
                 .map(|value| {
                     match value {
                         None => Value::Number(Number::from_f64(0.0).unwrap()),
@@ -157,43 +155,39 @@ pub fn array_ref_to_json_values(arr: &ArrayRef) -> Result<Vec<Value>> {
                         }
                     }
                 })
-                .collect())
+                .collect()
 
             // arr_to_json_values!(arr, Float32Array)
         }
         arrow::datatypes::DataType::Float64 => int_arr_to_json_values!(arr, Float64Array),
         arrow::datatypes::DataType::Boolean => arr_to_json_values!(arr, BooleanArray),
         arrow::datatypes::DataType::Utf8 => arr_to_json_values!(arr, StringArray),
-        arrow::datatypes::DataType::Timestamp(TimeUnit::Millisecond, _) => {
+        arrow::datatypes::DataType::Timestamp(TIME_UNIT, _) => {
             arr_to_json_values!(arr, TimestampMillisecondArray)
         }
         arrow::datatypes::DataType::Decimal128(_, _s) => {
             let arr = arr.as_any().downcast_ref::<Decimal128Array>().unwrap();
             arr.iter()
                 .map(|value| match value {
-                    None => Ok(Value::Number(Number::from_f64(0.0).unwrap())),
+                    None => Value::Number(Number::from_f64(0.0).unwrap()),
                     Some(v) => {
                         let d = Decimal::from_i128_with_scale(v, DECIMAL_SCALE as u32);
                         let d_f = match d.to_f64() {
                             None => {
-                                return Err(PlatformError::Internal(
-                                    "can't convert decimal to f64".to_string(),
-                                ));
+                                panic!("can't convert decimal to f64");
                             }
                             Some(v) => v,
                         };
                         let n = match Number::from_f64(d_f) {
                             None => {
-                                return Err(PlatformError::Internal(
-                                    "can't make json number from f64".to_string(),
-                                ));
+                                panic!("can't make json number from f64");
                             }
                             Some(v) => v,
                         };
-                        Ok(Value::Number(n))
+                        Value::Number(n)
                     }
                 })
-                .collect::<Result<_>>()
+                .collect::<Vec<_>>()
         }
         _ => unimplemented!("{}", arr.data_type()),
     }
@@ -220,54 +214,43 @@ where T: Debug
     pub meta: ResponseMetadata,
 }
 
-impl<A, B> TryInto<ListResponse<A>> for metadata::metadata::ListResponse<B>
+impl<A, B> Into<ListResponse<A>> for metadata::metadata::ListResponse<B>
 where
     A: Debug,
-    B: TryInto<A> + Clone + Debug,
-    PlatformError: std::convert::From<<B as TryInto<A>>::Error>,
+    B: Into<A> + Clone + Debug,
 {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<ListResponse<A>, Self::Error> {
-        let data = self
-            .data
-            .into_iter()
-            .map(|v| v.try_into())
-            .collect::<std::result::Result<Vec<A>, B::Error>>()?;
+    fn into(self) -> ListResponse<A> {
+        let data = self.data.into_iter().map(|v| v.into()).collect::<Vec<A>>();
         let meta = ResponseMetadata {
             next: self.meta.next,
         };
-        Ok(ListResponse { data, meta })
+        ListResponse { data, meta }
     }
 }
 
-pub fn json_value_to_scalar(v: &Value) -> Result<ScalarValue> {
+pub fn json_value_to_scalar(v: &Value) -> ScalarValue {
     match v {
-        Value::Bool(v) => Ok(ScalarValue::Boolean(Some(*v))),
+        Value::Bool(v) => ScalarValue::Boolean(Some(*v)),
         Value::Number(n) => {
-            let dec = Decimal::try_from(n.as_f64().unwrap())?;
-            Ok(ScalarValue::Decimal128(
-                Some(dec.mantissa()),
-                DECIMAL_PRECISION,
-                dec.scale() as i8,
-            ))
+            let dec = Decimal::try_from(n.as_f64().unwrap()).unwrap();
+            ScalarValue::Decimal128(Some(dec.mantissa()), DECIMAL_PRECISION, dec.scale() as i8)
         }
-        Value::String(v) => Ok(ScalarValue::Utf8(Some(v.to_string()))),
-        _ => Err(PlatformError::BadRequest("unexpected value".to_string())),
+        Value::String(v) => ScalarValue::Utf8(Some(v.to_string())),
+        _ => unreachable!("unexpected value"),
     }
 }
 
-pub fn scalar_to_json_value(v: &ScalarValue) -> Result<Value> {
+pub fn scalar_to_json_value(v: &ScalarValue) -> Value {
     match v {
-        ScalarValue::Decimal128(None, _, _) => Ok(Value::Null),
-        ScalarValue::Boolean(None) => Ok(Value::Null),
-        ScalarValue::Utf8(None) => Ok(Value::Null),
-        ScalarValue::Decimal128(Some(v), _p, s) => Ok(Value::Number(
+        ScalarValue::Decimal128(None, _, _) => Value::Null,
+        ScalarValue::Boolean(None) => Value::Null,
+        ScalarValue::Utf8(None) => Value::Null,
+        ScalarValue::Decimal128(Some(v), _p, s) => Value::Number(
             Number::from_f64(Decimal::new(*v as i64, *s as u32).to_f64().unwrap()).unwrap(),
-        )),
-        ScalarValue::Boolean(Some(v)) => Ok(Value::Bool(*v)),
-        ScalarValue::Utf8(Some(v)) => Ok(Value::String(v.to_owned())),
-        _ => Err(PlatformError::BadRequest("unexpected value".to_string())),
+        ),
+        ScalarValue::Boolean(Some(v)) => Value::Bool(*v),
+        ScalarValue::Utf8(Some(v)) => Value::String(v.to_owned()),
+        _ => unreachable!("unexpected value"),
     }
 }
 
@@ -290,11 +273,9 @@ pub enum PropValueOperation {
     NotRegex,
 }
 
-impl TryInto<common::query::PropValueOperation> for PropValueOperation {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<common::query::PropValueOperation, Self::Error> {
-        Ok(match self {
+impl Into<common::query::PropValueOperation> for PropValueOperation {
+    fn into(self) -> common::query::PropValueOperation {
+        match self {
             PropValueOperation::Eq => common::query::PropValueOperation::Eq,
             PropValueOperation::Neq => common::query::PropValueOperation::Neq,
             PropValueOperation::Gt => common::query::PropValueOperation::Gt,
@@ -309,15 +290,13 @@ impl TryInto<common::query::PropValueOperation> for PropValueOperation {
             PropValueOperation::Like => common::query::PropValueOperation::Like,
             PropValueOperation::NotLike => common::query::PropValueOperation::NotLike,
             PropValueOperation::NotRegex => common::query::PropValueOperation::NotRegex,
-        })
+        }
     }
 }
 
-impl TryInto<PropValueOperation> for common::query::PropValueOperation {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<PropValueOperation, Self::Error> {
-        Ok(match self {
+impl Into<PropValueOperation> for common::query::PropValueOperation {
+    fn into(self) -> PropValueOperation {
+        match self {
             common::query::PropValueOperation::Eq => PropValueOperation::Eq,
             common::query::PropValueOperation::Neq => PropValueOperation::Neq,
             common::query::PropValueOperation::Gt => PropValueOperation::Gt,
@@ -332,7 +311,7 @@ impl TryInto<PropValueOperation> for common::query::PropValueOperation {
             common::query::PropValueOperation::Like => PropValueOperation::Like,
             common::query::PropValueOperation::NotLike => PropValueOperation::NotLike,
             common::query::PropValueOperation::NotRegex => PropValueOperation::NotRegex,
-        })
+        }
     }
 }
 
@@ -365,15 +344,13 @@ impl From<EventRef> for common::query::EventRef {
     }
 }
 
-impl TryInto<EventRef> for common::query::EventRef {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<EventRef, Self::Error> {
-        Ok(match self {
+impl Into<EventRef> for common::query::EventRef {
+    fn into(self) -> EventRef {
+        match self {
             common::query::EventRef::RegularName(name) => EventRef::Regular { event_name: name },
             common::query::EventRef::Regular(_id) => unimplemented!(),
             common::query::EventRef::Custom(id) => EventRef::Custom { event_id: id },
-        })
+        }
     }
 }
 
@@ -390,11 +367,9 @@ pub enum PropertyRef {
     Custom { property_id: u64 },
 }
 
-impl TryInto<common::query::PropertyRef> for PropertyRef {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<common::query::PropertyRef, Self::Error> {
-        Ok(match self {
+impl Into<common::query::PropertyRef> for PropertyRef {
+    fn into(self) -> common::query::PropertyRef {
+        match self {
             PropertyRef::System { property_name } => {
                 common::query::PropertyRef::System(property_name)
             }
@@ -403,15 +378,13 @@ impl TryInto<common::query::PropertyRef> for PropertyRef {
                 common::query::PropertyRef::Event(property_name)
             }
             PropertyRef::Custom { property_id } => common::query::PropertyRef::Custom(property_id),
-        })
+        }
     }
 }
 
-impl TryInto<PropertyRef> for common::query::PropertyRef {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<PropertyRef, Self::Error> {
-        Ok(match self {
+impl Into<PropertyRef> for common::query::PropertyRef {
+    fn into(self) -> PropertyRef {
+        match self {
             common::query::PropertyRef::System(property_name) => {
                 PropertyRef::System { property_name }
             }
@@ -420,7 +393,7 @@ impl TryInto<PropertyRef> for common::query::PropertyRef {
                 PropertyRef::Event { property_name }
             }
             common::query::PropertyRef::Custom(property_id) => PropertyRef::Custom { property_id },
-        })
+        }
     }
 }
 
@@ -435,58 +408,53 @@ pub enum EventFilter {
         #[serde(skip_serializing_if = "Option::is_none")]
         value: Option<Vec<Value>>,
     },
-    #[serde(rename_all = "camelCase")]
-    Cohort { cohort_id: u64 },
-    #[serde(rename_all = "camelCase")]
-    Group { group_id: u64 },
+    // #[serde(rename_all = "camelCase")]
+    // Cohort { cohort_id: u64 },
+    // #[serde(rename_all = "camelCase")]
+    // Group { group_id: u64 },
 }
 
-impl TryInto<common::query::EventFilter> for &EventFilter {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<common::query::EventFilter, Self::Error> {
-        Ok(match self {
+impl Into<common::query::EventFilter> for EventFilter {
+    fn into(self) -> common::query::EventFilter {
+        match self {
             EventFilter::Property {
                 property,
                 operation,
                 value,
             } => common::query::EventFilter::Property {
-                property: property.to_owned().try_into()?,
-                operation: operation.to_owned().try_into()?,
+                property: property.to_owned().into(),
+                operation: operation.to_owned().into(),
                 value: match value {
                     None => None,
                     Some(v) => {
                         if v.is_empty() {
                             None
                         } else {
-                            Some(v.iter().map(json_value_to_scalar).collect::<Result<_>>()?)
+                            Some(v.iter().map(json_value_to_scalar).collect::<Vec<_>>())
                         }
                     }
                 },
             },
-            _ => todo!(),
-        })
+        }
     }
 }
 
-impl TryInto<EventFilter> for &common::query::EventFilter {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<EventFilter, Self::Error> {
-        Ok(match self {
+impl Into<EventFilter> for common::query::EventFilter {
+    fn into(self) -> EventFilter {
+        match self {
             common::query::EventFilter::Property {
                 property,
                 operation,
                 value,
             } => EventFilter::Property {
-                property: property.to_owned().try_into()?,
-                operation: operation.to_owned().try_into()?,
+                property: property.to_owned().into(),
+                operation: operation.to_owned().into(),
                 value: match value {
                     None => None,
-                    Some(v) => Some(v.iter().map(scalar_to_json_value).collect::<Result<_>>()?),
+                    Some(v) => Some(v.iter().map(scalar_to_json_value).collect::<Vec<_>>()),
                 },
             },
-        })
+        }
     }
 }
 
@@ -495,8 +463,6 @@ impl TryInto<EventFilter> for &common::query::EventFilter {
 pub enum ColumnType {
     Dimension,
     Metric,
-    MetricValue,
-    FunnelMetricValue,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -507,7 +473,6 @@ pub struct Column {
     pub name: String,
     pub is_nullable: bool,
     pub data_type: DType,
-    pub step: Option<usize>,
     pub data: Vec<Value>,
     pub compare_values: Option<Vec<Value>>,
 }
@@ -517,8 +482,6 @@ impl From<query::ColumnType> for ColumnType {
         match value {
             query::ColumnType::Dimension => ColumnType::Dimension,
             query::ColumnType::Metric => ColumnType::Metric,
-            query::ColumnType::MetricValue => ColumnType::MetricValue,
-            query::ColumnType::FunnelMetricValue => ColumnType::FunnelMetricValue,
         }
     }
 }
@@ -542,39 +505,60 @@ pub enum QueryResponse {
 }
 
 impl QueryResponse {
-    pub fn try_new_json(columns: Vec<query::Column>) -> Result<Self> {
+    pub fn columns_to_json(columns: Vec<query::Column>) -> Result<Self> {
         let columns = columns
             .iter()
             .cloned()
-            .map(|column| match array_ref_to_json_values(&column.data) {
-                Ok(data) => Ok(Column {
+            .map(|column| {
+                let data = array_ref_to_json_values(&column.data);
+                Column {
                     typ: column.typ.into(),
                     name: column.name,
                     is_nullable: column.is_nullable,
-                    data_type: column.data_type.try_into()?,
+                    data_type: column.data_type.into(),
                     data,
-                    step: None,
                     compare_values: None,
-                }),
-                Err(err) => Err(err),
+                }
             })
-            .collect::<Result<_>>()?;
+            .collect::<Vec<_>>();
 
         Ok(Self::JSON(JSONQueryResponse { columns }))
     }
 
-    pub fn try_new_json_compact(columns: Vec<query::Column>) -> Result<Self> {
+    pub fn columns_to_json_compact(columns: Vec<query::Column>) -> Result<Self> {
         let data = columns
             .iter()
             .cloned()
-            .map(|column| match array_ref_to_json_values(&column.data) {
-                Ok(data) => Ok(data),
-                Err(err) => Err(err),
-            })
-            .collect::<Result<_>>()?;
+            .map(|column| array_ref_to_json_values(&column.data))
+            .collect::<Vec<_>>();
 
         Ok(Self::JSONCompact(JSONCompactQueryResponse(data)))
     }
+}
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct FunnelStepData {
+    pub groups: Option<Vec<String>>,
+    pub ts: i64,
+    pub total: i64,
+    pub conversion_ratio: Decimal,
+    pub avg_time_to_convert: Decimal,
+    pub dropped_off: i64,
+    pub drop_off_ratio: Decimal,
+    pub time_to_convert: i64,
+    pub time_to_convert_from_start: i64,
+}
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct FunnelStep {
+    pub step: String,
+    pub data: Vec<FunnelStepData>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct FunnelResponse {
+    pub steps: Vec<FunnelStep>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Default, Debug, PartialEq, Eq)]

@@ -21,7 +21,7 @@ pub mod funnel;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum StepOrder {
-    Sequential,
+    Exact,
     Any(Vec<(usize, usize)>), // any of the steps
 }
 
@@ -40,7 +40,7 @@ impl ExcludeSteps {
 #[derive(Clone, Debug)]
 pub struct ExcludeExpr {
     pub expr: PhysicalExprRef,
-    pub steps: Option<Vec<ExcludeSteps>>,
+    pub steps: Option<ExcludeSteps>,
 }
 
 #[derive(Clone)]
@@ -84,7 +84,7 @@ pub struct Exclude {
     // array of booleans that indicate if the step exists
     // optional array of steps to apply exclude only between them. Otherwise include
     // will be applied on each step
-    steps: Option<Vec<ExcludeSteps>>,
+    steps: Option<ExcludeSteps>,
 }
 
 // Batch for state
@@ -117,9 +117,9 @@ fn evaluate_batch(
     batch: RecordBatch,
     steps_expr: &[PhysicalExprRef],
     exclude_expr: &Option<Vec<ExcludeExpr>>,
-    constants: &Option<Vec<Column>>,
-    ts_col: &Column,
-    partition_col: &Column,
+    constants: &Option<Vec<PhysicalExprRef>>,
+    ts_col: &PhysicalExprRef,
+    partition_col: &PhysicalExprRef,
 ) -> Result<Batch> {
     let mut steps = vec![];
     // evaluate steps
@@ -135,7 +135,6 @@ fn evaluate_batch(
         // add steps to state
         steps.push(arr);
     }
-
     // evaluate exclude
     let mut exclude = Some(vec![]);
     if let Some(exprs) = &exclude_expr {
@@ -163,7 +162,6 @@ fn evaluate_batch(
             }
         }
     }
-
     // prepare constants
     let mut constants_out: Option<Vec<_>> = None;
     if let Some(cc) = constants {
@@ -186,7 +184,6 @@ fn evaluate_batch(
         .downcast_ref::<TimestampMillisecondArray>()
         .unwrap()
         .clone();
-
     let parr = partition_col
         .evaluate(&batch)?
         .into_array(batch.num_rows())?
@@ -194,7 +191,6 @@ fn evaluate_batch(
         .downcast_ref::<Int64Array>()
         .unwrap()
         .clone();
-
     let res = Batch {
         steps,
         exclude,

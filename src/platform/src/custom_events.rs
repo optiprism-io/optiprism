@@ -43,25 +43,25 @@ impl CustomEvents {
             events: req
                 .events
                 .iter()
-                .map(|e| e.to_owned().try_into())
-                .collect::<Result<_>>()?,
+                .map(|e| e.to_owned().into())
+                .collect::<Vec<_>>(),
         };
 
         let event = self.prov.create(project_id, md_req)?;
 
-        event.try_into()
+        Ok(event.into())
     }
 
     pub async fn get_by_id(&self, ctx: Context, project_id: u64, id: u64) -> Result<CustomEvent> {
         ctx.check_project_permission(project_id, ProjectPermission::ViewSchema)?;
-        self.prov.get_by_id(project_id, id)?.try_into()
+        Ok(self.prov.get_by_id(project_id, id)?.into())
     }
 
     pub async fn list(&self, ctx: Context, project_id: u64) -> Result<ListResponse<CustomEvent>> {
         ctx.check_project_permission(project_id, ProjectPermission::ViewSchema)?;
         let resp = self.prov.list(project_id)?;
 
-        resp.try_into()
+        Ok(resp.into())
     }
 
     pub async fn update(
@@ -86,19 +86,19 @@ impl CustomEvents {
             md_req.events.insert(
                 events
                     .iter()
-                    .map(|e| e.to_owned().try_into())
-                    .collect::<Result<_>>()?,
+                    .map(|e| e.to_owned().into())
+                    .collect::<Vec<_>>(),
             );
         }
         let event = self.prov.update(project_id, event_id, md_req)?;
 
-        event.try_into()
+        Ok(event.into())
     }
 
     pub async fn delete(&self, ctx: Context, project_id: u64, id: u64) -> Result<CustomEvent> {
         ctx.check_project_permission(project_id, ProjectPermission::DeleteSchema)?;
 
-        self.prov.delete(project_id, id)?.try_into()
+        Ok(self.prov.delete(project_id, id)?.into())
     }
 }
 
@@ -135,31 +135,25 @@ pub struct Event {
     pub filters: Option<Vec<EventFilter>>,
 }
 
-impl TryInto<metadata::custom_events::Event> for Event {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<metadata::custom_events::Event, Self::Error> {
-        Ok(metadata::custom_events::Event {
+impl Into<metadata::custom_events::Event> for Event {
+    fn into(self) -> metadata::custom_events::Event {
+        metadata::custom_events::Event {
             event: self.event.into(),
             filters: self
                 .filters
-                .map(|v| v.iter().map(|e| e.try_into()).collect())
-                .transpose()?,
-        })
+                .map(|v| v.iter().map(|e| e.to_owned().into()).collect()),
+        }
     }
 }
 
-impl TryInto<Event> for metadata::custom_events::Event {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<Event, Self::Error> {
-        Ok(Event {
-            event: self.event.try_into()?,
+impl Into<Event> for metadata::custom_events::Event {
+    fn into(self) -> Event {
+        Event {
+            event: self.event.into(),
             filters: self
                 .filters
-                .map(|v| v.iter().map(|e| e.try_into()).collect())
-                .transpose()?,
-        })
+                .map(|v| v.iter().map(|e| e.to_owned().into()).collect()),
+        }
     }
 }
 
@@ -180,11 +174,9 @@ pub struct CustomEvent {
     pub events: Vec<Event>,
 }
 
-impl TryInto<CustomEvent> for metadata::custom_events::CustomEvent {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<CustomEvent, Self::Error> {
-        Ok(CustomEvent {
+impl Into<CustomEvent> for metadata::custom_events::CustomEvent {
+    fn into(self) -> CustomEvent {
+        CustomEvent {
             id: self.id,
             created_at: self.created_at,
             updated_at: self.updated_at,
@@ -199,9 +191,9 @@ impl TryInto<CustomEvent> for metadata::custom_events::CustomEvent {
             events: self
                 .events
                 .iter()
-                .map(|e| e.to_owned().try_into())
-                .collect::<Result<_>>()?,
-        })
+                .map(|e| e.to_owned().into())
+                .collect::<Vec<_>>(),
+        }
     }
 }
 

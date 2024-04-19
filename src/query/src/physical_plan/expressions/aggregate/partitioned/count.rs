@@ -16,6 +16,7 @@ use arrow::datatypes::Field;
 use arrow::record_batch::RecordBatch;
 use arrow::row::Row;
 use arrow::row::SortField;
+use common::types::RESERVED_COLUMN_AGG_PARTITIONED_COUNT;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 use datafusion::physical_expr::expressions::Column;
@@ -108,7 +109,7 @@ macro_rules! count {
             }
 
             fn fields(&self) -> Vec<Field> {
-                let field = Field::new("partitioned_count", DataType::$dt, true);
+                let field = Field::new(RESERVED_COLUMN_AGG_PARTITIONED_COUNT, DataType::$dt, true);
                 vec![field]
             }
 
@@ -300,7 +301,7 @@ impl PartitionedAggregateExpr for PartitionedCount<i128> {
 
     fn fields(&self) -> Vec<Field> {
         let field = Field::new(
-            "partitioned_count",
+            RESERVED_COLUMN_AGG_PARTITIONED_COUNT,
             DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
             true,
         );

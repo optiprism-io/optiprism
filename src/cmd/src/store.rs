@@ -400,7 +400,6 @@ where R: io::Read {
                 Some((ts, event)) => {
                     let cur = Utc::now().timestamp();
                     let ts = ts / 1000000000;
-                    let _d = NaiveDateTime::from_timestamp_opt(ts, 0).unwrap();
                     if ts > cur {
                         thread::sleep(std::time::Duration::from_secs((ts - cur) as u64));
                     }

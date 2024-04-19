@@ -15,6 +15,7 @@ mod segmented_aggregate;
 // mod sf;
 mod add_string_column;
 mod db_parquet;
+mod funnel;
 mod rename_column_rows;
 mod rename_columns;
 mod reorder_columns;

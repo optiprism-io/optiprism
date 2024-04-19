@@ -8,44 +8,17 @@ use serde::Serialize;
 
 use crate::query::time_columns;
 use crate::query::AggregateFunction;
+use crate::query::Breakdown;
 use crate::query::EventFilter;
 use crate::query::EventRef;
 use crate::query::PartitionedAggregateFunction;
 use crate::query::PropValueOperation;
 use crate::query::PropertyRef;
 use crate::query::QueryTime;
+use crate::query::Segment;
 use crate::query::TimeIntervalUnit;
 use crate::scalar::ScalarValueRef;
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub enum SegmentTime {
-    Between {
-        from: DateTime<Utc>,
-        to: DateTime<Utc>,
-    },
-    From(DateTime<Utc>),
-    Last {
-        n: i64,
-        unit: TimeIntervalUnit,
-    },
-    AfterFirstUse {
-        within: i64,
-        unit: TimeIntervalUnit,
-    },
-    Each {
-        n: i64,
-        unit: TimeIntervalUnit,
-    },
-}
-
-impl SegmentTime {
-    pub fn try_window(&self) -> Option<i64> {
-        match self {
-            SegmentTime::Each { n, unit } => Some(unit.duration(*n).num_seconds()),
-            _ => None,
-        }
-    }
-}
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum ChartType {
     Line,
@@ -167,22 +140,6 @@ impl Query {
                 AggregateFunction::Min => "Min".to_string(),
                 AggregateFunction::Max => "Max".to_string(),
                 AggregateFunction::Avg => "Avg".to_string(),
-                AggregateFunction::Median => "Median".to_string(),
-                AggregateFunction::ApproxDistinct => "Approx distinct".to_string(),
-                AggregateFunction::ArrayAgg => "Array agg".to_string(),
-                AggregateFunction::Variance => "Variance".to_string(),
-                AggregateFunction::VariancePop => "Variance pop".to_string(),
-                AggregateFunction::Stddev => "Std dev".to_string(),
-                AggregateFunction::StddevPop => "Std dev pop".to_string(),
-                AggregateFunction::Covariance => "Covariance".to_string(),
-                AggregateFunction::CovariancePop => "Covariance pop".to_string(),
-                AggregateFunction::Correlation => "Correlation".to_string(),
-                AggregateFunction::ApproxPercentileCont => "Approx percentile cont".to_string(),
-                AggregateFunction::ApproxPercentileContWithWeight => {
-                    "Approx percentile cont with weight".to_string()
-                }
-                AggregateFunction::ApproxMedian => "Approx median".to_string(),
-                AggregateFunction::Grouping => "Grouping".to_string(),
             },
             Query::AggregatePropertyPerGroup {
                 property,
@@ -219,11 +176,6 @@ impl NamedQuery {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub enum Breakdown {
-    Property(PropertyRef),
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Event {
     pub event: EventRef,
     pub filters: Option<Vec<EventFilter>>,
@@ -245,64 +197,6 @@ impl Event {
             queries,
         }
     }
-}
-
-#[serde_with::serde_as]
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub enum DidEventAggregate {
-    Count {
-        operation: PropValueOperation,
-        value: i64,
-        time: SegmentTime,
-    },
-    RelativeCount {
-        event: EventRef,
-        operation: PropValueOperation,
-        filters: Option<Vec<EventFilter>>,
-        time: SegmentTime,
-    },
-    AggregateProperty {
-        property: PropertyRef,
-        aggregate: QueryAggregate,
-        operation: PropValueOperation,
-        #[serde_as(as = "Option<ScalarValueRef>")]
-        value: Option<ScalarValue>,
-        time: SegmentTime,
-    },
-    HistoricalCount {
-        operation: PropValueOperation,
-        value: u64,
-        time: SegmentTime,
-    },
-}
-
-#[serde_with::serde_as]
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub enum SegmentCondition {
-    HasPropertyValue {
-        property_name: String,
-        operation: PropValueOperation,
-        #[serde_as(as = "Option<Vec<ScalarValueRef>>")]
-        value: Option<Vec<ScalarValue>>,
-    },
-    HadPropertyValue {
-        property_name: String,
-        operation: PropValueOperation,
-        #[serde_as(as = "Option<Vec<ScalarValueRef>>")]
-        value: Option<Vec<ScalarValue>>,
-        time: SegmentTime,
-    },
-    DidEvent {
-        event: EventRef,
-        filters: Option<Vec<EventFilter>>,
-        aggregate: DidEventAggregate,
-    },
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct Segment {
-    pub name: String,
-    pub conditions: Vec<Vec<SegmentCondition>>, // Or<And<SegmentCondition>>
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]

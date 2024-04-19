@@ -16,12 +16,11 @@ def test_types():
             if t1 == "f64" or t1 == "i128" or t1 == "decimal":
                 op = optiprism.aggregate_property_query(agg, field)
                 ch = clickhouse.aggregate_property_query(agg, field)
-
                 for idx, v in enumerate(ch[1]):
                     assert math.isclose(op[1][idx], v, rel_tol=0.000001)
             else:
-                op = optiprism.aggregate_property_query(agg, field, period=10)
                 ch = clickhouse.aggregate_property_query(agg, field, period=10)
+                op = optiprism.aggregate_property_query(agg, field, period=10)
                 print(ch)
                 print(op)
                 assert ch == op
