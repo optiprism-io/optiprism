@@ -234,9 +234,9 @@ impl Group {
                 }
             }
 
-            // for idx in 1..self.steps.len() {
-            //     b.steps[idx].dropped_off = b.steps[idx - 1].total - b.steps[idx].total;
-            // }
+            for idx in 1..self.steps.len() {
+                b.steps[idx].dropped_off = b.steps[idx - 1].total - b.steps[idx].total;
+            }
         });
 
         is_completed
@@ -766,7 +766,7 @@ impl Funnel {
                     let mut v = Decimal::from_f64(if completed > 0 {
                         completed as f64 / step.total as f64 * 100.
                     } else {
-                        0.
+                        if step_id == 0 { 100. } else { 0. }
                     })
                     .unwrap();
                     v.rescale(DECIMAL_SCALE as u32);
