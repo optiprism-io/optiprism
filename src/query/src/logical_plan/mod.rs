@@ -6,6 +6,7 @@ pub mod merge;
 pub mod pivot;
 // pub mod _segmentation;
 pub mod add_string_column;
+pub mod aggregate_columns;
 pub mod db_parquet;
 pub mod funnel;
 pub mod partitioned_aggregate;

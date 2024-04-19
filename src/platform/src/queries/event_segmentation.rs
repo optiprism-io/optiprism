@@ -816,7 +816,6 @@ pub(crate) fn fix_types(
     }
 
     // TODO make for out.filters
-    dbg!(out.clone());
 
     Ok(out)
 }
