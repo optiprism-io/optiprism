@@ -44,8 +44,9 @@ use crate::expr::property_col;
 use crate::expr::property_expression;
 use crate::expr::time_expression;
 use crate::logical_plan::add_string_column::AddStringColumnNode;
-use crate::logical_plan::aggregate_columns::AggregateColumnsNode;
+use crate::logical_plan::aggregate_columns::AggregateAndSortColumnsNode;
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
+use crate::logical_plan::limit_groups::LimitGroupsNode;
 use crate::logical_plan::merge::MergeNode;
 use crate::logical_plan::partitioned_aggregate;
 use crate::logical_plan::partitioned_aggregate::AggregateExpr;
@@ -539,17 +540,18 @@ impl LogicalPlanBuilder {
                     rename_rows,
                 )?),
             });
-
-            dbg!(&group_expr);
-            dbg!(group_expr.len());
-            dbg!(input.schema());
-            input = LogicalPlan::Extension(Extension {
-                node: Arc::new(AggregateColumnsNode::try_new(
-                    input,
-                    group_expr.len() - 1 + 2,
-                )?), // +2 is segment and agg_name cols that are groups as well
-            })
         }
+
+        input = LogicalPlan::Extension(Extension {
+            node: Arc::new(AggregateAndSortColumnsNode::try_new(
+                input,
+                group_expr.len() - 1 + 2,
+            )?), // +2 is segment and agg_name cols that are groups as well
+        });
+
+        input = LogicalPlan::Extension(Extension {
+            node: Arc::new(LimitGroupsNode::try_new(input, 1, group_expr.len() - 1, 3)?),
+        });
         Ok(input)
     }
 

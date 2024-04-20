@@ -9,6 +9,7 @@ pub mod add_string_column;
 pub mod aggregate_columns;
 pub mod db_parquet;
 pub mod funnel;
+pub mod limit_groups;
 pub mod partitioned_aggregate;
 pub mod rename_column_rows;
 pub mod rename_columns;

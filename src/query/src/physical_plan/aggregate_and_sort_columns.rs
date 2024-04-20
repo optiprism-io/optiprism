@@ -1,7 +1,10 @@
 use std::any::Any;
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::fmt;
 use std::ops::Deref;
 use std::pin::Pin;
+use std::rc::Rc;
 use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
@@ -10,7 +13,13 @@ use arrow::array::Array;
 use arrow::array::ArrayRef;
 use arrow::array::Decimal128Array;
 use arrow::array::Decimal128Builder;
+use arrow::array::Int64Array;
+use arrow::array::Int64Builder;
 use arrow::array::RecordBatch;
+use arrow::array::StringArray;
+use arrow::compute::sort_to_indices;
+use arrow::compute::take;
+use arrow::compute::SortOptions;
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
 use arrow::datatypes::Schema;
@@ -31,6 +40,7 @@ use datafusion_common::DataFusionError;
 use datafusion_common::Result as DFResult;
 use futures::Stream;
 use futures::StreamExt;
+use indexmap::IndexMap;
 
 use crate::error::QueryError;
 use crate::physical_plan::merge::MergeExec;
@@ -52,13 +62,13 @@ impl Agg {
 }
 
 #[derive(Debug)]
-pub struct AggregateColumnsExec {
+pub struct AggregateAndSortColumnsExec {
     input: Arc<dyn ExecutionPlan>,
     groups: usize,
     schema: SchemaRef,
 }
 
-impl AggregateColumnsExec {
+impl AggregateAndSortColumnsExec {
     pub fn new(input: Arc<dyn ExecutionPlan>, groups: usize) -> Self {
         let schema = input.schema();
 
@@ -84,14 +94,14 @@ impl AggregateColumnsExec {
     }
 }
 
-impl DisplayAs for AggregateColumnsExec {
+impl DisplayAs for AggregateAndSortColumnsExec {
     fn fmt_as(&self, _t: DisplayFormatType, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "AggregateColumnsExec")
+        write!(f, "AggregateAndSortColumnsExec")
     }
 }
 
 #[async_trait]
-impl ExecutionPlan for AggregateColumnsExec {
+impl ExecutionPlan for AggregateAndSortColumnsExec {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -116,7 +126,7 @@ impl ExecutionPlan for AggregateColumnsExec {
         self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
-        Ok(Arc::new(AggregateColumnsExec::new(
+        Ok(Arc::new(AggregateAndSortColumnsExec::new(
             children[0].clone(),
             self.groups.clone(),
         )))
@@ -128,20 +138,20 @@ impl ExecutionPlan for AggregateColumnsExec {
         context: Arc<TaskContext>,
     ) -> datafusion_common::Result<SendableRecordBatchStream> {
         let stream = self.input.execute(partition, context)?;
-        Ok(Box::pin(AggregateColumnsStream {
+        Ok(Box::pin(AggregateAndSortColumnsStream {
             stream,
             schema: self.schema.clone(),
             groups: self.groups,
         }))
     }
 }
-struct AggregateColumnsStream {
+struct AggregateAndSortColumnsStream {
     stream: SendableRecordBatchStream,
     schema: SchemaRef,
     groups: usize,
 }
 
-impl Stream for AggregateColumnsStream {
+impl Stream for AggregateAndSortColumnsStream {
     type Item = DFResult<RecordBatch>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -169,14 +179,30 @@ impl Stream for AggregateColumnsStream {
                     .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)
                     .map_err(|e| DataFusionError::Execution(e.to_string()))?;
 
+                let idx = Arc::new(sort_to_indices(
+                    &avg,
+                    Some(SortOptions {
+                        descending: true,
+                        nulls_first: false,
+                    }),
+                    None,
+                )?) as ArrayRef;
+
                 let mut out = vec![];
-                for (idx, column) in batch.columns().iter().enumerate() {
+                for (idx, column) in batch.columns().into_iter().enumerate() {
                     out.push(column.to_owned());
                     if idx == self.groups - 1 {
-                        out.push(Arc::new(avg.clone()) as ArrayRef);
+                        out.push(Arc::new(avg.clone()));
                     }
                 }
+
+                let out = out
+                    .iter()
+                    .map(|c| take(c, &idx, None).unwrap())
+                    .collect::<Vec<_>>();
+
                 let rb = RecordBatch::try_new(self.schema.clone(), out)?;
+
                 Poll::Ready(Some(Ok(rb)))
             }
             other => return other,
@@ -184,7 +210,7 @@ impl Stream for AggregateColumnsStream {
     }
 }
 
-impl RecordBatchStream for AggregateColumnsStream {
+impl RecordBatchStream for AggregateAndSortColumnsStream {
     fn schema(&self) -> SchemaRef {
         self.schema.clone()
     }
@@ -201,25 +227,30 @@ mod tests {
     use datafusion::prelude::SessionContext;
     use storage::test_util::parse_markdown_tables;
 
-    use crate::physical_plan::aggregate_columns::AggregateColumnsExec;
+    use crate::physical_plan::aggregate_and_sort_columns::AggregateAndSortColumnsExec;
 
     #[tokio::test]
-    async fn test_partial() {
+    async fn it_works() {
         let data = r#"
 | a(i64) | b(i64) | c(decimal) | d(decimal) |
 |--------|--------|---------|--------|
 | 1      | 1      | 1       | 2      |
-| 1      | 1      | 2       | 3      |
-| 1      | 1      | 3       | 4      |
-| 1      | 1      | 1       | 2      |
-| 1      | 1      | 1       | 2      |
+| 1      | 2      | 2       | 3      |
+| 1      | 3      | 3       | 3      |
+| 1      | 4      | 4       | 3      |
+| 2      | 1      | 5       | 4      |
+| 2      | 2      | 6       | 2      |
+| 2      | 3      | 7       | 2      |
+| 2      | 4      | 8       | 2      |
+| 3      | 1      | 9       | 2      |
+| 3      | 2      | 10      | 2      |
 "#;
 
         let res = parse_markdown_tables(data).unwrap();
         let schema = res[0].schema();
         let input = MemoryExec::try_new(&[res], schema.clone(), None).unwrap();
 
-        let exec = AggregateColumnsExec::new(Arc::new(input), 2);
+        let exec = AggregateAndSortColumnsExec::new(Arc::new(input), 2);
         let session_ctx = SessionContext::new();
         let task_ctx = session_ctx.task_ctx();
         let stream = exec.execute(0, task_ctx).unwrap();

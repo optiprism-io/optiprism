@@ -20,51 +20,41 @@ use datafusion_expr::UserDefinedLogicalNode;
 use crate::Result;
 
 #[derive(Hash, Eq, PartialEq)]
-pub struct AggregateAndSortColumnsNode {
+pub struct LimitGroupsNode {
     input: LogicalPlan,
+    pub skip: usize,
     pub groups: usize,
+    pub limit: usize,
     schema: DFSchemaRef,
 }
 
-impl AggregateAndSortColumnsNode {
-    pub fn try_new(input: LogicalPlan, groups: usize) -> Result<Self> {
-        let schema = input.schema();
-
-        let mut cols = vec![];
-
-        for (idx, f) in schema.fields().iter().enumerate() {
-            cols.push(f.to_owned());
-            if idx == groups - 1 {
-                let col = DFField::new_unqualified(
-                    "Average",
-                    DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
-                    false,
-                );
-                cols.push(col);
-            }
-        }
+impl LimitGroupsNode {
+    pub fn try_new(input: LogicalPlan, skip: usize, groups: usize, limit: usize) -> Result<Self> {
+        let schema = input.schema().to_owned();
 
         Ok(Self {
             input,
+            skip,
             groups,
-            schema: Arc::new(DFSchema::new_with_metadata(cols, HashMap::default())?),
+            limit,
+            schema,
         })
     }
 }
 
-impl Debug for AggregateAndSortColumnsNode {
+impl Debug for LimitGroupsNode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         self.fmt_for_explain(f)
     }
 }
 
-impl UserDefinedLogicalNode for AggregateAndSortColumnsNode {
+impl UserDefinedLogicalNode for LimitGroupsNode {
     fn as_any(&self) -> &dyn Any {
         self
     }
 
     fn name(&self) -> &str {
-        "AggregateColumns"
+        "LimitGroups"
     }
 
     fn inputs(&self) -> Vec<&LogicalPlan> {
@@ -80,7 +70,7 @@ impl UserDefinedLogicalNode for AggregateAndSortColumnsNode {
     }
 
     fn fmt_for_explain(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "AggregateColumns")
+        write!(f, "LimitGroups")
     }
 
     fn from_template(
@@ -88,7 +78,10 @@ impl UserDefinedLogicalNode for AggregateAndSortColumnsNode {
         _exprs: &[Expr],
         inputs: &[LogicalPlan],
     ) -> Arc<dyn UserDefinedLogicalNode> {
-        Arc::new(AggregateAndSortColumnsNode::try_new(inputs[0].clone(), self.groups).unwrap())
+        Arc::new(
+            LimitGroupsNode::try_new(inputs[0].clone(), self.skip, self.groups, self.limit)
+                .unwrap(),
+        )
     }
 
     fn dyn_hash(&self, state: &mut dyn Hasher) {
