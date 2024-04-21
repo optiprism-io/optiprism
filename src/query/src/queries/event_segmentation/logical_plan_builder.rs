@@ -550,7 +550,7 @@ impl LogicalPlanBuilder {
         });
 
         input = LogicalPlan::Extension(Extension {
-            node: Arc::new(LimitGroupsNode::try_new(input, 1, group_expr.len() - 1, 3)?),
+            node: Arc::new(LimitGroupsNode::try_new(input, 1, group_expr.len() - 1, 50)?),
         });
         Ok(input)
     }
