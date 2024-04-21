@@ -28,9 +28,11 @@ use datafusion_common::Result as DFResult;
 
 use crate::error::Result;
 use crate::logical_plan::add_string_column::AddStringColumnNode;
+use crate::logical_plan::aggregate_columns::AggregateAndSortColumnsNode;
 use crate::logical_plan::db_parquet::DbParquetNode;
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::logical_plan::funnel::FunnelNode;
+use crate::logical_plan::limit_groups::LimitGroupsNode;
 use crate::logical_plan::merge::MergeNode;
 use crate::logical_plan::partitioned_aggregate::PartitionedAggregateFinalNode;
 use crate::logical_plan::partitioned_aggregate::PartitionedAggregatePartialNode;
@@ -41,8 +43,10 @@ use crate::logical_plan::reorder_columns::ReorderColumnsNode;
 use crate::logical_plan::segment::SegmentNode;
 use crate::logical_plan::unpivot::UnpivotNode;
 use crate::physical_plan::add_string_column::AddStringColumnExec;
+use crate::physical_plan::aggregate_and_sort_columns::AggregateAndSortColumnsExec;
 use crate::physical_plan::db_parquet::DBParquetExec;
 use crate::physical_plan::dictionary_decode::DictionaryDecodeExec;
+use crate::physical_plan::limit_groups::LimitGroupsExec;
 use crate::physical_plan::merge::MergeExec;
 use crate::physical_plan::pivot::PivotExec;
 use crate::physical_plan::planner::funnel::build_funnel;
@@ -126,6 +130,18 @@ impl DFExtensionPlanner for ExtensionPlanner {
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<RenameColumnsNode>() {
             let exec = RenameColumnsExec::new(physical_inputs[0].clone(), node.columns.clone());
+            Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
+        } else if let Some(node) = any.downcast_ref::<AggregateAndSortColumnsNode>() {
+            let exec =
+                AggregateAndSortColumnsExec::new(physical_inputs[0].clone(), node.groups.clone());
+            Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
+        } else if let Some(node) = any.downcast_ref::<LimitGroupsNode>() {
+            let exec = LimitGroupsExec::new(
+                physical_inputs[0].clone(),
+                node.skip,
+                node.groups,
+                node.limit,
+            );
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<RenameColumnRowsNode>() {
             let col = Column::new(
