@@ -763,10 +763,10 @@ pub(crate) fn fix_types(
                                 md.system_properties.get_by_name(project_id, name)?
                             }
                             common::query::PropertyRef::User(name) => {
-                                md.system_properties.get_by_name(project_id, name)?
+                                md.user_properties.get_by_name(project_id, name)?
                             }
                             common::query::PropertyRef::Event(name) => {
-                                md.system_properties.get_by_name(project_id, name)?
+                                md.event_properties.get_by_name(project_id, name)?
                             }
                             common::query::PropertyRef::Custom(_) => unimplemented!(),
                         };
