@@ -195,34 +195,27 @@ impl ArrowIndexChunk {
     }
 }
 
-pub fn check_intersection(
-    chunks: &[PagesIndexChunk],
-    other: Option<&PagesIndexChunk>,
-    index_cols: usize,
-    is_replacing: bool,
-) -> bool {
+pub fn check_intersection(chunks: &[PagesIndexChunk], other: Option<&PagesIndexChunk>) -> bool {
     if other.is_none() {
         return false;
     }
 
-    let offset = if is_replacing { 1 } else { 0 };
     let mut iter = chunks.iter();
     let first = iter.next().unwrap();
-    let mut min_values = first.min_values()[..index_cols - offset].to_vec();
-    let mut max_values = first.max_values()[..index_cols - offset].to_vec();
+    let mut min_values = first.min_values();
+    let mut max_values = first.max_values();
     for row in iter {
-        if row.min_values()[..index_cols - offset].to_vec() <= min_values {
+        if row.min_values <= min_values {
             min_values = row.min_values();
         }
-        if row.max_values()[..index_cols - offset].to_vec() >= max_values {
+        if row.max_values >= max_values {
             max_values = row.max_values();
         }
     }
 
     let other = other.unwrap();
 
-    min_values <= other.max_values()[..index_cols - offset].to_vec()
-        && max_values >= other.min_values()[..index_cols - offset].to_vec()
+    min_values <= other.max_values() && max_values >= other.min_values
 }
 
 #[derive(Debug)]
@@ -483,20 +476,23 @@ pub fn merge_two_primitives<T1: NativeType + Ord, T2: NativeType + Ord>(
     let mut out_col2 = Vec::with_capacity(array_size);
     let mut order = Vec::with_capacity(array_size);
 
-    for (arr_id, iter) in arr_iters.iter_mut().enumerate() {
-        for _ in 0..chunks[arr_id].cols[0].len() {
-            let v1 = iter.0.next().unwrap();
-            let v2 = iter.1.next().unwrap();
-            let mr = TwoColMergeRow(arr_id, *v1, *v2);
-            sort.push(mr);
-        }
+    for (row_id, iter) in arr_iters.iter_mut().enumerate().take(chunks.len()) {
+        let mr = TwoColMergeRow(row_id, *iter.0.next().unwrap(), *iter.1.next().unwrap());
+        sort.push(mr);
     }
-    while let Some(TwoColMergeRow(arr_id, v1, v2)) = sort.pop() {
-        // dbg!((v1, v2));
+
+    while let Some(TwoColMergeRow(row_idx, v1, v2)) = sort.pop() {
         if is_replacing {
             if let Some(v) = sort.peek() {
                 if v1 == v.1 {
                     order.push(-1);
+
+                    if let Some(v1) = arr_iters[row_idx].0.next() {
+                        let v2 = arr_iters[row_idx].1.next().unwrap();
+                        let mr = TwoColMergeRow(row_idx, *v1, *v2);
+                        #[allow(clippy::drain_collect)]
+                        sort.push(mr);
+                    }
 
                     continue;
                 }
@@ -505,7 +501,14 @@ pub fn merge_two_primitives<T1: NativeType + Ord, T2: NativeType + Ord>(
 
         out_col1.push(v1);
         out_col2.push(v2);
-        order.push(chunks[arr_id].stream as i64);
+        order.push(chunks[row_idx].stream as i64);
+        if let Some(v1) = arr_iters[row_idx].0.next() {
+            let v2 = arr_iters[row_idx].1.next().unwrap();
+            let mr = TwoColMergeRow(row_idx, *v1, *v2);
+            #[allow(clippy::drain_collect)]
+            sort.push(mr);
+        }
+
         if out_col1.len() >= array_size {
             let out = vec![
                 PrimitiveArray::<T1>::from_vec(std::mem::take(&mut out_col1)).boxed(),
@@ -1323,12 +1326,7 @@ where R: Read + Seek
             self.merge_queue.push(chunk);
             // check intersection of first chunk with merge queue
             // all the intersected chunks should be merged
-            while check_intersection(
-                &self.merge_queue,
-                self.sorter.peek(),
-                self.index_cols.len(),
-                self.is_replacing,
-            ) {
+            while check_intersection(&self.merge_queue, self.sorter.peek()) {
                 // in case of intersection, take chunk and add it to merge queue
                 let next = self.sorter.pop().unwrap();
                 // try to take next chunk of stream and add it to sorter
