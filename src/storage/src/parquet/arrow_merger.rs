@@ -397,16 +397,6 @@ impl Iterator for MergingIterator {
         if let Some(chunk) = self.sorter.pop() {
             return Some(Ok(chunk.chunk));
         }
-        return match self.next_stream_chunk(self.current_idx).ok()? {
-            None => {
-                self.current_idx += 1;
-                if self.current_idx > self.streams.len() - 1 {
-                    return None;
-                }
-                return self.next();
-            }
-            Some(chunk) => Some(Ok(chunk.chunk)),
-        };
 
         // todo remove all the merging logic
         if let Some(chunk) = self.merge_result_buffer.pop_front() {

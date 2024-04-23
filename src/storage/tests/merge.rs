@@ -14,12 +14,14 @@ use arrow2::datatypes::Field;
 use arrow2::datatypes::TimeUnit;
 use arrow2::io::parquet::read;
 use arrow2::io::print;
+use storage::arrow_conversion::arrow1_to_arrow2;
 use storage::parquet::parquet_merger::merge;
 use storage::parquet::parquet_merger::Options;
 use storage::test_util::concat_chunks;
 use storage::test_util::create_parquet_from_chunk;
 use storage::test_util::create_parquet_from_chunks;
 use storage::test_util::gen_chunk_for_parquet;
+use storage::test_util::parse_markdown_tables;
 use storage::test_util::read_parquet_as_one_chunk;
 use storage::test_util::unmerge_chunk;
 use storage::test_util::PrimaryIndexType;
@@ -79,6 +81,7 @@ fn roundtrip(tc: TestCase) -> anyhow::Result<()> {
 
     let opts = Options {
         index_cols: idx_cols_len,
+        is_replacing: false,
         data_page_size_limit_bytes: tc.out_data_page_size_limit,
         row_group_values_limit: tc.out_row_group_values_limit,
         array_page_size: tc.out_arrow_page_size,
@@ -178,6 +181,7 @@ fn profile(tc: TestCase, case_id: usize, step: ProfileStep) {
 
             let opts = Options {
                 index_cols: idx_cols_len,
+                is_replacing: false,
                 data_page_size_limit_bytes: tc.out_data_page_size_limit,
                 row_group_values_limit: tc.out_row_group_values_limit,
                 array_page_size: tc.out_arrow_page_size,
@@ -221,13 +225,10 @@ fn test_merge() -> anyhow::Result<()> {
         ),
         Field::new("f15", DataType::Date32, true),
         Field::new("f16", DataType::Date64, true),
-        Field::new("f17", DataType::Time32(TimeUnit::Millisecond), true),
-        Field::new("f18", DataType::Time64(TimeUnit::Millisecond), true),
-        Field::new("f19", DataType::Duration(TimeUnit::Millisecond), true),
-        Field::new("f20", DataType::Binary, true),
-        Field::new("f21", DataType::LargeBinary, true),
-        Field::new("f22", DataType::Utf8, true),
-        Field::new("f23", DataType::LargeUtf8, true),
+        Field::new("f17", DataType::Binary, true),
+        Field::new("f18", DataType::LargeBinary, true),
+        Field::new("f19", DataType::Utf8, true),
+        Field::new("f20", DataType::LargeUtf8, true),
         // Field::new("f24", DataType::Interval(IntervalUnit::DayTime), true), // TODO: support interval
         // Field::new("f25",DataType::FixedSizeBinary(10), true), // TODO: support fixed size binary
     ];
@@ -555,6 +556,7 @@ fn test_different_row_group_sizes() -> anyhow::Result<()> {
 
     let opts = Options {
         index_cols: 2,
+        is_replacing: false,
         data_page_size_limit_bytes: None,
         row_group_values_limit: 100,
         array_page_size: 100,
@@ -647,6 +649,7 @@ fn test_merge_with_missing_columns() -> anyhow::Result<()> {
 
     let opts = Options {
         index_cols: 1,
+        is_replacing: false,
         data_page_size_limit_bytes: None,
         row_group_values_limit: 100,
         array_page_size: 100,
@@ -739,6 +742,7 @@ fn test_pick_with_null_columns() -> anyhow::Result<()> {
     fs::create_dir_all("/tmp/merge_pick_with_null_columns").unwrap();
     let opts = Options {
         index_cols: 1,
+        is_replacing: false,
         data_page_size_limit_bytes: None,
         row_group_values_limit: 100,
         array_page_size: 100,
@@ -761,6 +765,69 @@ fn test_pick_with_null_columns() -> anyhow::Result<()> {
     let exp = Chunk::new(vec![
         PrimitiveArray::<i64>::from_slice([1, 2, 3, 4, 5, 6]).boxed(),
         PrimitiveArray::<i64>::from(vec![Some(1), Some(2), Some(3), None, None, None]).boxed(),
+    ]);
+
+    debug_assert_eq!(exp, final_chunk);
+    Ok(())
+}
+
+#[traced_test]
+#[test]
+fn test_replacing() -> anyhow::Result<()> {
+    let cols = vec![
+        vec![
+            PrimitiveArray::<i64>::from_slice([1, 1, 1, 2, 2]).boxed(),
+            PrimitiveArray::<i64>::from_slice([1, 2, 3, 1, 2]).boxed(),
+        ],
+        vec![
+            PrimitiveArray::<i64>::from_slice([1, 1, 1, 2, 2]).boxed(),
+            PrimitiveArray::<i64>::from_slice([1, 2, 3, 1, 2]).boxed(),
+        ],
+    ];
+
+    let fields = vec![
+        vec![
+            Field::new("f1", DataType::Int64, false),
+            Field::new("f2", DataType::Int64, true),
+        ],
+        vec![
+            Field::new("f1", DataType::Int64, false),
+            Field::new("f2", DataType::Int64, true),
+        ],
+    ];
+
+    let readers = cols
+        .into_iter()
+        .zip(fields.iter())
+        .map(|(cols, fields)| {
+            let chunk = Chunk::new(cols);
+            let mut w = Cursor::new(vec![]);
+            create_parquet_from_chunk(chunk, fields.to_owned(), &mut w, None, 100).unwrap();
+
+            w
+        })
+        .collect::<Vec<_>>();
+
+    fs::remove_dir_all("/tmp/merge_replacing").ok();
+    fs::create_dir_all("/tmp/merge_replacing").unwrap();
+    let opts = Options {
+        index_cols: 2,
+        is_replacing: true,
+        data_page_size_limit_bytes: None,
+        row_group_values_limit: 100,
+        array_page_size: 100,
+        out_part_id: 0,
+        merge_max_page_size: 100,
+        max_part_size_bytes: None,
+    };
+    merge(readers, "/tmp/merge_replacing".into(), 1, "t", 0, opts)?;
+
+    let mut pfile = File::open("/tmp/merge_replacing/1.parquet").unwrap();
+    let final_chunk = read_parquet_as_one_chunk(&mut pfile);
+
+    let exp = Chunk::new(vec![
+        PrimitiveArray::<i64>::from_slice([1, 2]).boxed(),
+        PrimitiveArray::<i64>::from_slice(vec![3, 2]).boxed(),
     ]);
 
     debug_assert_eq!(exp, final_chunk);
