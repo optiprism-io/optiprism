@@ -269,10 +269,12 @@ impl QueryProvider {
             .unwrap()
             .to_owned();
         group_cols.push(col);
+        dbg!(&result);
         if let Some(breakdowns) = &req.breakdowns {
-            for idx in 0..=breakdowns.len() {
+            for idx in 0..breakdowns.len() {
+                dbg!(idx);
                 let col = result
-                    .column(idx)
+                    .column(idx + 1)
                     .as_any()
                     .downcast_ref::<StringArray>()
                     .unwrap()

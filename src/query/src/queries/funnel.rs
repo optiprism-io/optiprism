@@ -174,7 +174,7 @@ pub fn build(
                 name: prop.column_name(),
             });
             out.push((expr, prop.column_name(), SortField {
-                data_type: prop.data_type.into(),
+                data_type: prop.data_type(),
             }))
         }
         Some(out)

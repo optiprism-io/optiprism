@@ -35,6 +35,7 @@ use datafusion_expr::Sort;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
 
+use crate::breakdowns_to_dicts;
 use crate::context::Format;
 use crate::error::Result;
 use crate::expr::breakdown_expr;
@@ -71,48 +72,6 @@ pub struct LogicalPlanBuilder {
     ctx: Context,
     metadata: Arc<MetadataProvider>,
     es: EventSegmentation,
-}
-
-macro_rules! breakdowns_to_dicts {
-    ($self:expr, $breakdowns:expr, $cols_hash:expr,$decode_cols:expr) => {{
-        for breakdown in $breakdowns.iter() {
-            match &breakdown {
-                Breakdown::Property(prop) => {
-                    let p = match prop {
-                        PropertyRef::System(name) => $self
-                            .metadata
-                            .system_properties
-                            .get_by_name($self.ctx.project_id, name.as_str())?,
-                        PropertyRef::User(name) => $self
-                            .metadata
-                            .user_properties
-                            .get_by_name($self.ctx.project_id, name.as_str())?,
-                        PropertyRef::Event(name) => $self
-                            .metadata
-                            .event_properties
-                            .get_by_name($self.ctx.project_id, name.as_str())?,
-                        _ => unimplemented!(),
-                    };
-                    if !p.is_dictionary {
-                        continue;
-                    }
-                    if $cols_hash.contains_key(p.column_name().as_str()) {
-                        continue;
-                    }
-
-                    let dict = SingleDictionaryProvider::new(
-                        $self.ctx.project_id,
-                        p.column_name(),
-                        $self.metadata.dictionaries.clone(),
-                    );
-                    let col = Column::from_name(p.column_name());
-
-                    $decode_cols.push((col, Arc::new(dict)));
-                    $cols_hash.insert(p.column_name(), ());
-                }
-            };
-        }
-    }};
 }
 
 impl LogicalPlanBuilder {
@@ -550,7 +509,12 @@ impl LogicalPlanBuilder {
         });
 
         input = LogicalPlan::Extension(Extension {
-            node: Arc::new(LimitGroupsNode::try_new(input, 1, group_expr.len() - 1, 50)?),
+            node: Arc::new(LimitGroupsNode::try_new(
+                input,
+                1,
+                group_expr.len() - 1,
+                50,
+            )?),
         });
         Ok(input)
     }

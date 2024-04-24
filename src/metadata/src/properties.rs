@@ -3,6 +3,7 @@ use std::sync::Arc;
 use std::sync::RwLock;
 
 use arrow::datatypes;
+use arrow::datatypes::DataType;
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::DateTime;
@@ -595,6 +596,14 @@ impl Property {
         match &self.display_name {
             None => self.name.to_owned(),
             Some(dn) => dn.to_owned(),
+        }
+    }
+
+    pub fn data_type(&self) -> DataType {
+        if let Some(dt) = &self.dictionary_type {
+            dt.to_owned().into()
+        } else {
+            self.data_type.to_owned().into()
         }
     }
 }

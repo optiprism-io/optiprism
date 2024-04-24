@@ -68,6 +68,49 @@ pub mod queries;
 
 pub const DEFAULT_BATCH_SIZE: usize = 4096;
 
+#[macro_export]
+macro_rules! breakdowns_to_dicts {
+    ($self:expr, $breakdowns:expr, $cols_hash:expr,$decode_cols:expr) => {{
+        for breakdown in $breakdowns.iter() {
+            match &breakdown {
+                Breakdown::Property(prop) => {
+                    let p = match prop {
+                        PropertyRef::System(name) => $self
+                            .metadata
+                            .system_properties
+                            .get_by_name($self.ctx.project_id, name.as_str())?,
+                        PropertyRef::User(name) => $self
+                            .metadata
+                            .user_properties
+                            .get_by_name($self.ctx.project_id, name.as_str())?,
+                        PropertyRef::Event(name) => $self
+                            .metadata
+                            .event_properties
+                            .get_by_name($self.ctx.project_id, name.as_str())?,
+                        _ => unimplemented!(),
+                    };
+                    if !p.is_dictionary {
+                        continue;
+                    }
+                    if $cols_hash.contains_key(p.column_name().as_str()) {
+                        continue;
+                    }
+
+                    let dict = SingleDictionaryProvider::new(
+                        $self.ctx.project_id,
+                        p.column_name(),
+                        $self.metadata.dictionaries.clone(),
+                    );
+                    let col = Column::from_name(p.column_name());
+
+                    $decode_cols.push((col, Arc::new(dict)));
+                    $cols_hash.insert(p.column_name(), ());
+                }
+            };
+        }
+    }};
+}
+
 macro_rules! static_array_enum {
     ($($ident:ident)+) => {
         #[derive(Debug,Clone)]
