@@ -70,23 +70,20 @@ pub const DEFAULT_BATCH_SIZE: usize = 4096;
 
 #[macro_export]
 macro_rules! breakdowns_to_dicts {
-    ($self:expr, $breakdowns:expr, $cols_hash:expr,$decode_cols:expr) => {{
+    ($md:expr, $ctx:expr,$breakdowns:expr, $cols_hash:expr,$decode_cols:expr) => {{
         for breakdown in $breakdowns.iter() {
             match &breakdown {
                 Breakdown::Property(prop) => {
                     let p = match prop {
-                        PropertyRef::System(name) => $self
-                            .metadata
+                        PropertyRef::System(name) => $md
                             .system_properties
-                            .get_by_name($self.ctx.project_id, name.as_str())?,
-                        PropertyRef::User(name) => $self
-                            .metadata
+                            .get_by_name($ctx.project_id, name.as_str())?,
+                        PropertyRef::User(name) => $md
                             .user_properties
-                            .get_by_name($self.ctx.project_id, name.as_str())?,
-                        PropertyRef::Event(name) => $self
-                            .metadata
+                            .get_by_name($ctx.project_id, name.as_str())?,
+                        PropertyRef::Event(name) => $md
                             .event_properties
-                            .get_by_name($self.ctx.project_id, name.as_str())?,
+                            .get_by_name($ctx.project_id, name.as_str())?,
                         _ => unimplemented!(),
                     };
                     if !p.is_dictionary {
@@ -97,9 +94,9 @@ macro_rules! breakdowns_to_dicts {
                     }
 
                     let dict = SingleDictionaryProvider::new(
-                        $self.ctx.project_id,
+                        $ctx.project_id,
                         p.column_name(),
-                        $self.metadata.dictionaries.clone(),
+                        $md.dictionaries.clone(),
                     );
                     let col = Column::from_name(p.column_name());
 

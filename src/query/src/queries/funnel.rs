@@ -42,6 +42,7 @@ use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
 use rust_decimal::Decimal;
 
+use crate::breakdowns_to_dicts;
 use crate::error::Result;
 use crate::expr::event_expression;
 use crate::expr::event_filters_expression;
@@ -149,7 +150,9 @@ pub fn build(
     };
 
     let mut rename_groups = vec![];
+    let mut decode_cols: Vec<(Column, Arc<SingleDictionaryProvider>)> = Vec::new();
     let groups = if let Some(breakdowns) = &req.breakdowns {
+        breakdowns_to_dicts!(metadata, ctx, breakdowns, cols_hash, decode_cols);
         let mut out = vec![];
         for breakdown in breakdowns {
             let prop = match breakdown {
@@ -225,6 +228,14 @@ pub fn build(
             funnel,
         )?),
     });
+
+    let input = if !decode_cols.is_empty() {
+        LogicalPlan::Extension(Extension {
+            node: Arc::new(DictionaryDecodeNode::try_new(input, decode_cols.clone())?),
+        })
+    } else {
+        input
+    };
 
     let input = LogicalPlan::Extension(Extension {
         node: Arc::new(RenameColumnsNode::try_new(input, rename_groups)?),
