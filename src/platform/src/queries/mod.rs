@@ -112,7 +112,7 @@ impl Into<TimeIntervalUnit> for common::query::TimeIntervalUnit {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Breakdown {
     Property {

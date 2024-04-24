@@ -354,7 +354,7 @@ impl Into<EventRef> for common::query::EventRef {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 #[serde(tag = "propertyType", rename_all = "camelCase")]
 pub enum PropertyRef {
     #[serde(rename_all = "camelCase")]

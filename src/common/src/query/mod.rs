@@ -257,7 +257,7 @@ impl TryInto<DFOperator> for PropValueOperation {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Breakdown {
     Property(PropertyRef),
 }

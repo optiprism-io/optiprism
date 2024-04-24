@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use metadata::MetadataProvider;
@@ -527,6 +528,11 @@ pub(crate) fn validate(md: &Arc<MetadataProvider>, project_id: u64, req: &Funnel
         ));
     }
 
+    if req.steps.len() > 5 {
+        return Err(PlatformError::BadRequest(
+            "steps must not be more than 5".to_string(),
+        ));
+    }
     for (step_id, step) in req.steps.iter().enumerate() {
         if step.events.is_empty() {
             return Err(PlatformError::BadRequest(format!(
@@ -625,6 +631,15 @@ pub(crate) fn validate(md: &Arc<MetadataProvider>, project_id: u64, req: &Funnel
             if breakdowns.is_empty() {
                 return Err(PlatformError::BadRequest(
                     "breakdowns must not be empty".to_string(),
+                ));
+            }
+            let mut g = HashMap::new();
+            for b in breakdowns {
+                g.insert(b.to_owned(), ());
+            }
+            if g.len() != breakdowns.len() {
+                return Err(PlatformError::BadRequest(
+                    "use only unique breakdowns".to_string(),
                 ));
             }
             for (idx, breakdown) in breakdowns.iter().enumerate() {
