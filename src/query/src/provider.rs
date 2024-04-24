@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::ops::Deref;
 use std::sync::Arc;
@@ -270,9 +271,9 @@ impl QueryProvider {
             .to_owned();
         group_cols.push(col);
         if let Some(breakdowns) = &req.breakdowns {
-            for idx in 0..=breakdowns.len() {
+            for idx in 0..breakdowns.len() {
                 let col = result
-                    .column(idx)
+                    .column(idx + 1)
                     .as_any()
                     .downcast_ref::<StringArray>()
                     .unwrap()

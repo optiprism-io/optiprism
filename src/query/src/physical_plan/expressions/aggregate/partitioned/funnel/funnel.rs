@@ -494,7 +494,6 @@ impl Funnel {
         } else {
             None
         };
-
         let mut to_remove = Vec::with_capacity(self.buf.len() - 1);
         for (idx, batch) in &self.buf {
             if batch.first_partition < self.cur_partition {
