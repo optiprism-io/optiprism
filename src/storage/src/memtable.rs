@@ -165,7 +165,35 @@ impl Memtable {
     pub(crate) fn push_value(&mut self, col: usize, val: Value) {
         self.cols[col].values.push(val);
     }
+    pub(crate) fn push_row(&mut self, val: Vec<Value>) {
+        for (idx, v) in val.iter().enumerate() {
+            self.cols[idx].values.push(v.clone());
+        }
+    }
 
+    pub(crate) fn get(&self, key: Vec<Value>) -> Option<Vec<Value>> {
+        let mut found = false;
+        for idx in 0..self.len() {
+            found = true;
+            for (kid, k) in key.iter().enumerate() {
+                if &self.cols[kid].values[idx] != k {
+                    found = false;
+                    break;
+                }
+            }
+
+            if found {
+                let vals = self
+                    .cols
+                    .iter()
+                    .map(|c| c.values[idx].clone())
+                    .collect::<Vec<_>>();
+                return Some(vals);
+            }
+        }
+
+        None
+    }
     pub(crate) fn len(&self) -> usize {
         if self.cols_len() == 0 {
             return 0;
@@ -194,4 +222,51 @@ impl Memtable {
 #[derive(Debug, Clone)]
 pub(crate) struct Memtable {
     pub(crate) cols: Vec<Column>,
+}
+
+#[cfg(test)]
+mod tests {
+    use common::types::DType;
+
+    use crate::memtable::Memtable;
+    use crate::Value;
+
+    #[test]
+    fn test_get() {
+        let mut mt = Memtable::new();
+        mt.add_column(DType::Int32);
+        mt.add_column(DType::Int32);
+        mt.add_column(DType::Int32);
+        mt.push_row(vec![
+            Value::Int32(Some(1)),
+            Value::Int32(Some(1)),
+            Value::Int32(Some(1)),
+        ]);
+        mt.push_row(vec![
+            Value::Int32(Some(1)),
+            Value::Int32(Some(2)),
+            Value::Int32(Some(2)),
+        ]);
+        mt.push_row(vec![
+            Value::Int32(Some(2)),
+            Value::Int32(Some(1)),
+            Value::Int32(Some(3)),
+        ]);
+        mt.push_row(vec![
+            Value::Int32(Some(2)),
+            Value::Int32(Some(2)),
+            Value::Int32(Some(4)),
+        ]);
+
+        let res = mt.get(vec![Value::Int32(Some(1)), Value::Int32(Some(2))]);
+
+        assert_eq!(
+            res,
+            Some(vec![
+                Value::Int32(Some(1)),
+                Value::Int32(Some(2)),
+                Value::Int32(Some(2))
+            ])
+        );
+    }
 }
