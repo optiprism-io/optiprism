@@ -10,7 +10,6 @@ use std::io::BufWriter;
 use std::io::Read;
 use std::io::Write;
 use std::mem;
-use std::num::NonZeroUsize;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::mpsc;
@@ -43,7 +42,6 @@ use bincode::deserialize;
 use bincode::serialize;
 use common::types::DType;
 use futures::Stream;
-use lru::LruCache;
 use metrics::counter;
 use metrics::gauge;
 use metrics::histogram;
@@ -309,7 +307,6 @@ fn try_recover_table(path: PathBuf, name: String) -> Result<Table> {
         metadata: Arc::new(Mutex::new(metadata)),
         vfs: Arc::new(Fs::new()),
         log: Arc::new(Mutex::new(log)),
-        cas: Arc::new(RwLock::new(LruCache::new(NonZeroUsize::new(10).unwrap()))),
     })
 }
 
@@ -348,9 +345,7 @@ fn recover(path: PathBuf, opts: Options) -> Result<OptiDBImpl> {
 }
 
 fn write_level0(metadata: &Metadata, memtable: &Memtable, path: PathBuf) -> Result<Part> {
-    let chunk = memtable
-        .chunk(None, metadata.opts.index_cols, metadata.opts.is_replacing)?
-        .unwrap();
+    let chunk = memtable.chunk(None, metadata.opts.index_cols)?.unwrap();
     let (min, max) = chunk_min_max(&chunk, metadata.opts.index_cols);
     let popts = parquet::write::WriteOptions {
         write_statistics: true,
@@ -540,11 +535,7 @@ impl OptiDBImpl {
             })
             .collect::<Vec<_>>();
 
-        let maybe_chunk = memtable.chunk(
-            Some(projection),
-            metadata.opts.index_cols,
-            metadata.opts.is_replacing,
-        )?;
+        let maybe_chunk = memtable.chunk(Some(projection), metadata.opts.index_cols)?;
         histogram!("store.scan_memtable_seconds","table"=>tbl_name.to_string())
             .record(start_time.elapsed());
         let mut rdrs = vec![];
@@ -564,8 +555,7 @@ impl OptiDBImpl {
                 as Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>
         } else {
             let opts = arrow_merger::Options {
-                index_cols: metadata.opts.index_cols,
-                is_replacing: metadata.opts.is_replacing,
+                index_cols: metadata.opts.merge_index_cols,
                 array_size: metadata.opts.merge_array_size,
                 chunk_size: metadata.opts.merge_chunk_size,
                 fields: projected_fields
@@ -682,67 +672,6 @@ impl OptiDBImpl {
         Ok(())
     }
 
-    pub fn get_cas(&self, tbl_name: &str, key: Vec<KeyValue>) -> Result<Option<Vec<Value>>> {
-        let res = self.get(tbl_name, key.clone())?;
-        if res.is_none() {
-            return Ok(None);
-        }
-
-        let tables = self.tables.read();
-        let tbl = tables.iter().find(|t| t.name == tbl_name);
-        let tbl = match tbl {
-            None => return Err(StoreError::Internal("table not found".to_string())),
-            Some(tbl) => tbl.to_owned(),
-        };
-        drop(tables);
-        let md = tbl.metadata.lock();
-        let metadata = md.clone();
-        drop(md);
-
-        if let Some(res) = &res {
-            if let Value::Int64(Some(cas)) = res[metadata.opts.index_cols - 1] {
-                let mut cache = tbl.cas.write();
-                let key = res[..metadata.opts.index_cols - 1].to_vec();
-
-                cache.put(key, cas);
-            } else {
-                unreachable!();
-            }
-        }
-
-        Ok(res)
-    }
-
-    pub fn replace(&self, tbl_name: &str, values: Vec<NamedValue>) -> Result<()> {
-        let tables = self.tables.read();
-        let tbl = tables.iter().find(|t| t.name == tbl_name);
-        let tbl = match tbl {
-            None => return Err(StoreError::Internal("table not found".to_string())),
-            Some(tbl) => tbl.to_owned(),
-        };
-        drop(tables);
-        let md = tbl.metadata.lock();
-        let metadata = md.clone();
-        drop(md);
-
-        if let Value::Int64(Some(cas)) = values[metadata.opts.index_cols - 1].value {
-            let mut cache = tbl.cas.write();
-            let key = values[..metadata.opts.index_cols - 1]
-                .iter()
-                .map(|nv| nv.value.to_owned())
-                .collect::<Vec<_>>();
-            if let Some(c) = cache.pop(&key) {
-                if c != cas {
-                    return Err(StoreError::Internal("cas mismatch".to_string()));
-                }
-            }
-        } else {
-            unreachable!();
-        }
-
-        self.insert(tbl_name, values)
-    }
-
     pub fn get(&self, tbl_name: &str, key: Vec<KeyValue>) -> Result<Option<Vec<Value>>> {
         let tables = self.tables.read();
         let tbl = tables.iter().find(|t| t.name == tbl_name);
@@ -750,24 +679,21 @@ impl OptiDBImpl {
             None => return Err(StoreError::Internal("table not found".to_string())),
             Some(tbl) => tbl.to_owned(),
         };
+
         drop(tables);
         let mt = tbl.memtable.lock();
         if let Some(v) = mt.get(&key) {
             return Ok(Some(v));
         }
         drop(mt);
+
         let md = tbl.metadata.lock();
         let metadata = md.clone();
         drop(md);
 
         for (level_id, level) in metadata.levels.iter().enumerate() {
-            let mut parts = level.parts.clone();
-            parts.reverse();
-            for part in parts.iter() {
-                let offset = if metadata.opts.is_replacing { 1 } else { 0 };
-                if key >= part.min[..part.min.len() - offset].to_vec()
-                    && key <= part.max[..part.max.len() - offset].to_vec()
-                {
+            for part in level.parts.iter() {
+                if key >= part.min && key <= part.max {
                     let path = part_path(&self.path, tbl_name, level_id, part.id);
                     let mut rdr = File::open(path)?;
                     let parquet_md = read::read_metadata(&mut rdr)?;
@@ -801,8 +727,6 @@ impl OptiDBImpl {
                                 if v < minv || v > maxv {
                                     continue 'g;
                                 }
-                            } else {
-                                unreachable!();
                             }
                         }
 
@@ -1176,7 +1100,6 @@ impl OptiDBImpl {
             metadata: Arc::new(Mutex::new(metadata)),
             vfs: Arc::new(Fs::new()),
             log: Arc::new(Mutex::new(BufWriter::new(log))),
-            cas: Arc::new(RwLock::new(LruCache::new(NonZeroUsize::new(10).unwrap()))),
         };
 
         let mut tables = self.tables.write();
@@ -1214,11 +1137,7 @@ mod tests {
 
     use std::fs;
     use std::path::PathBuf;
-    use std::sync::Arc;
 
-    use arrow2::array::Array;
-    use arrow2::array::Int64Array;
-    use arrow2::chunk::Chunk;
     use common::types::DType;
 
     use crate::db::OptiDBImpl;
@@ -1228,77 +1147,6 @@ mod tests {
     use crate::NamedValue;
     use crate::Value;
 
-    #[test]
-    fn test_cas() {
-        let path = PathBuf::from("/tmp/cas");
-
-        fs::remove_dir_all(&path).ok();
-        fs::create_dir_all(&path).unwrap();
-        let opts = Options {};
-        let db = OptiDBImpl::open(path, opts).unwrap();
-        let topts = table::Options {
-            levels: 7,
-            merge_array_size: 10000,
-            parallelism: 1,
-            index_cols: 2,
-            l1_max_size_bytes: 1024 * 1024 * 10,
-            level_size_multiplier: 10,
-            l0_max_parts: 4,
-            max_log_length_bytes: 1024 * 1024 * 100,
-            merge_array_page_size: 10000,
-            merge_data_page_size_limit_bytes: Some(1024 * 1024),
-            merge_max_l1_part_size_bytes: 1024 * 1024,
-            merge_part_size_multiplier: 10,
-            merge_row_group_values_limit: 1000,
-            merge_chunk_size: 1024 * 8 * 8,
-            merge_max_page_size: 1024 * 1024,
-            is_replacing: false,
-        };
-        db.create_table("t1".to_string(), topts).unwrap();
-        db.add_field("t1", "f1", DType::Int64, false).unwrap();
-        db.add_field("t1", "f2", DType::Int64, false).unwrap();
-        db.add_field("t1", "f3", DType::Int64, false).unwrap();
-        db.replace("t1", vec![
-            NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
-            NamedValue::new("f2".to_string(), Value::Int64(Some(1))),
-            NamedValue::new("f3".to_string(), Value::Int64(Some(1))),
-        ])
-        .unwrap();
-
-        let res = db
-            .get_cas("t1", vec![KeyValue::Int64(1), KeyValue::Int64(1)])
-            .unwrap();
-
-        db.replace("t1", vec![
-            NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
-            NamedValue::new("f2".to_string(), Value::Int64(Some(1))),
-            NamedValue::new("f3".to_string(), Value::Int64(Some(2))),
-        ])
-        .unwrap();
-
-        let res = db
-            .get_cas("t1", vec![KeyValue::Int64(1), KeyValue::Int64(2)])
-            .unwrap();
-
-        db.replace("t1", vec![
-            NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
-            NamedValue::new("f2".to_string(), Value::Int64(Some(2))),
-            NamedValue::new("f3".to_string(), Value::Int64(Some(3))),
-        ])
-        .unwrap();
-
-        let res = db
-            .get_cas("t1", vec![KeyValue::Int64(1), KeyValue::Int64(2)])
-            .unwrap();
-
-        let r = db.replace("t1", vec![
-            NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
-            NamedValue::new("f2".to_string(), Value::Int64(Some(3))),
-            NamedValue::new("f3".to_string(), Value::Int64(Some(3))),
-        ]);
-
-        assert!(r.is_err());
-    }
     #[test]
     fn test_get() {
         let path = PathBuf::from("/tmp/get");
@@ -1317,12 +1165,12 @@ mod tests {
             max_log_length_bytes: 1024 * 1024 * 100,
             merge_array_page_size: 10000,
             merge_data_page_size_limit_bytes: Some(1024 * 1024),
+            merge_index_cols: 2,
             merge_max_l1_part_size_bytes: 1024 * 1024,
             merge_part_size_multiplier: 10,
             merge_row_group_values_limit: 1000,
             merge_chunk_size: 1024 * 8 * 8,
             merge_max_page_size: 1024 * 1024,
-            is_replacing: true,
         };
         db.create_table("t1".to_string(), topts).unwrap();
         db.add_field("t1", "f1", DType::Int64, false).unwrap();
@@ -1351,7 +1199,9 @@ mod tests {
         .unwrap();
 
         // get from memtable
-        let res = db.get_cas("t1", vec![KeyValue::Int64(1)]).unwrap();
+        let res = db
+            .get("t1", vec![KeyValue::Int64(1), KeyValue::Int64(2)])
+            .unwrap();
 
         assert_eq!(
             res,
@@ -1361,6 +1211,8 @@ mod tests {
                 Value::Int64(Some(2))
             ])
         );
+
+        db.flush().unwrap();
     }
 
     #[test]
@@ -1381,12 +1233,12 @@ mod tests {
             max_log_length_bytes: 1024 * 1024 * 100,
             merge_array_page_size: 10000,
             merge_data_page_size_limit_bytes: Some(1024 * 1024),
+            merge_index_cols: 2,
             merge_max_l1_part_size_bytes: 1024 * 1024,
             merge_part_size_multiplier: 10,
             merge_row_group_values_limit: 1000,
             merge_chunk_size: 1024 * 8 * 8,
             merge_max_page_size: 1024 * 1024,
-            is_replacing: true,
         };
         db.create_table("t1".to_string(), topts).unwrap();
         db.add_field("t1", "f1", DType::Int64, false).unwrap();
@@ -1414,205 +1266,6 @@ mod tests {
 
         dbg!(res);
     }
-
-    #[test]
-    fn test_update() {
-        let path = PathBuf::from("/tmp/update");
-        fs::remove_dir_all(&path).ok();
-        fs::create_dir_all(&path).unwrap();
-        let opts = Options {};
-        let db = OptiDBImpl::open(path, opts).unwrap();
-        let topts = table::Options {
-            levels: 7,
-            merge_array_size: 10000,
-            parallelism: 1,
-            index_cols: 2,
-            l1_max_size_bytes: 1024 * 1024 * 10,
-            level_size_multiplier: 10,
-            l0_max_parts: 4,
-            max_log_length_bytes: 1024 * 1024 * 100,
-            merge_array_page_size: 10000,
-            merge_data_page_size_limit_bytes: Some(1024 * 1024),
-            merge_max_l1_part_size_bytes: 1024 * 1024,
-            merge_part_size_multiplier: 10,
-            merge_row_group_values_limit: 1000,
-            merge_chunk_size: 1024 * 8 * 8,
-            merge_max_page_size: 1024 * 1024,
-            is_replacing: true,
-        };
-        db.create_table("t1".to_string(), topts).unwrap();
-        db.add_field("t1", "f1", DType::Int64, false).unwrap();
-        db.add_field("t1", "f2", DType::Int64, false).unwrap();
-        db.add_field("t1", "f3", DType::Int64, false).unwrap();
-        db.insert("t1", vec![
-            NamedValue::new("f1".to_string(), Value::Int64(Some(1))), // pk
-            NamedValue::new("f2".to_string(), Value::Int64(Some(1))), // version
-            NamedValue::new("f3".to_string(), Value::Int64(Some(1))), // counter
-        ])
-        .unwrap();
-        db.insert("t1", vec![
-            NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
-            NamedValue::new("f2".to_string(), Value::Int64(Some(2))),
-            NamedValue::new("f3".to_string(), Value::Int64(Some(2))),
-        ])
-        .unwrap();
-        db.insert("t1", vec![
-            NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
-            NamedValue::new("f2".to_string(), Value::Int64(Some(3))),
-            NamedValue::new("f3".to_string(), Value::Int64(Some(3))),
-        ])
-        .unwrap();
-        db.insert("t1", vec![
-            NamedValue::new("f1".to_string(), Value::Int64(Some(2))),
-            NamedValue::new("f2".to_string(), Value::Int64(Some(1))),
-            NamedValue::new("f3".to_string(), Value::Int64(Some(1))),
-        ])
-        .unwrap();
-
-        let r = db.get("t1", vec![KeyValue::Int64(1)]).unwrap();
-        assert!(r.is_some());
-        let r = db
-            .get("t1", vec![KeyValue::Int64(1), KeyValue::Int64(1)])
-            .unwrap();
-        assert!(r.is_some());
-        let r = db
-            .get("t1", vec![KeyValue::Int64(1), KeyValue::Int64(3)])
-            .unwrap();
-        assert!(r.is_some());
-
-        let r = db
-            .get("t1", vec![KeyValue::Int64(1), KeyValue::Int64(4)])
-            .unwrap();
-        assert!(r.is_none());
-
-        db.flush().unwrap();
-
-        let r = db.get("t1", vec![KeyValue::Int64(1)]).unwrap();
-        assert_eq!(
-            r,
-            Some(vec![
-                Value::Int64(Some(1)),
-                Value::Int64(Some(3)),
-                Value::Int64(Some(3))
-            ])
-        );
-
-        let r = db.get("t1", vec![KeyValue::Int64(2)]).unwrap();
-        assert!(r.is_some());
-
-        let r = db.get("t1", vec![KeyValue::Int64(3)]).unwrap();
-        assert!(r.is_none());
-
-        db.insert("t1", vec![
-            NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
-            NamedValue::new("f2".to_string(), Value::Int64(Some(4))),
-            NamedValue::new("f3".to_string(), Value::Int64(Some(4))),
-        ])
-        .unwrap();
-
-        db.flush().unwrap();
-
-        db.insert("t1", vec![
-            NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
-            NamedValue::new("f2".to_string(), Value::Int64(Some(5))),
-            NamedValue::new("f3".to_string(), Value::Int64(Some(5))),
-        ])
-        .unwrap();
-        db.flush().unwrap();
-
-        db.insert("t1", vec![
-            NamedValue::new("f1".to_string(), Value::Int64(Some(2))),
-            NamedValue::new("f2".to_string(), Value::Int64(Some(2))),
-            NamedValue::new("f3".to_string(), Value::Int64(Some(2))),
-        ])
-        .unwrap();
-
-        db.flush().unwrap();
-
-        db.insert("t1", vec![
-            NamedValue::new("f1".to_string(), Value::Int64(Some(2))),
-            NamedValue::new("f2".to_string(), Value::Int64(Some(3))),
-            NamedValue::new("f3".to_string(), Value::Int64(Some(3))),
-        ])
-        .unwrap();
-
-        db.flush().unwrap();
-        db.compact();
-
-        let r = db.get("t1", vec![KeyValue::Int64(1)]).unwrap();
-        assert_eq!(
-            r,
-            Some(vec![
-                Value::Int64(Some(1)),
-                Value::Int64(Some(5)),
-                Value::Int64(Some(5))
-            ])
-        );
-    }
-
-    #[test]
-    fn test_scan() {
-        let path = PathBuf::from("/tmp/scan");
-        fs::remove_dir_all(&path).ok();
-        fs::create_dir_all(&path).unwrap();
-        let opts = Options {};
-        let db = OptiDBImpl::open(path, opts).unwrap();
-        let topts = table::Options {
-            levels: 7,
-            merge_array_size: 10000,
-            parallelism: 1,
-            index_cols: 2,
-            l1_max_size_bytes: 1024 * 1024 * 10,
-            level_size_multiplier: 10,
-            l0_max_parts: 4,
-            max_log_length_bytes: 1024 * 1024 * 100,
-            merge_array_page_size: 10000,
-            merge_data_page_size_limit_bytes: Some(1024 * 1024),
-            merge_max_l1_part_size_bytes: 1024 * 1024,
-            merge_part_size_multiplier: 10,
-            merge_row_group_values_limit: 1000,
-            merge_chunk_size: 1024 * 8 * 8,
-            merge_max_page_size: 1024 * 1024,
-            is_replacing: true,
-        };
-        db.create_table("t1".to_string(), topts).unwrap();
-        db.add_field("t1", "f1", DType::Int64, false).unwrap();
-        db.add_field("t1", "f2", DType::Int64, false).unwrap();
-        db.insert("t1", vec![
-            NamedValue::new("f1".to_string(), Value::Int64(Some(1))), // pk
-            NamedValue::new("f2".to_string(), Value::Int64(Some(1))), // version
-        ])
-        .unwrap();
-
-        db.flush().unwrap();
-
-        db.insert("t1", vec![
-            NamedValue::new("f1".to_string(), Value::Int64(Some(1))), // pk
-            NamedValue::new("f2".to_string(), Value::Int64(Some(2))), // version
-        ])
-        .unwrap();
-
-        db.flush().unwrap();
-
-        db.insert("t1", vec![
-            NamedValue::new("f1".to_string(), Value::Int64(Some(1))), // pk
-            NamedValue::new("f2".to_string(), Value::Int64(Some(3))), // version
-        ])
-        .unwrap();
-        db.insert("t1", vec![
-            NamedValue::new("f1".to_string(), Value::Int64(Some(1))), // pk
-            NamedValue::new("f2".to_string(), Value::Int64(Some(4))), // version
-        ])
-        .unwrap();
-
-        let mut stream = db.scan("t1", vec![0, 1]).unwrap();
-
-        let exp = Chunk::new(vec![
-            Box::new(Int64Array::from_vec(vec![1])) as Box<dyn Array>,
-            Box::new(Int64Array::from_vec(vec![4])) as Box<dyn Array>,
-        ]);
-        let res = stream.iter.next().unwrap().unwrap();
-    }
     #[test]
     fn test_schema_evolution() {
         let path = PathBuf::from("/tmp/schema_evolution");
@@ -1632,28 +1285,26 @@ mod tests {
             max_log_length_bytes: 1024 * 1024 * 100,
             merge_array_page_size: 10000,
             merge_data_page_size_limit_bytes: Some(1024 * 1024),
+            merge_index_cols: 1,
             merge_max_l1_part_size_bytes: 1024 * 1024,
             merge_part_size_multiplier: 10,
             merge_row_group_values_limit: 1000,
             merge_chunk_size: 1024 * 8 * 8,
             merge_max_page_size: 1024 * 1024,
-            is_replacing: false,
         };
 
         db.create_table("t1".to_string(), topts).unwrap();
         db.add_field("t1", "f1", DType::Int64, false).unwrap();
-        db.add_field("t1", "f2", DType::Int64, false).unwrap();
-        db.insert("t1", vec![
-            NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
-            NamedValue::new("f2".to_string(), Value::Int64(Some(1))),
-        ])
+        db.insert("t1", vec![NamedValue::new(
+            "f1".to_string(),
+            Value::Int64(Some(1)),
+        )])
         .unwrap();
-        db.add_field("t1", "f3", DType::Int64, false).unwrap();
+        db.add_field("t1", "f2", DType::Int64, false).unwrap();
 
         db.insert("t1", vec![
             NamedValue::new("f1".to_string(), Value::Int64(Some(2))),
             NamedValue::new("f2".to_string(), Value::Int64(Some(2))),
-            NamedValue::new("f3".to_string(), Value::Int64(Some(2))),
         ])
         .unwrap();
 

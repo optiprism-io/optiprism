@@ -14,6 +14,7 @@ use common::types::DType;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 
+use crate::KeyValue;
 use crate::Value;
 
 macro_rules! memory_col_to_arrow {
@@ -171,7 +172,8 @@ impl Memtable {
         }
     }
 
-    pub(crate) fn get(&self, key: Vec<Value>) -> Option<Vec<Value>> {
+    pub(crate) fn get(&self, key: &[KeyValue]) -> Option<Vec<Value>> {
+        let key = key.iter().map(|k| Value::from(k)).collect::<Vec<_>>();
         let mut found = false;
         for idx in 0..self.len() {
             found = true;
@@ -229,6 +231,7 @@ mod tests {
     use common::types::DType;
 
     use crate::memtable::Memtable;
+    use crate::KeyValue;
     use crate::Value;
 
     #[test]
@@ -258,7 +261,7 @@ mod tests {
             Value::Int32(Some(4)),
         ]);
 
-        let res = mt.get(vec![Value::Int32(Some(1)), Value::Int32(Some(2))]);
+        let res = mt.get(&[KeyValue::Int32(1)]);
 
         assert_eq!(
             res,

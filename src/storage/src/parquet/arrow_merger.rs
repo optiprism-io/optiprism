@@ -398,7 +398,6 @@ impl Iterator for MergingIterator {
             return Some(Ok(chunk.chunk));
         }
 
-        // todo remove all the merging logic
         if let Some(chunk) = self.merge_result_buffer.pop_front() {
             return Some(Ok(chunk));
         }
