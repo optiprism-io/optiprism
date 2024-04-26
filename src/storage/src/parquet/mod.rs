@@ -632,7 +632,7 @@ impl ArrowIteratorImpl {
             rdr,
             metadata.row_groups,
             schema.clone(),
-            Some(chunk_size), // todo define
+            Some(chunk_size),
             None,
             None,
         );
