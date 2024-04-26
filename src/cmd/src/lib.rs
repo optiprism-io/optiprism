@@ -140,12 +140,12 @@ pub fn init_system(
         max_log_length_bytes: 1024 * 1024 * 100,
         merge_array_page_size: 100000,
         merge_data_page_size_limit_bytes: Some(1024 * 1024 * 1000),
-        merge_index_cols: 2,
         merge_max_l1_part_size_bytes: 1024 * 1024 * 10,
         merge_part_size_multiplier: 10,
         merge_row_group_values_limit: 1000,
         merge_chunk_size: 1024 * 8 * 8,
         merge_max_page_size: 1024 * 1024 * 10,
+        is_replacing: false,
     };
     match db.create_table(TABLE_EVENTS.to_string(), topts) {
         Ok(_) => {}
