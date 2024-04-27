@@ -31,7 +31,7 @@ use crate::KeyValue;
 
 pub fn merge_one_primitive<T: NativeType + Ord>(
     chunks: Vec<&[Box<dyn Array>]>,
-) -> Result<Vec<usize>> {
+) -> Result<Vec<i64>> {
     let arrs = chunks
         .iter()
         .enumerate()
@@ -56,7 +56,7 @@ pub fn merge_one_primitive<T: NativeType + Ord>(
     }
 
     while let Some(OneColMergeRow(row_idx, _)) = sort.pop() {
-        out.push(row_idx);
+        out.push(row_idx as i64);
     }
 
     Ok(out)
@@ -64,7 +64,8 @@ pub fn merge_one_primitive<T: NativeType + Ord>(
 
 pub fn merge_two_primitives<T1: NativeType + Ord, T2: NativeType + Ord>(
     chunks: Vec<&[Box<dyn Array>]>,
-) -> Result<Vec<usize>> {
+    is_replacing: bool,
+) -> Result<Vec<i64>> {
     let arrs = chunks
         .iter()
         .enumerate()
@@ -94,8 +95,18 @@ pub fn merge_two_primitives<T1: NativeType + Ord, T2: NativeType + Ord>(
         }
     }
 
-    while let Some(TwoColMergeRow(row_idx, _, _)) = sort.pop() {
-        out.push(row_idx);
+    while let Some(TwoColMergeRow(row_idx, v1, _)) = sort.pop() {
+        if is_replacing {
+            if let Some(v) = sort.peek() {
+                if v1 == v.1 {
+                    out.push(-1);
+
+                    continue;
+                }
+            }
+        }
+
+        out.push(row_idx as i64);
     }
 
     Ok(out)
@@ -105,7 +116,11 @@ pub fn merge_two_primitives<T1: NativeType + Ord, T2: NativeType + Ord>(
 
 // Merge multiple chunks into vector of MergedArrowChunk of arrays split by array_size
 
-pub fn merge_chunks(chunks: Vec<&[Box<dyn Array>]>, index_cols: usize) -> Result<Vec<usize>> {
+pub fn merge_chunks(
+    chunks: Vec<&[Box<dyn Array>]>,
+    index_cols: usize,
+    is_replacing: bool,
+) -> Result<Vec<i64>> {
     let res = match index_cols {
         1 => match chunks[0][0].data_type() {
             DataType::Int64 => merge_one_primitive::<i64>(chunks)?,
@@ -117,7 +132,9 @@ pub fn merge_chunks(chunks: Vec<&[Box<dyn Array>]>, index_cols: usize) -> Result
             }
         },
         2 => match (chunks[0][0].data_type(), chunks[0][0].data_type()) {
-            (DataType::Int64, DataType::Int64) => merge_two_primitives::<i64, i64>(chunks)?,
+            (DataType::Int64, DataType::Int64) => {
+                merge_two_primitives::<i64, i64>(chunks, is_replacing)?
+            }
             _ => {
                 return Err(StoreError::InvalidParameter(format!(
                     "merge not implemented for type {:?}",
@@ -136,27 +153,33 @@ pub fn merge_chunks(chunks: Vec<&[Box<dyn Array>]>, index_cols: usize) -> Result
     Ok(res)
 }
 
-pub fn check_intersection(chunks: &[ArrowChunk], other: Option<&ArrowChunk>) -> bool {
+pub fn check_intersection(
+    chunks: &[ArrowChunk],
+    other: Option<&ArrowChunk>,
+    index_cols: usize,
+    is_replacing: bool,
+) -> bool {
     if other.is_none() {
         return false;
     }
 
     let mut iter = chunks.iter();
     let first = iter.next().unwrap();
-    let mut min_values = first.min_values();
-    let mut max_values = first.max_values();
+    let offset = if is_replacing { 1 } else { 0 };
+    let mut min_values = first.min_values()[..index_cols - offset].to_vec();
+    let mut max_values = first.max_values()[..index_cols - offset].to_vec();
     for row in iter {
         if row.min_values <= min_values {
-            min_values = row.min_values();
+            min_values = row.min_values()[..index_cols - offset].to_vec();
         }
         if row.max_values >= max_values {
-            max_values = row.max_values();
+            max_values = row.max_values()[..index_cols - offset].to_vec();
         }
     }
 
     let other = other.unwrap();
-
-    min_values <= other.max_values() && max_values >= other.min_values
+    min_values <= other.max_values()[..index_cols - offset].to_vec()
+        && max_values >= other.min_values()[..index_cols - offset].to_vec()
 }
 
 #[derive(Debug, Clone)]
@@ -228,6 +251,7 @@ impl ArrowChunk {
 
 pub struct Options {
     pub index_cols: usize,
+    pub is_replacing: bool,
     pub array_size: usize,
     pub chunk_size: usize,
     pub fields: Vec<String>,
@@ -257,6 +281,7 @@ pub struct MergingIterator {
     current_idx: usize,
     // list of index cols (partitions) in parquet file
     index_cols: Vec<ColumnDescriptor>,
+    is_replacing: bool,
     array_size: usize,
     schema: Schema,
     // list of streams to merge
@@ -305,6 +330,7 @@ impl MergingIterator {
         let mut mr = Self {
             current_idx: 0,
             index_cols,
+            is_replacing: opts.is_replacing,
             array_size: opts.array_size,
             schema,
             streams: arrow_streams,
@@ -325,7 +351,7 @@ impl MergingIterator {
             .iter()
             .map(|chunk| chunk.columns())
             .collect::<Vec<_>>();
-        let reorder = merge_chunks(arrs, self.index_cols.len())?;
+        let reorder = merge_chunks(arrs, self.index_cols.len(), self.is_replacing)?;
 
         let cols_len = queue[0].columns().len();
         let mut arrs = (0..cols_len)
@@ -337,8 +363,11 @@ impl MergingIterator {
                 let mut arr_cursors = vec![0; arrs.len()];
                 let mut growable = make_growable(&arrs, false, reorder.len());
                 for idx in reorder.iter() {
-                    growable.extend(*idx, arr_cursors[*idx], 1);
-                    arr_cursors[*idx] += 1;
+                    if *idx == -1 {
+                        continue;
+                    }
+                    growable.extend(*idx as usize, arr_cursors[*idx as usize], 1);
+                    arr_cursors[*idx as usize] += 1;
                 }
 
                 growable.as_box()
@@ -394,14 +423,9 @@ impl Iterator for MergingIterator {
     type Item = Result<Chunk<Box<dyn Array>>>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(chunk) = self.sorter.pop() {
-            return Some(Ok(chunk.chunk));
-        }
-
         if let Some(chunk) = self.merge_result_buffer.pop_front() {
             return Some(Ok(chunk));
         }
-
         let mut merge_queue: Vec<ArrowChunk> = vec![];
         if let Some(chunk) = self.sorter.pop() {
             if let Some(chunk) = self.next_stream_chunk(chunk.stream).ok()? {
@@ -413,7 +437,12 @@ impl Iterator for MergingIterator {
             return None;
         };
 
-        while check_intersection(&merge_queue, self.sorter.peek()) {
+        while check_intersection(
+            &merge_queue,
+            self.sorter.peek(),
+            self.index_cols.len(),
+            self.is_replacing,
+        ) {
             // in case of intersection, take chunk and add it to merge queue
             let next = self.sorter.pop().unwrap();
             // try to take next chunk of stream and add it to sorter
@@ -423,7 +452,6 @@ impl Iterator for MergingIterator {
             // push chunk to merge queue
             merge_queue.push(next);
         }
-
         // check queue len. Queue len may be 1 if there is no intersection
         if merge_queue.len() > 1 {
             // in case of intersection, merge queue

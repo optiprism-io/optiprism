@@ -565,6 +565,7 @@ impl OptiDBImpl {
         } else {
             let opts = arrow_merger::Options {
                 index_cols: metadata.opts.index_cols,
+                is_replacing: metadata.opts.is_replacing,
                 array_size: metadata.opts.merge_array_size,
                 chunk_size: metadata.opts.merge_chunk_size,
                 fields: projected_fields
@@ -1213,7 +1214,11 @@ mod tests {
 
     use std::fs;
     use std::path::PathBuf;
+    use std::sync::Arc;
 
+    use arrow2::array::Array;
+    use arrow2::array::Int64Array;
+    use arrow2::chunk::Chunk;
     use common::types::DType;
 
     use crate::db::OptiDBImpl;
@@ -1543,6 +1548,70 @@ mod tests {
                 Value::Int64(Some(5))
             ])
         );
+    }
+
+    #[test]
+    fn test_scan() {
+        let path = PathBuf::from("/tmp/scan");
+        fs::remove_dir_all(&path).ok();
+        fs::create_dir_all(&path).unwrap();
+        let opts = Options {};
+        let db = OptiDBImpl::open(path, opts).unwrap();
+        let topts = table::Options {
+            levels: 7,
+            merge_array_size: 10000,
+            parallelism: 1,
+            index_cols: 2,
+            l1_max_size_bytes: 1024 * 1024 * 10,
+            level_size_multiplier: 10,
+            l0_max_parts: 4,
+            max_log_length_bytes: 1024 * 1024 * 100,
+            merge_array_page_size: 10000,
+            merge_data_page_size_limit_bytes: Some(1024 * 1024),
+            merge_max_l1_part_size_bytes: 1024 * 1024,
+            merge_part_size_multiplier: 10,
+            merge_row_group_values_limit: 1000,
+            merge_chunk_size: 1024 * 8 * 8,
+            merge_max_page_size: 1024 * 1024,
+            is_replacing: true,
+        };
+        db.create_table("t1".to_string(), topts).unwrap();
+        db.add_field("t1", "f1", DType::Int64, false).unwrap();
+        db.add_field("t1", "f2", DType::Int64, false).unwrap();
+        db.insert("t1", vec![
+            NamedValue::new("f1".to_string(), Value::Int64(Some(1))), // pk
+            NamedValue::new("f2".to_string(), Value::Int64(Some(1))), // version
+        ])
+        .unwrap();
+
+        db.flush().unwrap();
+
+        db.insert("t1", vec![
+            NamedValue::new("f1".to_string(), Value::Int64(Some(1))), // pk
+            NamedValue::new("f2".to_string(), Value::Int64(Some(2))), // version
+        ])
+        .unwrap();
+
+        db.flush().unwrap();
+
+        db.insert("t1", vec![
+            NamedValue::new("f1".to_string(), Value::Int64(Some(1))), // pk
+            NamedValue::new("f2".to_string(), Value::Int64(Some(3))), // version
+        ])
+        .unwrap();
+        db.insert("t1", vec![
+            NamedValue::new("f1".to_string(), Value::Int64(Some(1))), // pk
+            NamedValue::new("f2".to_string(), Value::Int64(Some(4))), // version
+        ])
+        .unwrap();
+
+        let mut stream = db.scan("t1", vec![0, 1]).unwrap();
+
+        let exp = Chunk::new(vec![
+            Box::new(Int64Array::from_vec(vec![1])) as Box<dyn Array>,
+            Box::new(Int64Array::from_vec(vec![4])) as Box<dyn Array>,
+        ]);
+        let res = stream.iter.next().unwrap().unwrap();
     }
     #[test]
     fn test_schema_evolution() {

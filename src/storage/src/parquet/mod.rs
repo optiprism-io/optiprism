@@ -177,6 +177,7 @@ impl<A> Eq for OneColMergeRow<A> where A: Eq {}
 
 // usize - stream id
 // A,B - partition types
+#[derive(Debug)]
 pub struct TwoColMergeRow<A, B>(usize, A, B);
 
 impl<A, B> Ord for TwoColMergeRow<A, B>
