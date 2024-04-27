@@ -5,7 +5,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use arrow2::datatypes::Schema;
+use lru::LruCache;
 use parking_lot::Mutex;
+use parking_lot::RwLock;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -13,6 +15,7 @@ use crate::memtable::Memtable;
 use crate::Fs;
 use crate::KeyValue;
 use crate::Stats;
+use crate::Value;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Options {
@@ -119,6 +122,7 @@ pub(crate) struct Table {
     pub(crate) metadata: Arc<Mutex<Metadata>>,
     pub(crate) vfs: Arc<Fs>,
     pub(crate) log: Arc<Mutex<BufWriter<File>>>,
+    pub(crate) cas: Arc<RwLock<LruCache<Vec<Value>, i64>>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
