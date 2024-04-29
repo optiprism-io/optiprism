@@ -62,7 +62,7 @@ impl NamedValue {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Hash, GetSize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash, GetSize, PartialEq, Eq)]
 pub enum Value {
     Null,
     Int8(Option<i8>),

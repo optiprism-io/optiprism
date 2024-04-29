@@ -53,7 +53,10 @@ macro_rules! merge_arrays_inner {
         let mut out = <$out_ty>::with_capacity($reorder.len());
         // go through each row idx in reorder, get stream id for row
         for idx in 0..$reorder.len() {
-            let stream_id = $reorder[idx];
+            if $reorder[idx] == -1 {
+                continue;
+            }
+            let stream_id = $reorder[idx] as usize;
             // push null if column doesn't exist
             if !col_exist_per_stream[stream_id] {
                 out.push_null();
@@ -174,7 +177,10 @@ macro_rules! merge_list_arrays_inner {
 
         let mut out = <$out_ty>::with_capacity($reorder.len());
         for idx in 0..$reorder.len() {
-            let stream_id = $reorder[idx];
+            if $reorder[idx] == -1 {
+                continue;
+            }
+            let stream_id = $reorder[idx] as usize;
             if !col_exist_per_stream[stream_id] {
                 out.push_null();
                 continue;
@@ -298,7 +304,10 @@ macro_rules! merge_list_primitive_arrays {
 
         let mut out = <$out_ty>::with_capacity($reorder.len());
         for idx in 0..$reorder.len() {
-            let stream_id = $reorder[idx];
+            if $reorder[idx] == -1 {
+                continue;
+            }
+            let stream_id = $reorder[idx] as usize;
             if !col_exist_per_stream[stream_id] {
                 out.push_null();
                 continue;

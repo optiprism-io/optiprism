@@ -1,19 +1,23 @@
 use arrow2::array::Array;
+use arrow2::array::Int64Array;
 use arrow2::array::MutableArray;
 use arrow2::array::MutableBooleanArray;
 use arrow2::array::MutablePrimitiveArray;
 use arrow2::array::MutableUtf8Array;
+use arrow2::array::PrimitiveArray;
 use arrow2::chunk::Chunk;
 use arrow2::compute::merge_sort::SortOptions;
 use arrow2::compute::sort::lexsort_to_indices;
 use arrow2::compute::sort::SortColumn;
 use arrow2::compute::take;
+use arrow2::compute::take::take;
 use arrow2::datatypes::DataType;
 use arrow2::datatypes::TimeUnit;
 use common::types::DType;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 
+use crate::KeyValue;
 use crate::Value;
 
 macro_rules! memory_col_to_arrow {
@@ -121,6 +125,7 @@ impl Memtable {
         &self,
         cols: Option<Vec<usize>>,
         index_cols: usize,
+        is_replacing: bool,
     ) -> crate::error::Result<Option<Chunk<Box<dyn Array>>>> {
         if self.len() == 0 {
             return Ok(None);
@@ -153,11 +158,44 @@ impl Memtable {
 
         let indices = lexsort_to_indices::<i32>(&sort_cols, None)?;
 
-        let arrs = arrs
+        let mut arrs = arrs
             .iter()
             .map(|arr| take::take(arr.as_ref(), &indices))
             .collect::<std::result::Result<Vec<_>, _>>()?;
 
+        if is_replacing {
+            let mut indices = MutablePrimitiveArray::<i64>::new();
+            if index_cols == 2 {
+                let a = arrs[0]
+                    .as_any()
+                    .downcast_ref::<arrow2::array::Int64Array>()
+                    .unwrap();
+
+                let mut last = None;
+                for row_id in 0..arrs[0].len() {
+                    if last.is_none() {
+                        last = Some(a.value(row_id));
+                        continue;
+                    }
+                    if last != Some(a.value(row_id)) {
+                        indices.push(Some(row_id as i64 - 1));
+                        last = Some(a.value(row_id));
+                    }
+                }
+                indices.push(Some(arrs[0].len() as i64 - 1));
+            }
+
+            let idx = indices
+                .as_box()
+                .as_any()
+                .downcast_ref::<Int64Array>()
+                .unwrap()
+                .to_owned();
+            arrs = arrs
+                .iter()
+                .map(|arr| take::take(arr.as_ref(), &idx))
+                .collect::<std::result::Result<Vec<_>, _>>()?;
+        }
         let chunk = Chunk::new(arrs);
         Ok(Some(chunk))
     }
@@ -165,7 +203,41 @@ impl Memtable {
     pub(crate) fn push_value(&mut self, col: usize, val: Value) {
         self.cols[col].values.push(val);
     }
+    pub(crate) fn push_row(&mut self, val: Vec<Value>) {
+        for (idx, v) in val.iter().enumerate() {
+            self.cols[idx].values.push(v.clone());
+        }
+    }
 
+    pub(crate) fn get(&self, key: &[KeyValue]) -> Option<Vec<Value>> {
+        let key = key.iter().map(|k| Value::from(k)).collect::<Vec<_>>();
+        let mut found = false;
+        let mut last_idx = None;
+        for idx in 0..self.len() {
+            found = true;
+            for (kid, k) in key.iter().enumerate() {
+                if &self.cols[kid].values[idx] != k {
+                    found = false;
+                    break;
+                }
+            }
+
+            if found {
+                last_idx = Some(idx);
+            }
+        }
+
+        if let Some(idx) = last_idx {
+            let vals = self
+                .cols
+                .iter()
+                .map(|c| c.values[idx].clone())
+                .collect::<Vec<_>>();
+            return Some(vals);
+        }
+
+        None
+    }
     pub(crate) fn len(&self) -> usize {
         if self.cols_len() == 0 {
             return 0;
@@ -194,4 +266,52 @@ impl Memtable {
 #[derive(Debug, Clone)]
 pub(crate) struct Memtable {
     pub(crate) cols: Vec<Column>,
+}
+
+#[cfg(test)]
+mod tests {
+    use common::types::DType;
+
+    use crate::memtable::Memtable;
+    use crate::KeyValue;
+    use crate::Value;
+
+    #[test]
+    fn test_get() {
+        let mut mt = Memtable::new();
+        mt.add_column(DType::Int32);
+        mt.add_column(DType::Int32);
+        mt.add_column(DType::Int32);
+        mt.push_row(vec![
+            Value::Int32(Some(1)),
+            Value::Int32(Some(1)),
+            Value::Int32(Some(1)),
+        ]);
+        mt.push_row(vec![
+            Value::Int32(Some(1)),
+            Value::Int32(Some(2)),
+            Value::Int32(Some(2)),
+        ]);
+        mt.push_row(vec![
+            Value::Int32(Some(2)),
+            Value::Int32(Some(1)),
+            Value::Int32(Some(3)),
+        ]);
+        mt.push_row(vec![
+            Value::Int32(Some(2)),
+            Value::Int32(Some(2)),
+            Value::Int32(Some(4)),
+        ]);
+
+        let res = mt.get(&[KeyValue::Int32(1)]);
+
+        assert_eq!(
+            res,
+            Some(vec![
+                Value::Int32(Some(1)),
+                Value::Int32(Some(2)),
+                Value::Int32(Some(2))
+            ])
+        );
+    }
 }

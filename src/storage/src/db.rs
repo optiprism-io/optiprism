@@ -10,6 +10,7 @@ use std::io::BufWriter;
 use std::io::Read;
 use std::io::Write;
 use std::mem;
+use std::num::NonZeroUsize;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::mpsc;
@@ -22,16 +23,27 @@ use std::time::Duration;
 use std::time::Instant;
 
 use arrow2::array::Array;
+use arrow2::array::BooleanArray;
+use arrow2::array::Int128Array;
+use arrow2::array::Int16Array;
+use arrow2::array::Int32Array;
+use arrow2::array::Int64Array;
+use arrow2::array::Int8Array;
+use arrow2::array::ListArray;
 use arrow2::chunk::Chunk;
 use arrow2::datatypes::DataType;
 use arrow2::datatypes::Field;
 use arrow2::datatypes::Schema;
 use arrow2::io::parquet;
+use arrow2::io::parquet::read;
 use arrow2::io::parquet::write::transverse;
+use arrow_array::StringArray;
+use arrow_array::TimestampNanosecondArray;
 use bincode::deserialize;
 use bincode::serialize;
 use common::types::DType;
 use futures::Stream;
+use lru::LruCache;
 use metrics::counter;
 use metrics::gauge;
 use metrics::histogram;
@@ -297,6 +309,7 @@ fn try_recover_table(path: PathBuf, name: String) -> Result<Table> {
         metadata: Arc::new(Mutex::new(metadata)),
         vfs: Arc::new(Fs::new()),
         log: Arc::new(Mutex::new(log)),
+        cas: Arc::new(RwLock::new(LruCache::new(NonZeroUsize::new(10).unwrap()))),
     })
 }
 
@@ -335,9 +348,10 @@ fn recover(path: PathBuf, opts: Options) -> Result<OptiDBImpl> {
 }
 
 fn write_level0(metadata: &Metadata, memtable: &Memtable, path: PathBuf) -> Result<Part> {
-    let chunk = memtable.chunk(None, metadata.opts.index_cols)?.unwrap();
+    let chunk = memtable
+        .chunk(None, metadata.opts.index_cols, metadata.opts.is_replacing)?
+        .unwrap();
     let (min, max) = chunk_min_max(&chunk, metadata.opts.index_cols);
-
     let popts = parquet::write::WriteOptions {
         write_statistics: true,
         compression: parquet::write::CompressionOptions::Snappy,
@@ -526,7 +540,11 @@ impl OptiDBImpl {
             })
             .collect::<Vec<_>>();
 
-        let maybe_chunk = memtable.chunk(Some(projection), metadata.opts.index_cols)?;
+        let maybe_chunk = memtable.chunk(
+            Some(projection),
+            metadata.opts.index_cols,
+            metadata.opts.is_replacing,
+        )?;
         histogram!("store.scan_memtable_seconds","table"=>tbl_name.to_string())
             .record(start_time.elapsed());
         let mut rdrs = vec![];
@@ -546,7 +564,8 @@ impl OptiDBImpl {
                 as Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>
         } else {
             let opts = arrow_merger::Options {
-                index_cols: metadata.opts.merge_index_cols,
+                index_cols: metadata.opts.index_cols,
+                is_replacing: metadata.opts.is_replacing,
                 array_size: metadata.opts.merge_array_size,
                 chunk_size: metadata.opts.merge_chunk_size,
                 fields: projected_fields
@@ -663,6 +682,368 @@ impl OptiDBImpl {
         Ok(())
     }
 
+    pub fn get_cas(&self, tbl_name: &str, key: Vec<KeyValue>) -> Result<Option<Vec<Value>>> {
+        let res = self.get(tbl_name, key.clone())?;
+        if res.is_none() {
+            return Ok(None);
+        }
+
+        let tables = self.tables.read();
+        let tbl = tables.iter().find(|t| t.name == tbl_name);
+        let tbl = match tbl {
+            None => return Err(StoreError::Internal("table not found".to_string())),
+            Some(tbl) => tbl.to_owned(),
+        };
+        drop(tables);
+        let md = tbl.metadata.lock();
+        let metadata = md.clone();
+        drop(md);
+
+        if let Some(res) = &res {
+            if let Value::Int64(Some(cas)) = res[metadata.opts.index_cols - 1] {
+                let mut cache = tbl.cas.write();
+                let key = res[..metadata.opts.index_cols - 1].to_vec();
+
+                cache.put(key, cas);
+            } else {
+                unreachable!();
+            }
+        }
+
+        Ok(res)
+    }
+
+    pub fn replace(&self, tbl_name: &str, values: Vec<NamedValue>) -> Result<()> {
+        let tables = self.tables.read();
+        let tbl = tables.iter().find(|t| t.name == tbl_name);
+        let tbl = match tbl {
+            None => return Err(StoreError::Internal("table not found".to_string())),
+            Some(tbl) => tbl.to_owned(),
+        };
+        drop(tables);
+        let md = tbl.metadata.lock();
+        let metadata = md.clone();
+        drop(md);
+
+        if let Value::Int64(Some(cas)) = values[metadata.opts.index_cols - 1].value {
+            let mut cache = tbl.cas.write();
+            let key = values[..metadata.opts.index_cols - 1]
+                .iter()
+                .map(|nv| nv.value.to_owned())
+                .collect::<Vec<_>>();
+            if let Some(c) = cache.pop(&key) {
+                if c != cas {
+                    return Err(StoreError::Internal("cas mismatch".to_string()));
+                }
+            }
+        } else {
+            unreachable!();
+        }
+
+        self.insert(tbl_name, values)
+    }
+
+    pub fn get(&self, tbl_name: &str, key: Vec<KeyValue>) -> Result<Option<Vec<Value>>> {
+        let tables = self.tables.read();
+        let tbl = tables.iter().find(|t| t.name == tbl_name);
+        let tbl = match tbl {
+            None => return Err(StoreError::Internal("table not found".to_string())),
+            Some(tbl) => tbl.to_owned(),
+        };
+        drop(tables);
+        let mt = tbl.memtable.lock();
+        if let Some(v) = mt.get(&key) {
+            return Ok(Some(v));
+        }
+        drop(mt);
+        let md = tbl.metadata.lock();
+        let metadata = md.clone();
+        drop(md);
+
+        for (level_id, level) in metadata.levels.iter().enumerate() {
+            let mut parts = level.parts.clone();
+            parts.reverse();
+            for part in parts.iter() {
+                let offset = if metadata.opts.is_replacing { 1 } else { 0 };
+                if key >= part.min[..part.min.len() - offset].to_vec()
+                    && key <= part.max[..part.max.len() - offset].to_vec()
+                {
+                    let path = part_path(&self.path, tbl_name, level_id, part.id);
+                    let mut rdr = File::open(path)?;
+                    let parquet_md = read::read_metadata(&mut rdr)?;
+                    let schema = read::infer_schema(&parquet_md)?;
+
+                    let mut found = None;
+                    'g: for row_group_id in 0..parquet_md.row_groups.len() {
+                        for field_id in 0..key.len() {
+                            let field = &schema.fields[field_id];
+                            let statistics = read::statistics::deserialize(field, &[parquet_md
+                                .row_groups[row_group_id]
+                                .clone()])?;
+                            // todo support non-int64 values
+                            let min = statistics
+                                .min_value
+                                .as_any()
+                                .downcast_ref::<Int64Array>()
+                                .unwrap();
+                            // assume we have only one value
+                            let minv = min.value(0);
+
+                            let max = statistics
+                                .max_value
+                                .as_any()
+                                .downcast_ref::<Int64Array>()
+                                .unwrap();
+                            // assume we have only one value
+                            let maxv = max.value(0);
+
+                            if let KeyValue::Int64(v) = key[field_id] {
+                                if v < minv || v > maxv {
+                                    continue 'g;
+                                }
+                            } else {
+                                unreachable!();
+                            }
+                        }
+
+                        found = Some(row_group_id);
+                        break;
+                    }
+
+                    if found.is_none() {
+                        return Ok(None);
+                    }
+
+                    let mut chunks = read::FileReader::new(
+                        rdr,
+                        vec![parquet_md.row_groups[found.unwrap()].clone()],
+                        schema.clone(),
+                        Some(1024 * 8 * 8), // todo make configurable?
+                        None,
+                        None,
+                    );
+
+                    let int_v = key
+                        .iter()
+                        .map(|v| match v {
+                            KeyValue::Int64(v) => *v,
+                            _ => unreachable!(),
+                        })
+                        .collect::<Vec<_>>();
+
+                    for chunk in chunks.next() {
+                        let chunk = chunk?;
+
+                        let mut idx_cols = vec![];
+                        for field_id in 0..key.len() {
+                            idx_cols.push(
+                                chunk.arrays()[field_id]
+                                    .as_any()
+                                    .downcast_ref::<Int64Array>()
+                                    .unwrap(),
+                            );
+                        }
+
+                        's: for row_id in 0..chunk.len() {
+                            let v = idx_cols[0].value(row_id);
+                            if int_v[0] != v {
+                                continue;
+                            }
+
+                            for other in 1..key.len() {
+                                let v = idx_cols[other].value(row_id);
+                                if int_v[other] != v {
+                                    continue 's;
+                                }
+                            }
+
+                            let mut vals = vec![];
+
+                            for (field_id, field) in metadata.schema.fields.iter().enumerate() {
+                                if field_id > schema.fields.len() - 1 {
+                                    let val = match &field.data_type {
+                                        DataType::Boolean => Value::Null,
+                                        DataType::Int8 => Value::Null,
+                                        DataType::Int16 => Value::Null,
+                                        DataType::Int32 => Value::Null,
+                                        DataType::Int64 => Value::Null,
+                                        DataType::Timestamp(_, _) => Value::Null,
+                                        DataType::Decimal(_, _) => Value::Null,
+                                        DataType::Utf8 => Value::Null,
+                                        DataType::List(f) => match f.data_type {
+                                            DataType::Boolean => Value::Null,
+                                            DataType::Int8 => Value::Null,
+                                            DataType::Int16 => Value::Null,
+                                            DataType::Int32 => Value::Null,
+                                            DataType::Int64 => Value::Null,
+                                            DataType::Timestamp(_, _) => Value::Null,
+                                            DataType::Decimal(_, _) => Value::Null,
+                                            DataType::Utf8 => Value::Null,
+                                            _ => unreachable!(),
+                                        },
+                                        _ => unreachable!(),
+                                    };
+
+                                    vals.push(val);
+                                } else {
+                                    if chunk.arrays()[field_id].is_null(row_id) {
+                                        vals.push(Value::Null);
+                                        continue;
+                                    }
+
+                                    match &field.data_type {
+                                        DataType::Boolean => {
+                                            let arr = chunk.arrays()[field_id]
+                                                .as_any()
+                                                .downcast_ref::<BooleanArray>()
+                                                .unwrap();
+                                            vals.push(Value::Boolean(Some(arr.value(row_id))));
+                                        }
+                                        DataType::Int8 => {
+                                            let arr = chunk.arrays()[field_id]
+                                                .as_any()
+                                                .downcast_ref::<Int8Array>()
+                                                .unwrap();
+                                            vals.push(Value::Int8(Some(arr.value(row_id))));
+                                        }
+                                        DataType::Int16 => {
+                                            let arr = chunk.arrays()[field_id]
+                                                .as_any()
+                                                .downcast_ref::<Int16Array>()
+                                                .unwrap();
+                                            vals.push(Value::Int16(Some(arr.value(row_id))));
+                                        }
+                                        DataType::Int32 => {
+                                            let arr = chunk.arrays()[field_id]
+                                                .as_any()
+                                                .downcast_ref::<Int32Array>()
+                                                .unwrap();
+                                            vals.push(Value::Int32(Some(arr.value(row_id))));
+                                        }
+                                        DataType::Int64 => {
+                                            let arr = chunk.arrays()[field_id]
+                                                .as_any()
+                                                .downcast_ref::<Int64Array>()
+                                                .unwrap();
+                                            vals.push(Value::Int64(Some(arr.value(row_id))));
+                                        }
+                                        DataType::Decimal(_, _) => {
+                                            let arr = chunk.arrays()[field_id]
+                                                .as_any()
+                                                .downcast_ref::<Int128Array>()
+                                                .unwrap();
+                                            vals.push(Value::Decimal(Some(arr.value(row_id))));
+                                        }
+                                        DataType::Timestamp(_, _) => {
+                                            let arr = chunk.arrays()[field_id]
+                                                .as_any()
+                                                .downcast_ref::<TimestampNanosecondArray>()
+                                                .unwrap();
+                                            vals.push(Value::Timestamp(Some(arr.value(row_id))));
+                                        }
+                                        DataType::Utf8 => {
+                                            let arr = chunk.arrays()[field_id]
+                                                .as_any()
+                                                .downcast_ref::<StringArray>()
+                                                .unwrap();
+                                            vals.push(Value::String(Some(
+                                                arr.value(row_id).to_string(),
+                                            )));
+                                        }
+                                        DataType::List(f) => {
+                                            let arr = chunk.arrays()[field_id]
+                                                .as_any()
+                                                .downcast_ref::<ListArray<i32>>()
+                                                .unwrap();
+
+                                            match f.data_type {
+                                                DataType::Boolean => {
+                                                    let arr = arr
+                                                        .as_any()
+                                                        .downcast_ref::<BooleanArray>()
+                                                        .unwrap();
+                                                    vals.push(Value::Boolean(Some(
+                                                        arr.value(row_id),
+                                                    )));
+                                                }
+                                                DataType::Int8 => {
+                                                    let arr = arr
+                                                        .as_any()
+                                                        .downcast_ref::<Int8Array>()
+                                                        .unwrap();
+                                                    vals.push(Value::Int8(Some(arr.value(row_id))));
+                                                }
+                                                DataType::Int16 => {
+                                                    let arr = arr
+                                                        .as_any()
+                                                        .downcast_ref::<Int16Array>()
+                                                        .unwrap();
+                                                    vals.push(Value::Int16(Some(
+                                                        arr.value(row_id),
+                                                    )));
+                                                }
+                                                DataType::Int32 => {
+                                                    let arr = arr
+                                                        .as_any()
+                                                        .downcast_ref::<Int32Array>()
+                                                        .unwrap();
+                                                    vals.push(Value::Int32(Some(
+                                                        arr.value(row_id),
+                                                    )));
+                                                }
+                                                DataType::Int64 => {
+                                                    let arr = arr
+                                                        .as_any()
+                                                        .downcast_ref::<Int64Array>()
+                                                        .unwrap();
+                                                    vals.push(Value::Int64(Some(
+                                                        arr.value(row_id),
+                                                    )));
+                                                }
+                                                DataType::Decimal(_, _) => {
+                                                    let arr = arr
+                                                        .as_any()
+                                                        .downcast_ref::<Int128Array>()
+                                                        .unwrap();
+                                                    vals.push(Value::Decimal(Some(
+                                                        arr.value(row_id),
+                                                    )));
+                                                }
+                                                DataType::Timestamp(_, _) => {
+                                                    let arr = arr
+                                                        .as_any()
+                                                        .downcast_ref::<TimestampNanosecondArray>()
+                                                        .unwrap();
+                                                    vals.push(Value::Timestamp(Some(
+                                                        arr.value(row_id),
+                                                    )));
+                                                }
+                                                DataType::Utf8 => {
+                                                    let arr = arr
+                                                        .as_any()
+                                                        .downcast_ref::<StringArray>()
+                                                        .unwrap();
+                                                    vals.push(Value::String(Some(
+                                                        arr.value(row_id).to_string(),
+                                                    )));
+                                                }
+                                                _ => unreachable!(),
+                                            }
+                                        }
+                                        _ => unreachable!(),
+                                    }
+                                }
+                            }
+
+                            return Ok(Some(vals));
+                        }
+                    }
+                    return Ok(None);
+                }
+            }
+        }
+        Ok(None)
+    }
     pub fn parts_path(&self, tbl_name: &str) -> Result<Vec<String>> {
         let tables = self.tables.read();
         let tbl = tables.iter().find(|t| t.name == tbl_name).cloned().unwrap();
@@ -712,10 +1093,6 @@ impl OptiDBImpl {
     pub fn schema1(&self, tbl_name: &str) -> Result<arrow_schema::Schema> {
         let schema = self.schema(tbl_name)?;
         Ok(schema2_to_schema1(schema))
-    }
-
-    pub fn get(&self, _opts: ReadOptions, _key: Vec<KeyValue>) -> Result<Vec<(String, Value)>> {
-        unimplemented!()
     }
 
     pub fn delete(&self, _opts: WriteOptions, _key: Vec<KeyValue>) -> Result<()> {
@@ -799,6 +1176,7 @@ impl OptiDBImpl {
             metadata: Arc::new(Mutex::new(metadata)),
             vfs: Arc::new(Fs::new()),
             log: Arc::new(Mutex::new(BufWriter::new(log))),
+            cas: Arc::new(RwLock::new(LruCache::new(NonZeroUsize::new(10).unwrap()))),
         };
 
         let mut tables = self.tables.write();
@@ -836,15 +1214,405 @@ mod tests {
 
     use std::fs;
     use std::path::PathBuf;
+    use std::sync::Arc;
 
+    use arrow2::array::Array;
+    use arrow2::array::Int64Array;
+    use arrow2::chunk::Chunk;
     use common::types::DType;
 
     use crate::db::OptiDBImpl;
     use crate::db::Options;
     use crate::table;
+    use crate::KeyValue;
     use crate::NamedValue;
     use crate::Value;
 
+    #[test]
+    fn test_cas() {
+        let path = PathBuf::from("/tmp/cas");
+
+        fs::remove_dir_all(&path).ok();
+        fs::create_dir_all(&path).unwrap();
+        let opts = Options {};
+        let db = OptiDBImpl::open(path, opts).unwrap();
+        let topts = table::Options {
+            levels: 7,
+            merge_array_size: 10000,
+            parallelism: 1,
+            index_cols: 2,
+            l1_max_size_bytes: 1024 * 1024 * 10,
+            level_size_multiplier: 10,
+            l0_max_parts: 4,
+            max_log_length_bytes: 1024 * 1024 * 100,
+            merge_array_page_size: 10000,
+            merge_data_page_size_limit_bytes: Some(1024 * 1024),
+            merge_max_l1_part_size_bytes: 1024 * 1024,
+            merge_part_size_multiplier: 10,
+            merge_row_group_values_limit: 1000,
+            merge_chunk_size: 1024 * 8 * 8,
+            merge_max_page_size: 1024 * 1024,
+            is_replacing: false,
+        };
+        db.create_table("t1".to_string(), topts).unwrap();
+        db.add_field("t1", "f1", DType::Int64, false).unwrap();
+        db.add_field("t1", "f2", DType::Int64, false).unwrap();
+        db.add_field("t1", "f3", DType::Int64, false).unwrap();
+        db.replace("t1", vec![
+            NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
+            NamedValue::new("f2".to_string(), Value::Int64(Some(1))),
+            NamedValue::new("f3".to_string(), Value::Int64(Some(1))),
+        ])
+        .unwrap();
+
+        let res = db
+            .get_cas("t1", vec![KeyValue::Int64(1), KeyValue::Int64(1)])
+            .unwrap();
+
+        db.replace("t1", vec![
+            NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
+            NamedValue::new("f2".to_string(), Value::Int64(Some(1))),
+            NamedValue::new("f3".to_string(), Value::Int64(Some(2))),
+        ])
+        .unwrap();
+
+        let res = db
+            .get_cas("t1", vec![KeyValue::Int64(1), KeyValue::Int64(2)])
+            .unwrap();
+
+        db.replace("t1", vec![
+            NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
+            NamedValue::new("f2".to_string(), Value::Int64(Some(2))),
+            NamedValue::new("f3".to_string(), Value::Int64(Some(3))),
+        ])
+        .unwrap();
+
+        let res = db
+            .get_cas("t1", vec![KeyValue::Int64(1), KeyValue::Int64(2)])
+            .unwrap();
+
+        let r = db.replace("t1", vec![
+            NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
+            NamedValue::new("f2".to_string(), Value::Int64(Some(3))),
+            NamedValue::new("f3".to_string(), Value::Int64(Some(3))),
+        ]);
+
+        assert!(r.is_err());
+    }
+    #[test]
+    fn test_get() {
+        let path = PathBuf::from("/tmp/get");
+        fs::remove_dir_all(&path).ok();
+        fs::create_dir_all(&path).unwrap();
+        let opts = Options {};
+        let db = OptiDBImpl::open(path, opts).unwrap();
+        let topts = table::Options {
+            levels: 7,
+            merge_array_size: 10000,
+            parallelism: 1,
+            index_cols: 2,
+            l1_max_size_bytes: 1024 * 1024 * 10,
+            level_size_multiplier: 10,
+            l0_max_parts: 4,
+            max_log_length_bytes: 1024 * 1024 * 100,
+            merge_array_page_size: 10000,
+            merge_data_page_size_limit_bytes: Some(1024 * 1024),
+            merge_max_l1_part_size_bytes: 1024 * 1024,
+            merge_part_size_multiplier: 10,
+            merge_row_group_values_limit: 1000,
+            merge_chunk_size: 1024 * 8 * 8,
+            merge_max_page_size: 1024 * 1024,
+            is_replacing: true,
+        };
+        db.create_table("t1".to_string(), topts).unwrap();
+        db.add_field("t1", "f1", DType::Int64, false).unwrap();
+        db.add_field("t1", "f2", DType::Int64, false).unwrap();
+        db.add_field("t1", "f3", DType::Int64, false).unwrap();
+
+        db.insert("t1", vec![
+            NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
+            NamedValue::new("f2".to_string(), Value::Int64(Some(1))),
+            NamedValue::new("f3".to_string(), Value::Int64(Some(1))),
+        ])
+        .unwrap();
+
+        db.insert("t1", vec![
+            NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
+            NamedValue::new("f2".to_string(), Value::Int64(Some(2))),
+            NamedValue::new("f3".to_string(), Value::Int64(Some(2))),
+        ])
+        .unwrap();
+
+        db.insert("t1", vec![
+            NamedValue::new("f1".to_string(), Value::Int64(Some(2))),
+            NamedValue::new("f2".to_string(), Value::Int64(Some(1))),
+            NamedValue::new("f3".to_string(), Value::Int64(Some(3))),
+        ])
+        .unwrap();
+
+        // get from memtable
+        let res = db.get_cas("t1", vec![KeyValue::Int64(1)]).unwrap();
+
+        assert_eq!(
+            res,
+            Some(vec![
+                Value::Int64(Some(1)),
+                Value::Int64(Some(2)),
+                Value::Int64(Some(2))
+            ])
+        );
+    }
+
+    #[test]
+    fn test_get_full() {
+        let path = PathBuf::from("/tmp/get_full");
+        fs::remove_dir_all(&path).ok();
+        fs::create_dir_all(&path).unwrap();
+        let opts = Options {};
+        let db = OptiDBImpl::open(path, opts).unwrap();
+        let topts = table::Options {
+            levels: 7,
+            merge_array_size: 10000,
+            parallelism: 1,
+            index_cols: 2,
+            l1_max_size_bytes: 1024 * 1024 * 10,
+            level_size_multiplier: 10,
+            l0_max_parts: 4,
+            max_log_length_bytes: 1024 * 1024 * 100,
+            merge_array_page_size: 10000,
+            merge_data_page_size_limit_bytes: Some(1024 * 1024),
+            merge_max_l1_part_size_bytes: 1024 * 1024,
+            merge_part_size_multiplier: 10,
+            merge_row_group_values_limit: 1000,
+            merge_chunk_size: 1024 * 8 * 8,
+            merge_max_page_size: 1024 * 1024,
+            is_replacing: true,
+        };
+        db.create_table("t1".to_string(), topts).unwrap();
+        db.add_field("t1", "f1", DType::Int64, false).unwrap();
+        db.add_field("t1", "f2", DType::Int64, false).unwrap();
+        let mut f = 3;
+        for i in 0..2000 {
+            db.insert("t1", vec![
+                NamedValue::new("f1".to_string(), Value::Int64(Some(i))),
+                NamedValue::new("f2".to_string(), Value::Int64(Some(i))),
+            ])
+            .unwrap();
+
+            if i % 150 == 0 {
+                db.flush().unwrap();
+                db.compact();
+                db.add_field("t1", format!("f{f}").as_str(), DType::Int64, true)
+                    .unwrap();
+                f += 1;
+            }
+        }
+
+        let res = db
+            .get("t1", vec![KeyValue::Int64(1), KeyValue::Int64(1)])
+            .unwrap();
+
+        dbg!(res);
+    }
+
+    #[test]
+    fn test_update() {
+        let path = PathBuf::from("/tmp/update");
+        fs::remove_dir_all(&path).ok();
+        fs::create_dir_all(&path).unwrap();
+        let opts = Options {};
+        let db = OptiDBImpl::open(path, opts).unwrap();
+        let topts = table::Options {
+            levels: 7,
+            merge_array_size: 10000,
+            parallelism: 1,
+            index_cols: 2,
+            l1_max_size_bytes: 1024 * 1024 * 10,
+            level_size_multiplier: 10,
+            l0_max_parts: 4,
+            max_log_length_bytes: 1024 * 1024 * 100,
+            merge_array_page_size: 10000,
+            merge_data_page_size_limit_bytes: Some(1024 * 1024),
+            merge_max_l1_part_size_bytes: 1024 * 1024,
+            merge_part_size_multiplier: 10,
+            merge_row_group_values_limit: 1000,
+            merge_chunk_size: 1024 * 8 * 8,
+            merge_max_page_size: 1024 * 1024,
+            is_replacing: true,
+        };
+        db.create_table("t1".to_string(), topts).unwrap();
+        db.add_field("t1", "f1", DType::Int64, false).unwrap();
+        db.add_field("t1", "f2", DType::Int64, false).unwrap();
+        db.add_field("t1", "f3", DType::Int64, false).unwrap();
+        db.insert("t1", vec![
+            NamedValue::new("f1".to_string(), Value::Int64(Some(1))), // pk
+            NamedValue::new("f2".to_string(), Value::Int64(Some(1))), // version
+            NamedValue::new("f3".to_string(), Value::Int64(Some(1))), // counter
+        ])
+        .unwrap();
+        db.insert("t1", vec![
+            NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
+            NamedValue::new("f2".to_string(), Value::Int64(Some(2))),
+            NamedValue::new("f3".to_string(), Value::Int64(Some(2))),
+        ])
+        .unwrap();
+        db.insert("t1", vec![
+            NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
+            NamedValue::new("f2".to_string(), Value::Int64(Some(3))),
+            NamedValue::new("f3".to_string(), Value::Int64(Some(3))),
+        ])
+        .unwrap();
+        db.insert("t1", vec![
+            NamedValue::new("f1".to_string(), Value::Int64(Some(2))),
+            NamedValue::new("f2".to_string(), Value::Int64(Some(1))),
+            NamedValue::new("f3".to_string(), Value::Int64(Some(1))),
+        ])
+        .unwrap();
+
+        let r = db.get("t1", vec![KeyValue::Int64(1)]).unwrap();
+        assert!(r.is_some());
+        let r = db
+            .get("t1", vec![KeyValue::Int64(1), KeyValue::Int64(1)])
+            .unwrap();
+        assert!(r.is_some());
+        let r = db
+            .get("t1", vec![KeyValue::Int64(1), KeyValue::Int64(3)])
+            .unwrap();
+        assert!(r.is_some());
+
+        let r = db
+            .get("t1", vec![KeyValue::Int64(1), KeyValue::Int64(4)])
+            .unwrap();
+        assert!(r.is_none());
+
+        db.flush().unwrap();
+
+        let r = db.get("t1", vec![KeyValue::Int64(1)]).unwrap();
+        assert_eq!(
+            r,
+            Some(vec![
+                Value::Int64(Some(1)),
+                Value::Int64(Some(3)),
+                Value::Int64(Some(3))
+            ])
+        );
+
+        let r = db.get("t1", vec![KeyValue::Int64(2)]).unwrap();
+        assert!(r.is_some());
+
+        let r = db.get("t1", vec![KeyValue::Int64(3)]).unwrap();
+        assert!(r.is_none());
+
+        db.insert("t1", vec![
+            NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
+            NamedValue::new("f2".to_string(), Value::Int64(Some(4))),
+            NamedValue::new("f3".to_string(), Value::Int64(Some(4))),
+        ])
+        .unwrap();
+
+        db.flush().unwrap();
+
+        db.insert("t1", vec![
+            NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
+            NamedValue::new("f2".to_string(), Value::Int64(Some(5))),
+            NamedValue::new("f3".to_string(), Value::Int64(Some(5))),
+        ])
+        .unwrap();
+        db.flush().unwrap();
+
+        db.insert("t1", vec![
+            NamedValue::new("f1".to_string(), Value::Int64(Some(2))),
+            NamedValue::new("f2".to_string(), Value::Int64(Some(2))),
+            NamedValue::new("f3".to_string(), Value::Int64(Some(2))),
+        ])
+        .unwrap();
+
+        db.flush().unwrap();
+
+        db.insert("t1", vec![
+            NamedValue::new("f1".to_string(), Value::Int64(Some(2))),
+            NamedValue::new("f2".to_string(), Value::Int64(Some(3))),
+            NamedValue::new("f3".to_string(), Value::Int64(Some(3))),
+        ])
+        .unwrap();
+
+        db.flush().unwrap();
+        db.compact();
+
+        let r = db.get("t1", vec![KeyValue::Int64(1)]).unwrap();
+        assert_eq!(
+            r,
+            Some(vec![
+                Value::Int64(Some(1)),
+                Value::Int64(Some(5)),
+                Value::Int64(Some(5))
+            ])
+        );
+    }
+
+    #[test]
+    fn test_scan() {
+        let path = PathBuf::from("/tmp/scan");
+        fs::remove_dir_all(&path).ok();
+        fs::create_dir_all(&path).unwrap();
+        let opts = Options {};
+        let db = OptiDBImpl::open(path, opts).unwrap();
+        let topts = table::Options {
+            levels: 7,
+            merge_array_size: 10000,
+            parallelism: 1,
+            index_cols: 2,
+            l1_max_size_bytes: 1024 * 1024 * 10,
+            level_size_multiplier: 10,
+            l0_max_parts: 4,
+            max_log_length_bytes: 1024 * 1024 * 100,
+            merge_array_page_size: 10000,
+            merge_data_page_size_limit_bytes: Some(1024 * 1024),
+            merge_max_l1_part_size_bytes: 1024 * 1024,
+            merge_part_size_multiplier: 10,
+            merge_row_group_values_limit: 1000,
+            merge_chunk_size: 1024 * 8 * 8,
+            merge_max_page_size: 1024 * 1024,
+            is_replacing: true,
+        };
+        db.create_table("t1".to_string(), topts).unwrap();
+        db.add_field("t1", "f1", DType::Int64, false).unwrap();
+        db.add_field("t1", "f2", DType::Int64, false).unwrap();
+        db.insert("t1", vec![
+            NamedValue::new("f1".to_string(), Value::Int64(Some(1))), // pk
+            NamedValue::new("f2".to_string(), Value::Int64(Some(1))), // version
+        ])
+        .unwrap();
+
+        db.flush().unwrap();
+
+        db.insert("t1", vec![
+            NamedValue::new("f1".to_string(), Value::Int64(Some(1))), // pk
+            NamedValue::new("f2".to_string(), Value::Int64(Some(2))), // version
+        ])
+        .unwrap();
+
+        db.flush().unwrap();
+
+        db.insert("t1", vec![
+            NamedValue::new("f1".to_string(), Value::Int64(Some(1))), // pk
+            NamedValue::new("f2".to_string(), Value::Int64(Some(3))), // version
+        ])
+        .unwrap();
+        db.insert("t1", vec![
+            NamedValue::new("f1".to_string(), Value::Int64(Some(1))), // pk
+            NamedValue::new("f2".to_string(), Value::Int64(Some(4))), // version
+        ])
+        .unwrap();
+
+        let mut stream = db.scan("t1", vec![0, 1]).unwrap();
+
+        let exp = Chunk::new(vec![
+            Box::new(Int64Array::from_vec(vec![1])) as Box<dyn Array>,
+            Box::new(Int64Array::from_vec(vec![4])) as Box<dyn Array>,
+        ]);
+        let res = stream.iter.next().unwrap().unwrap();
+    }
     #[test]
     fn test_schema_evolution() {
         let path = PathBuf::from("/tmp/schema_evolution");
@@ -857,37 +1625,35 @@ mod tests {
             levels: 7,
             merge_array_size: 10000,
             parallelism: 1,
-            index_cols: 1,
+            index_cols: 2,
             l1_max_size_bytes: 1024 * 1024 * 10,
             level_size_multiplier: 10,
             l0_max_parts: 4,
             max_log_length_bytes: 1024 * 1024 * 100,
             merge_array_page_size: 10000,
             merge_data_page_size_limit_bytes: Some(1024 * 1024),
-            merge_index_cols: 1,
             merge_max_l1_part_size_bytes: 1024 * 1024,
             merge_part_size_multiplier: 10,
             merge_row_group_values_limit: 1000,
             merge_chunk_size: 1024 * 8 * 8,
             merge_max_page_size: 1024 * 1024,
+            is_replacing: false,
         };
 
-        println!("1");
         db.create_table("t1".to_string(), topts).unwrap();
-        println!("2");
         db.add_field("t1", "f1", DType::Int64, false).unwrap();
-        println!("3");
-        db.insert("t1", vec![NamedValue::new(
-            "f1".to_string(),
-            Value::Int64(Some(1)),
-        )])
-        .unwrap();
-        println!("4");
         db.add_field("t1", "f2", DType::Int64, false).unwrap();
+        db.insert("t1", vec![
+            NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
+            NamedValue::new("f2".to_string(), Value::Int64(Some(1))),
+        ])
+        .unwrap();
+        db.add_field("t1", "f3", DType::Int64, false).unwrap();
 
         db.insert("t1", vec![
             NamedValue::new("f1".to_string(), Value::Int64(Some(2))),
             NamedValue::new("f2".to_string(), Value::Int64(Some(2))),
+            NamedValue::new("f3".to_string(), Value::Int64(Some(2))),
         ])
         .unwrap();
 

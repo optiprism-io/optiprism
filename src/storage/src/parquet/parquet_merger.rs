@@ -195,27 +195,34 @@ impl ArrowIndexChunk {
     }
 }
 
-pub fn check_intersection(chunks: &[PagesIndexChunk], other: Option<&PagesIndexChunk>) -> bool {
+pub fn check_intersection(
+    chunks: &[PagesIndexChunk],
+    other: Option<&PagesIndexChunk>,
+    index_cols: usize,
+    is_replacing: bool,
+) -> bool {
     if other.is_none() {
         return false;
     }
 
+    let offset = if is_replacing { 1 } else { 0 };
     let mut iter = chunks.iter();
     let first = iter.next().unwrap();
-    let mut min_values = first.min_values();
-    let mut max_values = first.max_values();
+    let mut min_values = first.min_values()[..index_cols - offset].to_vec();
+    let mut max_values = first.max_values()[..index_cols - offset].to_vec();
     for row in iter {
-        if row.min_values <= min_values {
+        if row.min_values()[..index_cols - offset].to_vec() <= min_values {
             min_values = row.min_values();
         }
-        if row.max_values >= max_values {
+        if row.max_values()[..index_cols - offset].to_vec() >= max_values {
             max_values = row.max_values();
         }
     }
 
     let other = other.unwrap();
 
-    min_values <= other.max_values() && max_values >= other.min_values
+    min_values <= other.max_values()[..index_cols - offset].to_vec()
+        && max_values >= other.min_values()[..index_cols - offset].to_vec()
 }
 
 #[derive(Debug)]
@@ -370,12 +377,12 @@ impl MergedPagesChunk {
 pub struct MergedArrowChunk {
     pub cols: Vec<Box<dyn Array>>,
     // contains the stream id of each row so we can take the rows in the correct order
-    pub reorder: Vec<usize>,
+    pub reorder: Vec<i64>,
 }
 
 impl MergedArrowChunk {
     // Create new merged arrow chunk
-    pub fn new(arrs: Vec<Box<dyn Array>>, reorder: Vec<usize>) -> Self {
+    pub fn new(arrs: Vec<Box<dyn Array>>, reorder: Vec<i64>) -> Self {
         Self {
             cols: arrs,
             reorder,
@@ -418,7 +425,7 @@ pub fn merge_one_primitive<T: NativeType + Ord>(
     // get sorted values
     while let Some(OneColMergeRow(row_idx, v)) = sort.pop() {
         out_col.push(v);
-        order.push(chunks[row_idx].stream);
+        order.push(chunks[row_idx].stream as i64);
         if let Some(v) = arr_iters[row_idx].next() {
             let mr = OneColMergeRow(row_idx, *v);
             #[allow(clippy::drain_collect)]
@@ -450,6 +457,7 @@ pub fn merge_one_primitive<T: NativeType + Ord>(
 pub fn merge_two_primitives<T1: NativeType + Ord, T2: NativeType + Ord>(
     chunks: Vec<ArrowIndexChunk>,
     array_size: usize,
+    is_replacing: bool,
 ) -> Result<Vec<MergedArrowChunk>> {
     let mut arr_iters = chunks
         .iter()
@@ -475,22 +483,29 @@ pub fn merge_two_primitives<T1: NativeType + Ord, T2: NativeType + Ord>(
     let mut out_col2 = Vec::with_capacity(array_size);
     let mut order = Vec::with_capacity(array_size);
 
-    for (row_id, iter) in arr_iters.iter_mut().enumerate().take(chunks.len()) {
-        let mr = TwoColMergeRow(row_id, *iter.0.next().unwrap(), *iter.1.next().unwrap());
-        sort.push(mr);
-    }
-
-    while let Some(TwoColMergeRow(row_idx, v1, v2)) = sort.pop() {
-        out_col1.push(v1);
-        out_col2.push(v2);
-        order.push(chunks[row_idx].stream);
-        if let Some(v1) = arr_iters[row_idx].0.next() {
-            let v2 = arr_iters[row_idx].1.next().unwrap();
-            let mr = TwoColMergeRow(row_idx, *v1, *v2);
-            #[allow(clippy::drain_collect)]
+    for (arr_id, iter) in arr_iters.iter_mut().enumerate() {
+        for _ in 0..chunks[arr_id].cols[0].len() {
+            let v1 = iter.0.next().unwrap();
+            let v2 = iter.1.next().unwrap();
+            let mr = TwoColMergeRow(arr_id, *v1, *v2);
             sort.push(mr);
         }
+    }
+    while let Some(TwoColMergeRow(arr_id, v1, v2)) = sort.pop() {
+        // dbg!((v1, v2));
+        if is_replacing {
+            if let Some(v) = sort.peek() {
+                if v1 == v.1 {
+                    order.push(-1);
 
+                    continue;
+                }
+            }
+        }
+
+        out_col1.push(v1);
+        out_col2.push(v2);
+        order.push(chunks[arr_id].stream as i64);
         if out_col1.len() >= array_size {
             let out = vec![
                 PrimitiveArray::<T1>::from_vec(std::mem::take(&mut out_col1)).boxed(),
@@ -501,7 +516,7 @@ pub fn merge_two_primitives<T1: NativeType + Ord, T2: NativeType + Ord>(
         }
     }
 
-    if !out_col1.is_empty() {
+    if !order.is_empty() {
         let out = vec![
             PrimitiveArray::<T1>::from_vec(std::mem::take(&mut out_col1)).boxed(),
             PrimitiveArray::<T2>::from_vec(std::mem::take(&mut out_col2)).boxed(),
@@ -563,7 +578,7 @@ pub fn merge_three_primitives<T1: NativeType + Ord, T2: NativeType + Ord, T3: Na
         out_col1.push(v1);
         out_col2.push(v2);
         out_col3.push(v3);
-        order.push(chunks[row_idx].stream);
+        order.push(chunks[row_idx].stream as i64);
         if let Some(v1) = arr_iters[row_idx].0.next() {
             let v2 = arr_iters[row_idx].1.next().unwrap();
             let v3 = arr_iters[row_idx].2.next().unwrap();
@@ -592,6 +607,8 @@ pub fn merge_three_primitives<T1: NativeType + Ord, T2: NativeType + Ord, T3: Na
         res.push(MergedArrowChunk::new(out, arr_order));
     }
 
+    dbg!(&res);
+
     Ok(res)
 }
 
@@ -603,6 +620,7 @@ pub fn merge_three_primitives<T1: NativeType + Ord, T2: NativeType + Ord, T3: Na
 pub fn merge_chunks(
     chunks: Vec<ArrowIndexChunk>,
     array_size: usize,
+    is_replacing: bool,
 ) -> Result<Vec<MergedArrowChunk>> {
     // supported lengths (count of index columns)
     match chunks[0].cols.len() {
@@ -629,10 +647,10 @@ pub fn merge_chunks(
                         // Put here possible combination that you need
                         // Or find a way to merge any types dynamically without performance penalty
                         (ArrowPrimitiveType::Int64, ArrowPrimitiveType::Int64) => {
-                            merge_two_primitives::<i64, i64>(chunks, array_size)
+                            merge_two_primitives::<i64, i64>(chunks, array_size, is_replacing)
                         }
                         (ArrowPrimitiveType::Int64, ArrowPrimitiveType::Int32) => {
-                            merge_two_primitives::<i64, i32>(chunks, array_size)
+                            merge_two_primitives::<i64, i32>(chunks, array_size, is_replacing)
                         }
                         _ => unimplemented!(
                             "merge is not implemented for {a:?} {b:?} primitive types"
@@ -640,9 +658,10 @@ pub fn merge_chunks(
                     }
                 }
                 _ => unimplemented!(
-                    "merge not implemented for {:?} {:?} types",
+                    "merge not implemented for {:?} {:?} {:?} types",
                     chunks[0].cols[0].data_type(),
-                    chunks[0].cols[1].data_type()
+                    chunks[0].cols[1].data_type(),
+                    chunks[0].cols[2].data_type()
                 ),
             }
         }
@@ -671,9 +690,10 @@ pub fn merge_chunks(
                     }
                 }
                 _ => unimplemented!(
-                    "merge not implemented for {:?} {:?} types",
+                    "merge not implemented for {:?} {:?} {:?} types",
                     chunks[0].cols[0].data_type(),
-                    chunks[0].cols[1].data_type()
+                    chunks[0].cols[1].data_type(),
+                    chunks[0].cols[3].data_type()
                 ),
             }
         }
@@ -686,6 +706,7 @@ pub fn merge_chunks(
 
 pub struct Options {
     pub index_cols: usize,
+    pub is_replacing: bool,
     pub data_page_size_limit_bytes: Option<usize>,
     pub row_group_values_limit: usize,
     pub array_page_size: usize,
@@ -699,6 +720,7 @@ where R: Read
 {
     // list of index cols (partitions) in parquet file
     index_cols: Vec<ColumnDescriptor>,
+    is_replacing: bool,
     // final schema of parquet file (merged multiple schemas)
     parquet_schema: SchemaDescriptor,
     // final arrow schema
@@ -735,7 +757,7 @@ pub enum MergeReorder {
     // pick page from stream, e.g. don't merge and write as is
     PickFromStream(usize, usize),
     // first vector - stream_id to pick from, second vector - streams which are merged
-    Merge(Vec<usize>, Vec<usize>),
+    Merge(Vec<i64>, Vec<usize>),
 }
 
 #[derive(Debug, Clone)]
@@ -778,6 +800,7 @@ pub fn merge<R: Read + Seek>(
 
     let mut mr = Merger {
         index_cols,
+        is_replacing: opts.is_replacing,
         parquet_schema,
         arrow_schema,
         page_streams,
@@ -1002,7 +1025,7 @@ where R: Read + Seek
         &mut self,
         col: &ColumnDescriptor,
         field: Field,
-        reorder: &[usize],
+        reorder: &[i64],
         streams: &[usize],
     ) -> Result<Vec<CompressedPage>> {
         // Call merger for type
@@ -1243,6 +1266,9 @@ where R: Read + Seek
             ),
         };
 
+        if out.len() == 0 {
+            return Ok(vec![]);
+        }
         let pages =
             array_to_pages_simple(out, col.base_type.clone(), self.data_page_size_limit_bytes)?;
 
@@ -1267,7 +1293,7 @@ where R: Read + Seek
         // remove duplicates in case if there are several chunks from the same stream
         streams.dedup();
         // merge
-        let merged_chunks = merge_chunks(arrow_chunks, self.array_page_size)?;
+        let merged_chunks = merge_chunks(arrow_chunks, self.array_page_size, self.is_replacing)?;
 
         // convert arrow to parquet page chunks
         for chunk in merged_chunks {
@@ -1297,7 +1323,12 @@ where R: Read + Seek
             self.merge_queue.push(chunk);
             // check intersection of first chunk with merge queue
             // all the intersected chunks should be merged
-            while check_intersection(&self.merge_queue, self.sorter.peek()) {
+            while check_intersection(
+                &self.merge_queue,
+                self.sorter.peek(),
+                self.index_cols.len(),
+                self.is_replacing,
+            ) {
                 // in case of intersection, take chunk and add it to merge queue
                 let next = self.sorter.pop().unwrap();
                 // try to take next chunk of stream and add it to sorter

@@ -297,7 +297,8 @@ fn compact(
                 let max_part_size_bytes = opts.merge_max_l1_part_size_bytes
                     * opts.merge_part_size_multiplier.pow(level_id as u32 + 1);
                 let merger_opts = parquet_merger::Options {
-                    index_cols: opts.merge_index_cols,
+                    index_cols: opts.index_cols,
+                    is_replacing: opts.is_replacing,
                     data_page_size_limit_bytes: opts.merge_data_page_size_limit_bytes,
                     row_group_values_limit: opts.merge_row_group_values_limit,
                     array_page_size: opts.merge_array_page_size,

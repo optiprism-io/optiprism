@@ -5,7 +5,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use arrow2::datatypes::Schema;
+use lru::LruCache;
 use parking_lot::Mutex;
+use parking_lot::RwLock;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -13,11 +15,13 @@ use crate::memtable::Memtable;
 use crate::Fs;
 use crate::KeyValue;
 use crate::Stats;
+use crate::Value;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Options {
     pub parallelism: usize,
     pub index_cols: usize,
+    pub is_replacing: bool,
     pub levels: usize,
     pub l0_max_parts: usize,
     pub l1_max_size_bytes: usize,
@@ -25,7 +29,6 @@ pub struct Options {
     pub max_log_length_bytes: usize,
     pub merge_max_l1_part_size_bytes: usize,
     pub merge_part_size_multiplier: usize,
-    pub merge_index_cols: usize,
     pub merge_data_page_size_limit_bytes: Option<usize>,
     pub merge_row_group_values_limit: usize,
     pub merge_array_size: usize,
@@ -35,19 +38,19 @@ pub struct Options {
 }
 
 impl Options {
-    pub fn test() -> Self {
+    pub fn test(is_replacing: bool) -> Self {
         Options {
             levels: 7,
             merge_array_size: 10000,
             parallelism: 1,
             index_cols: 1,
+            is_replacing,
             l1_max_size_bytes: 1024 * 1024 * 10,
             level_size_multiplier: 10,
             l0_max_parts: 4,
             max_log_length_bytes: 1024 * 1024 * 100,
             merge_array_page_size: 10000,
             merge_data_page_size_limit_bytes: Some(1024 * 1024),
-            merge_index_cols: 2,
             merge_max_l1_part_size_bytes: 1024 * 1024,
             merge_part_size_multiplier: 10,
             merge_row_group_values_limit: 1000,
@@ -119,6 +122,7 @@ pub(crate) struct Table {
     pub(crate) metadata: Arc<Mutex<Metadata>>,
     pub(crate) vfs: Arc<Fs>,
     pub(crate) log: Arc<Mutex<BufWriter<File>>>,
+    pub(crate) cas: Arc<RwLock<LruCache<Vec<Value>, i64>>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
