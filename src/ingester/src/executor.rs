@@ -142,7 +142,7 @@ impl Executor<Track> {
         if let Some(props) = &req.user_properties {
             req.resolved_user_properties = Some(resolve_properties(
                 &ctx,
-                &self.md.user_properties,
+                &self.md.group_properties,
                 &self.db,
                 properties::Type::Event,
                 props,

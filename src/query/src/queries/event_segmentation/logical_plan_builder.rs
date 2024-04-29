@@ -198,7 +198,7 @@ impl LogicalPlanBuilder {
                             metadata.system_properties.get_by_name(ctx.project_id, p)?
                         }
                         PropertyRef::User(p) => {
-                            metadata.user_properties.get_by_name(ctx.project_id, p)?
+                            metadata.group_properties.get_by_name(ctx.project_id, p)?
                         }
                         PropertyRef::Event(p) => {
                             metadata.event_properties.get_by_name(ctx.project_id, p)?
@@ -223,7 +223,7 @@ impl LogicalPlanBuilder {
                                 metadata.system_properties.get_by_name(ctx.project_id, p)?
                             }
                             PropertyRef::User(p) => {
-                                metadata.user_properties.get_by_name(ctx.project_id, p)?
+                                metadata.group_properties.get_by_name(ctx.project_id, p)?
                             }
                             PropertyRef::Event(p) => {
                                 metadata.event_properties.get_by_name(ctx.project_id, p)?
@@ -595,7 +595,7 @@ impl LogicalPlanBuilder {
                             .get_by_name(self.ctx.project_id, p)?,
                         PropertyRef::User(p) => self
                             .metadata
-                            .user_properties
+                            .group_properties
                             .get_by_name(self.ctx.project_id, p)?,
                         PropertyRef::Event(p) => self
                             .metadata
@@ -622,7 +622,7 @@ impl LogicalPlanBuilder {
                             .get_by_name(self.ctx.project_id, p)?,
                         PropertyRef::User(p) => self
                             .metadata
-                            .user_properties
+                            .group_properties
                             .get_by_name(self.ctx.project_id, p)?,
                         PropertyRef::Event(p) => self
                             .metadata

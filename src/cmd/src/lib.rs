@@ -19,6 +19,7 @@ use common::types::DType;
 use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_EVENT_ID;
+use common::types::COLUMN_GROUP;
 use common::types::COLUMN_PROJECT_ID;
 use common::types::COLUMN_USER_ID;
 use common::types::EVENT_CLICK;
@@ -52,6 +53,7 @@ use common::types::USER_PROPERTY_OS_VERSION_MAJOR;
 use common::types::USER_PROPERTY_OS_VERSION_MINOR;
 use common::types::USER_PROPERTY_OS_VERSION_PATCH;
 use common::types::USER_PROPERTY_OS_VERSION_PATCH_MINOR;
+use common::GROUPS_COUNT;
 use ingester::error::IngesterError;
 use ingester::executor::Executor;
 use ingester::transformers::geo;
@@ -165,15 +167,17 @@ pub fn init_system(
         dict: None,
     })?;
 
-    create_property(md, 0, CreatePropertyMainRequest {
-        name: COLUMN_USER_ID.to_string(),
-        display_name: Some("User".to_string()),
-        typ: Type::System,
-        data_type: DType::Int64,
-        nullable: false,
-        hidden: false,
-        dict: None,
-    })?;
+    for g in 0..GROUPS_COUNT {
+        create_property(md, 0, CreatePropertyMainRequest {
+            name: format!("group_{g}"),
+            display_name: Some(format!("Group {g}")),
+            typ: Type::System,
+            data_type: DType::String,
+            nullable: false,
+            hidden: false,
+            dict: Some(DictionaryType::Int64),
+        })?;
+    }
 
     create_property(md, 0, CreatePropertyMainRequest {
         name: COLUMN_CREATED_AT.to_string(),
@@ -241,12 +245,12 @@ fn init_ingester(
     let mut track_transformers = Vec::new();
     let ua_parser = UserAgentParser::from_file(File::open(ua_db_path)?)
         .map_err(|e| Error::Internal(e.to_string()))?;
-    let ua = user_agent::track::UserAgent::try_new(md.user_properties.clone(), ua_parser)?;
+    let ua = user_agent::track::UserAgent::try_new(md.group_properties.clone(), ua_parser)?;
     track_transformers.push(Arc::new(ua) as Arc<dyn Transformer<Track>>);
 
     // todo make common
     let city_rdr = maxminddb::Reader::open_readfile(geo_city_path)?;
-    let geo = geo::track::Geo::try_new(md.user_properties.clone(), city_rdr)?;
+    let geo = geo::track::Geo::try_new(md.group_properties.clone(), city_rdr)?;
     track_transformers.push(Arc::new(geo) as Arc<dyn Transformer<Track>>);
 
     let mut track_destinations = Vec::new();
@@ -263,12 +267,12 @@ fn init_ingester(
     info!("initializing ua parser...");
     let ua_parser = UserAgentParser::from_file(File::open(ua_db_path)?)
         .map_err(|e| IngesterError::Internal(e.to_string()))?;
-    let ua = user_agent::identify::UserAgent::try_new(md.user_properties.clone(), ua_parser)?;
+    let ua = user_agent::identify::UserAgent::try_new(md.group_properties.clone(), ua_parser)?;
     identify_transformers.push(Arc::new(ua) as Arc<dyn Transformer<Identify>>);
 
     info!("initializing geo...");
     let city_rdr = maxminddb::Reader::open_readfile(geo_city_path)?;
-    let geo = geo::identify::Geo::try_new(md.user_properties.clone(), city_rdr)?;
+    let geo = geo::identify::Geo::try_new(md.group_properties.clone(), city_rdr)?;
     identify_transformers.push(Arc::new(geo) as Arc<dyn Transformer<Identify>>);
     let mut identify_destinations = Vec::new();
     let identify_debug_dst = ingester::destinations::debug::identify::Debug::new();

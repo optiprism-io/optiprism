@@ -37,7 +37,7 @@ pub fn decode_filter_single_dictionary(
                         .system_properties
                         .get_by_name(ctx.project_id, prop_ref.as_str())?,
                     PropertyRef::User(prop_ref) => metadata
-                        .user_properties
+                        .group_properties
                         .get_by_name(ctx.project_id, prop_ref.as_str())?,
                     PropertyRef::Event(prop_ref) => metadata
                         .event_properties

@@ -1,3 +1,5 @@
+use std::string::ToString;
+
 use arrow::datatypes;
 use arrow2::datatypes::DataType as DataType2;
 use arrow_schema::DataType;
@@ -19,7 +21,6 @@ pub const TABLE_EVENTS: &str = "events";
 pub const TABLE_USERS: &str = "users";
 
 pub const COLUMN_PROJECT_ID: &str = "project_id";
-pub const COLUMN_USER_ID: &str = "user_id";
 pub const COLUMN_CREATED_AT: &str = "created_at";
 pub const COLUMN_EVENT_ID: &str = "event_id";
 pub const COLUMN_EVENT: &str = "event";
@@ -93,7 +94,9 @@ pub const RESERVED_COLUMN_AGG: &str = "agg";
 pub const RESERVED_COLUMN_COUNT: &str = "count";
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+#[derive(Default)]
 pub enum DType {
+    #[default]
     String,
     Int8,
     Int16,

@@ -130,7 +130,7 @@ pub(crate) fn validate(
                 for (idx, prop) in props.iter().enumerate() {
                     match prop {
                         PropertyRef::User { property_name } => md
-                            .user_properties
+                            .group_properties
                             .get_by_name(project_id, &property_name)
                             .map_err(|err| {
                                 PlatformError::BadRequest(format!("property {idx}: {err}"))

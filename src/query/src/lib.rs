@@ -452,7 +452,7 @@ pub mod test_util {
     ) -> Result<Property> {
         let prop = match req.typ {
             Type::Event => md.event_properties.create(proj_id, req)?,
-            Type::User => md.user_properties.create(proj_id, req)?,
+            Type::Group => md.group_properties.create(proj_id, req)?,
             _ => unimplemented!(),
         };
 
@@ -479,7 +479,7 @@ pub mod test_util {
             name: "Country".to_string(),
             description: None,
             display_name: None,
-            typ: properties::Type::User,
+            typ: properties::Type::Group,
             data_type: DType::String,
             status: properties::Status::Enabled,
             hidden: false,
@@ -504,7 +504,7 @@ pub mod test_util {
             name: "Device".to_string(),
             description: None,
             display_name: None,
-            typ: properties::Type::User,
+            typ: properties::Type::Group,
             data_type: DType::String,
             status: properties::Status::Enabled,
             nullable: true,
@@ -521,7 +521,7 @@ pub mod test_util {
             name: "Is Premium".to_string(),
             description: None,
             display_name: None,
-            typ: Type::User,
+            typ: Type::Group,
             data_type: DType::Boolean,
             status: properties::Status::Enabled,
             hidden: false,
@@ -620,7 +620,7 @@ pub fn col_name(ctx: &Context, prop: &PropertyRef, md: &Arc<MetadataProvider>) -
             .get_by_name(ctx.project_id, v)?
             .column_name(),
         PropertyRef::User(v) => md
-            .user_properties
+            .group_properties
             .get_by_name(ctx.project_id, v)?
             .column_name(),
         PropertyRef::Event(v) => md

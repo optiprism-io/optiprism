@@ -10,3 +10,5 @@ pub mod types;
 pub use types::DECIMAL_MULTIPLIER;
 pub use types::DECIMAL_PRECISION;
 pub use types::DECIMAL_SCALE;
+
+pub const GROUPS_COUNT: usize = 5;

@@ -221,7 +221,7 @@ pub fn init_project(project_id: u64, md: &Arc<MetadataProvider>) -> error::Resul
         create_property(md, project_id, CreatePropertyMainRequest {
             name: prop.to_string(),
             display_name: None,
-            typ: Type::User,
+            typ: Type::Group,
             data_type: DType::String,
             nullable: true,
             hidden: false,

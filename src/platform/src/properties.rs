@@ -100,7 +100,7 @@ impl From<metadata::properties::Type> for Type {
     fn from(value: metadata::properties::Type) -> Self {
         match value {
             metadata::properties::Type::Event => Type::Event,
-            metadata::properties::Type::User => Type::User,
+            metadata::properties::Type::Group => Type::User,
             metadata::properties::Type::System => Type::System,
         }
     }
@@ -110,7 +110,7 @@ impl From<Type> for metadata::properties::Type {
     fn from(value: Type) -> Self {
         match value {
             Type::Event => metadata::properties::Type::Event,
-            Type::User => metadata::properties::Type::User,
+            Type::User => metadata::properties::Type::Group,
             Type::System => metadata::properties::Type::System,
         }
     }

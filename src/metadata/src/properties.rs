@@ -11,6 +11,7 @@ use chrono::Utc;
 use common::types::DType;
 use common::types::OptionalProperty;
 use common::types::TABLE_EVENTS;
+use common::GROUPS_COUNT;
 use convert_case::Case;
 use convert_case::Casing;
 use lru::LruCache;
@@ -89,20 +90,27 @@ pub struct Properties {
 }
 
 impl Properties {
-    pub fn new_user(db: Arc<TransactionDB>, opti_db: Arc<OptiDBImpl>) -> Self {
-        let id_cache = RwLock::new(LruCache::new(
-            NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
-        ));
-        let name_cache = RwLock::new(LruCache::new(
-            NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
-        ));
-        Properties {
-            db,
-            opti_db,
-            id_cache,
-            name_cache,
-            typ: Type::User,
-        }
+    pub fn new_group(db: Arc<TransactionDB>, opti_db: Arc<OptiDBImpl>) -> Vec<Self> {
+        let props = (0..GROUPS_COUNT)
+            .into_iter()
+            .map(|gid| {
+                let id_cache = RwLock::new(LruCache::new(
+                    NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
+                ));
+                let name_cache = RwLock::new(LruCache::new(
+                    NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
+                ));
+                Properties {
+                    db: db.clone(),
+                    opti_db: opti_db.clone(),
+                    id_cache,
+                    name_cache,
+                    typ: Type::Group(gid),
+                }
+            })
+            .collect::<Vec<_>>();
+
+        props
     }
 
     pub fn new_event(db: Arc<TransactionDB>, opti_db: Arc<OptiDBImpl>) -> Self {
@@ -499,19 +507,22 @@ pub enum Status {
     Disabled,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 pub enum Type {
+    #[default]
     System,
     Event,
-    User,
+    Group(usize),
 }
 
 impl Type {
-    pub fn path(&self) -> &str {
+    pub fn path(&self) -> String {
         match self {
-            Type::System => "system_properties",
-            Type::Event => "event_properties",
-            Type::User => "user_properties",
+            Type::System => "system_properties".to_string(),
+            Type::Event => "event_properties".to_string(),
+            Type::Group(gid) => {
+                format!("group_{gid}_properties")
+            }
         }
     }
 
@@ -586,8 +597,8 @@ impl Property {
             Type::Event => {
                 format!("e_{}_{}", self.data_type.short_name(), self.order)
             }
-            Type::User => {
-                format!("u_{}_{}", self.data_type.short_name(), self.order)
+            Type::Group(gid) => {
+                format!("g_{gid}_{}_{}", self.data_type.short_name(), self.order)
             }
         }
     }

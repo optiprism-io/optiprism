@@ -253,7 +253,7 @@ where R: io::Read {
     let profiles = ProfileProvider::try_new_from_csv(
         cfg.project_id,
         &md.dictionaries,
-        &md.user_properties,
+        &md.group_properties,
         cfg.geo_rdr,
         cfg.device_rdr,
     )?;
@@ -329,7 +329,7 @@ where R: io::Read {
     let profiles = ProfileProvider::try_new_from_csv(
         cfg.project_id,
         &md.dictionaries,
-        &md.user_properties,
+        &md.group_properties,
         cfg.geo_rdr,
         cfg.device_rdr,
     )?;
@@ -498,70 +498,70 @@ fn write_event(
             Value::Decimal(event.revenue),
         ),
         NamedValue::new(
-            md.user_properties
+            md.group_properties
                 .get_by_name(proj_id, "Spent Total")
                 .unwrap()
                 .column_name(),
             Value::Decimal(event.spent_total),
         ),
         NamedValue::new(
-            md.user_properties
+            md.group_properties
                 .get_by_name(proj_id, "Products Bought")
                 .unwrap()
                 .column_name(),
             Value::Int8(event.products_bought),
         ),
         NamedValue::new(
-            md.user_properties
+            md.group_properties
                 .get_by_name(proj_id, "Cart Items Number")
                 .unwrap()
                 .column_name(),
             Value::Int8(event.cart_items_number),
         ),
         NamedValue::new(
-            md.user_properties
+            md.group_properties
                 .get_by_name(proj_id, "Cart Amount")
                 .unwrap()
                 .column_name(),
             Value::Decimal(event.cart_amount),
         ),
         NamedValue::new(
-            md.user_properties
+            md.group_properties
                 .get_by_name(proj_id, USER_PROPERTY_COUNTRY)
                 .unwrap()
                 .column_name(),
             Value::Int64(event.country.map(|v| v as i64)),
         ),
         NamedValue::new(
-            md.user_properties
+            md.group_properties
                 .get_by_name(proj_id, USER_PROPERTY_CITY)
                 .unwrap()
                 .column_name(),
             Value::Int64(event.city.map(|v| v as i64)),
         ),
         NamedValue::new(
-            md.user_properties
+            md.group_properties
                 .get_by_name(proj_id, USER_PROPERTY_DEVICE_MODEL)
                 .unwrap()
                 .column_name(),
             Value::Int64(event.device.map(|v| v as i64)),
         ),
         NamedValue::new(
-            md.user_properties
+            md.group_properties
                 .get_by_name(proj_id, USER_PROPERTY_OS_FAMILY)
                 .unwrap()
                 .column_name(),
             Value::Int64(event.device_category.map(|v| v as i64)),
         ),
         NamedValue::new(
-            md.user_properties
+            md.group_properties
                 .get_by_name(proj_id, USER_PROPERTY_OS)
                 .unwrap()
                 .column_name(),
             Value::Int64(event.os.map(|v| v as i64)),
         ),
         NamedValue::new(
-            md.user_properties
+            md.group_properties
                 .get_by_name(proj_id, USER_PROPERTY_OS_VERSION_MAJOR)
                 .unwrap()
                 .column_name(),

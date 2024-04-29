@@ -73,7 +73,7 @@ pub(crate) fn validate(
 ) -> Result<()> {
     match &req.property {
         PropertyRef::User { property_name } => {
-            md.user_properties
+            md.group_properties
                 .get_by_name(project_id, &property_name)
                 .map_err(|err| PlatformError::BadRequest(format!("{err}")))?;
         }

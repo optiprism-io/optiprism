@@ -91,7 +91,7 @@ impl LogicalPlanBuilder {
             }
             PropertyRef::User(prop_name) => {
                 let prop = metadata
-                    .user_properties
+                    .group_properties
                     .get_by_name(ctx.project_id, prop_name)?;
                 let col_name = prop.column_name();
                 (property_col!(ctx, metadata, input, prop), col_name)

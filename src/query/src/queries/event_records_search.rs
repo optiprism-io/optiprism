@@ -65,7 +65,7 @@ pub fn build(
                     .system_properties
                     .get_by_name(ctx.project_id, n.as_ref())?,
                 PropertyRef::User(n) => metadata
-                    .user_properties
+                    .group_properties
                     .get_by_name(ctx.project_id, n.as_ref())?,
                 PropertyRef::Event(n) => metadata
                     .event_properties
@@ -164,7 +164,7 @@ pub fn build(
         properties.append(&mut (l));
         let mut l = metadata.event_properties.list(ctx.project_id)?.data;
         properties.append(&mut (l));
-        let mut l = metadata.user_properties.list(ctx.project_id)?.data;
+        let mut l = metadata.group_properties.list(ctx.project_id)?.data;
         properties.append(&mut (l));
     }
 

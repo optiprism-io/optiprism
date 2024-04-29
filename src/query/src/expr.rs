@@ -256,7 +256,7 @@ pub fn property_expression(
         ),
         PropertyRef::User(prop_name) => prop_expression(
             ctx,
-            &md.user_properties,
+            &md.group_properties,
             &md.dictionaries,
             prop_name,
             operation,
@@ -287,7 +287,7 @@ pub fn property_col(
             col(prop.column_name().as_str())
         }
         PropertyRef::User(prop_name) => {
-            let prop = md.user_properties.get_by_name(ctx.project_id, prop_name)?;
+            let prop = md.group_properties.get_by_name(ctx.project_id, prop_name)?;
             col(prop.column_name().as_str())
         }
         PropertyRef::Event(prop_name) => {

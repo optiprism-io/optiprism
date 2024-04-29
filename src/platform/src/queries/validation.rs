@@ -18,7 +18,7 @@ pub fn validate_property(
 ) -> crate::Result<()> {
     match property {
         PropertyRef::User { property_name } => {
-            md.user_properties
+            md.group_properties
                 .get_by_name(project_id, &property_name)
                 .map_err(|err| PlatformError::BadRequest(format!("{err_prefix}: {err}")))?;
         }
@@ -50,7 +50,7 @@ pub fn validate_filter_property(
 ) -> crate::Result<()> {
     let prop = match property {
         PropertyRef::User { property_name } => md
-            .user_properties
+            .group_properties
             .get_by_name(project_id, &property_name)
             .map_err(|err| PlatformError::BadRequest(format!("{err_prefix}: {err}")))?,
         PropertyRef::Event { property_name } => md

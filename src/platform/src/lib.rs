@@ -97,7 +97,7 @@ impl PlatformProvider {
             events: Arc::new(Events::new(md.events.clone())),
             custom_events: Arc::new(CustomEvents::new(md.custom_events.clone())),
             event_properties: Arc::new(Properties::new_event(md.event_properties.clone())),
-            user_properties: Arc::new(Properties::new_user(md.user_properties.clone())),
+            user_properties: Arc::new(Properties::new_user(md.group_properties.clone())),
             system_properties: Arc::new(Properties::new_user(md.system_properties.clone())),
             accounts: Arc::new(Accounts::new(md.accounts.clone())),
             auth: Arc::new(Auth::new(md.accounts.clone(), cfg.clone())),
