@@ -44,6 +44,7 @@ use common::types::DType;
 use common::types::TIME_UNIT;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
+use common::GROUPS_COUNT;
 pub use context::Context;
 use convert_case::Case;
 use convert_case::Casing;
@@ -74,7 +75,7 @@ pub struct PlatformProvider {
     pub events: Arc<Events>,
     pub custom_events: Arc<CustomEvents>,
     pub event_properties: Arc<Properties>,
-    pub user_properties: Arc<Properties>,
+    pub group_properties: Vec<Arc<Properties>>,
     pub system_properties: Arc<Properties>,
     pub accounts: Arc<Accounts>,
     pub auth: Arc<Auth>,
@@ -93,12 +94,15 @@ impl PlatformProvider {
         query_prov: Arc<query::QueryProvider>,
         cfg: Config,
     ) -> Self {
+        let group_properties = (0..GROUPS_COUNT)
+            .map(|gid| Arc::new(Properties::new_group(md.group_properties[gid].clone())))
+            .collect::<Vec<_>>();
         Self {
             events: Arc::new(Events::new(md.events.clone())),
             custom_events: Arc::new(CustomEvents::new(md.custom_events.clone())),
             event_properties: Arc::new(Properties::new_event(md.event_properties.clone())),
-            user_properties: Arc::new(Properties::new_user(md.group_properties.clone())),
-            system_properties: Arc::new(Properties::new_user(md.system_properties.clone())),
+            group_properties,
+            system_properties: Arc::new(Properties::new_system(md.system_properties.clone())),
             accounts: Arc::new(Accounts::new(md.accounts.clone())),
             auth: Arc::new(Auth::new(md.accounts.clone(), cfg.clone())),
             query: Arc::new(Queries::new(query_prov, md.clone())),
@@ -360,7 +364,7 @@ pub enum PropertyRef {
     #[serde(rename_all = "camelCase")]
     System { property_name: String },
     #[serde(rename_all = "camelCase")]
-    User { property_name: String },
+    Group { property_name: String, group: usize },
     #[serde(rename_all = "camelCase")]
     Event { property_name: String },
     #[serde(rename_all = "camelCase")]
@@ -373,7 +377,10 @@ impl Into<common::query::PropertyRef> for PropertyRef {
             PropertyRef::System { property_name } => {
                 common::query::PropertyRef::System(property_name)
             }
-            PropertyRef::User { property_name } => common::query::PropertyRef::User(property_name),
+            PropertyRef::Group {
+                property_name,
+                group,
+            } => common::query::PropertyRef::Group(property_name, group),
             PropertyRef::Event { property_name } => {
                 common::query::PropertyRef::Event(property_name)
             }
@@ -388,7 +395,10 @@ impl Into<PropertyRef> for common::query::PropertyRef {
             common::query::PropertyRef::System(property_name) => {
                 PropertyRef::System { property_name }
             }
-            common::query::PropertyRef::User(property_name) => PropertyRef::User { property_name },
+            common::query::PropertyRef::Group(property_name, group) => PropertyRef::Group {
+                property_name,
+                group,
+            },
             common::query::PropertyRef::Event(property_name) => {
                 PropertyRef::Event { property_name }
             }

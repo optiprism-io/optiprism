@@ -171,7 +171,7 @@ impl TryInto<arrow_schema::TimeUnit> for TimeUnit {
 #[derive(Serialize, Deserialize, Clone, Debug, Hash, Eq, PartialEq)]
 pub enum PropertyRef {
     System(String),
-    User(String),
+    Group(String, usize),
     Event(String),
     Custom(u64),
 }
@@ -180,7 +180,7 @@ impl PropertyRef {
     pub fn name(&self) -> String {
         match self {
             PropertyRef::System(name) => name.clone(),
-            PropertyRef::User(name) => name.clone(),
+            PropertyRef::Group(name, ..) => name.clone(),
             PropertyRef::Event(name) => name.clone(),
             PropertyRef::Custom(_id) => unimplemented!(),
         }

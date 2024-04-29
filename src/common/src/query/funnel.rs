@@ -19,7 +19,7 @@ use crate::query::TimeIntervalUnit;
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Funnel {
     pub time: QueryTime,
-    pub group: String,
+    pub group_id: usize,
     pub steps: Vec<Step>,
     pub time_window: TimeWindow,
     pub chart_type: ChartType,

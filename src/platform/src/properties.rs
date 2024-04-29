@@ -19,11 +19,14 @@ pub struct Properties {
 }
 
 impl Properties {
-    pub fn new_user(prov: Arc<metadata::properties::Properties>) -> Self {
+    pub fn new_group(prov: Arc<metadata::properties::Properties>) -> Self {
         Self { prov }
     }
 
     pub fn new_event(prov: Arc<metadata::properties::Properties>) -> Self {
+        Self { prov }
+    }
+    pub fn new_system(prov: Arc<metadata::properties::Properties>) -> Self {
         Self { prov }
     }
     pub async fn get_by_id(&self, ctx: Context, project_id: u64, id: u64) -> Result<Property> {
@@ -93,28 +96,9 @@ pub enum Status {
 pub enum Type {
     System,
     Event,
-    User,
+    Group,
 }
 
-impl From<metadata::properties::Type> for Type {
-    fn from(value: metadata::properties::Type) -> Self {
-        match value {
-            metadata::properties::Type::Event => Type::Event,
-            metadata::properties::Type::Group => Type::User,
-            metadata::properties::Type::System => Type::System,
-        }
-    }
-}
-
-impl From<Type> for metadata::properties::Type {
-    fn from(value: Type) -> Self {
-        match value {
-            Type::Event => metadata::properties::Type::Event,
-            Type::User => metadata::properties::Type::Group,
-            Type::System => metadata::properties::Type::System,
-        }
-    }
-}
 // #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 // #[serde(rename_all = "camelCase")]
 // pub enum DataType {
@@ -241,6 +225,7 @@ pub struct Property {
     pub display_name: Option<String>,
     pub description: Option<String>,
     pub typ: Type,
+    pub group_id: Option<usize>,
     pub order: u64,
     pub data_type: DType,
     pub status: Status,
@@ -255,6 +240,15 @@ pub struct Property {
 
 impl Into<metadata::properties::Property> for Property {
     fn into(self) -> metadata::properties::Property {
+        let typ = if let Some(gid) = self.group_id {
+            metadata::properties::Type::Group(gid)
+        } else {
+            match self.typ {
+                Type::System => metadata::properties::Type::System,
+                Type::Event => metadata::properties::Type::Event,
+                _ => unreachable!(),
+            }
+        };
         metadata::properties::Property {
             id: self.id,
             created_at: self.created_at,
@@ -267,7 +261,7 @@ impl Into<metadata::properties::Property> for Property {
             description: self.description,
             display_name: self.display_name,
             order: self.order,
-            typ: self.typ.into(),
+            typ,
             data_type: self.data_type,
             status: self.status.into(),
             is_system: self.is_system,
@@ -282,6 +276,12 @@ impl Into<metadata::properties::Property> for Property {
 
 impl Into<Property> for metadata::properties::Property {
     fn into(self) -> Property {
+        let (typ, group_id) = match self.typ {
+            metadata::properties::Type::System => (Type::System, None),
+            metadata::properties::Type::Event => (Type::Event, None),
+            metadata::properties::Type::Group(gid) => (Type::Group, Some(gid)),
+        };
+
         Property {
             id: self.id,
             created_at: self.created_at,
@@ -302,7 +302,8 @@ impl Into<Property> for metadata::properties::Property {
             is_array: self.is_array,
             is_dictionary: self.is_dictionary,
             dictionary_type: self.dictionary_type.map(|v| v.into()),
-            typ: self.typ.into(),
+            typ,
+            group_id,
             order: self.order,
         }
     }

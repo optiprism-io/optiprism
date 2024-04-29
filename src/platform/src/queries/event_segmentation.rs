@@ -451,7 +451,7 @@ impl Into<Event> for &common::query::event_segmentation::Event {
 #[serde(rename_all = "camelCase")]
 pub struct EventSegmentation {
     pub time: QueryTime,
-    pub group: String,
+    pub group: usize,
     pub interval_unit: TimeIntervalUnit,
     pub chart_type: ChartType,
     pub analysis: Analysis,
@@ -564,7 +564,7 @@ impl Into<common::query::event_segmentation::EventSegmentation> for EventSegment
     fn into(self) -> common::query::event_segmentation::EventSegmentation {
         common::query::event_segmentation::EventSegmentation {
             time: self.time.into(),
-            group: self.group,
+            group_id: self.group,
             interval_unit: self.interval_unit.into(),
             chart_type: self.chart_type.into(),
             analysis: self.analysis.into(),
@@ -605,7 +605,7 @@ impl Into<EventSegmentation> for common::query::event_segmentation::EventSegment
     fn into(self) -> EventSegmentation {
         EventSegmentation {
             time: self.time.into(),
-            group: self.group,
+            group: self.group_id,
             interval_unit: self.interval_unit.into(),
             chart_type: self.chart_type.into(),
             analysis: self.analysis.into(),
@@ -653,12 +653,6 @@ pub(crate) fn validate(
             }
         }
         _ => {}
-    }
-
-    if req.group == "" {
-        return Err(PlatformError::BadRequest(
-            "group cannot be empty".to_string(),
-        ));
     }
 
     if req.events.is_empty() {
@@ -759,8 +753,8 @@ pub(crate) fn fix_types(
                             common::query::PropertyRef::System(name) => {
                                 md.system_properties.get_by_name(project_id, name)?
                             }
-                            common::query::PropertyRef::User(name) => {
-                                md.group_properties.get_by_name(project_id, name)?
+                            common::query::PropertyRef::Group(name, group) => {
+                                md.group_properties[*group].get_by_name(project_id, name)?
                             }
                             common::query::PropertyRef::Event(name) => {
                                 md.event_properties.get_by_name(project_id, name)?
@@ -826,7 +820,7 @@ pub(crate) fn fix_types(
 mod tests {
     use chrono::DateTime;
     use chrono::Utc;
-    use common::types::COLUMN_USER_ID;
+    use common::GROUP_USER_ID;
     use serde_json::json;
 
     use crate::error::Result;
@@ -857,13 +851,13 @@ mod tests {
             .with_timezone(&Utc);
         let es = EventSegmentation {
             time: QueryTime::Between { from, to },
-            group: COLUMN_USER_ID.to_string(),
-            interval_unit: TimeIntervalUnit::Minute,
+            group: GROUP_USER_ID,
+            interval_unit: TimeIntervalUnit::Hour,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
             compare: Some(Compare {
                 offset: 1,
-                unit: TimeIntervalUnit::Second,
+                unit: TimeIntervalUnit::Hour,
             }),
             events: vec![Event {
                 event: EventRef::Regular {
@@ -871,7 +865,7 @@ mod tests {
                 },
                 filters: Some(vec![
                     EventFilter::Property {
-                        property: PropertyRef::User {
+                        property: PropertyRef::Group {
                             property_name: "p1".to_string(),
                         },
                         operation: PropValueOperation::Eq,
@@ -900,7 +894,7 @@ mod tests {
                     },
                 ]),
                 breakdowns: Some(vec![Breakdown::Property {
-                    property: PropertyRef::User {
+                    property: PropertyRef::Group {
                         property_name: "Device".to_string(),
                     },
                 }]),
@@ -937,7 +931,7 @@ mod tests {
             // value: Some(vec![json!(true)]),
             // }]),
             breakdowns: Some(vec![Breakdown::Property {
-                property: PropertyRef::User {
+                property: PropertyRef::Group {
                     property_name: "Device".to_string(),
                 },
             }]),

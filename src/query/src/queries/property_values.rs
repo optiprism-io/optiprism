@@ -76,7 +76,10 @@ impl LogicalPlanBuilder {
         );
 
         if let Some(event) = &req.event {
-            expr = and(expr, event_expression(&ctx, &metadata, event)?);
+            expr = and(
+                expr,
+                event_expression(&ctx, &metadata, event, req.group_id)?,
+            );
         }
 
         let input = LogicalPlan::Filter(PlanFilter::try_new(expr, Arc::new(input))?);
@@ -89,10 +92,9 @@ impl LogicalPlanBuilder {
                 let col_name = prop.column_name();
                 (property_col!(ctx, metadata, input, prop), col_name)
             }
-            PropertyRef::User(prop_name) => {
-                let prop = metadata
-                    .group_properties
-                    .get_by_name(ctx.project_id, prop_name)?;
+            PropertyRef::Group(prop_name, group) => {
+                let prop =
+                    metadata.group_properties[*group].get_by_name(ctx.project_id, prop_name)?;
                 let col_name = prop.column_name();
                 (property_col!(ctx, metadata, input, prop), col_name)
             }
@@ -148,6 +150,7 @@ pub struct Filter {
 #[derive(Clone, Debug)]
 pub struct PropertyValues {
     pub property: PropertyRef,
+    pub group_id: usize,
     pub event: Option<EventRef>,
     pub filter: Option<Filter>,
 }

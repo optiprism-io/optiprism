@@ -34,12 +34,14 @@ pub struct ListPropertyValuesRequest {
     #[serde(flatten)]
     pub event: Option<EventRef>,
     pub filter: Option<Filter>,
+    pub group: usize,
 }
 
 impl Into<query::queries::property_values::PropertyValues> for ListPropertyValuesRequest {
     fn into(self) -> query::queries::property_values::PropertyValues {
         query::queries::property_values::PropertyValues {
             property: self.property.into(),
+            group_id: self.group,
             event: self.event.map(|event| event.into()),
             filter: self.filter.map(|filter| filter.into()),
         }
@@ -72,8 +74,11 @@ pub(crate) fn validate(
     req: &ListPropertyValuesRequest,
 ) -> Result<()> {
     match &req.property {
-        PropertyRef::User { property_name } => {
-            md.group_properties
+        PropertyRef::Group {
+            property_name,
+            group,
+        } => {
+            md.group_properties[*group]
                 .get_by_name(project_id, &property_name)
                 .map_err(|err| PlatformError::BadRequest(format!("{err}")))?;
         }

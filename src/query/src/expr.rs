@@ -61,6 +61,7 @@ pub fn event_expression(
     ctx: &Context,
     metadata: &Arc<MetadataProvider>,
     event: &EventRef,
+    group_id: usize,
 ) -> Result<Expr> {
     Ok(match &event {
         // regular event
@@ -83,14 +84,17 @@ pub fn event_expression(
             let mut exprs: Vec<Expr> = Vec::new();
             for event in e.events.iter() {
                 let mut expr = match &event.event {
-                    EventRef::RegularName(name) => {
-                        event_expression(ctx, metadata, &EventRef::RegularName(name.to_owned()))?
-                    }
+                    EventRef::RegularName(name) => event_expression(
+                        ctx,
+                        metadata,
+                        &EventRef::RegularName(name.to_owned()),
+                        group_id,
+                    )?,
                     EventRef::Regular(id) => {
-                        event_expression(ctx, metadata, &EventRef::Regular(*id))?
+                        event_expression(ctx, metadata, &EventRef::Regular(*id), group_id)?
                     }
                     EventRef::Custom(id) => {
-                        event_expression(ctx, metadata, &EventRef::Custom(*id))?
+                        event_expression(ctx, metadata, &EventRef::Custom(*id), group_id)?
                     }
                 };
 
@@ -150,9 +154,10 @@ pub fn breakdown_expr(
 ) -> crate::Result<Expr> {
     match breakdown {
         Breakdown::Property(prop_ref) => match prop_ref {
-            PropertyRef::System(_prop_name)
-            | PropertyRef::User(_prop_name)
-            | PropertyRef::Event(_prop_name) => {
+            PropertyRef::System(..) | PropertyRef::Group(..) => {
+                Ok(property_col(ctx, metadata, prop_ref)?)
+            }
+            PropertyRef::Event(_prop_name) => {
                 let prop_col = property_col(ctx, metadata, prop_ref)?;
                 Ok(prop_col)
             }
@@ -254,9 +259,9 @@ pub fn property_expression(
             operation,
             values,
         ),
-        PropertyRef::User(prop_name) => prop_expression(
+        PropertyRef::Group(prop_name, group) => prop_expression(
             ctx,
-            &md.group_properties,
+            &md.group_properties[*group],
             &md.dictionaries,
             prop_name,
             operation,
@@ -286,8 +291,8 @@ pub fn property_col(
                 .get_by_name(ctx.project_id, prop_name)?;
             col(prop.column_name().as_str())
         }
-        PropertyRef::User(prop_name) => {
-            let prop = md.group_properties.get_by_name(ctx.project_id, prop_name)?;
+        PropertyRef::Group(prop_name, group_id) => {
+            let prop = md.group_properties[*group_id].get_by_name(ctx.project_id, prop_name)?;
             col(prop.column_name().as_str())
         }
         PropertyRef::Event(prop_name) => {

@@ -1,5 +1,4 @@
 use axum::http;
-use axum::http::HeaderValue;
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::types::OptionalProperty;
@@ -12,6 +11,9 @@ use platform::auth::provider::UpdateNameRequest;
 use platform::auth::provider::UpdatePasswordRequest;
 use platform::http::auth::RefreshTokenRequest;
 use reqwest::header::HeaderMap;
+use reqwest::header::HeaderValue;
+use reqwest::header::AUTHORIZATION;
+use reqwest::header::CONTENT_TYPE;
 use reqwest::Client;
 use reqwest::StatusCode;
 
@@ -32,7 +34,7 @@ async fn test_auth() {
 
     let mut headers = HeaderMap::new();
     headers.insert(
-        http::header::CONTENT_TYPE,
+        CONTENT_TYPE,
         HeaderValue::from_str("application/json").unwrap(),
     );
 
@@ -86,7 +88,7 @@ async fn test_auth() {
     {
         let mut jwt_headers = headers.clone();
         jwt_headers.insert(
-            http::header::AUTHORIZATION,
+            AUTHORIZATION,
             HeaderValue::from_str(format!("Bearer {}", user_tokens.access_token).as_str()).unwrap(),
         );
 
@@ -122,7 +124,7 @@ async fn test_auth() {
 
         let mut new_jwt_headers = headers.clone();
         new_jwt_headers.insert(
-            http::header::AUTHORIZATION,
+            AUTHORIZATION,
             HeaderValue::from_str(format!("Bearer {}", new_user_tokens.access_token).as_str())
                 .unwrap(),
         );

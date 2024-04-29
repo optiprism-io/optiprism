@@ -64,9 +64,9 @@ pub fn build(
                 PropertyRef::System(n) => metadata
                     .system_properties
                     .get_by_name(ctx.project_id, n.as_ref())?,
-                PropertyRef::User(n) => metadata
-                    .group_properties
-                    .get_by_name(ctx.project_id, n.as_ref())?,
+                PropertyRef::Group(n, group_id) => {
+                    metadata.group_properties[*group_id].get_by_name(ctx.project_id, n.as_ref())?
+                }
                 PropertyRef::Event(n) => metadata
                     .event_properties
                     .get_by_name(ctx.project_id, n.as_ref())?,
@@ -113,7 +113,7 @@ pub fn build(
         let mut exprs = vec![];
         for event in events {
             // event expression
-            let mut expr = event_expression(&ctx, &metadata, &event.event)?;
+            let mut expr = event_expression(&ctx, &metadata, &event.event, req.group_id)?;
             // apply event filters
             if let Some(filters) = &event.filters
                 && !filters.is_empty()
@@ -164,7 +164,9 @@ pub fn build(
         properties.append(&mut (l));
         let mut l = metadata.event_properties.list(ctx.project_id)?.data;
         properties.append(&mut (l));
-        let mut l = metadata.group_properties.list(ctx.project_id)?.data;
+        let mut l = metadata.group_properties[req.group_id]
+            .list(ctx.project_id)?
+            .data;
         properties.append(&mut (l));
     }
 
@@ -257,6 +259,7 @@ pub struct Event {
 #[derive(Clone, Debug)]
 pub struct EventRecordsSearch {
     pub time: QueryTime,
+    pub group_id: usize,
     pub events: Option<Vec<Event>>,
     pub filters: Option<Vec<EventFilter>>,
     pub properties: Option<Vec<PropertyRef>>,

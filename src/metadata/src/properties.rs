@@ -90,7 +90,7 @@ pub struct Properties {
 }
 
 impl Properties {
-    pub fn new_group(db: Arc<TransactionDB>, opti_db: Arc<OptiDBImpl>) -> Vec<Self> {
+    pub fn new_group(db: Arc<TransactionDB>, opti_db: Arc<OptiDBImpl>) -> Vec<Arc<Self>> {
         let props = (0..GROUPS_COUNT)
             .into_iter()
             .map(|gid| {
@@ -100,13 +100,13 @@ impl Properties {
                 let name_cache = RwLock::new(LruCache::new(
                     NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
                 ));
-                Properties {
+                Arc::new(Properties {
                     db: db.clone(),
                     opti_db: opti_db.clone(),
                     id_cache,
                     name_cache,
                     typ: Type::Group(gid),
-                }
+                })
             })
             .collect::<Vec<_>>();
 

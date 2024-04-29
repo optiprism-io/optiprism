@@ -17,6 +17,7 @@ use arrow::datatypes::DataType;
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
 use arrow::util::pretty::print_batches;
+use common::group_col;
 use common::query::event_segmentation::EventSegmentation;
 use common::query::event_segmentation::Query;
 use common::query::funnel::Funnel;
@@ -28,7 +29,6 @@ use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_EVENT_ID;
 use common::types::COLUMN_PROJECT_ID;
-use common::types::COLUMN_USER_ID;
 use common::types::TABLE_EVENTS;
 use common::DECIMAL_SCALE;
 use datafusion::execution::context::SessionState;
@@ -363,7 +363,7 @@ fn property_values_projection(
 ) -> Result<Vec<String>> {
     let mut fields = vec![
         COLUMN_PROJECT_ID.to_string(),
-        COLUMN_USER_ID.to_string(),
+        group_col(req.group_id),
         COLUMN_EVENT.to_string(),
     ];
     fields.push(col_name(ctx, &req.property, md)?);
@@ -378,7 +378,7 @@ fn event_records_search_projection(
 ) -> Result<Vec<String>> {
     let mut fields = vec![
         COLUMN_PROJECT_ID.to_string(),
-        COLUMN_USER_ID.to_string(),
+        group_col(req.group_id),
         COLUMN_CREATED_AT.to_string(),
         COLUMN_EVENT.to_string(),
         COLUMN_EVENT_ID.to_string(),
@@ -405,7 +405,7 @@ fn event_segmentation_projection(
 ) -> Result<Vec<String>> {
     let mut fields = vec![
         COLUMN_PROJECT_ID.to_string(),
-        COLUMN_USER_ID.to_string(),
+        group_col(req.group_id),
         COLUMN_CREATED_AT.to_string(),
         COLUMN_EVENT.to_string(),
     ];
@@ -476,7 +476,7 @@ fn funnel_projection(
 ) -> Result<Vec<String>> {
     let mut fields = vec![
         COLUMN_PROJECT_ID.to_string(),
-        COLUMN_USER_ID.to_string(),
+        group_col(req.group_id),
         COLUMN_CREATED_AT.to_string(),
         COLUMN_EVENT.to_string(),
     ];

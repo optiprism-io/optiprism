@@ -27,6 +27,7 @@ pub struct EventRecordsSearchRequest {
     pub events: Option<Vec<Event>>,
     pub filters: Option<Vec<EventFilter>>,
     pub properties: Option<Vec<PropertyRef>>,
+    pub group: usize,
 }
 
 impl Into<query::queries::event_records_search::Event> for Event {
@@ -47,6 +48,7 @@ impl Into<query::queries::event_records_search::EventRecordsSearch> for EventRec
     fn into(self) -> query::queries::event_records_search::EventRecordsSearch {
         query::queries::event_records_search::EventRecordsSearch {
             time: self.time.into(),
+            group_id: self.group,
             events: self.events.map(|events| {
                 events
                     .into_iter()
@@ -129,8 +131,10 @@ pub(crate) fn validate(
                 }
                 for (idx, prop) in props.iter().enumerate() {
                     match prop {
-                        PropertyRef::User { property_name } => md
-                            .group_properties
+                        PropertyRef::Group {
+                            property_name,
+                            group,
+                        } => md.group_properties[*group]
                             .get_by_name(project_id, &property_name)
                             .map_err(|err| {
                                 PlatformError::BadRequest(format!("property {idx}: {err}"))

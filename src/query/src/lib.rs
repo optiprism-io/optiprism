@@ -78,8 +78,7 @@ macro_rules! breakdowns_to_dicts {
                         PropertyRef::System(name) => $md
                             .system_properties
                             .get_by_name($ctx.project_id, name.as_str())?,
-                        PropertyRef::User(name) => $md
-                            .user_properties
+                        PropertyRef::Group(name, group) => $md.group_properties[*group]
                             .get_by_name($ctx.project_id, name.as_str())?,
                         PropertyRef::Event(name) => $md
                             .event_properties
@@ -365,14 +364,16 @@ pub mod test_util {
     use arrow::datatypes::Field;
     use arrow::datatypes::Schema;
     use arrow::datatypes::TimeUnit;
+    use common::group_col;
     use common::types::DType;
     use common::types::COLUMN_CREATED_AT;
     use common::types::COLUMN_EVENT;
     use common::types::COLUMN_PROJECT_ID;
-    use common::types::COLUMN_USER_ID;
     use common::types::TIME_UNIT;
     use common::DECIMAL_PRECISION;
     use common::DECIMAL_SCALE;
+    use common::GROUPS_COUNT;
+    use common::GROUP_USER_ID;
     use datafusion::datasource::listing::ListingTable;
     use datafusion::datasource::listing::ListingTableConfig;
     use datafusion::datasource::listing::ListingTableUrl;
@@ -399,25 +400,34 @@ pub mod test_util {
     use crate::physical_plan::planner::QueryPlanner;
 
     pub async fn events_provider(db: Arc<OptiDBImpl>, _proj_id: u64) -> Result<LogicalPlan> {
-        let schema = Schema::new(vec![
-            Field::new(COLUMN_PROJECT_ID, DataType::Int64, false),
-            Field::new(COLUMN_USER_ID, DataType::Int64, false),
-            Field::new(
-                COLUMN_CREATED_AT,
-                DataType::Timestamp(TIME_UNIT, None),
-                false,
-            ),
-            Field::new(COLUMN_EVENT, DataType::Int64, true),
-            Field::new("user_country", DataType::Int64, true),
-            Field::new("user_device", DataType::Utf8, true),
-            Field::new("user_is_premium", DataType::Boolean, true),
-            Field::new("event_product_name", DataType::Utf8, true),
-            Field::new(
-                "event_revenue",
-                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
-                true,
-            ),
-        ]);
+        let group_fields = (0..GROUPS_COUNT)
+            .into_iter()
+            .map(|gid| Field::new(group_col(gid), DataType::Int64, false))
+            .collect::<Vec<_>>();
+        let schema = Schema::new(
+            vec![
+                vec![Field::new(COLUMN_PROJECT_ID, DataType::Int64, false)],
+                group_fields,
+                vec![
+                    Field::new(
+                        COLUMN_CREATED_AT,
+                        DataType::Timestamp(TIME_UNIT, None),
+                        false,
+                    ),
+                    Field::new(COLUMN_EVENT, DataType::Int64, true),
+                    Field::new("user_country", DataType::Int64, true),
+                    Field::new("user_device", DataType::Utf8, true),
+                    Field::new("user_is_premium", DataType::Boolean, true),
+                    Field::new("event_product_name", DataType::Utf8, true),
+                    Field::new(
+                        "event_revenue",
+                        DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                        true,
+                    ),
+                ],
+            ]
+            .concat(),
+        );
         let mut options = CsvReadOptions::new();
         options.schema = Some(&schema);
         let table_path = ListingTableUrl::parse(
@@ -446,13 +456,12 @@ pub mod test_util {
     pub fn create_property(
         md: &Arc<MetadataProvider>,
         _db: &Arc<OptiDBImpl>,
-
         proj_id: u64,
         req: CreatePropertyRequest,
     ) -> Result<Property> {
         let prop = match req.typ {
             Type::Event => md.event_properties.create(proj_id, req)?,
-            Type::Group => md.group_properties.create(proj_id, req)?,
+            Type::Group(gid) => md.group_properties[gid].create(proj_id, req)?,
             _ => unimplemented!(),
         };
 
@@ -464,11 +473,12 @@ pub mod test_util {
     pub async fn create_entities(
         md: Arc<MetadataProvider>,
         db: &Arc<OptiDBImpl>,
-
         proj_id: u64,
     ) -> Result<()> {
         db.add_field("events", COLUMN_PROJECT_ID, DType::Int64, false)?;
-        db.add_field("events", COLUMN_USER_ID, DType::Int64, false)?;
+        for gid in 0..GROUPS_COUNT {
+            db.add_field("events", group_col(gid).as_str(), DType::Int64, false)?;
+        }
         db.add_field("events", COLUMN_CREATED_AT, DType::Timestamp, false)?;
         db.add_field("events", COLUMN_EVENT, DType::Int64, false)?;
         // create user props
@@ -479,7 +489,7 @@ pub mod test_util {
             name: "Country".to_string(),
             description: None,
             display_name: None,
-            typ: properties::Type::Group,
+            typ: properties::Type::Group(GROUP_USER_ID),
             data_type: DType::String,
             status: properties::Status::Enabled,
             hidden: false,
@@ -504,7 +514,7 @@ pub mod test_util {
             name: "Device".to_string(),
             description: None,
             display_name: None,
-            typ: properties::Type::Group,
+            typ: properties::Type::Group(GROUP_USER_ID),
             data_type: DType::String,
             status: properties::Status::Enabled,
             nullable: true,
@@ -521,7 +531,7 @@ pub mod test_util {
             name: "Is Premium".to_string(),
             description: None,
             display_name: None,
-            typ: Type::Group,
+            typ: Type::Group(GROUP_USER_ID),
             data_type: DType::Boolean,
             status: properties::Status::Enabled,
             hidden: false,
@@ -619,8 +629,7 @@ pub fn col_name(ctx: &Context, prop: &PropertyRef, md: &Arc<MetadataProvider>) -
             .system_properties
             .get_by_name(ctx.project_id, v)?
             .column_name(),
-        PropertyRef::User(v) => md
-            .group_properties
+        PropertyRef::Group(v, group) => md.group_properties[*group]
             .get_by_name(ctx.project_id, v)?
             .column_name(),
         PropertyRef::Event(v) => md

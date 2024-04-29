@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use common::types::DType;
 use common::types::DICT_USERS;
+use common::GROUP_USER_ID;
 use metadata::events;
 use metadata::events::CreateEventRequest;
 use metadata::properties;
@@ -142,7 +143,7 @@ impl Executor<Track> {
         if let Some(props) = &req.user_properties {
             req.resolved_user_properties = Some(resolve_properties(
                 &ctx,
-                &self.md.group_properties,
+                &self.md.group_properties[GROUP_USER_ID],
                 &self.db,
                 properties::Type::Event,
                 props,

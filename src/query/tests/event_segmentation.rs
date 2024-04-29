@@ -48,7 +48,7 @@ mod tests {
                 from: to.sub(Duration::days(10)),
                 to,
             },
-            group: COLUMN_USER_ID.to_string(),
+            group_id: COLUMN_USER_ID.to_string(),
             interval_unit: TimeIntervalUnit::Second,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
@@ -57,11 +57,11 @@ mod tests {
                 Event::new(
                     EventRef::RegularName("View Product".to_string()),
                     Some(vec![EventFilter::Property {
-                        property: PropertyRef::User("Is Premium".to_string()),
+                        property: PropertyRef::Group("Is Premium".to_string()),
                         operation: PropValueOperation::Eq,
                         value: Some(vec![ScalarValue::Boolean(Some(true))]),
                     }]),
-                    Some(vec![Breakdown::Property(PropertyRef::User(
+                    Some(vec![Breakdown::Property(PropertyRef::Group(
                         "Device".to_string(),
                     ))]),
                     vec![NamedQuery::new(
@@ -87,12 +87,12 @@ mod tests {
                             ]),
                         },
                         EventFilter::Property {
-                            property: PropertyRef::User("Country".to_string()),
+                            property: PropertyRef::Group("Country".to_string()),
                             operation: PropValueOperation::Empty,
                             value: None,
                         },
                         EventFilter::Property {
-                            property: PropertyRef::User("Country".to_string()),
+                            property: PropertyRef::Group("Country".to_string()),
                             operation: PropValueOperation::Eq,
                             value: Some(vec![
                                 ScalarValue::Utf8(Some("Spain".to_string())),
@@ -135,17 +135,17 @@ mod tests {
             ],
             filters: Some(vec![
                 EventFilter::Property {
-                    property: PropertyRef::User("Device".to_string()),
+                    property: PropertyRef::Group("Device".to_string()),
                     operation: PropValueOperation::Eq,
                     value: Some(vec![ScalarValue::Utf8(Some("Iphone".to_string()))]),
                 },
                 EventFilter::Property {
-                    property: PropertyRef::User("Is Premium".to_string()),
+                    property: PropertyRef::Group("Is Premium".to_string()),
                     operation: PropValueOperation::Eq,
                     value: Some(vec![ScalarValue::Decimal128(Some(1), 1, 0)]),
                 },
             ]),
-            breakdowns: Some(vec![Breakdown::Property(PropertyRef::User(
+            breakdowns: Some(vec![Breakdown::Property(PropertyRef::Group(
                 "Device".to_string(),
             ))]),
             segments: None,
@@ -198,7 +198,7 @@ mod tests {
                 last: 20,
                 unit: TimeIntervalUnit::Day,
             },
-            group: COLUMN_USER_ID.to_string(),
+            group_id: COLUMN_USER_ID.to_string(),
             interval_unit: TimeIntervalUnit::Day,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
@@ -263,7 +263,7 @@ mod tests {
                 ),
             ],
             filters: None,
-            breakdowns: Some(vec![Breakdown::Property(PropertyRef::User(
+            breakdowns: Some(vec![Breakdown::Property(PropertyRef::Group(
                 "Country".to_string(),
             ))]),
             // breakdowns: None,
@@ -314,12 +314,12 @@ mod tests {
                         event: EventRef::RegularName("View Product".to_string()),
                         filters: Some(vec![
                             EventFilter::Property {
-                                property: PropertyRef::User("Is Premium".to_string()),
+                                property: PropertyRef::Group("Is Premium".to_string()),
                                 operation: PropValueOperation::Eq,
                                 value: Some(vec![ScalarValue::Boolean(Some(true))]),
                             },
                             EventFilter::Property {
-                                property: PropertyRef::User("Country".to_string()),
+                                property: PropertyRef::Group("Country".to_string()),
                                 operation: PropValueOperation::Eq,
                                 value: Some(vec![
                                     ScalarValue::Utf8(Some("spain".to_string())),
@@ -347,7 +347,7 @@ mod tests {
                 last: 30,
                 unit: TimeIntervalUnit::Day,
             },
-            group: COLUMN_USER_ID.to_string(),
+            group_id: COLUMN_USER_ID.to_string(),
             interval_unit: TimeIntervalUnit::Week,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
@@ -355,7 +355,7 @@ mod tests {
             events: vec![Event::new(
                 EventRef::Custom(custom_event.id),
                 None,
-                Some(vec![Breakdown::Property(PropertyRef::User(
+                Some(vec![Breakdown::Property(PropertyRef::Group(
                     "Device".to_string(),
                 ))]),
                 vec![NamedQuery::new(
@@ -364,7 +364,7 @@ mod tests {
                 )],
             )],
             filters: None,
-            breakdowns: Some(vec![Breakdown::Property(PropertyRef::User(
+            breakdowns: Some(vec![Breakdown::Property(PropertyRef::Group(
                 "Country".to_string(),
             ))]),
             segments: None,

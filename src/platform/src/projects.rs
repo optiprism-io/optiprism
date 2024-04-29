@@ -38,6 +38,7 @@ use common::types::USER_PROPERTY_OS_VERSION_MAJOR;
 use common::types::USER_PROPERTY_OS_VERSION_MINOR;
 use common::types::USER_PROPERTY_OS_VERSION_PATCH;
 use common::types::USER_PROPERTY_OS_VERSION_PATCH_MINOR;
+use common::GROUP_USER_ID;
 use metadata::projects::Projects as MDProjects;
 use metadata::properties::DictionaryType;
 use metadata::properties::Type;
@@ -221,7 +222,7 @@ pub fn init_project(project_id: u64, md: &Arc<MetadataProvider>) -> error::Resul
         create_property(md, project_id, CreatePropertyMainRequest {
             name: prop.to_string(),
             display_name: None,
-            typ: Type::Group,
+            typ: Type::Group(GROUP_USER_ID),
             data_type: DType::String,
             nullable: true,
             hidden: false,

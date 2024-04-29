@@ -94,7 +94,7 @@ mod tests {
                                       * },
                                       * steps: None,
                                       * }]) */
-            breakdowns: Some(vec![Breakdown::Property(PropertyRef::User(
+            breakdowns: Some(vec![Breakdown::Property(PropertyRef::Group(
                 "Device".to_string(),
             ))]),
             segments: None,

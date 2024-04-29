@@ -202,7 +202,7 @@ impl Event {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct EventSegmentation {
     pub time: QueryTime,
-    pub group: String,
+    pub group_id: usize,
     pub interval_unit: TimeIntervalUnit,
     pub chart_type: ChartType,
     pub analysis: Analysis,
@@ -217,17 +217,5 @@ impl EventSegmentation {
     pub fn time_columns(&self, cur_time: DateTime<Utc>) -> Vec<String> {
         let (from, to) = self.time.range(cur_time);
         time_columns(from, to, &self.interval_unit)
-    }
-
-    pub fn groups(&self) -> Vec<String> {
-        match &self.breakdowns {
-            Some(breakdowns) => breakdowns
-                .iter()
-                .map(|b| match b {
-                    Breakdown::Property(p) => p.name(),
-                })
-                .collect(),
-            None => vec![self.group.clone()],
-        }
     }
 }

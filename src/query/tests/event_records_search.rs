@@ -123,7 +123,7 @@ mod tests {
             },
             events: None,
             filters: Some(vec![EventFilter::Property {
-                property: PropertyRef::User("Country".to_string()),
+                property: PropertyRef::Group("Country".to_string()),
                 operation: PropValueOperation::Like,
                 value: Some(vec![ScalarValue::Utf8(Some("spa%".to_string()))]),
             }]),

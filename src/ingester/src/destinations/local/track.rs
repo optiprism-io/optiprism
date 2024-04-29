@@ -1,13 +1,15 @@
 use std::sync::Arc;
 
 use chrono::Utc;
+use common::group_col;
 use common::types::DType;
 use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_EVENT_ID;
 use common::types::COLUMN_PROJECT_ID;
-use common::types::COLUMN_USER_ID;
 use common::types::EVENT_SESSION_BEGIN;
+use common::GROUPS_COUNT;
+use common::GROUP_USER_ID;
 use metadata::dictionaries::Dictionaries;
 use metadata::properties::DictionaryType;
 use metadata::MetadataProvider;
@@ -88,6 +90,10 @@ impl Destination<Track> for Local {
             ts,
         )?;
 
+        let groups = (1..GROUPS_COUNT)
+            .into_iter()
+            .map(|gid| NamedValue::new(group_col(gid), Value::Int64(None)))
+            .collect::<Vec<_>>();
         if is_new_session {
             let record_id = self
                 .md
@@ -101,27 +107,33 @@ impl Destination<Track> for Local {
                 .id;
 
             let values = vec![
-                NamedValue::new(
-                    COLUMN_PROJECT_ID.to_string(),
-                    Value::Int64(Some(ctx.project_id.unwrap() as i64)),
-                ),
-                NamedValue::new(
-                    COLUMN_USER_ID.to_string(),
-                    Value::Int64(Some(req.resolved_user_id.unwrap())),
-                ),
-                NamedValue::new(
-                    COLUMN_CREATED_AT.to_string(),
-                    Value::Timestamp(Some(req.timestamp.timestamp())),
-                ),
-                NamedValue::new(
-                    COLUMN_EVENT_ID.to_string(),
-                    Value::Int64(Some(record_id as i64)),
-                ),
-                NamedValue::new(
-                    COLUMN_EVENT.to_string(),
-                    Value::Int64(Some(event_id as i64)),
-                ),
-            ];
+                vec![
+                    NamedValue::new(
+                        COLUMN_PROJECT_ID.to_string(),
+                        Value::Int64(Some(ctx.project_id.unwrap() as i64)),
+                    ),
+                    NamedValue::new(
+                        group_col(GROUP_USER_ID),
+                        Value::Int64(Some(req.resolved_user_id.unwrap())),
+                    ),
+                ],
+                groups.clone(),
+                vec![
+                    NamedValue::new(
+                        COLUMN_CREATED_AT.to_string(),
+                        Value::Timestamp(Some(req.timestamp.timestamp())),
+                    ),
+                    NamedValue::new(
+                        COLUMN_EVENT_ID.to_string(),
+                        Value::Int64(Some(record_id as i64)),
+                    ),
+                    NamedValue::new(
+                        COLUMN_EVENT.to_string(),
+                        Value::Int64(Some(event_id as i64)),
+                    ),
+                ],
+            ]
+            .concat();
 
             self.db.insert("events", values)?;
         }
@@ -134,27 +146,33 @@ impl Destination<Track> for Local {
         let event_id = req.resolved_event.as_ref().unwrap().id;
 
         let mut values = vec![
-            NamedValue::new(
-                COLUMN_PROJECT_ID.to_string(),
-                Value::Int64(Some(ctx.project_id.unwrap() as i64)),
-            ),
-            NamedValue::new(
-                COLUMN_USER_ID.to_string(),
-                Value::Int64(Some(req.resolved_user_id.unwrap())),
-            ),
-            NamedValue::new(
-                COLUMN_CREATED_AT.to_string(),
-                Value::Timestamp(Some(req.timestamp.timestamp_millis())),
-            ),
-            NamedValue::new(
-                COLUMN_EVENT_ID.to_string(),
-                Value::Int64(Some(record_id as i64)),
-            ),
-            NamedValue::new(
-                COLUMN_EVENT.to_string(),
-                Value::Int64(Some(event_id as i64)),
-            ),
-        ];
+            vec![
+                NamedValue::new(
+                    COLUMN_PROJECT_ID.to_string(),
+                    Value::Int64(Some(ctx.project_id.unwrap() as i64)),
+                ),
+                NamedValue::new(
+                    group_col(GROUP_USER_ID),
+                    Value::Int64(Some(req.resolved_user_id.unwrap())),
+                ),
+            ],
+            groups,
+            vec![
+                NamedValue::new(
+                    COLUMN_CREATED_AT.to_string(),
+                    Value::Timestamp(Some(req.timestamp.timestamp_millis())),
+                ),
+                NamedValue::new(
+                    COLUMN_EVENT_ID.to_string(),
+                    Value::Int64(Some(record_id as i64)),
+                ),
+                NamedValue::new(
+                    COLUMN_EVENT.to_string(),
+                    Value::Int64(Some(event_id as i64)),
+                ),
+            ],
+        ]
+        .concat();
 
         let event_props = req
             .resolved_properties

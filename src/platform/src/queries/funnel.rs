@@ -26,7 +26,7 @@ use crate::PropertyRef;
 #[serde(rename_all = "camelCase")]
 pub struct Funnel {
     pub time: QueryTime,
-    pub group: String,
+    pub group: usize,
     pub steps: Vec<Step>,
     pub time_window: TimeWindow,
     pub chart_type: ChartType,
@@ -432,7 +432,7 @@ impl Into<common::query::funnel::Funnel> for Funnel {
     fn into(self) -> common::query::funnel::Funnel {
         common::query::funnel::Funnel {
             time: self.time.into(),
-            group: self.group.clone(),
+            group_id: self.group,
             steps: self
                 .steps
                 .iter()
@@ -471,7 +471,7 @@ impl Into<Funnel> for common::query::funnel::Funnel {
     fn into(self) -> Funnel {
         Funnel {
             time: self.time.into(),
-            group: self.group.clone(),
+            group: self.group_id,
             steps: self
                 .steps
                 .iter()
