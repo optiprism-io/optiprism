@@ -24,7 +24,7 @@ pub fn init_db() -> anyhow::Result<(Arc<MetadataProvider>, Arc<OptiDBImpl>)> {
     let store = Arc::new(crate::rocksdb::new(path.join("md"))?);
 
     let db = Arc::new(OptiDBImpl::open(path.join("db"), Options {})?);
-    let opts = TableOptions::test();
+    let opts = TableOptions::test(false);
     db.create_table("events".to_string(), opts).unwrap();
     Ok((Arc::new(MetadataProvider::try_new(store, db.clone())?), db))
 }

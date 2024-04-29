@@ -788,6 +788,69 @@ fn test_replacing() -> anyhow::Result<()> {
     let fields = vec![
         vec![
             Field::new("f1", DataType::Int64, false),
+            Field::new("f2", DataType::Int64, false),
+        ],
+        vec![
+            Field::new("f1", DataType::Int64, false),
+            Field::new("f2", DataType::Int64, false),
+        ],
+    ];
+
+    let readers = cols
+        .into_iter()
+        .zip(fields.iter())
+        .map(|(cols, fields)| {
+            let chunk = Chunk::new(cols);
+            let mut w = Cursor::new(vec![]);
+            create_parquet_from_chunk(chunk, fields.to_owned(), &mut w, None, 100).unwrap();
+
+            w
+        })
+        .collect::<Vec<_>>();
+
+    fs::remove_dir_all("/tmp/merge_replacing").ok();
+    fs::create_dir_all("/tmp/merge_replacing").unwrap();
+    let opts = Options {
+        index_cols: 2,
+        is_replacing: true,
+        data_page_size_limit_bytes: None,
+        row_group_values_limit: 100,
+        array_page_size: 100,
+        out_part_id: 0,
+        merge_max_page_size: 100,
+        max_part_size_bytes: None,
+    };
+    merge(readers, "/tmp/merge_replacing".into(), 1, "t", 0, opts)?;
+
+    let mut pfile = File::open("/tmp/merge_replacing/1.parquet").unwrap();
+    let final_chunk = read_parquet_as_one_chunk(&mut pfile);
+
+    let exp = Chunk::new(vec![
+        PrimitiveArray::<i64>::from_slice([1, 2]).boxed(),
+        PrimitiveArray::<i64>::from_slice(vec![3, 2]).boxed(),
+    ]);
+
+    debug_assert_eq!(exp, final_chunk);
+    Ok(())
+}
+
+#[traced_test]
+#[test]
+fn test_replacing_different_parts() -> anyhow::Result<()> {
+    let cols = vec![
+        vec![
+            PrimitiveArray::<i64>::from_slice([1, 1, 1]).boxed(),
+            PrimitiveArray::<i64>::from_slice([1, 2, 3]).boxed(),
+        ],
+        vec![
+            PrimitiveArray::<i64>::from_slice([1, 1, 2, 2]).boxed(),
+            PrimitiveArray::<i64>::from_slice([4, 5, 6, 7]).boxed(),
+        ],
+    ];
+
+    let fields = vec![
+        vec![
+            Field::new("f1", DataType::Int64, false),
             Field::new("f2", DataType::Int64, true),
         ],
         vec![
@@ -827,7 +890,7 @@ fn test_replacing() -> anyhow::Result<()> {
 
     let exp = Chunk::new(vec![
         PrimitiveArray::<i64>::from_slice([1, 2]).boxed(),
-        PrimitiveArray::<i64>::from_slice(vec![3, 2]).boxed(),
+        PrimitiveArray::<i64>::from_slice(vec![5, 7]).boxed(),
     ]);
 
     debug_assert_eq!(exp, final_chunk);
