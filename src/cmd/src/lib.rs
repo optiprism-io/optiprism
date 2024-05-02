@@ -131,7 +131,7 @@ pub fn init_system(
     db: &Arc<OptiDBImpl>,
     partitions: usize,
 ) -> error::Result<()> {
-    let topts = TableOptions {
+    let events_table = TableOptions {
         levels: 7,
         merge_array_size: 10000,
         parallelism: partitions,
@@ -149,7 +149,7 @@ pub fn init_system(
         merge_max_page_size: 1024 * 1024 * 10,
         is_replacing: false,
     };
-    match db.create_table(TABLE_EVENTS.to_string(), topts) {
+    match db.create_table(TABLE_EVENTS.to_string(), events_table) {
         Ok(_) => {}
         Err(err) => match err {
             StoreError::AlreadyExists(_) => {}
@@ -168,8 +168,36 @@ pub fn init_system(
     })?;
 
     for g in 0..GROUPS_COUNT {
+        let tbl = TableOptions {
+            levels: 7,
+            merge_array_size: 10000,
+            parallelism: partitions,
+            index_cols: 2,
+            l1_max_size_bytes: 1024 * 1024 * 10,
+            level_size_multiplier: 10,
+            l0_max_parts: 4,
+            max_log_length_bytes: 1024 * 1024 * 100,
+            merge_array_page_size: 100000,
+            merge_data_page_size_limit_bytes: Some(1024 * 1024 * 1000),
+            merge_max_l1_part_size_bytes: 1024 * 1024 * 10,
+            merge_part_size_multiplier: 10,
+            merge_row_group_values_limit: 1000,
+            merge_chunk_size: 1024 * 8 * 8,
+            merge_max_page_size: 1024 * 1024 * 10,
+            is_replacing: false,
+        };
+
+        let name = format!("group_{g}");
+        match db.create_table(name.clone(), tbl) {
+            Ok(_) => {}
+            Err(err) => match err {
+                StoreError::AlreadyExists(_) => {}
+                other => return Err(other.into()),
+            },
+        }
+
         create_property(md, 0, CreatePropertyMainRequest {
-            name: format!("group_{g}"),
+            name,
             display_name: Some(format!("Group {g}")),
             typ: Type::System,
             data_type: DType::String,
