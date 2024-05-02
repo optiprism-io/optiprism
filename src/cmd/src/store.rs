@@ -19,6 +19,7 @@ use common::types::COLUMN_EVENT;
 use common::types::EVENT_PROPERTY_PAGE_PATH;
 use common::types::EVENT_PROPERTY_PAGE_TITLE;
 use common::types::EVENT_PROPERTY_PAGE_URL;
+use common::types::TABLE_EVENTS;
 use common::types::USER_PROPERTY_CITY;
 use common::types::USER_PROPERTY_COUNTRY;
 use common::types::USER_PROPERTY_DEVICE_MODEL;
@@ -193,7 +194,7 @@ pub async fn start(args: &Store) -> Result<()> {
             };
 
             gen(md_clone, db_clone.clone(), store_cfg).unwrap();
-            db_clone.flush().unwrap();
+            db_clone.flush(TABLE_EVENTS).unwrap();
         });
 
         info!("successfully generated!");

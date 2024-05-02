@@ -13,6 +13,7 @@ use chrono::Utc;
 use clap::Parser;
 use common::config::Config;
 use common::types::DType;
+use common::types::TABLE_EVENTS;
 use common::DECIMAL_SCALE;
 use hyper::Server;
 use indicatif::ProgressBar;
@@ -243,7 +244,7 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
                         ));
                     }
 
-                    db.insert("events", vals.clone())?;
+                    db.insert(TABLE_EVENTS, vals.clone())?;
                     let d = Duration::days(1).num_seconds() / events;
                     let diff = Duration::seconds(d);
                     event_time = event_time.add(diff);
@@ -251,14 +252,14 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
                     pb.inc(1);
                     if i >= records_per_parquet {
                         i = 0;
-                        db.flush()?;
+                        db.flush(TABLE_EVENTS)?;
                     }
                 }
                 cur_time = cur_time.add(Duration::days(1));
             }
         }
     }
-    db.flush()?;
+    db.flush(TABLE_EVENTS)?;
     info!("successfully generated {i} events!");
     let all_parquet_files: Vec<_> = ScanDir::files()
         .walk(args.path.join("store/tables/events"), |iter| {
