@@ -6,6 +6,7 @@ pub mod dashboards;
 pub mod dictionaries;
 pub mod error;
 pub mod events;
+pub mod groups;
 pub mod index;
 pub mod metadata;
 pub mod organizations;
