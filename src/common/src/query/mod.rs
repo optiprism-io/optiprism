@@ -223,6 +223,17 @@ pub enum PropValueOperation {
     NotRegex,
 }
 
+impl PropValueOperation {
+    pub fn is_without_value(&self) -> bool {
+        match self {
+            PropValueOperation::True
+            | PropValueOperation::False
+            | PropValueOperation::Exists
+            | PropValueOperation::Empty => true,
+            _ => false,
+        }
+    }
+}
 impl From<PropValueOperation> for Operator {
     fn from(pv: PropValueOperation) -> Self {
         match pv {

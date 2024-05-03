@@ -48,6 +48,7 @@ impl Queries {
         event_segmentation::validate(&self.md, project_id, &req)?;
         let lreq = req.into();
         let lreq = event_segmentation::fix_types(&self.md, project_id, lreq)?;
+        dbg!(&lreq);
 
         let cur_time = match query.timestamp {
             None => Utc::now(),

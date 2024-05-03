@@ -67,6 +67,7 @@ pub fn validate_filter_property(
             ));
         }
     };
+    let mut allow_empty_values = false;
     match operation {
         PropValueOperation::Gt
         | PropValueOperation::Gte
@@ -87,6 +88,7 @@ pub fn validate_filter_property(
                     prop.name, operation
                 )));
             }
+            allow_empty_values = true;
         }
         PropValueOperation::Exists | PropValueOperation::Empty => {
             if !prop.nullable {
@@ -95,6 +97,7 @@ pub fn validate_filter_property(
                     prop.name, operation
                 )));
             }
+            allow_empty_values = true;
         }
         PropValueOperation::Regex
         | PropValueOperation::Like
@@ -119,9 +122,9 @@ pub fn validate_filter_property(
             }
         }
         Some(values) => {
-            if values.is_empty() {
+            if !allow_empty_values && values.is_empty() {
                 return Err(PlatformError::BadRequest(format!(
-                    "{err_prefix}values cannot be empty"
+                    "{err_prefix} values cannot be empty"
                 )));
             }
             for (vid, value) in values.iter().enumerate() {

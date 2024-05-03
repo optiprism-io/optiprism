@@ -755,9 +755,6 @@ pub(crate) fn fix_types(
                         value,
                         operation,
                     } => {
-                        if value.is_none() {
-                            continue;
-                        }
                         let prop = match property {
                             common::query::PropertyRef::System(name) => {
                                 md.system_properties.get_by_name(project_id, name)?
@@ -772,30 +769,35 @@ pub(crate) fn fix_types(
                         };
 
                         let mut ev = vec![];
-                        for value in value.to_owned().unwrap().iter() {
-                            match (&prop.data_type, value) {
-                                (&DType::Timestamp, &ScalarValue::Decimal128(_, _, _)) => {
-                                    match out.events[event_id].clone().filters.unwrap()[filter_id]
-                                        .clone()
-                                    {
-                                        common::query::EventFilter::Property { value, .. } => {
-                                            for value in value.unwrap().iter() {
-                                                if let ScalarValue::Decimal128(Some(ts), _, _) =
-                                                    value
-                                                {
-                                                    let sv = ScalarValue::TimestampMillisecond(
-                                                        Some(*ts as i64),
-                                                        None,
-                                                    );
-                                                    ev.push(sv);
-                                                } else {
-                                                    unreachable!()
+                        if let Some(value) = value {
+                            for value in value {
+                                match (&prop.data_type, value) {
+                                    (&DType::Timestamp, &ScalarValue::Decimal128(_, _, _)) => {
+                                        match out.events[event_id].clone().filters.unwrap()
+                                            [filter_id]
+                                            .clone()
+                                        {
+                                            common::query::EventFilter::Property {
+                                                value, ..
+                                            } => {
+                                                for value in value.unwrap().iter() {
+                                                    if let ScalarValue::Decimal128(Some(ts), _, _) =
+                                                        value
+                                                    {
+                                                        let sv = ScalarValue::TimestampMillisecond(
+                                                            Some(*ts as i64),
+                                                            None,
+                                                        );
+                                                        ev.push(sv);
+                                                    } else {
+                                                        unreachable!()
+                                                    }
                                                 }
                                             }
-                                        }
-                                    };
+                                        };
+                                    }
+                                    _ => ev.push(value.to_owned()),
                                 }
-                                _ => ev.push(value.to_owned()),
                             }
                         }
 
