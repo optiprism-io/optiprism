@@ -113,7 +113,7 @@ pub struct TrackRequest {
     pub typ: Type,
     pub event: Option<String>,
     pub properties: Option<HashMap<String, PropValue>>,
-    pub user_properties: Option<HashMap<String, PropValue>>,
+    pub groups: Option<HashMap<String, String>>,
 }
 
 #[debug_handler]
@@ -184,11 +184,7 @@ impl App {
                 .map(|(k, v)| (k.to_owned(), v.into()))
                 .collect::<_>()
         });
-        let raw_user_properties = req.user_properties.map(|v| {
-            v.into_iter()
-                .map(|(k, v)| (k.to_owned(), v.into()))
-                .collect::<_>()
-        });
+
         let track = crate::Track {
             user_id: req.user_id.clone(),
             anonymous_id: req.anonymous_id.clone(),
@@ -199,9 +195,10 @@ impl App {
             event: req.event.clone().unwrap(),
             resolved_event: None,
             properties: raw_properties,
-            user_properties: raw_user_properties,
             resolved_properties: None,
             resolved_user_properties: None,
+            groups: req.groups.clone(),
+            resolved_groups: None,
         };
 
         self.track.lock().unwrap().execute(ctx, track)

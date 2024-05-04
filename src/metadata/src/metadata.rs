@@ -15,6 +15,7 @@ use crate::dictionaries;
 use crate::dictionaries::Dictionaries;
 use crate::events;
 use crate::events::Events;
+use crate::groups::Groups;
 use crate::organizations;
 use crate::organizations::Organizations;
 use crate::projects;
@@ -40,6 +41,7 @@ pub struct MetadataProvider {
     pub accounts: Arc<Accounts>,
     pub dictionaries: Arc<Dictionaries>,
     pub sessions: Arc<Sessions>,
+    pub groups: Arc<Groups>,
 }
 
 impl MetadataProvider {
@@ -64,7 +66,8 @@ impl MetadataProvider {
             projects: Arc::new(projects::Projects::new(db.clone())),
             accounts: Arc::new(accounts::Accounts::new(db.clone())),
             dictionaries: dicts.clone(),
-            sessions: Arc::new(sessions::Sessions::new(db)),
+            sessions: Arc::new(sessions::Sessions::new(db.clone())),
+            groups: Arc::new(Groups::new(db)),
         })
     }
 }

@@ -4,12 +4,15 @@ use bincode::deserialize;
 use bincode::serialize;
 use byteorder::ByteOrder;
 use byteorder::LittleEndian;
+use common::GROUPS_COUNT;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::error::MetadataError;
 use crate::index::next_seq;
+use crate::index::next_zero_seq;
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::project_ns;
@@ -67,7 +70,7 @@ impl Groups {
 
     // try to find user id by user key
     // if not found, try to get or create anonymous key and assign id to user
-    // return user id
+    // return user group
     pub fn merge_with_anonymous(
         &self,
         project_id: u64,
@@ -140,6 +143,33 @@ impl Groups {
         let tx = self.db.transaction();
         let id = self.get_or_create_(&tx, project_id, group_id, key, values)?;
         tx.commit()?;
+        Ok(id)
+    }
+
+    pub fn get_or_create_group_name(&self, project_id: u64, name: &str) -> Result<u64> {
+        let tx = self.db.transaction();
+        let key = format!("projects/{project_id}/groups/names/{name}");
+        let id = match tx.get(key.as_bytes())? {
+            None => {
+                let id = next_seq(
+                    &tx,
+                    make_id_seq_key(project_ns(project_id, "groups".as_bytes()).as_slice()),
+                )?;
+
+                if id >= GROUPS_COUNT as u64 {
+                    return Err(MetadataError::BadRequest(
+                        "group name limit reached".to_string(),
+                    ));
+                }
+                tx.put(key.as_bytes(), id.to_le_bytes().as_ref())?;
+
+                id
+            }
+            Some(value) => u64::from_le_bytes(value.try_into().unwrap()),
+        };
+
+        tx.commit()?;
+
         Ok(id)
     }
 }
