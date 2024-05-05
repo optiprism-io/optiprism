@@ -25,10 +25,14 @@ impl UserAgent {
 
 impl Transformer<Identify> for UserAgent {
     fn process(&self, ctx: &RequestContext, mut req: Identify) -> Result<Identify> {
+        // enrich only user
+        if req.group != "user".to_string() {
+            return Ok(req);
+        }
         if req.context.user_agent.is_none() {
             return Ok(req);
         }
-        let mut user_props = if let Some(props) = &req.resolved_user_properties {
+        let mut user_props = if let Some(props) = &req.resolved_properties {
             props.to_owned()
         } else {
             vec![]
@@ -41,7 +45,7 @@ impl Transformer<Identify> for UserAgent {
             &self.ua_parser,
         )?;
         if !user_props.is_empty() {
-            req.resolved_user_properties = Some(user_props);
+            req.resolved_properties = Some(user_props);
         }
 
         Ok(req)

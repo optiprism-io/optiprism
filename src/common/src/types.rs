@@ -18,13 +18,15 @@ pub const DECIMAL_MULTIPLIER: i128 = 10i128.pow(DECIMAL_SCALE as u32);
 pub const TIME_UNIT: TimeUnit = TimeUnit::Millisecond;
 
 pub const TABLE_EVENTS: &str = "events";
-pub const TABLE_USERS: &str = "users";
 
 pub const COLUMN_PROJECT_ID: &str = "project_id";
 pub const COLUMN_CREATED_AT: &str = "created_at";
 pub const COLUMN_EVENT_ID: &str = "event_id";
 pub const COLUMN_EVENT: &str = "event";
 pub const COLUMN_SEGMENT: &str = "segment";
+
+pub const GROUP_COLUMN_ID: &str = "id";
+pub const GROUP_COLUMN_VERSION: &str = "version";
 
 pub const EVENT_PROPERTY_NAME: &str = "Name";
 pub const EVENT_PROPERTY_HREF: &str = "Href";

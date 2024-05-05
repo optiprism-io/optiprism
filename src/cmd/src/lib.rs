@@ -36,6 +36,8 @@ use common::types::EVENT_PROPERTY_SESSION_LENGTH;
 use common::types::EVENT_SCREEN;
 use common::types::EVENT_SESSION_BEGIN;
 use common::types::EVENT_SESSION_END;
+use common::types::GROUP_COLUMN_ID;
+use common::types::GROUP_COLUMN_VERSION;
 use common::types::TABLE_EVENTS;
 use common::types::USER_PROPERTY_CITY;
 use common::types::USER_PROPERTY_CLIENT_FAMILY;
@@ -184,10 +186,10 @@ pub fn init_system(
             merge_row_group_values_limit: 1000,
             merge_chunk_size: 1024 * 8 * 8,
             merge_max_page_size: 1024 * 1024 * 10,
-            is_replacing: false,
+            is_replacing: true,
         };
 
-        let name = format!("group_{g}");
+        let name = group_col(g);
         match db.create_table(name.clone(), tbl) {
             Ok(_) => {}
             Err(err) => match err {
@@ -205,6 +207,26 @@ pub fn init_system(
             hidden: false,
             dict: Some(DictionaryType::Int64),
         })?;
+
+        // create_property(md, 0, CreatePropertyMainRequest {
+        // name: GROUP_COLUMN_ID.to_string(),
+        // display_name: Some("Id".to_string()),
+        // typ: Type::SystemGroup(g),
+        // data_type: DType::String,
+        // nullable: false,
+        // hidden: false,
+        // dict: Some(DictionaryType::Int64),
+        // })?;
+        //
+        // create_property(md, 0, CreatePropertyMainRequest {
+        // name: GROUP_COLUMN_VERSION.to_string(),
+        // display_name: Some("Version".to_string()),
+        // typ: Type::SystemGroup(g),
+        // data_type: DType::String,
+        // nullable: false,
+        // hidden: false,
+        // dict: Some(DictionaryType::Int64),
+        // })?;
     }
 
     create_property(md, 0, CreatePropertyMainRequest {
@@ -309,7 +331,8 @@ fn init_ingester(
     let geo = geo::identify::Geo::try_new(md.group_properties[GROUP_USER_ID].clone(), city_rdr)?;
     identify_transformers.push(Arc::new(geo) as Arc<dyn Transformer<Identify>>);
     let mut identify_destinations = Vec::new();
-    let identify_debug_dst = ingester::destinations::debug::identify::Debug::new();
+    let identify_debug_dst =
+        ingester::destinations::local::identify::Local::new(db.clone(), md.clone());
     identify_destinations.push(Arc::new(identify_debug_dst) as Arc<dyn Destination<Identify>>);
     let identify_exec = Executor::<Identify>::new(
         identify_transformers,

@@ -8,6 +8,7 @@ use bincode::deserialize;
 use bincode::serialize;
 use chrono::DateTime;
 use chrono::Utc;
+use common::group_col;
 use common::types::DType;
 use common::types::OptionalProperty;
 use common::types::TABLE_EVENTS;
@@ -241,7 +242,7 @@ impl Properties {
             description: req.description,
             display_name: req.display_name,
             order,
-            typ: req.typ,
+            typ: req.typ.clone(),
             data_type: req.data_type.clone(),
             status: req.status,
             hidden: req.hidden,

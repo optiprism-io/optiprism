@@ -126,13 +126,14 @@ fn property_to_value(
 
 #[derive(Debug, Clone)]
 pub struct Identify {
-    pub user_id: Option<String>,
-    pub resolved_user_id: Option<i64>,
-    pub sent_at: DateTime<Utc>,
+    pub timestamp: DateTime<Utc>,
     pub context: Context,
-    pub event: String,
-    pub user_properties: Option<HashMap<String, PropValue>>,
-    pub resolved_user_properties: Option<Vec<PropertyAndValue>>,
+    pub group: String,
+    pub group_id: u64,
+    pub resolved_group: Option<Group>,
+    pub id: String,
+    pub properties: Option<HashMap<String, PropValue>>,
+    pub resolved_properties: Option<Vec<PropertyAndValue>>,
 }
 
 #[derive(Debug, Clone)]
@@ -140,7 +141,6 @@ pub struct Track {
     pub user_id: Option<String>,
     pub anonymous_id: Option<String>,
     pub resolved_user_id: Option<i64>,
-    pub sent_at: DateTime<Utc>,
     pub timestamp: DateTime<Utc>,
     pub context: Context,
     pub event: String,

@@ -48,7 +48,7 @@ impl Destination<Track> for Local {
             ts,
         )?;
 
-        // group ids
+        // fill group id for each of GROUPS_COUNT groups
         let groups = if let Some(groups) = &req.resolved_groups {
             let mut found = HashMap::new();
             let mut groups = groups

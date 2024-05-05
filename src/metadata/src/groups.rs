@@ -146,12 +146,62 @@ impl Groups {
         Ok(id)
     }
 
+    pub fn create_or_update(
+        &self,
+        project_id: u64,
+        group_id: u64,
+        key: &str,
+        values: Vec<PropertyValue>,
+    ) -> Result<Group> {
+        let tx = self.db.transaction();
+        let key = format!("projects/{project_id}/groups/{group_id}/real/keys/{key}");
+        let group = match tx.get(key.as_bytes())? {
+            None => {
+                let group_key = format!("groups/{group_id}");
+                let id = next_seq(
+                    &tx,
+                    make_id_seq_key(project_ns(project_id, group_key.as_bytes()).as_slice()),
+                )?;
+
+                let group = Group { id, values };
+                tx.put(key.as_bytes(), serialize(&group)?)?;
+                group
+            }
+            Some(value) => {
+                let group: Group = deserialize(&value)?;
+                let mut vals = group.values.clone();
+                for value in values {
+                    let mut found = false;
+                    for (gid, gvalue) in group.values.iter().enumerate() {
+                        if gvalue.property_id == value.property_id {
+                            vals[gid] = value.clone();
+                            found = true;
+                            break;
+                        }
+                    }
+                    if !found {
+                        vals.push(value);
+                    }
+                }
+                let group = Group {
+                    id: group.id,
+                    values: vals,
+                };
+                tx.put(key.as_bytes(), serialize(&group)?)?;
+
+                group
+            }
+        };
+        tx.commit()?;
+        Ok(group)
+    }
+
     pub fn get_or_create_group_name(&self, project_id: u64, name: &str) -> Result<u64> {
         let tx = self.db.transaction();
         let key = format!("projects/{project_id}/groups/names/{name}");
         let id = match tx.get(key.as_bytes())? {
             None => {
-                let id = next_seq(
+                let id = next_zero_seq(
                     &tx,
                     make_id_seq_key(project_ns(project_id, "groups".as_bytes()).as_slice()),
                 )?;
@@ -170,6 +220,19 @@ impl Groups {
 
         tx.commit()?;
 
+        Ok(id)
+    }
+
+    pub fn next_record_sequence(&self, project_id: u64, group_id: u64) -> Result<u64> {
+        let group_key = format!("groups/{group_id}/records");
+        let tx = self.db.transaction();
+
+        let id = next_seq(
+            &tx,
+            make_id_seq_key(project_ns(project_id, group_key.as_bytes()).as_slice()),
+        )?;
+
+        tx.commit()?;
         Ok(id)
     }
 }

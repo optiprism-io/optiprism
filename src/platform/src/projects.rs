@@ -38,6 +38,7 @@ use common::types::USER_PROPERTY_OS_VERSION_MAJOR;
 use common::types::USER_PROPERTY_OS_VERSION_MINOR;
 use common::types::USER_PROPERTY_OS_VERSION_PATCH;
 use common::types::USER_PROPERTY_OS_VERSION_PATCH_MINOR;
+use common::GROUP_USER;
 use common::GROUP_USER_ID;
 use metadata::projects::Projects as MDProjects;
 use metadata::properties::DictionaryType;
@@ -196,6 +197,7 @@ pub struct UpdateProjectRequest {
 }
 
 pub fn init_project(project_id: u64, md: &Arc<MetadataProvider>) -> error::Result<()> {
+    let a = md.groups.get_or_create_group_name(project_id, GROUP_USER)?;
     create_event(md, project_id, EVENT_CLICK.to_string())?;
     create_event(md, project_id, EVENT_PAGE.to_string())?;
     create_event(md, project_id, EVENT_SCREEN.to_string())?;

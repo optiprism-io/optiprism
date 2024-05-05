@@ -124,44 +124,6 @@ impl Executor<Track> {
 
         let (user_id, user_group) = match (&req.user_id, &req.anonymous_id) {
             (Some(user_id), None) => {
-                // let vals = if let Some(props) = &req.resolved_user_properties {
-                // let mut vals = vec![];
-                // for prop in props {
-                // let v = property_to_value(&ctx, prop, &self.md.dictionaries)?;
-                // let vv = match v {
-                // Value::Int8(v) => metadata::groups::Value::Int8(v),
-                // Value::Int16(v) => metadata::groups::Value::Int16(v),
-                // Value::Int32(v) => metadata::groups::Value::Int32(v),
-                // Value::Int64(v) => metadata::groups::Value::Int64(v),
-                // Value::Boolean(v) => metadata::groups::Value::Boolean(v),
-                // Value::Timestamp(v) => metadata::groups::Value::Timestamp(v),
-                // Value::Decimal(v) => metadata::groups::Value::Decimal(v),
-                // Value::String(v) => metadata::groups::Value::String(v),
-                // Value::ListInt8(v) => metadata::groups::Value::ListInt8(v),
-                // Value::ListInt16(v) => metadata::groups::Value::ListInt16(v),
-                // Value::ListInt32(v) => metadata::groups::Value::ListInt32(v),
-                // Value::ListInt64(v) => metadata::groups::Value::ListInt64(v),
-                // Value::ListBoolean(v) => metadata::groups::Value::ListBoolean(v),
-                // Value::ListTimestamp(v) => metadata::groups::Value::ListTimestamp(v),
-                // Value::ListDecimal(v) => metadata::groups::Value::ListDecimal(v),
-                // Value::ListString(v) => metadata::groups::Value::ListString(v),
-                // _ => {
-                // return Err(IngesterError::BadRequest(
-                // "unsupported value type".to_string(),
-                // ));
-                // }
-                // };
-                //
-                // vals.push(metadata::groups::PropertyValue {
-                // property_id: prop.property.id,
-                // value: vv,
-                // })
-                // }
-                //
-                // vals
-                // } else {
-                // vec![]
-                // };
                 let group = self.md.groups.get_or_create(
                     ctx.project_id.unwrap(),
                     GROUP_USER_ID as u64,
@@ -289,6 +251,70 @@ impl Executor<Identify> {
         let project = self.md.projects.get_by_token(ctx.token.as_str())?;
         let mut ctx = ctx.to_owned();
         ctx.project_id = Some(project.id);
+
+        let group_id = self
+            .md
+            .groups
+            .get_or_create_group_name(ctx.project_id.unwrap(), req.group.as_str())?;
+
+        if let Some(props) = &req.properties {
+            req.resolved_properties = Some(resolve_properties(
+                &ctx,
+                &self.md.group_properties[group_id as usize],
+                &self.db,
+                properties::Type::Group(group_id as usize),
+                props,
+            )?);
+        }
+
+        let vals = if let Some(props) = &req.resolved_properties {
+            let mut vals = vec![];
+            for prop in props {
+                let v = property_to_value(&ctx, prop, &self.md.dictionaries)?;
+                let vv = match v {
+                    Value::Int8(v) => metadata::groups::Value::Int8(v),
+                    Value::Int16(v) => metadata::groups::Value::Int16(v),
+                    Value::Int32(v) => metadata::groups::Value::Int32(v),
+                    Value::Int64(v) => metadata::groups::Value::Int64(v),
+                    Value::Boolean(v) => metadata::groups::Value::Boolean(v),
+                    Value::Timestamp(v) => metadata::groups::Value::Timestamp(v),
+                    Value::Decimal(v) => metadata::groups::Value::Decimal(v),
+                    Value::String(v) => metadata::groups::Value::String(v),
+                    Value::ListInt8(v) => metadata::groups::Value::ListInt8(v),
+                    Value::ListInt16(v) => metadata::groups::Value::ListInt16(v),
+                    Value::ListInt32(v) => metadata::groups::Value::ListInt32(v),
+                    Value::ListInt64(v) => metadata::groups::Value::ListInt64(v),
+                    Value::ListBoolean(v) => metadata::groups::Value::ListBoolean(v),
+                    Value::ListTimestamp(v) => metadata::groups::Value::ListTimestamp(v),
+                    Value::ListDecimal(v) => metadata::groups::Value::ListDecimal(v),
+                    Value::ListString(v) => metadata::groups::Value::ListString(v),
+                    _ => {
+                        return Err(IngesterError::BadRequest(
+                            "unsupported value type".to_string(),
+                        ));
+                    }
+                };
+
+                vals.push(metadata::groups::PropertyValue {
+                    property_id: prop.property.id,
+                    value: vv,
+                })
+            }
+
+            vals
+        } else {
+            vec![]
+        };
+
+        let resolved_group = self.md.groups.create_or_update(
+            ctx.project_id.unwrap(),
+            group_id,
+            req.id.as_str(),
+            vals,
+        )?;
+
+        req.group_id = group_id;
+        req.resolved_group = Some(resolved_group);
 
         for transformer in &mut self.transformers {
             req = transformer.process(&ctx, req)?;
