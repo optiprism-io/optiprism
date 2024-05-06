@@ -25,6 +25,7 @@ pub const COLUMN_EVENT_ID: &str = "event_id";
 pub const COLUMN_EVENT: &str = "event";
 pub const COLUMN_SEGMENT: &str = "segment";
 
+pub const GROUP_COLUMN_PROJECT_ID: &str = "project_id";
 pub const GROUP_COLUMN_ID: &str = "id";
 pub const GROUP_COLUMN_VERSION: &str = "version";
 

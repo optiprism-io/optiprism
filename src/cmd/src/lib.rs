@@ -37,6 +37,7 @@ use common::types::EVENT_SCREEN;
 use common::types::EVENT_SESSION_BEGIN;
 use common::types::EVENT_SESSION_END;
 use common::types::GROUP_COLUMN_ID;
+use common::types::GROUP_COLUMN_PROJECT_ID;
 use common::types::GROUP_COLUMN_VERSION;
 use common::types::TABLE_EVENTS;
 use common::types::USER_PROPERTY_CITY;
@@ -256,6 +257,36 @@ pub fn init_system(
         data_type: DType::String,
         nullable: false,
         dict: Some(DictionaryType::Int64),
+        hidden: true,
+    })?;
+
+    create_property(md, 0, CreatePropertyMainRequest {
+        name: GROUP_COLUMN_PROJECT_ID.to_string(),
+        display_name: Some("Project ID".to_string()),
+        typ: Type::SystemGroup,
+        data_type: DType::String,
+        nullable: false,
+        dict: Some(DictionaryType::Int64),
+        hidden: true,
+    })?;
+
+    create_property(md, 0, CreatePropertyMainRequest {
+        name: GROUP_COLUMN_ID.to_string(),
+        display_name: Some("ID".to_string()),
+        typ: Type::SystemGroup,
+        data_type: DType::String,
+        nullable: false,
+        dict: Some(DictionaryType::Int64),
+        hidden: true,
+    })?;
+
+    create_property(md, 0, CreatePropertyMainRequest {
+        name: GROUP_COLUMN_VERSION.to_string(),
+        display_name: Some("Version".to_string()),
+        typ: Type::SystemGroup,
+        data_type: DType::Int64,
+        nullable: false,
+        dict: None,
         hidden: true,
     })?;
 

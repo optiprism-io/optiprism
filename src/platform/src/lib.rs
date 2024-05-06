@@ -77,6 +77,7 @@ pub struct PlatformProvider {
     pub event_properties: Arc<Properties>,
     pub group_properties: Vec<Arc<Properties>>,
     pub system_properties: Arc<Properties>,
+    pub system_group_properties: Arc<Properties>,
     pub accounts: Arc<Accounts>,
     pub auth: Arc<Auth>,
     pub query: Arc<Queries>,
@@ -103,6 +104,9 @@ impl PlatformProvider {
             event_properties: Arc::new(Properties::new_event(md.event_properties.clone())),
             group_properties,
             system_properties: Arc::new(Properties::new_system(md.system_properties.clone())),
+            system_group_properties: Arc::new(Properties::new_system_group(
+                md.system_group_properties.clone(),
+            )),
             accounts: Arc::new(Accounts::new(md.accounts.clone())),
             auth: Arc::new(Auth::new(md.accounts.clone(), cfg.clone())),
             query: Arc::new(Queries::new(query_prov, md.clone())),

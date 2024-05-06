@@ -2,6 +2,8 @@ use std::sync::Arc;
 
 use common::group_col;
 use common::types::GROUP_COLUMN_ID;
+use common::types::GROUP_COLUMN_PROJECT_ID;
+use common::types::GROUP_COLUMN_VERSION;
 use metadata::MetadataProvider;
 use storage::db::OptiDBImpl;
 use storage::NamedValue;
@@ -26,6 +28,11 @@ impl Local {
 impl Destination<Identify> for Local {
     fn send(&self, ctx: &RequestContext, req: Identify) -> Result<()> {
         let mut prop_values = vec![];
+
+        prop_values.push(NamedValue::new(
+            GROUP_COLUMN_PROJECT_ID.to_string(),
+            Value::Int64(Some(ctx.project_id.unwrap() as i64)),
+        ));
         prop_values.push(NamedValue::new(
             GROUP_COLUMN_ID.to_string(),
             Value::Int64(Some(req.resolved_group.clone().unwrap().id as i64)),
@@ -36,7 +43,7 @@ impl Destination<Identify> for Local {
             .next_record_sequence(ctx.project_id.unwrap(), req.group_id)?;
 
         prop_values.push(NamedValue::new(
-            GROUP_COLUMN_ID.to_string(),
+            GROUP_COLUMN_VERSION.to_string(),
             Value::Int64(Some(version as i64)),
         ));
 
@@ -65,7 +72,6 @@ impl Destination<Identify> for Local {
             prop_values.push(NamedValue::new(prop.column_name(), value));
         }
 
-        dbg!(&prop_values);
         self.db
             .insert(group_col(req.group_id as usize).as_str(), prop_values)?;
         Ok(())
