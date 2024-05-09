@@ -117,6 +117,7 @@ impl PlatformError {
                 QueryError::Common(err) => ApiError::internal(err.to_string()),
                 QueryError::Store(err) => ApiError::internal(err.to_string()),
                 QueryError::Other(err) => ApiError::internal(err.to_string()),
+                QueryError::Unimplemented(_) => ApiError::unimplemented(err),
             },
             PlatformError::BadRequest(msg) => ApiError::bad_request(msg),
             PlatformError::Internal(msg) => ApiError::internal(msg),

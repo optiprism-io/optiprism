@@ -10,7 +10,7 @@ use crate::PlatformError;
 use crate::PropValueOperation;
 use crate::PropertyRef;
 
-pub fn validate_property(
+pub fn validate_event_property(
     md: &Arc<MetadataProvider>,
     project_id: u64,
     property: &PropertyRef,
@@ -35,15 +35,15 @@ pub fn validate_property(
                 .get_by_name(project_id, &property_name)
                 .map_err(|err| PlatformError::BadRequest(format!("{err_prefix}: {err}")))?;
         }
-        PropertyRef::Custom { .. } => {
+        _ => {
             return Err(PlatformError::Unimplemented(
-                "custom property is unimplemented".to_string(),
+                "invalid property type".to_string(),
             ));
         }
     }
     Ok(())
 }
-pub fn validate_filter_property(
+pub fn validate_event_filter_property(
     md: &Arc<MetadataProvider>,
     project_id: u64,
     property: &PropertyRef,
@@ -66,9 +66,9 @@ pub fn validate_filter_property(
             .system_properties
             .get_by_name(project_id, &property_name)
             .map_err(|err| PlatformError::BadRequest(format!("{err_prefix}: {err}")))?,
-        PropertyRef::Custom { .. } => {
+        _ => {
             return Err(PlatformError::Unimplemented(
-                "custom property is unimplemented".to_string(),
+                "invalid custom type".to_string(),
             ));
         }
     };
@@ -225,7 +225,7 @@ pub(crate) fn validate_event_filter(
             operation,
             value,
         } => {
-            validate_filter_property(
+            validate_event_filter_property(
                 md,
                 project_id,
                 property,

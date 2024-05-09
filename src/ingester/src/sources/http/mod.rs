@@ -81,10 +81,8 @@ impl From<PropValue> for crate::PropValue {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct IdentifyRequest {
-    pub sent_at: Option<DateTime<Utc>>,
+    pub timestamp: Option<DateTime<Utc>>,
     pub context: Context,
-    #[serde(rename = "type")]
-    pub typ: String,
     pub group: String,
     pub id: String,
     pub properties: Option<HashMap<String, PropValue>>,
@@ -92,24 +90,12 @@ pub struct IdentifyRequest {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub enum Type {
-    Track,
-    Identify,
-    Page,
-    Screen,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct TrackRequest {
     pub user_id: Option<String>,
     pub anonymous_id: Option<String>,
-    pub sent_at: Option<DateTime<Utc>>,
     pub timestamp: Option<DateTime<Utc>>,
     pub context: Context,
-    #[serde(rename = "type")]
-    pub typ: Type,
-    pub event: Option<String>,
+    pub event: String,
     pub properties: Option<HashMap<String, PropValue>>,
     pub groups: Option<HashMap<String, String>>,
 }
@@ -150,7 +136,7 @@ async fn identify(
         token,
     };
     app.identify(&ctx, request)?;
-    Ok(StatusCode::OK)
+    Ok(StatusCode::NO_CONTENT)
 }
 
 #[derive(Clone)]
@@ -189,7 +175,7 @@ impl App {
             resolved_user_id: None,
             timestamp: req.timestamp.unwrap_or_else(Utc::now),
             context,
-            event: req.event.clone().unwrap(),
+            event: req.event.clone(),
             resolved_event: None,
             properties: raw_properties,
             resolved_properties: None,
@@ -224,7 +210,7 @@ impl App {
                 .collect::<_>()
         });
         let track = crate::Identify {
-            timestamp: req.sent_at.unwrap_or_else(Utc::now),
+            timestamp: req.timestamp.unwrap_or_else(Utc::now),
             context,
             group: req.group,
             group_id: 0,

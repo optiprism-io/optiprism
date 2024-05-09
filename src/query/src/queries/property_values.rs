@@ -25,6 +25,7 @@ use datafusion_expr::Sort;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
 
+use crate::error::QueryError;
 use crate::error::Result;
 use crate::expr::event_expression;
 use crate::expr::property_expression;
@@ -105,7 +106,11 @@ impl LogicalPlanBuilder {
                 let col_name = prop.column_name();
                 (property_col!(ctx, metadata, input, prop), col_name)
             }
-            PropertyRef::Custom(_id) => unimplemented!(),
+            _ => {
+                return Err(QueryError::Unimplemented(
+                    "invalid property type".to_string(),
+                ));
+            }
         };
 
         let input = match &req.filter {

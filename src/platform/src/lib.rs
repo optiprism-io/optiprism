@@ -368,6 +368,8 @@ pub enum PropertyRef {
     #[serde(rename_all = "camelCase")]
     System { property_name: String },
     #[serde(rename_all = "camelCase")]
+    SystemGroup { property_name: String },
+    #[serde(rename_all = "camelCase")]
     Group { property_name: String, group: usize },
     #[serde(rename_all = "camelCase")]
     Event { property_name: String },
@@ -380,6 +382,9 @@ impl Into<common::query::PropertyRef> for PropertyRef {
         match self {
             PropertyRef::System { property_name } => {
                 common::query::PropertyRef::System(property_name)
+            }
+            PropertyRef::SystemGroup { property_name } => {
+                common::query::PropertyRef::SystemGroup(property_name)
             }
             PropertyRef::Group {
                 property_name,
@@ -398,6 +403,9 @@ impl Into<PropertyRef> for common::query::PropertyRef {
         match self {
             common::query::PropertyRef::System(property_name) => {
                 PropertyRef::System { property_name }
+            }
+            common::query::PropertyRef::SystemGroup(property_name) => {
+                PropertyRef::SystemGroup { property_name }
             }
             common::query::PropertyRef::Group(property_name, group) => PropertyRef::Group {
                 property_name,

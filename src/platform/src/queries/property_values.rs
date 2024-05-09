@@ -10,7 +10,7 @@ use crate::array_ref_to_json_values;
 use crate::json_value_to_scalar;
 use crate::queries::event_records_search::EventRecordsSearchRequest;
 use crate::queries::validation::validate_event_filter;
-use crate::queries::validation::validate_filter_property;
+use crate::queries::validation::validate_event_filter_property;
 use crate::EventRef;
 use crate::ListResponse;
 use crate::PlatformError;
@@ -92,9 +92,9 @@ pub(crate) fn validate(
                 .get_by_name(project_id, &property_name)
                 .map_err(|err| PlatformError::BadRequest(format!("{err}")))?;
         }
-        PropertyRef::Custom { .. } => {
+        _ => {
             return Err(PlatformError::Unimplemented(
-                "custom property is unimplemented".to_string(),
+                "invalid property type".to_string(),
             ));
         }
     }
@@ -115,7 +115,7 @@ pub(crate) fn validate(
     }
 
     if let Some(filter) = &req.filter {
-        validate_filter_property(
+        validate_event_filter_property(
             md,
             project_id,
             &req.property,

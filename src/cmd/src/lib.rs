@@ -36,6 +36,7 @@ use common::types::EVENT_PROPERTY_SESSION_LENGTH;
 use common::types::EVENT_SCREEN;
 use common::types::EVENT_SESSION_BEGIN;
 use common::types::EVENT_SESSION_END;
+use common::types::GROUP_COLUMN_CREATED_AT;
 use common::types::GROUP_COLUMN_ID;
 use common::types::GROUP_COLUMN_PROJECT_ID;
 use common::types::GROUP_COLUMN_VERSION;
@@ -288,6 +289,16 @@ pub fn init_system(
         nullable: false,
         dict: None,
         hidden: true,
+    })?;
+
+    create_property(md, 0, CreatePropertyMainRequest {
+        name: GROUP_COLUMN_CREATED_AT.to_string(),
+        display_name: Some("Created At".to_string()),
+        typ: Type::SystemGroup,
+        data_type: DType::Timestamp,
+        nullable: false,
+        hidden: false,
+        dict: None,
     })?;
 
     Ok(())

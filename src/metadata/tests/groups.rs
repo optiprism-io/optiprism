@@ -47,5 +47,14 @@ fn test_groups() -> Result<()> {
         .merge_with_anonymous(1, 1, "a2", "u3", vec![])
         .unwrap();
     assert_eq!(group.id, 3);
+
+    groups.get_or_create_group_name(1, "n1").unwrap();
+    groups.get_or_create_group_name(1, "n2").unwrap();
+    groups.get_or_create_group_name(1, "n3").unwrap();
+    groups.get_or_create_group_name(1, "n4").unwrap();
+    groups.get_or_create_group_name(1, "n5").unwrap();
+    assert!(groups.get_or_create_group_name(1, "n6").is_err());
+
+    let resp = groups.list_names(1).unwrap();
     Ok(())
 }

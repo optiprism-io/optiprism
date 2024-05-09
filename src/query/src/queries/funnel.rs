@@ -43,6 +43,7 @@ use metadata::MetadataProvider;
 use rust_decimal::Decimal;
 
 use crate::breakdowns_to_dicts;
+use crate::error::QueryError;
 use crate::error::Result;
 use crate::expr::event_expression;
 use crate::expr::event_filters_expression;
@@ -166,7 +167,11 @@ pub fn build(
                     PropertyRef::Event(p) => {
                         metadata.event_properties.get_by_name(ctx.project_id, p)?
                     }
-                    PropertyRef::Custom(_) => unimplemented!(),
+                    _ => {
+                        return Err(QueryError::Unimplemented(
+                            "invalid property type".to_string(),
+                        ));
+                    }
                 },
             };
 

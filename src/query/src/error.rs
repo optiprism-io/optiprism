@@ -13,6 +13,8 @@ pub type Result<T> = result::Result<T, QueryError>;
 pub enum QueryError {
     #[error("internal {0:?}")]
     Internal(String),
+    #[error("unimplemented {0:?}")]
+    Unimplemented(String),
     #[error("plan {0:?}")]
     Plan(String),
     #[error("execution {0:?}")]

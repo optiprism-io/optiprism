@@ -151,9 +151,9 @@ pub(crate) fn validate(
                             .map_err(|err| {
                                 PlatformError::BadRequest(format!("property {idx}: {err}"))
                             })?,
-                        PropertyRef::Custom { .. } => {
+                        _ => {
                             return Err(PlatformError::Unimplemented(
-                                "custom property is unimplemented".to_string(),
+                                "invalid property type".to_string(),
                             ));
                         }
                     };

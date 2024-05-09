@@ -11,10 +11,14 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::error::MetadataError;
+use crate::events::Event;
 use crate::index::next_seq;
 use crate::index::next_zero_seq;
+use crate::list_data;
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
+use crate::metadata::ListResponse;
+use crate::metadata::ResponseMetadata;
 use crate::project_ns;
 use crate::Result;
 
@@ -194,6 +198,27 @@ impl Groups {
         };
         tx.commit()?;
         Ok(group)
+    }
+
+    pub fn list_names(&self, project_id: u64) -> Result<ListResponse<(u64, String)>> {
+        let tx = self.db.transaction();
+        let mut res = vec![];
+        let key = format!("projects/{project_id}/groups/names");
+        for i in tx.prefix_iterator(key) {
+            let i = i?;
+            let k = u64::from_le_bytes(i.1.as_ref().try_into().unwrap());
+            let v = String::from_utf8(i.0.to_vec())?
+                .split("/")
+                .last()
+                .unwrap()
+                .to_string();
+            res.push((k, v));
+        }
+
+        Ok(ListResponse {
+            data: res,
+            meta: ResponseMetadata { next: None },
+        })
     }
 
     pub fn get_or_create_group_name(&self, project_id: u64, name: &str) -> Result<u64> {

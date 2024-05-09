@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use std::sync::Arc;
 
 use rocksdb::TransactionDB;
@@ -77,18 +78,22 @@ impl MetadataProvider {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ResponseMetadata {
     pub next: Option<String>,
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct ListResponse<T> {
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ListResponse<T>
+where T: Debug
+{
     pub data: Vec<T>,
     pub meta: ResponseMetadata,
 }
 
-impl<T> ListResponse<T> {
+impl<T> ListResponse<T>
+where T: Debug
+{
     pub fn len(&self) -> usize {
         self.data.len()
     }
@@ -98,7 +103,9 @@ impl<T> ListResponse<T> {
     }
 }
 
-impl<T> IntoIterator for ListResponse<T> {
+impl<T> IntoIterator for ListResponse<T>
+where T: Debug
+{
     type Item = T;
     type IntoIter = std::vec::IntoIter<Self::Item>;
 

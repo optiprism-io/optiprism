@@ -13,6 +13,7 @@ use crate::Context;
 pub mod event_records_search;
 pub mod event_segmentation;
 pub mod funnel;
+pub mod group_records_search;
 pub mod property_values;
 
 pub fn decode_filter_single_dictionary(
@@ -35,6 +36,9 @@ pub fn decode_filter_single_dictionary(
                 let prop = match property {
                     PropertyRef::System(prop_ref) => metadata
                         .system_properties
+                        .get_by_name(ctx.project_id, prop_ref.as_str())?,
+                    PropertyRef::SystemGroup(prop_ref) => metadata
+                        .system_group_properties
                         .get_by_name(ctx.project_id, prop_ref.as_str())?,
                     PropertyRef::Group(prop_ref, group) => metadata.group_properties[*group]
                         .get_by_name(ctx.project_id, prop_ref.as_str())?,

@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use common::group_col;
+use common::types::GROUP_COLUMN_CREATED_AT;
 use common::types::GROUP_COLUMN_ID;
 use common::types::GROUP_COLUMN_PROJECT_ID;
 use common::types::GROUP_COLUMN_VERSION;
@@ -45,6 +46,11 @@ impl Destination<Identify> for Local {
         prop_values.push(NamedValue::new(
             GROUP_COLUMN_VERSION.to_string(),
             Value::Int64(Some(version as i64)),
+        ));
+
+        prop_values.push(NamedValue::new(
+            GROUP_COLUMN_CREATED_AT.to_string(),
+            Value::Int64(Some(req.timestamp.timestamp())),
         ));
 
         for value in &req.resolved_group.unwrap().values {

@@ -10,7 +10,7 @@ use crate::error::Result;
 use crate::queries::event_records_search::EventRecordsSearchRequest;
 use crate::queries::validation::validate_event;
 use crate::queries::validation::validate_event_filter;
-use crate::queries::validation::validate_property;
+use crate::queries::validation::validate_event_property;
 use crate::queries::Breakdown;
 use crate::queries::QueryTime;
 use crate::queries::Segment;
@@ -645,7 +645,12 @@ pub(crate) fn validate(md: &Arc<MetadataProvider>, project_id: u64, req: &Funnel
             for (idx, breakdown) in breakdowns.iter().enumerate() {
                 match breakdown {
                     Breakdown::Property { property } => {
-                        validate_property(md, project_id, property, format!("breakdown {idx}"))?;
+                        validate_event_property(
+                            md,
+                            project_id,
+                            property,
+                            format!("breakdown {idx}"),
+                        )?;
                     }
                 }
             }
@@ -665,7 +670,7 @@ pub(crate) fn validate(md: &Arc<MetadataProvider>, project_id: u64, req: &Funnel
             ));
         }
         for (idx, prop) in hc.iter().enumerate() {
-            validate_property(md, project_id, prop, format!("holding constant {idx}"))?;
+            validate_event_property(md, project_id, prop, format!("holding constant {idx}"))?;
         }
     }
 

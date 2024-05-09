@@ -14,7 +14,7 @@ use crate::error::Result;
 use crate::json_value_to_scalar;
 use crate::queries::validation::validate_event;
 use crate::queries::validation::validate_event_filter;
-use crate::queries::validation::validate_property;
+use crate::queries::validation::validate_event_property;
 use crate::queries::AggregateFunction;
 use crate::queries::Breakdown;
 use crate::queries::PartitionedAggregateFunction;
@@ -717,7 +717,12 @@ pub(crate) fn validate(
             for (idx, breakdown) in breakdowns.iter().enumerate() {
                 match breakdown {
                     Breakdown::Property { property } => {
-                        validate_property(md, project_id, property, format!("breakdown {idx}"))?;
+                        validate_event_property(
+                            md,
+                            project_id,
+                            property,
+                            format!("breakdown {idx}"),
+                        )?;
                     }
                 }
             }
@@ -753,13 +758,18 @@ pub(crate) fn fix_types(
                             common::query::PropertyRef::System(name) => {
                                 md.system_properties.get_by_name(project_id, name)?
                             }
+
                             common::query::PropertyRef::Group(name, group) => {
                                 md.group_properties[*group].get_by_name(project_id, name)?
                             }
                             common::query::PropertyRef::Event(name) => {
                                 md.event_properties.get_by_name(project_id, name)?
                             }
-                            common::query::PropertyRef::Custom(_) => unimplemented!(),
+                            _ => {
+                                return Err(PlatformError::Unimplemented(
+                                    "invalid property type".to_string(),
+                                ));
+                            }
                         };
 
                         let mut ev = vec![];

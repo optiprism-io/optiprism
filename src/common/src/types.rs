@@ -28,6 +28,7 @@ pub const COLUMN_SEGMENT: &str = "segment";
 pub const GROUP_COLUMN_PROJECT_ID: &str = "project_id";
 pub const GROUP_COLUMN_ID: &str = "id";
 pub const GROUP_COLUMN_VERSION: &str = "version";
+pub const GROUP_COLUMN_CREATED_AT: &str = "created_at";
 
 pub const EVENT_PROPERTY_NAME: &str = "Name";
 pub const EVENT_PROPERTY_HREF: &str = "Href";

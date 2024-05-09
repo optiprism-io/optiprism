@@ -37,6 +37,7 @@ use metadata::MetadataProvider;
 
 use crate::breakdowns_to_dicts;
 use crate::context::Format;
+use crate::error::QueryError;
 use crate::error::Result;
 use crate::expr::breakdown_expr;
 use crate::expr::event_expression;
@@ -209,7 +210,11 @@ impl LogicalPlanBuilder {
                         PropertyRef::Event(p) => {
                             metadata.event_properties.get_by_name(ctx.project_id, p)?
                         }
-                        PropertyRef::Custom(_) => unimplemented!(),
+                        _ => {
+                            return Err(QueryError::Unimplemented(
+                                "invalid property type".to_string(),
+                            ));
+                        }
                     },
                 };
                 let cn = prop.column_name();
@@ -234,7 +239,11 @@ impl LogicalPlanBuilder {
                             PropertyRef::Event(p) => {
                                 metadata.event_properties.get_by_name(ctx.project_id, p)?
                             }
-                            PropertyRef::Custom(_) => unimplemented!(),
+                            _ => {
+                                return Err(QueryError::Unimplemented(
+                                    "invalid property type".to_string(),
+                                ));
+                            }
                         },
                     };
                     let cn = prop.column_name();
@@ -618,7 +627,11 @@ impl LogicalPlanBuilder {
                             .metadata
                             .event_properties
                             .get_by_name(self.ctx.project_id, p)?,
-                        PropertyRef::Custom(_) => unimplemented!(),
+                        _ => {
+                            return Err(QueryError::Unimplemented(
+                                "invalid property type".to_string(),
+                            ));
+                        }
                     },
                 };
                 group_expr.push((
@@ -643,7 +656,11 @@ impl LogicalPlanBuilder {
                             .metadata
                             .event_properties
                             .get_by_name(self.ctx.project_id, p)?,
-                        PropertyRef::Custom(_) => unimplemented!(),
+                        _ => {
+                            return Err(QueryError::Unimplemented(
+                                "invalid property type".to_string(),
+                            ));
+                        }
                     },
                 };
                 group_expr.push((
