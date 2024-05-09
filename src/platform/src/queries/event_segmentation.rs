@@ -9,6 +9,7 @@ use metadata::MetadataProvider;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
+use common::GROUPS_COUNT;
 
 use crate::error::Result;
 use crate::json_value_to_scalar;
@@ -644,6 +645,11 @@ pub(crate) fn validate(
     project_id: u64,
     req: &EventSegmentation,
 ) -> Result<()> {
+    if req.group>GROUPS_COUNT-1 {
+        return Err(PlatformError::BadRequest(
+            "group id is out of range".to_string(),
+        ));
+    }
     match req.time {
         QueryTime::Between { from, to } => {
             if from > to {

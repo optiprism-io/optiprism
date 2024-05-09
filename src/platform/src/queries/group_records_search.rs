@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use common::GROUPS_COUNT;
 use metadata::MetadataProvider;
 use serde::Deserialize;
 use serde::Serialize;
@@ -86,6 +87,11 @@ pub(crate) fn validate(
     project_id: u64,
     req: &GroupRecordsSearchRequest,
 ) -> Result<()> {
+    if req.group > GROUPS_COUNT - 1 {
+        return Err(PlatformError::BadRequest(
+            "group id is out of range".to_string(),
+        ));
+    }
     if let Some(time) = &req.time {
         match time {
             QueryTime::Between { from, to } => {

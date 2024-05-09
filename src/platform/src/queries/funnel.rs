@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use common::GROUPS_COUNT;
 use metadata::MetadataProvider;
 use rust_decimal::Decimal;
 use serde::Deserialize;
@@ -511,6 +512,12 @@ impl Into<Funnel> for common::query::funnel::Funnel {
 }
 
 pub(crate) fn validate(md: &Arc<MetadataProvider>, project_id: u64, req: &Funnel) -> Result<()> {
+    if req.group > GROUPS_COUNT - 1 {
+        return Err(PlatformError::BadRequest(
+            "group id is out of range".to_string(),
+        ));
+    }
+
     match req.time {
         QueryTime::Between { from, to } => {
             if from > to {
