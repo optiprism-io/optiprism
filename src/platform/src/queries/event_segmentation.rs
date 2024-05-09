@@ -23,11 +23,11 @@ use crate::queries::Segment;
 use crate::queries::TimeIntervalUnit;
 use crate::scalar_to_json_value;
 use crate::Context;
-use crate::EventFilter;
 use crate::EventGroupedFilterGroup;
 use crate::EventGroupedFilters;
 use crate::EventRef;
 use crate::PlatformError;
+use crate::PropValueFilter;
 use crate::PropValueOperation;
 use crate::PropertyRef;
 
@@ -371,7 +371,7 @@ pub struct Event {
     #[serde(flatten)]
     pub event: EventRef,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub filters: Option<Vec<EventFilter>>,
+    pub filters: Option<Vec<PropValueFilter>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub breakdowns: Option<Vec<Breakdown>>,
     pub queries: Vec<Query>,
@@ -749,7 +749,7 @@ pub(crate) fn fix_types(
             let mut filters_out = vec![];
             for (filter_id, filter) in filters.iter().enumerate() {
                 match filter {
-                    common::query::EventFilter::Property {
+                    common::query::PropValueFilter::Property {
                         property,
                         value,
                         operation,
@@ -781,8 +781,9 @@ pub(crate) fn fix_types(
                                             [filter_id]
                                             .clone()
                                         {
-                                            common::query::EventFilter::Property {
-                                                value, ..
+                                            common::query::PropValueFilter::Property {
+                                                value,
+                                                ..
                                             } => {
                                                 for value in value.unwrap().iter() {
                                                     if let ScalarValue::Decimal128(Some(ts), _, _) =
@@ -805,7 +806,7 @@ pub(crate) fn fix_types(
                             }
                         }
 
-                        let filter = common::query::EventFilter::Property {
+                        let filter = common::query::PropValueFilter::Property {
                             property: property.to_owned(),
                             operation: operation.to_owned(),
                             value: Some(ev),
@@ -840,9 +841,9 @@ mod tests {
     use crate::queries::event_segmentation::ChartType;
     use crate::queries::event_segmentation::Compare;
     use crate::queries::event_segmentation::Event;
-    use crate::queries::event_segmentation::EventFilter;
     use crate::queries::event_segmentation::EventSegmentation;
     use crate::queries::event_segmentation::PartitionedAggregateFunction;
+    use crate::queries::event_segmentation::PropValueFilter;
     use crate::queries::event_segmentation::Query;
     use crate::queries::event_segmentation::QueryTime;
     use crate::queries::event_segmentation::TimeIntervalUnit;
@@ -874,28 +875,28 @@ mod tests {
                     event_name: "e1".to_string(),
                 },
                 filters: Some(vec![
-                    EventFilter::Property {
+                    PropValueFilter::Property {
                         property: PropertyRef::Group {
                             property_name: "p1".to_string(),
                         },
                         operation: PropValueOperation::Eq,
                         value: Some(vec![json!(true)]),
                     },
-                    EventFilter::Property {
+                    PropValueFilter::Property {
                         property: PropertyRef::Event {
                             property_name: "p2".to_string(),
                         },
                         operation: PropValueOperation::Eq,
                         value: Some(vec![json!(true)]),
                     },
-                    EventFilter::Property {
+                    PropValueFilter::Property {
                         property: PropertyRef::Event {
                             property_name: "p3".to_string(),
                         },
                         operation: PropValueOperation::Empty,
                         value: None,
                     },
-                    EventFilter::Property {
+                    PropValueFilter::Property {
                         property: PropertyRef::Event {
                             property_name: "p4".to_string(),
                         },

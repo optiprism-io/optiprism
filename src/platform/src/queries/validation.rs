@@ -4,9 +4,9 @@ use common::types::DType;
 use metadata::MetadataProvider;
 use serde_json::Value;
 
-use crate::EventFilter;
 use crate::EventRef;
 use crate::PlatformError;
+use crate::PropValueFilter;
 use crate::PropValueOperation;
 use crate::PropertyRef;
 
@@ -215,12 +215,12 @@ pub(crate) fn validate_event(
 pub(crate) fn validate_event_filter(
     md: &Arc<MetadataProvider>,
     project_id: u64,
-    filter: &EventFilter,
+    filter: &PropValueFilter,
     filter_id: usize,
     err_prefix: String,
 ) -> crate::Result<()> {
     match filter {
-        EventFilter::Property {
+        PropValueFilter::Property {
             property,
             operation,
             value,

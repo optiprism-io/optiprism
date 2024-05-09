@@ -10,8 +10,8 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::query::Breakdown;
-use crate::query::EventFilter;
 use crate::query::EventRef;
+use crate::query::PropValueFilter;
 use crate::query::PropertyRef;
 use crate::query::QueryTime;
 use crate::query::Segment;
@@ -31,7 +31,7 @@ pub struct Funnel {
     pub exclude: Option<Vec<Exclude>>,
     pub breakdowns: Option<Vec<Breakdown>>,
     pub segments: Option<Vec<Segment>>,
-    pub filters: Option<Vec<EventFilter>>,
+    pub filters: Option<Vec<PropValueFilter>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -47,7 +47,7 @@ pub enum Order {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Event {
     pub event: EventRef,
-    pub filters: Option<Vec<EventFilter>>,
+    pub filters: Option<Vec<PropValueFilter>>,
 }
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct TimeWindow {

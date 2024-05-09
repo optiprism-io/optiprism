@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use common::query::EventFilter;
 use common::query::EventRef;
+use common::query::PropValueFilter;
 use common::query::PropertyRef;
 use common::query::QueryTime;
 use common::types::COLUMN_CREATED_AT;
@@ -219,7 +219,7 @@ fn decode_filter_dictionaries(
     ctx: &Context,
     metadata: &Arc<MetadataProvider>,
     events: Option<&Vec<Event>>,
-    filters: Option<&Vec<EventFilter>>,
+    filters: Option<&Vec<PropValueFilter>>,
     input: LogicalPlan,
     cols_hash: &mut HashMap<String, ()>,
 ) -> Result<LogicalPlan> {
@@ -258,7 +258,7 @@ fn decode_filter_dictionaries(
 #[derive(Clone, Debug)]
 pub struct Event {
     pub event: EventRef,
-    pub filters: Option<Vec<EventFilter>>,
+    pub filters: Option<Vec<PropValueFilter>>,
 }
 
 #[derive(Clone, Debug)]
@@ -266,6 +266,6 @@ pub struct EventRecordsSearch {
     pub time: QueryTime,
     pub group_id: usize,
     pub events: Option<Vec<Event>>,
-    pub filters: Option<Vec<EventFilter>>,
+    pub filters: Option<Vec<PropValueFilter>>,
     pub properties: Option<Vec<PropertyRef>>,
 }

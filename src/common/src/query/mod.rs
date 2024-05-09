@@ -277,7 +277,7 @@ pub enum Breakdown {
 
 #[serde_with::serde_as]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub enum EventFilter {
+pub enum PropValueFilter {
     Property {
         property: PropertyRef,
         operation: PropValueOperation,
@@ -327,7 +327,7 @@ pub enum DidEventAggregate {
     RelativeCount {
         event: EventRef,
         operation: PropValueOperation,
-        filters: Option<Vec<EventFilter>>,
+        filters: Option<Vec<PropValueFilter>>,
         time: SegmentTime,
     },
     AggregateProperty {
@@ -363,7 +363,7 @@ pub enum SegmentCondition {
     },
     DidEvent {
         event: EventRef,
-        filters: Option<Vec<EventFilter>>,
+        filters: Option<Vec<PropValueFilter>>,
         aggregate: DidEventAggregate,
     },
 }

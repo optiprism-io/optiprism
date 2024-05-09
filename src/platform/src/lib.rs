@@ -41,6 +41,7 @@ use arrow::array::UInt8Array;
 use arrow::datatypes::TimeUnit;
 use common::config::Config;
 use common::types::DType;
+use common::types::SortDirection;
 use common::types::TIME_UNIT;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
@@ -377,6 +378,37 @@ pub enum PropertyRef {
     Custom { property_id: u64 },
 }
 
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
+#[serde(tag = "propertyType", rename_all = "camelCase")]
+pub enum SortablePropertyRef {
+    #[serde(rename_all = "camelCase")]
+    System {
+        property_name: String,
+        direction: SortDirection,
+    },
+    #[serde(rename_all = "camelCase")]
+    SystemGroup {
+        property_name: String,
+        direction: SortDirection,
+    },
+    #[serde(rename_all = "camelCase")]
+    Group {
+        property_name: String,
+        group: usize,
+        direction: SortDirection,
+    },
+    #[serde(rename_all = "camelCase")]
+    Event {
+        property_name: String,
+        direction: SortDirection,
+    },
+    #[serde(rename_all = "camelCase")]
+    Custom {
+        property_id: u64,
+        direction: SortDirection,
+    },
+}
+
 impl Into<common::query::PropertyRef> for PropertyRef {
     fn into(self) -> common::query::PropertyRef {
         match self {
@@ -421,7 +453,7 @@ impl Into<PropertyRef> for common::query::PropertyRef {
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "camelCase")]
-pub enum EventFilter {
+pub enum PropValueFilter {
     #[serde(rename_all = "camelCase")]
     Property {
         #[serde(flatten)]
@@ -436,14 +468,14 @@ pub enum EventFilter {
     // Group { group_id: u64 },
 }
 
-impl Into<common::query::EventFilter> for EventFilter {
-    fn into(self) -> common::query::EventFilter {
+impl Into<common::query::PropValueFilter> for PropValueFilter {
+    fn into(self) -> common::query::PropValueFilter {
         match self {
-            EventFilter::Property {
+            PropValueFilter::Property {
                 property,
                 operation,
                 value,
-            } => common::query::EventFilter::Property {
+            } => common::query::PropValueFilter::Property {
                 property: property.to_owned().into(),
                 operation: operation.to_owned().into(),
                 value: match value {
@@ -461,14 +493,14 @@ impl Into<common::query::EventFilter> for EventFilter {
     }
 }
 
-impl Into<EventFilter> for common::query::EventFilter {
-    fn into(self) -> EventFilter {
+impl Into<PropValueFilter> for common::query::PropValueFilter {
+    fn into(self) -> PropValueFilter {
         match self {
-            common::query::EventFilter::Property {
+            common::query::PropValueFilter::Property {
                 property,
                 operation,
                 value,
-            } => EventFilter::Property {
+            } => PropValueFilter::Property {
                 property: property.to_owned().into(),
                 operation: operation.to_owned().into(),
                 value: match value {
@@ -604,7 +636,7 @@ pub enum EventGroupedFilterGroupCondition {
 pub struct EventGroupedFilterGroup {
     #[serde(default)]
     pub filters_condition: EventGroupedFilterGroupCondition,
-    pub filters: Vec<EventFilter>,
+    pub filters: Vec<PropValueFilter>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]

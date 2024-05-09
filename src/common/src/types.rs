@@ -320,7 +320,13 @@ where T: Deserialize<'de>
         a.map(OptionalProperty::Some)
     }
 }
-
+#[derive(Serialize, Deserialize, Clone, PartialEq, PartialOrd, Eq, Ord, Debug, Hash, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum SortDirection {
+    #[default]
+    Asc,
+    Desc,
+}
 #[cfg(test)]
 mod tests {
     use serde::Deserialize;

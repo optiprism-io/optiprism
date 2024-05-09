@@ -16,9 +16,9 @@ mod tests {
     use common::query::event_segmentation::Query;
     use common::query::AggregateFunction;
     use common::query::Breakdown;
-    use common::query::EventFilter;
     use common::query::EventRef;
     use common::query::PartitionedAggregateFunction;
+    use common::query::PropValueFilter;
     use common::query::PropValueOperation;
     use common::query::PropertyRef;
     use common::query::QueryTime;
@@ -56,7 +56,7 @@ mod tests {
             events: vec![
                 Event::new(
                     EventRef::RegularName("View Product".to_string()),
-                    Some(vec![EventFilter::Property {
+                    Some(vec![PropValueFilter::Property {
                         property: PropertyRef::Group("Is Premium".to_string()),
                         operation: PropValueOperation::Eq,
                         value: Some(vec![ScalarValue::Boolean(Some(true))]),
@@ -72,12 +72,12 @@ mod tests {
                 Event::new(
                     EventRef::RegularName("Buy Product".to_string()),
                     Some(vec![
-                        EventFilter::Property {
+                        PropValueFilter::Property {
                             property: PropertyRef::Event("Revenue".to_string()),
                             operation: PropValueOperation::Empty,
                             value: None,
                         },
-                        EventFilter::Property {
+                        PropValueFilter::Property {
                             property: PropertyRef::Event("Revenue".to_string()),
                             operation: PropValueOperation::Eq,
                             value: Some(vec![
@@ -86,12 +86,12 @@ mod tests {
                                 ScalarValue::Decimal128(Some(3), 1, 0),
                             ]),
                         },
-                        EventFilter::Property {
+                        PropValueFilter::Property {
                             property: PropertyRef::Group("Country".to_string()),
                             operation: PropValueOperation::Empty,
                             value: None,
                         },
-                        EventFilter::Property {
+                        PropValueFilter::Property {
                             property: PropertyRef::Group("Country".to_string()),
                             operation: PropValueOperation::Eq,
                             value: Some(vec![
@@ -134,12 +134,12 @@ mod tests {
                 ),
             ],
             filters: Some(vec![
-                EventFilter::Property {
+                PropValueFilter::Property {
                     property: PropertyRef::Group("Device".to_string()),
                     operation: PropValueOperation::Eq,
                     value: Some(vec![ScalarValue::Utf8(Some("Iphone".to_string()))]),
                 },
-                EventFilter::Property {
+                PropValueFilter::Property {
                     property: PropertyRef::Group("Is Premium".to_string()),
                     operation: PropValueOperation::Eq,
                     value: Some(vec![ScalarValue::Decimal128(Some(1), 1, 0)]),
@@ -313,12 +313,12 @@ mod tests {
                     custom_events::Event {
                         event: EventRef::RegularName("View Product".to_string()),
                         filters: Some(vec![
-                            EventFilter::Property {
+                            PropValueFilter::Property {
                                 property: PropertyRef::Group("Is Premium".to_string()),
                                 operation: PropValueOperation::Eq,
                                 value: Some(vec![ScalarValue::Boolean(Some(true))]),
                             },
-                            EventFilter::Property {
+                            PropValueFilter::Property {
                                 property: PropertyRef::Group("Country".to_string()),
                                 operation: PropValueOperation::Eq,
                                 value: Some(vec![

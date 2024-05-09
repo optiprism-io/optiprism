@@ -18,8 +18,8 @@ mod tests {
     use common::query::funnel::TimeWindow;
     use common::query::funnel::Touch;
     use common::query::Breakdown;
-    use common::query::EventFilter;
     use common::query::EventRef;
+    use common::query::PropValueFilter;
     use common::query::PropValueOperation;
     use common::query::PropertyRef;
     use common::query::QueryTime;

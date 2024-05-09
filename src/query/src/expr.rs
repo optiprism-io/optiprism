@@ -6,8 +6,8 @@ use chrono::NaiveDateTime;
 use chrono::TimeZone;
 use chrono::Utc;
 use common::query::Breakdown;
-use common::query::EventFilter;
 use common::query::EventRef;
+use common::query::PropValueFilter;
 use common::query::PropValueOperation;
 use common::query::PropertyRef;
 use common::query::QueryTime;
@@ -122,7 +122,7 @@ pub fn event_expression(
 pub fn event_filters_expression(
     ctx: &Context,
     metadata: &Arc<MetadataProvider>,
-    filters: &[EventFilter],
+    filters: &[PropValueFilter],
 ) -> Result<Expr> {
     // iterate over filters
     let filters_exprs = filters
@@ -130,7 +130,7 @@ pub fn event_filters_expression(
         .map(|filter| {
             // match filter type
             match filter {
-                EventFilter::Property {
+                PropValueFilter::Property {
                     property,
                     operation,
                     value,

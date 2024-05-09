@@ -9,10 +9,10 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::Context;
-use crate::EventFilter;
 use crate::EventRef;
 use crate::ListResponse;
 use crate::PlatformError;
+use crate::PropValueFilter;
 use crate::Result;
 
 pub struct CustomEvents {
@@ -132,7 +132,7 @@ impl From<Status> for metadata::custom_events::Status {
 pub struct Event {
     #[serde(flatten)]
     pub event: EventRef,
-    pub filters: Option<Vec<EventFilter>>,
+    pub filters: Option<Vec<PropValueFilter>>,
 }
 
 impl Into<metadata::custom_events::Event> for Event {

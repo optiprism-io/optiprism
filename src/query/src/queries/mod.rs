@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use common::query::EventFilter;
+use common::query::PropValueFilter;
 use common::query::PropValueOperation;
 use common::query::PropertyRef;
 use datafusion_common::Column;
@@ -21,10 +21,10 @@ pub fn decode_filter_single_dictionary(
     metadata: &Arc<MetadataProvider>,
     cols_hash: &mut HashMap<String, ()>,
     decode_cols: &mut Vec<(Column, Arc<SingleDictionaryProvider>)>,
-    filter: &EventFilter,
+    filter: &PropValueFilter,
 ) -> crate::Result<()> {
     match filter {
-        EventFilter::Property {
+        PropValueFilter::Property {
             property,
             operation,
             value: _,

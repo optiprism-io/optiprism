@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use common::query::EventFilter;
 use common::query::EventRef;
+use common::query::PropValueFilter;
 use common::query::PropertyRef;
 use common::query::QueryTime;
+use common::types::SortDirection;
 use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT_ID;
 use common::types::COLUMN_PROJECT_ID;
@@ -130,10 +131,14 @@ pub fn build(
         Arc::new(input),
     )?);
 
-    let input = if let Some(prop) = &req.sort {
+    let input = if let Some((prop, sort)) = &req.sort {
         let s = Expr::Sort(expr::Sort {
             expr: Box::new(property_col(&ctx, &metadata, prop)?),
-            asc: true,
+            asc: if *sort == SortDirection::Asc {
+                true
+            } else {
+                false
+            },
             nulls_first: false,
         });
 
@@ -204,7 +209,7 @@ pub fn build(
 fn decode_filter_dictionaries(
     ctx: &Context,
     metadata: &Arc<MetadataProvider>,
-    filters: Option<&Vec<EventFilter>>,
+    filters: Option<&Vec<PropValueFilter>>,
     input: LogicalPlan,
     cols_hash: &mut HashMap<String, ()>,
 ) -> Result<LogicalPlan> {
@@ -228,7 +233,7 @@ fn decode_filter_dictionaries(
 pub struct GroupRecordsSearch {
     pub time: Option<QueryTime>,
     pub group_id: usize,
-    pub filters: Option<Vec<EventFilter>>,
+    pub filters: Option<Vec<PropValueFilter>>,
     pub properties: Option<Vec<PropertyRef>>,
-    pub sort: Option<PropertyRef>,
+    pub sort: Option<(PropertyRef, SortDirection)>,
 }

@@ -16,6 +16,8 @@ use crate::queries::event_segmentation;
 use crate::queries::event_segmentation::EventSegmentation;
 use crate::queries::funnel;
 use crate::queries::funnel::Funnel;
+use crate::queries::group_records_search;
+use crate::queries::group_records_search::GroupRecordsSearchRequest;
 use crate::queries::property_values::ListPropertyValuesRequest;
 use crate::queries::QueryParams;
 use crate::queries::QueryResponseFormat;
@@ -177,6 +179,52 @@ impl Queries {
         };
 
         let mut data = self.query.event_records_search(ctx, lreq).await?;
+
+        // do empty response so it will be [] instead of [[],[],[],...]
+        if !data.columns.is_empty() && data.columns[0].data.is_empty() {
+            data.columns = vec![];
+        }
+        let resp = match query.format {
+            None => QueryResponse::columns_to_json(data.columns),
+            Some(QueryResponseFormat::Json) => QueryResponse::columns_to_json(data.columns),
+            Some(QueryResponseFormat::JsonCompact) => {
+                QueryResponse::columns_to_json_compact(data.columns)
+            }
+        }?;
+
+        Ok(resp)
+    }
+
+    pub async fn group_record_search(
+        &self,
+        ctx: Context,
+        project_id: u64,
+        req: GroupRecordsSearchRequest,
+        query: QueryParams,
+    ) -> Result<QueryResponse> {
+        ctx.check_project_permission(project_id, ProjectPermission::ExploreReports)?;
+        group_records_search::validate(&self.md, project_id, &req)?;
+        let lreq = req.into();
+        let cur_time = match query.timestamp {
+            None => Utc::now(),
+            Some(ts_sec) => DateTime::from_naive_utc_and_offset(
+                chrono::NaiveDateTime::from_timestamp_millis(ts_sec * 1000).unwrap(),
+                Utc,
+            ),
+        };
+        let ctx = query::Context {
+            project_id,
+            format: match &query.format {
+                None => Format::Regular,
+                Some(format) => match format {
+                    QueryResponseFormat::Json => Format::Regular,
+                    QueryResponseFormat::JsonCompact => Format::Compact,
+                },
+            },
+            cur_time,
+        };
+
+        let mut data = self.query.group_records_search(ctx, lreq).await?;
 
         // do empty response so it will be [] instead of [[],[],[],...]
         if !data.columns.is_empty() && data.columns[0].data.is_empty() {

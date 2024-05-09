@@ -9,9 +9,9 @@ use serde::Serialize;
 use crate::query::time_columns;
 use crate::query::AggregateFunction;
 use crate::query::Breakdown;
-use crate::query::EventFilter;
 use crate::query::EventRef;
 use crate::query::PartitionedAggregateFunction;
+use crate::query::PropValueFilter;
 use crate::query::PropValueOperation;
 use crate::query::PropertyRef;
 use crate::query::QueryTime;
@@ -178,7 +178,7 @@ impl NamedQuery {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Event {
     pub event: EventRef,
-    pub filters: Option<Vec<EventFilter>>,
+    pub filters: Option<Vec<PropValueFilter>>,
     pub breakdowns: Option<Vec<Breakdown>>,
     pub queries: Vec<NamedQuery>,
 }
@@ -186,7 +186,7 @@ pub struct Event {
 impl Event {
     pub fn new(
         event: EventRef,
-        filters: Option<Vec<EventFilter>>,
+        filters: Option<Vec<PropValueFilter>>,
         breakdowns: Option<Vec<Breakdown>>,
         queries: Vec<NamedQuery>,
     ) -> Self {
@@ -208,7 +208,7 @@ pub struct EventSegmentation {
     pub analysis: Analysis,
     pub compare: Option<Compare>,
     pub events: Vec<Event>,
-    pub filters: Option<Vec<EventFilter>>,
+    pub filters: Option<Vec<PropValueFilter>>,
     pub breakdowns: Option<Vec<Breakdown>>,
     pub segments: Option<Vec<Segment>>,
 }

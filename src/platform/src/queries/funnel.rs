@@ -15,11 +15,11 @@ use crate::queries::Breakdown;
 use crate::queries::QueryTime;
 use crate::queries::Segment;
 use crate::queries::TimeIntervalUnit;
-use crate::EventFilter;
 use crate::EventGroupedFilterGroup;
 use crate::EventGroupedFilters;
 use crate::EventRef;
 use crate::PlatformError;
+use crate::PropValueFilter;
 use crate::PropertyRef;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -100,7 +100,7 @@ pub struct Event {
     #[serde(flatten)]
     pub event: EventRef,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub filters: Option<Vec<EventFilter>>,
+    pub filters: Option<Vec<PropValueFilter>>,
 }
 
 impl Into<common::query::funnel::Event> for Event {

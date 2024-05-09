@@ -13,8 +13,8 @@ mod tests {
     use platform::queries::PartitionedAggregateFunction;
     use platform::queries::QueryTime;
     use platform::queries::TimeIntervalUnit;
-    use platform::EventFilter;
     use platform::EventRef;
+    use platform::PropValueFilter;
     use platform::PropValueOperation;
     use platform::PropertyRef;
     use reqwest::Client;
@@ -53,7 +53,7 @@ mod tests {
                     event: EventRef::Regular {
                         event_name: "View Product".to_string(),
                     },
-                    filters: Some(vec![EventFilter::Property {
+                    filters: Some(vec![PropValueFilter::Property {
                         property: PropertyRef::Group {
                             property_name: "Is Premium".to_string(),
                         },
