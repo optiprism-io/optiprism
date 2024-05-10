@@ -4,12 +4,12 @@ use chrono::DateTime;
 use chrono::Utc;
 use common::query::event_segmentation::NamedQuery;
 use common::types::DType;
+use common::GROUPS_COUNT;
 use datafusion_common::ScalarValue;
 use metadata::MetadataProvider;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
-use common::GROUPS_COUNT;
 
 use crate::error::Result;
 use crate::json_value_to_scalar;
@@ -645,7 +645,7 @@ pub(crate) fn validate(
     project_id: u64,
     req: &EventSegmentation,
 ) -> Result<()> {
-    if req.group>GROUPS_COUNT-1 {
+    if req.group > GROUPS_COUNT - 1 {
         return Err(PlatformError::BadRequest(
             "group id is out of range".to_string(),
         ));
