@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use std::sync::Arc;
 
 use rocksdb::TransactionDB;
@@ -15,6 +16,7 @@ use crate::dictionaries;
 use crate::dictionaries::Dictionaries;
 use crate::events;
 use crate::events::Events;
+use crate::groups::Groups;
 use crate::organizations;
 use crate::organizations::Organizations;
 use crate::projects;
@@ -33,13 +35,15 @@ pub struct MetadataProvider {
     pub events: Arc<Events>,
     pub custom_events: Arc<CustomEvents>,
     pub event_properties: Arc<Properties>,
-    pub user_properties: Arc<Properties>,
+    pub group_properties: Vec<Arc<Properties>>,
     pub system_properties: Arc<Properties>,
+    pub system_group_properties: Arc<Properties>,
     pub organizations: Arc<Organizations>,
     pub projects: Arc<Projects>,
     pub accounts: Arc<Accounts>,
     pub dictionaries: Arc<Dictionaries>,
     pub sessions: Arc<Sessions>,
+    pub groups: Arc<Groups>,
 }
 
 impl MetadataProvider {
@@ -55,11 +59,12 @@ impl MetadataProvider {
                 db.clone(),
                 opti_db.clone(),
             )),
-            user_properties: Arc::new(properties::Properties::new_user(
+            group_properties: properties::Properties::new_group(db.clone(), opti_db.clone()),
+            system_properties: Arc::new(properties::Properties::new_system(
                 db.clone(),
                 opti_db.clone(),
             )),
-            system_properties: Arc::new(properties::Properties::new_system(
+            system_group_properties: Arc::new(properties::Properties::new_system_group(
                 db.clone(),
                 opti_db.clone(),
             )),
@@ -67,23 +72,28 @@ impl MetadataProvider {
             projects: Arc::new(projects::Projects::new(db.clone())),
             accounts: Arc::new(accounts::Accounts::new(db.clone())),
             dictionaries: dicts.clone(),
-            sessions: Arc::new(sessions::Sessions::new(db)),
+            sessions: Arc::new(sessions::Sessions::new(db.clone())),
+            groups: Arc::new(Groups::new(db)),
         })
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ResponseMetadata {
     pub next: Option<String>,
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct ListResponse<T> {
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ListResponse<T>
+where T: Debug
+{
     pub data: Vec<T>,
     pub meta: ResponseMetadata,
 }
 
-impl<T> ListResponse<T> {
+impl<T> ListResponse<T>
+where T: Debug
+{
     pub fn len(&self) -> usize {
         self.data.len()
     }
@@ -93,7 +103,9 @@ impl<T> ListResponse<T> {
     }
 }
 
-impl<T> IntoIterator for ListResponse<T> {
+impl<T> IntoIterator for ListResponse<T>
+where T: Debug
+{
     type Item = T;
     type IntoIter = std::vec::IntoIter<Self::Item>;
 

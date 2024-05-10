@@ -36,9 +36,10 @@ pub struct Service {}
 
 #[derive(Clone)]
 pub struct PropertiesLayer {
-    event: Arc<Properties>,
-    user: Arc<Properties>,
+    events: Arc<Properties>,
+    groups: Vec<Arc<Properties>>,
     system: Arc<Properties>,
+    system_groups: Arc<Properties>,
 }
 
 pub fn attach_routes(
@@ -54,8 +55,9 @@ pub fn attach_routes(
     router = events::attach_routes(router);
     router = custom_events::attach_routes(router);
     router = properties::attach_event_routes(router);
-    router = properties::attach_user_routes(router);
+    router = properties::attach_group_routes(router);
     router = properties::attach_system_routes(router);
+    router = properties::attach_system_group_routes(router);
     router = queries::attach_routes(router);
     router = dashboards::attach_routes(router);
     router = reports::attach_routes(router);
@@ -78,9 +80,10 @@ pub fn attach_routes(
         .layer(Extension(platform.events.clone()))
         .layer(Extension(platform.custom_events.clone()))
         .layer(Extension(PropertiesLayer {
-            event: platform.event_properties.clone(),
-            user: platform.user_properties.clone(),
+            events: platform.event_properties.clone(),
+            groups: platform.group_properties.clone(),
             system: platform.system_properties.clone(),
+            system_groups: platform.system_group_properties.clone(),
         }))
         .layer(Extension(cfg))
         .layer(Extension(platform.query.clone()))

@@ -3,15 +3,16 @@ use chrono::Utc;
 
 use crate::json_value_to_scalar;
 use crate::scalar_to_json_value;
-use crate::EventFilter;
 use crate::EventRef;
 use crate::PlatformError;
+use crate::PropValueFilter;
 use crate::PropValueOperation;
 use crate::PropertyRef;
 
 pub mod event_records_search;
 pub mod event_segmentation;
 pub mod funnel;
+pub mod group_records_search;
 pub mod property_values;
 pub mod provider;
 mod validation;
@@ -190,7 +191,7 @@ pub enum DidEventAggregate {
         #[serde(flatten)]
         event: EventRef,
         operation: PropValueOperation,
-        filters: Option<Vec<EventFilter>>,
+        filters: Option<Vec<PropValueFilter>>,
         time: crate::queries::SegmentTime,
     },
     AggregateProperty {
@@ -333,7 +334,7 @@ pub enum SegmentCondition {
     DidEvent {
         #[serde(flatten)]
         event: EventRef,
-        filters: Option<Vec<EventFilter>>,
+        filters: Option<Vec<PropValueFilter>>,
         aggregate: DidEventAggregate,
     },
 }

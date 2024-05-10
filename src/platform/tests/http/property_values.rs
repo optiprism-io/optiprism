@@ -1,12 +1,13 @@
 #[cfg(test)]
 mod tests {
-    use axum::http::StatusCode;
+    use common::GROUP_USER_ID;
     use platform::queries::property_values::Filter;
     use platform::queries::property_values::ListPropertyValuesRequest;
     use platform::EventRef;
     use platform::PropValueOperation;
     use platform::PropertyRef;
     use reqwest::Client;
+    use reqwest::StatusCode;
     use serde_json::Value;
 
     use crate::assert_response_status_eq;
@@ -31,6 +32,7 @@ mod tests {
                 operation: PropValueOperation::Eq,
                 value: Some(vec![Value::String("goo%".to_string())]),
             }),
+            group: GROUP_USER_ID,
         };
 
         let resp = cl

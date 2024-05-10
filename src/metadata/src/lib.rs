@@ -6,6 +6,7 @@ pub mod dashboards;
 pub mod dictionaries;
 pub mod error;
 pub mod events;
+pub mod groups;
 pub mod index;
 pub mod metadata;
 pub mod organizations;
@@ -16,6 +17,8 @@ pub mod rocksdb;
 mod sessions;
 pub mod teams;
 pub mod util;
+
+use std::fmt::Debug;
 
 use ::rocksdb::Transaction;
 use ::rocksdb::TransactionDB;
@@ -58,7 +61,7 @@ pub fn make_id_seq_key(ns: &[u8]) -> Vec<u8> {
 }
 
 pub fn list_data<T>(tx: &Transaction<TransactionDB>, ns: &[u8]) -> Result<ListResponse<T>>
-where T: DeserializeOwned {
+where T: DeserializeOwned + Debug {
     let prefix = make_data_key(ns);
 
     let list = tx
@@ -80,7 +83,7 @@ where T: DeserializeOwned {
 }
 
 pub fn list<T>(tx: &Transaction<TransactionDB>, path: &[u8]) -> Result<ListResponse<T>>
-where T: DeserializeOwned {
+where T: DeserializeOwned + Debug {
     let prefix = path;
 
     let list = tx

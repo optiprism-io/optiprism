@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use common::types::DType;
-use common::types::DICT_USERS;
+use common::GROUP_USER_ID;
 use metadata::events;
 use metadata::events::CreateEventRequest;
 use metadata::properties;
@@ -12,9 +12,11 @@ use metadata::properties::Properties;
 use metadata::properties::Status;
 use metadata::MetadataProvider;
 use storage::db::OptiDBImpl;
+use storage::Value;
 
 use crate::error::IngesterError;
 use crate::error::Result;
+use crate::property_to_value;
 use crate::Destination;
 use crate::Identify;
 use crate::PropValue;
@@ -110,25 +112,6 @@ impl Executor<Track> {
         let mut ctx = ctx.to_owned();
         ctx.project_id = Some(project.id);
 
-        let user_id = match (&req.user_id, &req.anonymous_id) {
-            (Some(user_id), None) => self.md.dictionaries.get_key_or_create(
-                ctx.project_id.unwrap(),
-                DICT_USERS,
-                user_id.as_str(),
-            )?,
-            (None, Some(user_id)) => self.md.dictionaries.get_key_or_create(
-                ctx.project_id.unwrap(),
-                DICT_USERS,
-                user_id.as_str(),
-            )?,
-            _ => {
-                return Err(IngesterError::BadRequest(
-                    "user_id or anonymous_id must be set".to_string(),
-                ));
-            }
-        };
-
-        req.resolved_user_id = Some(user_id as i64);
         if let Some(props) = &req.properties {
             req.resolved_properties = Some(resolve_properties(
                 &ctx,
@@ -139,14 +122,68 @@ impl Executor<Track> {
             )?);
         }
 
-        if let Some(props) = &req.user_properties {
-            req.resolved_user_properties = Some(resolve_properties(
-                &ctx,
-                &self.md.user_properties,
-                &self.db,
-                properties::Type::Event,
-                props,
-            )?);
+        let (user_id, user_group) = match (&req.user_id, &req.anonymous_id) {
+            (Some(user_id), None) => {
+                let group = self.md.groups.get_or_create(
+                    ctx.project_id.unwrap(),
+                    GROUP_USER_ID as u64,
+                    user_id,
+                    vec![],
+                )?;
+                (group.id, Some(group))
+            }
+            (None, Some(user_id)) => {
+                let id = self.md.groups.get_or_create_anonymous_id(
+                    ctx.project_id.unwrap(),
+                    GROUP_USER_ID as u64,
+                    user_id.as_str(),
+                )?;
+
+                (id, None)
+            }
+            (Some(aid), Some(uid)) => {
+                let group = self.md.groups.merge_with_anonymous(
+                    ctx.project_id.unwrap(),
+                    GROUP_USER_ID as u64,
+                    aid.as_str(),
+                    uid.as_str(),
+                    vec![],
+                )?;
+
+                (group.id, None)
+            }
+            _ => {
+                return Err(IngesterError::BadRequest(
+                    "user_id or anonymous_id must be set".to_string(),
+                ));
+            }
+        };
+
+        req.resolved_user_id = Some(user_id as i64);
+
+        if let Some(groups) = &req.groups {
+            let mut resolved_groups = vec![];
+            // add user as a first group
+            if let Some(user_group) = user_group {
+                resolved_groups.push((0, user_group));
+            }
+
+            for (group_name, group) in groups {
+                let group_id = self
+                    .md
+                    .groups
+                    .get_or_create_group_name(ctx.project_id.unwrap(), group_name)?;
+
+                let resolved_group = self.md.groups.get_or_create(
+                    ctx.project_id.unwrap(),
+                    group_id,
+                    group,
+                    vec![],
+                )?;
+
+                resolved_groups.push((group_id as usize, resolved_group));
+            }
+            req.resolved_groups = Some(resolved_groups);
         }
 
         let event_req = CreateEventRequest {
@@ -161,10 +198,7 @@ impl Executor<Track> {
                 .resolved_properties
                 .clone()
                 .map(|props| props.iter().map(|p| p.property.id).collect::<Vec<u64>>()),
-            user_properties: req
-                .resolved_user_properties
-                .clone()
-                .map(|props| props.iter().map(|p| p.property.id).collect::<Vec<u64>>()),
+            user_properties: None,
             custom_properties: None,
         };
 
@@ -174,16 +208,14 @@ impl Executor<Track> {
             .get_or_create(ctx.project_id.unwrap(), event_req)?;
         let event_id = md_event.id;
         req.resolved_event = Some(md_event);
-        self.md.events.try_attach_properties(
-            ctx.project_id.unwrap(),
-            event_id,
-            req.resolved_properties
-                .as_ref()
-                .map(|props| props.iter().map(|p| p.property.id).collect()),
-            req.resolved_user_properties
-                .as_ref()
-                .map(|props| props.iter().map(|p| p.property.id).collect()),
-        )?;
+        if let Some(props) = &req.resolved_properties {
+            self.md.events.try_attach_properties(
+                ctx.project_id.unwrap(),
+                event_id,
+                props.iter().map(|p| p.property.id).collect(),
+            )?;
+        }
+
         for transformer in &mut self.transformers {
             req = transformer.process(&ctx, req)?;
         }
@@ -219,6 +251,70 @@ impl Executor<Identify> {
         let project = self.md.projects.get_by_token(ctx.token.as_str())?;
         let mut ctx = ctx.to_owned();
         ctx.project_id = Some(project.id);
+
+        let group_id = self
+            .md
+            .groups
+            .get_or_create_group_name(ctx.project_id.unwrap(), req.group.as_str())?;
+
+        if let Some(props) = &req.properties {
+            req.resolved_properties = Some(resolve_properties(
+                &ctx,
+                &self.md.group_properties[group_id as usize],
+                &self.db,
+                properties::Type::Group(group_id as usize),
+                props,
+            )?);
+        }
+
+        let vals = if let Some(props) = &req.resolved_properties {
+            let mut vals = vec![];
+            for prop in props {
+                let v = property_to_value(&ctx, prop, &self.md.dictionaries)?;
+                let vv = match v {
+                    Value::Int8(v) => metadata::groups::Value::Int8(v),
+                    Value::Int16(v) => metadata::groups::Value::Int16(v),
+                    Value::Int32(v) => metadata::groups::Value::Int32(v),
+                    Value::Int64(v) => metadata::groups::Value::Int64(v),
+                    Value::Boolean(v) => metadata::groups::Value::Boolean(v),
+                    Value::Timestamp(v) => metadata::groups::Value::Timestamp(v),
+                    Value::Decimal(v) => metadata::groups::Value::Decimal(v),
+                    Value::String(v) => metadata::groups::Value::String(v),
+                    Value::ListInt8(v) => metadata::groups::Value::ListInt8(v),
+                    Value::ListInt16(v) => metadata::groups::Value::ListInt16(v),
+                    Value::ListInt32(v) => metadata::groups::Value::ListInt32(v),
+                    Value::ListInt64(v) => metadata::groups::Value::ListInt64(v),
+                    Value::ListBoolean(v) => metadata::groups::Value::ListBoolean(v),
+                    Value::ListTimestamp(v) => metadata::groups::Value::ListTimestamp(v),
+                    Value::ListDecimal(v) => metadata::groups::Value::ListDecimal(v),
+                    Value::ListString(v) => metadata::groups::Value::ListString(v),
+                    _ => {
+                        return Err(IngesterError::BadRequest(
+                            "unsupported value type".to_string(),
+                        ));
+                    }
+                };
+
+                vals.push(metadata::groups::PropertyValue {
+                    property_id: prop.property.id,
+                    value: vv,
+                })
+            }
+
+            vals
+        } else {
+            vec![]
+        };
+
+        let resolved_group = self.md.groups.create_or_update(
+            ctx.project_id.unwrap(),
+            group_id,
+            req.id.as_str(),
+            vals,
+        )?;
+
+        req.group_id = group_id;
+        req.resolved_group = Some(resolved_group);
 
         for transformer in &mut self.transformers {
             req = transformer.process(&ctx, req)?;

@@ -4,6 +4,7 @@ use std::sync::Arc;
 use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
+use common::group_col;
 // use std::time::Duration;
 use common::query::funnel::ChartType;
 use common::query::funnel::Count;
@@ -16,13 +17,12 @@ use common::query::funnel::TimeIntervalUnitSession;
 use common::query::funnel::TimeWindow;
 use common::query::funnel::Touch;
 use common::query::Breakdown;
-use common::query::EventFilter;
 use common::query::EventRef;
+use common::query::PropValueFilter;
 use common::query::PropertyRef;
 use common::query::QueryTime;
 use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_PROJECT_ID;
-use common::types::COLUMN_USER_ID;
 use datafusion_common::Column;
 use datafusion_common::ScalarValue;
 use datafusion_expr::and;
@@ -43,6 +43,7 @@ use metadata::MetadataProvider;
 use rust_decimal::Decimal;
 
 use crate::breakdowns_to_dicts;
+use crate::error::QueryError;
 use crate::error::Result;
 use crate::expr::event_expression;
 use crate::expr::event_filters_expression;
@@ -89,7 +90,7 @@ pub fn build(
         for step in req.steps.iter() {
             let mut exprs = vec![];
             for event in step.events.iter() {
-                let mut expr = event_expression(&ctx, &metadata, &event.event)?;
+                let mut expr = event_expression(&ctx, &metadata, &event.event, req.group_id)?;
                 if let Some(filters) = &event.filters {
                     expr = and(expr, event_filters_expression(&ctx, &metadata, &filters)?);
                 }
@@ -109,7 +110,7 @@ pub fn build(
     let exclude = if let Some(excludes) = &req.exclude {
         let mut out = vec![];
         for exclude in excludes {
-            let mut expr = event_expression(&ctx, &metadata, &exclude.event.event)?;
+            let mut expr = event_expression(&ctx, &metadata, &exclude.event.event, req.group_id)?;
             if let Some(filters) = &exclude.event.filters {
                 expr = and(expr, event_filters_expression(&ctx, &metadata, &filters)?);
             }
@@ -160,13 +161,17 @@ pub fn build(
                     PropertyRef::System(p) => {
                         metadata.system_properties.get_by_name(ctx.project_id, p)?
                     }
-                    PropertyRef::User(p) => {
-                        metadata.user_properties.get_by_name(ctx.project_id, p)?
+                    PropertyRef::Group(p, group) => {
+                        metadata.group_properties[*group].get_by_name(ctx.project_id, p)?
                     }
                     PropertyRef::Event(p) => {
                         metadata.event_properties.get_by_name(ctx.project_id, p)?
                     }
-                    PropertyRef::Custom(_) => unimplemented!(),
+                    _ => {
+                        return Err(QueryError::Unimplemented(
+                            "invalid property type".to_string(),
+                        ));
+                    }
                 },
             };
 
@@ -215,7 +220,7 @@ pub fn build(
         },
         partition_col: col(Column {
             relation: None,
-            name: COLUMN_USER_ID.to_string(),
+            name: group_col(req.group_id),
         }),
         time_interval: req.chart_type.time_interval(),
         groups,
@@ -224,7 +229,7 @@ pub fn build(
         node: Arc::new(FunnelNode::new(
             input,
             None,
-            Column::from_qualified_name(COLUMN_USER_ID),
+            Column::from_qualified_name(group_col(req.group_id)),
             funnel,
         )?),
     });

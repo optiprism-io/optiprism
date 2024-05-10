@@ -25,6 +25,7 @@ use datafusion_expr::Sort;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
 
+use crate::error::QueryError;
 use crate::error::Result;
 use crate::expr::event_expression;
 use crate::expr::property_expression;
@@ -76,7 +77,10 @@ impl LogicalPlanBuilder {
         );
 
         if let Some(event) = &req.event {
-            expr = and(expr, event_expression(&ctx, &metadata, event)?);
+            expr = and(
+                expr,
+                event_expression(&ctx, &metadata, event, req.group_id)?,
+            );
         }
 
         let input = LogicalPlan::Filter(PlanFilter::try_new(expr, Arc::new(input))?);
@@ -89,10 +93,9 @@ impl LogicalPlanBuilder {
                 let col_name = prop.column_name();
                 (property_col!(ctx, metadata, input, prop), col_name)
             }
-            PropertyRef::User(prop_name) => {
-                let prop = metadata
-                    .user_properties
-                    .get_by_name(ctx.project_id, prop_name)?;
+            PropertyRef::Group(prop_name, group) => {
+                let prop =
+                    metadata.group_properties[*group].get_by_name(ctx.project_id, prop_name)?;
                 let col_name = prop.column_name();
                 (property_col!(ctx, metadata, input, prop), col_name)
             }
@@ -103,7 +106,11 @@ impl LogicalPlanBuilder {
                 let col_name = prop.column_name();
                 (property_col!(ctx, metadata, input, prop), col_name)
             }
-            PropertyRef::Custom(_id) => unimplemented!(),
+            _ => {
+                return Err(QueryError::Unimplemented(
+                    "invalid property type".to_string(),
+                ));
+            }
         };
 
         let input = match &req.filter {
@@ -148,6 +155,7 @@ pub struct Filter {
 #[derive(Clone, Debug)]
 pub struct PropertyValues {
     pub property: PropertyRef,
+    pub group_id: usize,
     pub event: Option<EventRef>,
     pub filter: Option<Filter>,
 }

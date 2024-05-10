@@ -8,9 +8,11 @@ use bincode::deserialize;
 use bincode::serialize;
 use chrono::DateTime;
 use chrono::Utc;
+use common::group_col;
 use common::types::DType;
 use common::types::OptionalProperty;
 use common::types::TABLE_EVENTS;
+use common::GROUPS_COUNT;
 use convert_case::Case;
 use convert_case::Casing;
 use lru::LruCache;
@@ -89,20 +91,27 @@ pub struct Properties {
 }
 
 impl Properties {
-    pub fn new_user(db: Arc<TransactionDB>, opti_db: Arc<OptiDBImpl>) -> Self {
-        let id_cache = RwLock::new(LruCache::new(
-            NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
-        ));
-        let name_cache = RwLock::new(LruCache::new(
-            NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
-        ));
-        Properties {
-            db,
-            opti_db,
-            id_cache,
-            name_cache,
-            typ: Type::User,
-        }
+    pub fn new_group(db: Arc<TransactionDB>, opti_db: Arc<OptiDBImpl>) -> Vec<Arc<Self>> {
+        let props = (0..GROUPS_COUNT)
+            .into_iter()
+            .map(|gid| {
+                let id_cache = RwLock::new(LruCache::new(
+                    NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
+                ));
+                let name_cache = RwLock::new(LruCache::new(
+                    NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
+                ));
+                Arc::new(Properties {
+                    db: db.clone(),
+                    opti_db: opti_db.clone(),
+                    id_cache,
+                    name_cache,
+                    typ: Type::Group(gid),
+                })
+            })
+            .collect::<Vec<_>>();
+
+        props
     }
 
     pub fn new_event(db: Arc<TransactionDB>, opti_db: Arc<OptiDBImpl>) -> Self {
@@ -134,6 +143,22 @@ impl Properties {
             id_cache,
             name_cache,
             typ: Type::System,
+        }
+    }
+
+    pub fn new_system_group(db: Arc<TransactionDB>, opti_db: Arc<OptiDBImpl>) -> Self {
+        let id_cache = RwLock::new(LruCache::new(
+            NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
+        ));
+        let name_cache = RwLock::new(LruCache::new(
+            NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
+        ));
+        Properties {
+            db,
+            opti_db,
+            id_cache,
+            name_cache,
+            typ: Type::SystemGroup,
         }
     }
 
@@ -195,7 +220,7 @@ impl Properties {
         project_id: u64,
         req: CreatePropertyRequest,
     ) -> Result<Property> {
-        let project_id = if self.typ == Type::System {
+        let project_id = if self.typ == Type::System || self.typ == Type::SystemGroup {
             0
         } else {
             project_id
@@ -233,7 +258,7 @@ impl Properties {
             description: req.description,
             display_name: req.display_name,
             order,
-            typ: req.typ,
+            typ: req.typ.clone(),
             data_type: req.data_type.clone(),
             status: req.status,
             hidden: req.hidden,
@@ -273,18 +298,58 @@ impl Properties {
             req.data_type.clone()
         };
 
-        match self
-            .opti_db
-            .add_field(TABLE_EVENTS, prop.column_name().as_str(), dt, req.nullable)
-        {
-            Ok(_) => Ok(prop),
-            Err(StoreError::AlreadyExists(_)) => Ok(prop),
-            Err(err) => Err(err.into()),
-        }
+        return if self.typ == Type::SystemGroup {
+            for g in 0..GROUPS_COUNT {
+                match self.opti_db.add_field(
+                    group_col(g).as_str(),
+                    prop.column_name().as_str(),
+                    dt.clone(),
+                    req.nullable,
+                ) {
+                    Err(StoreError::AlreadyExists(_)) => {}
+                    Err(err) => return Err(err.into()),
+                    Ok(_) => {}
+                }
+            }
+            Ok(prop.clone())
+        } else if let Type::Group(g) = self.typ {
+            match self.opti_db.add_field(
+                TABLE_EVENTS,
+                prop.column_name().as_str(),
+                dt.clone(),
+                req.nullable,
+            ) {
+                Err(StoreError::AlreadyExists(_)) => {}
+                Err(err) => return Err(err.into()),
+                _ => {}
+            };
+
+            match self.opti_db.add_field(
+                group_col(g).as_str(),
+                prop.column_name().as_str(),
+                dt,
+                req.nullable,
+            ) {
+                Ok(_) => Ok(prop),
+                Err(StoreError::AlreadyExists(_)) => Ok(prop),
+                Err(err) => Err(err.into()),
+            }
+        } else {
+            match self.opti_db.add_field(
+                TABLE_EVENTS,
+                prop.column_name().as_str(),
+                dt,
+                req.nullable,
+            ) {
+                Ok(_) => Ok(prop),
+                Err(StoreError::AlreadyExists(_)) => Ok(prop),
+                Err(err) => Err(err.into()),
+            }
+        };
     }
 
     pub fn create(&self, project_id: u64, req: CreatePropertyRequest) -> Result<Property> {
-        let project_id = if self.typ == Type::System {
+        let project_id = if self.typ == Type::System || self.typ == Type::SystemGroup {
             0
         } else {
             project_id
@@ -298,7 +363,7 @@ impl Properties {
     }
 
     pub fn get_or_create(&self, project_id: u64, req: CreatePropertyRequest) -> Result<Property> {
-        let project_id = if self.typ == Type::System {
+        let project_id = if self.typ == Type::System || self.typ == Type::SystemGroup {
             0
         } else {
             project_id
@@ -323,7 +388,7 @@ impl Properties {
     }
 
     pub fn get_by_name(&self, project_id: u64, name: &str) -> Result<Property> {
-        let project_id = if self.typ == Type::System {
+        let project_id = if self.typ == Type::System || self.typ == Type::SystemGroup {
             0
         } else {
             project_id
@@ -346,7 +411,7 @@ impl Properties {
         ))
     }
     pub fn list(&self, project_id: u64) -> Result<ListResponse<Property>> {
-        let project_id = if self.typ == Type::System {
+        let project_id = if self.typ == Type::System || self.typ == Type::SystemGroup {
             0
         } else {
             project_id
@@ -365,7 +430,7 @@ impl Properties {
         property_id: u64,
         req: UpdatePropertyRequest,
     ) -> Result<Property> {
-        let project_id = if self.typ == Type::System {
+        let project_id = if self.typ == Type::System || self.typ == Type::SystemGroup {
             0
         } else {
             project_id
@@ -465,7 +530,7 @@ impl Properties {
     }
 
     pub fn delete(&self, project_id: u64, id: u64) -> Result<Property> {
-        let project_id = if self.typ == Type::System {
+        let project_id = if self.typ == Type::System || self.typ == Type::SystemGroup {
             0
         } else {
             project_id
@@ -499,19 +564,24 @@ pub enum Status {
     Disabled,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 pub enum Type {
+    #[default]
     System,
+    SystemGroup,
     Event,
-    User,
+    Group(usize),
 }
 
 impl Type {
-    pub fn path(&self) -> &str {
+    pub fn path(&self) -> String {
         match self {
-            Type::System => "system_properties",
-            Type::Event => "event_properties",
-            Type::User => "user_properties",
+            Type::System => "system_properties".to_string(),
+            Type::SystemGroup => "system_group_properties".to_string(),
+            Type::Event => "event_properties".to_string(),
+            Type::Group(gid) => {
+                format!("group_{gid}_properties")
+            }
         }
     }
 
@@ -570,7 +640,7 @@ pub struct Property {
 impl Property {
     pub fn column_name(&self) -> String {
         match self.typ {
-            Type::System => {
+            Type::System | Type::SystemGroup => {
                 let mut name: String = self
                     .name
                     .chars()
@@ -586,8 +656,8 @@ impl Property {
             Type::Event => {
                 format!("e_{}_{}", self.data_type.short_name(), self.order)
             }
-            Type::User => {
-                format!("u_{}_{}", self.data_type.short_name(), self.order)
+            Type::Group(gid) => {
+                format!("g_{gid}_{}_{}", self.data_type.short_name(), self.order)
             }
         }
     }

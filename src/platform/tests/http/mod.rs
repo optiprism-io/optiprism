@@ -13,28 +13,31 @@ mod reports;
 mod tests {
     use std::env::temp_dir;
     use std::net::SocketAddr;
+    use std::str::FromStr;
     use std::sync::atomic::AtomicU16;
     use std::sync::atomic::Ordering;
     use std::sync::Arc;
 
-    use axum::headers::HeaderMap;
-    use axum::headers::HeaderValue;
     use axum::http;
     use axum::Router;
+    use axum_extra::headers::Server;
     use chrono::Duration;
+    use common::config::Config;
     use common::rbac::OrganizationRole;
-    use hyper::Server;
     use lazy_static::lazy_static;
     use metadata::accounts::Accounts;
     use metadata::MetadataProvider;
     use platform::auth::password::make_password_hash;
-    use platform::auth::provider::Config;
     use platform::auth::provider::LogInRequest;
     use platform::auth::Auth;
     use platform::http::attach_routes;
     use platform::PlatformProvider;
     use query::test_util::create_entities;
     use query::QueryProvider;
+    use reqwest::header::HeaderMap;
+    use reqwest::header::HeaderValue;
+    use reqwest::header::AUTHORIZATION;
+    use reqwest::header::CONTENT_TYPE;
     use serde_json::json;
     use storage::db::OptiDBImpl;
     use storage::db::Options;
@@ -44,10 +47,15 @@ mod tests {
     lazy_static! {
         pub static ref EMPTY_LIST: serde_json::Value = json!({"data":[],"meta":{"next":null}});
         pub static ref AUTH_CFG: Config = Config {
+            path: Default::default(),
+            host: SocketAddr::from_str(":8080").unwrap(),
+            ui_path: None,
+            ua_db_path: Default::default(),
+            geo_city_path: Default::default(),
+            session_cleaner_interval: Default::default(),
+            project_default_session_duration: Default::default(),
             access_token_duration: Duration::days(1),
-            access_token_key: "access_secret".to_string(),
             refresh_token_duration: Duration::days(1),
-            refresh_token_key: "refresh_secret".to_string(),
         };
     }
     static HTTP_PORT: AtomicU16 = AtomicU16::new(8080);
@@ -76,12 +84,9 @@ mod tests {
             })
             .await?;
         let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_str("application/json")?);
         headers.insert(
-            http::header::CONTENT_TYPE,
-            HeaderValue::from_str("application/json")?,
-        );
-        headers.insert(
-            http::header::AUTHORIZATION,
+            AUTHORIZATION,
             HeaderValue::from_str(format!("Bearer {}", tokens.access_token).as_str())?,
         );
 
@@ -100,7 +105,7 @@ mod tests {
         let rocks = Arc::new(metadata::rocksdb::new(path.join("md"))?);
         let db = Arc::new(OptiDBImpl::open(path.join("store"), Options {})?);
         let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
-        db.create_table("events".to_string(), storage::table::Options::test())?;
+        db.create_table("events".to_string(), storage::table::Options::test(false))?;
 
         if create_test_data {
             create_entities(md.clone(), &db, 1).await?;
@@ -115,11 +120,12 @@ mod tests {
 
         let addr = SocketAddr::from(([127, 0, 0, 1], HTTP_PORT.fetch_add(1, Ordering::SeqCst)));
         let router = attach_routes(Router::new(), &md, &platform_provider, AUTH_CFG.clone());
+        let listener = tokio::net::TcpListener::bind(addr).await?;
         tokio::spawn(async move {
-            Server::bind(&addr)
-                .serve(router.into_make_service_with_connect_info::<SocketAddr>())
-                .await
-                .unwrap();
+            axum::serve(
+                listener,
+                router.into_make_service_with_connect_info::<SocketAddr>(),
+            )
         });
 
         sleep(tokio::time::Duration::from_millis(100)).await;

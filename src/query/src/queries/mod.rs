@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use common::query::EventFilter;
+use common::query::PropValueFilter;
 use common::query::PropValueOperation;
 use common::query::PropertyRef;
 use datafusion_common::Column;
@@ -13,6 +13,7 @@ use crate::Context;
 pub mod event_records_search;
 pub mod event_segmentation;
 pub mod funnel;
+pub mod group_records_search;
 pub mod property_values;
 
 pub fn decode_filter_single_dictionary(
@@ -20,10 +21,10 @@ pub fn decode_filter_single_dictionary(
     metadata: &Arc<MetadataProvider>,
     cols_hash: &mut HashMap<String, ()>,
     decode_cols: &mut Vec<(Column, Arc<SingleDictionaryProvider>)>,
-    filter: &EventFilter,
+    filter: &PropValueFilter,
 ) -> crate::Result<()> {
     match filter {
-        EventFilter::Property {
+        PropValueFilter::Property {
             property,
             operation,
             value: _,
@@ -36,8 +37,10 @@ pub fn decode_filter_single_dictionary(
                     PropertyRef::System(prop_ref) => metadata
                         .system_properties
                         .get_by_name(ctx.project_id, prop_ref.as_str())?,
-                    PropertyRef::User(prop_ref) => metadata
-                        .user_properties
+                    PropertyRef::SystemGroup(prop_ref) => metadata
+                        .system_group_properties
+                        .get_by_name(ctx.project_id, prop_ref.as_str())?,
+                    PropertyRef::Group(prop_ref, group) => metadata.group_properties[*group]
                         .get_by_name(ctx.project_id, prop_ref.as_str())?,
                     PropertyRef::Event(prop_ref) => metadata
                         .event_properties

@@ -18,8 +18,8 @@ mod tests {
     use common::query::funnel::TimeWindow;
     use common::query::funnel::Touch;
     use common::query::Breakdown;
-    use common::query::EventFilter;
     use common::query::EventRef;
+    use common::query::PropValueFilter;
     use common::query::PropValueOperation;
     use common::query::PropertyRef;
     use common::query::QueryTime;
@@ -94,7 +94,7 @@ mod tests {
                                       * },
                                       * steps: None,
                                       * }]) */
-            breakdowns: Some(vec![Breakdown::Property(PropertyRef::User(
+            breakdowns: Some(vec![Breakdown::Property(PropertyRef::Group(
                 "Device".to_string(),
             ))]),
             segments: None,

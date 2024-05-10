@@ -1,11 +1,12 @@
 #[cfg(test)]
 mod tests {
-    use axum::http::StatusCode;
     use chrono::DateTime;
     use chrono::Utc;
+    use common::GROUP_USER_ID;
     use platform::queries::event_records_search::EventRecordsSearchRequest;
     use platform::queries::QueryTime;
     use reqwest::Client;
+    use reqwest::StatusCode;
 
     use crate::assert_response_status_eq;
     use crate::http::tests::create_admin_acc_and_login;
@@ -29,6 +30,7 @@ mod tests {
             events: None,
             filters: None,
             properties: None,
+            group: GROUP_USER_ID,
         };
 
         let resp = cl

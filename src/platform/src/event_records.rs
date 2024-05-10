@@ -7,10 +7,10 @@ use serde_json::Value;
 
 use crate::queries::QueryTime;
 use crate::Context;
-use crate::EventFilter;
 use crate::EventGroupedFilters;
 use crate::EventRef;
 use crate::ListResponse;
+use crate::PropValueFilter;
 use crate::Result;
 
 #[async_trait]
@@ -32,7 +32,7 @@ pub struct Event {
     #[serde(flatten)]
     pub event: EventRef,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub filters: Option<Vec<EventFilter>>,
+    pub filters: Option<Vec<PropValueFilter>>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]

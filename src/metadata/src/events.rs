@@ -292,53 +292,24 @@ impl Events {
         &self,
         project_id: u64,
         event_id: u64,
-        event_props: Option<Vec<u64>>,
-        user_props: Option<Vec<u64>>,
+        event_props: Vec<u64>,
     ) -> Result<()> {
-        if event_props.is_none() && user_props.is_none() {
-            return Ok(());
-        }
-
         let tx = self.db.transaction();
 
         let mut event = self.get_by_id_(&tx, project_id, event_id)?;
-        match event_props {
-            None => {}
-            Some(props) => {
-                for prop in props {
-                    match &event.event_properties {
-                        None => {}
-                        Some(ex) => {
-                            if ex.iter().any(|x| prop == *x) {
-                                continue;
-                            }
-                        }
+        for prop in event_props {
+            match &event.event_properties {
+                None => {}
+                Some(ex) => {
+                    if ex.iter().any(|x| prop == *x) {
+                        continue;
                     }
-                    event.event_properties = match event.event_properties {
-                        None => Some(vec![prop]),
-                        Some(props) => Some([props, vec![prop]].concat()),
-                    };
                 }
             }
-        }
-        match user_props {
-            None => {}
-            Some(props) => {
-                for prop in props {
-                    match &event.user_properties {
-                        None => {}
-                        Some(ex) => {
-                            if ex.iter().any(|x| prop == *x) {
-                                continue;
-                            }
-                        }
-                    }
-                    event.user_properties = match event.user_properties {
-                        None => Some(vec![prop]),
-                        Some(props) => Some([props, vec![prop]].concat()),
-                    };
-                }
-            }
+            event.event_properties = match event.event_properties {
+                None => Some(vec![prop]),
+                Some(props) => Some([props, vec![prop]].concat()),
+            };
         }
         tx.put(
             make_data_value_key(project_ns(project_id, NAMESPACE).as_slice(), event.id),

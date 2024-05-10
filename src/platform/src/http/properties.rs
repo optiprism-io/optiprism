@@ -18,20 +18,19 @@ async fn get_event_by_id(
 ) -> Result<Json<Property>> {
     Ok(Json(
         provider
-            .event
+            .events
             .get_by_id(ctx, project_id, property_id)
             .await?,
     ))
 }
 
-async fn get_user_by_id(
+async fn get_group_by_id(
     ctx: Context,
     Extension(provider): Extension<PropertiesLayer>,
-    Path((project_id, property_id)): Path<(u64, u64)>,
+    Path((project_id, property_id, group_id)): Path<(u64, u64, usize)>,
 ) -> Result<Json<Property>> {
     Ok(Json(
-        provider
-            .user
+        provider.groups[group_id]
             .get_by_id(ctx, project_id, property_id)
             .await?,
     ))
@@ -50,6 +49,19 @@ async fn get_system_by_id(
     ))
 }
 
+async fn get_system_group_by_id(
+    ctx: Context,
+    Extension(provider): Extension<PropertiesLayer>,
+    Path((project_id, property_id)): Path<(u64, u64)>,
+) -> Result<Json<Property>> {
+    Ok(Json(
+        provider
+            .system_groups
+            .get_by_id(ctx, project_id, property_id)
+            .await?,
+    ))
+}
+
 async fn get_event_by_name(
     ctx: Context,
     Extension(provider): Extension<PropertiesLayer>,
@@ -57,20 +69,19 @@ async fn get_event_by_name(
 ) -> Result<Json<Property>> {
     Ok(Json(
         provider
-            .event
+            .events
             .get_by_name(ctx, project_id, &prop_name)
             .await?,
     ))
 }
 
-async fn get_user_by_name(
+async fn get_group_by_name(
     ctx: Context,
     Extension(provider): Extension<PropertiesLayer>,
-    Path((project_id, prop_name)): Path<(u64, String)>,
+    Path((project_id, group_id, prop_name)): Path<(u64, usize, String)>,
 ) -> Result<Json<Property>> {
     Ok(Json(
-        provider
-            .user
+        provider.groups[group_id]
             .get_by_name(ctx, project_id, &prop_name)
             .await?,
     ))
@@ -89,20 +100,33 @@ async fn get_system_by_name(
     ))
 }
 
+async fn get_system_group_by_name(
+    ctx: Context,
+    Extension(provider): Extension<PropertiesLayer>,
+    Path((project_id, prop_name)): Path<(u64, String)>,
+) -> Result<Json<Property>> {
+    Ok(Json(
+        provider
+            .system_groups
+            .get_by_name(ctx, project_id, &prop_name)
+            .await?,
+    ))
+}
+
 async fn list_event(
     ctx: Context,
     Extension(provider): Extension<PropertiesLayer>,
     Path(project_id): Path<u64>,
 ) -> Result<Json<ListResponse<Property>>> {
-    Ok(Json(provider.event.list(ctx, project_id).await?))
+    Ok(Json(provider.events.list(ctx, project_id).await?))
 }
 
-async fn list_user(
+async fn list_group(
     ctx: Context,
     Extension(provider): Extension<PropertiesLayer>,
-    Path(project_id): Path<u64>,
+    Path((project_id, group_id)): Path<(u64, usize)>,
 ) -> Result<Json<ListResponse<Property>>> {
-    Ok(Json(provider.user.list(ctx, project_id).await?))
+    Ok(Json(provider.groups[group_id].list(ctx, project_id).await?))
 }
 
 async fn list_system(
@@ -113,6 +137,14 @@ async fn list_system(
     Ok(Json(provider.system.list(ctx, project_id).await?))
 }
 
+async fn list_system_group(
+    ctx: Context,
+    Extension(provider): Extension<PropertiesLayer>,
+    Path(project_id): Path<u64>,
+) -> Result<Json<ListResponse<Property>>> {
+    Ok(Json(provider.system_groups.list(ctx, project_id).await?))
+}
+
 async fn update_event(
     ctx: Context,
     Extension(provider): Extension<PropertiesLayer>,
@@ -121,21 +153,20 @@ async fn update_event(
 ) -> Result<Json<Property>> {
     Ok(Json(
         provider
-            .event
+            .events
             .update(ctx, project_id, prop_id, request)
             .await?,
     ))
 }
 
-async fn update_user(
+async fn update_group(
     ctx: Context,
     Extension(provider): Extension<PropertiesLayer>,
-    Path((project_id, prop_id)): Path<(u64, u64)>,
+    Path((project_id, group_id, prop_id)): Path<(u64, usize, u64)>,
     Json(request): Json<UpdatePropertyRequest>,
 ) -> Result<Json<Property>> {
     Ok(Json(
-        provider
-            .user
+        provider.groups[group_id]
             .update(ctx, project_id, prop_id, request)
             .await?,
     ))
@@ -155,20 +186,40 @@ async fn update_system(
     ))
 }
 
+async fn update_system_group(
+    ctx: Context,
+    Extension(provider): Extension<PropertiesLayer>,
+    Path((project_id, prop_id)): Path<(u64, u64)>,
+    Json(request): Json<UpdatePropertyRequest>,
+) -> Result<Json<Property>> {
+    Ok(Json(
+        provider
+            .system_groups
+            .update(ctx, project_id, prop_id, request)
+            .await?,
+    ))
+}
+
 async fn delete_event(
     ctx: Context,
     Extension(provider): Extension<PropertiesLayer>,
     Path((project_id, prop_id)): Path<(u64, u64)>,
 ) -> Result<Json<Property>> {
-    Ok(Json(provider.event.delete(ctx, project_id, prop_id).await?))
+    Ok(Json(
+        provider.events.delete(ctx, project_id, prop_id).await?,
+    ))
 }
 
-async fn delete_user(
+async fn delete_group(
     ctx: Context,
     Extension(provider): Extension<PropertiesLayer>,
-    Path((project_id, prop_id)): Path<(u64, u64)>,
+    Path((project_id, group_id, prop_id)): Path<(u64, usize, u64)>,
 ) -> Result<Json<Property>> {
-    Ok(Json(provider.user.delete(ctx, project_id, prop_id).await?))
+    Ok(Json(
+        provider.groups[group_id]
+            .delete(ctx, project_id, prop_id)
+            .await?,
+    ))
 }
 
 async fn delete_system(
@@ -181,18 +232,30 @@ async fn delete_system(
     ))
 }
 
-pub fn attach_user_routes(router: Router) -> Router {
+async fn delete_system_group(
+    ctx: Context,
+    Extension(provider): Extension<PropertiesLayer>,
+    Path((project_id, prop_id)): Path<(u64, u64)>,
+) -> Result<Json<Property>> {
+    Ok(Json(
+        provider
+            .system_groups
+            .delete(ctx, project_id, prop_id)
+            .await?,
+    ))
+}
+
+pub fn attach_group_routes(router: Router) -> Router {
     router.clone().nest(
-        "/api/v1/projects/:project_id/schema/user-properties",
+        "/api/v1/projects/:project_id/schema/group-properties/:group_id",
         router
-            .route("/", routing::get(list_user))
             .route(
                 "/:prop_id",
-                routing::get(get_user_by_id)
-                    .delete(delete_user)
-                    .put(update_user),
+                routing::get(get_group_by_id)
+                    .delete(delete_group)
+                    .put(update_group),
             )
-            .route("/name/:prop_name", routing::get(get_user_by_name)),
+            .route("/name/:prop_name", routing::get(get_group_by_name)),
     )
 }
 
@@ -223,5 +286,20 @@ pub fn attach_system_routes(router: Router) -> Router {
                     .put(update_system),
             )
             .route("/name/:prop_name", routing::get(get_system_by_name)),
+    )
+}
+
+pub fn attach_system_group_routes(router: Router) -> Router {
+    router.clone().nest(
+        "/api/v1/projects/:project_id/schema/system-group-properties",
+        router
+            .route("/", routing::get(list_system_group))
+            .route(
+                "/:prop_id",
+                routing::get(get_system_group_by_id)
+                    .delete(delete_system_group)
+                    .put(update_system_group),
+            )
+            .route("/name/:prop_name", routing::get(get_system_group_by_name)),
     )
 }

@@ -171,7 +171,8 @@ impl TryInto<arrow_schema::TimeUnit> for TimeUnit {
 #[derive(Serialize, Deserialize, Clone, Debug, Hash, Eq, PartialEq)]
 pub enum PropertyRef {
     System(String),
-    User(String),
+    SystemGroup(String),
+    Group(String, usize),
     Event(String),
     Custom(u64),
 }
@@ -179,8 +180,9 @@ pub enum PropertyRef {
 impl PropertyRef {
     pub fn name(&self) -> String {
         match self {
+            PropertyRef::SystemGroup(name) => name.clone(),
             PropertyRef::System(name) => name.clone(),
-            PropertyRef::User(name) => name.clone(),
+            PropertyRef::Group(name, ..) => name.clone(),
             PropertyRef::Event(name) => name.clone(),
             PropertyRef::Custom(_id) => unimplemented!(),
         }
@@ -275,7 +277,7 @@ pub enum Breakdown {
 
 #[serde_with::serde_as]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub enum EventFilter {
+pub enum PropValueFilter {
     Property {
         property: PropertyRef,
         operation: PropValueOperation,
@@ -325,7 +327,7 @@ pub enum DidEventAggregate {
     RelativeCount {
         event: EventRef,
         operation: PropValueOperation,
-        filters: Option<Vec<EventFilter>>,
+        filters: Option<Vec<PropValueFilter>>,
         time: SegmentTime,
     },
     AggregateProperty {
@@ -361,7 +363,7 @@ pub enum SegmentCondition {
     },
     DidEvent {
         event: EventRef,
-        filters: Option<Vec<EventFilter>>,
+        filters: Option<Vec<PropValueFilter>>,
         aggregate: DidEventAggregate,
     },
 }

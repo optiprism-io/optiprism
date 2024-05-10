@@ -9,9 +9,9 @@ use serde::Serialize;
 use crate::query::time_columns;
 use crate::query::AggregateFunction;
 use crate::query::Breakdown;
-use crate::query::EventFilter;
 use crate::query::EventRef;
 use crate::query::PartitionedAggregateFunction;
+use crate::query::PropValueFilter;
 use crate::query::PropValueOperation;
 use crate::query::PropertyRef;
 use crate::query::QueryTime;
@@ -178,7 +178,7 @@ impl NamedQuery {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Event {
     pub event: EventRef,
-    pub filters: Option<Vec<EventFilter>>,
+    pub filters: Option<Vec<PropValueFilter>>,
     pub breakdowns: Option<Vec<Breakdown>>,
     pub queries: Vec<NamedQuery>,
 }
@@ -186,7 +186,7 @@ pub struct Event {
 impl Event {
     pub fn new(
         event: EventRef,
-        filters: Option<Vec<EventFilter>>,
+        filters: Option<Vec<PropValueFilter>>,
         breakdowns: Option<Vec<Breakdown>>,
         queries: Vec<NamedQuery>,
     ) -> Self {
@@ -202,13 +202,13 @@ impl Event {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct EventSegmentation {
     pub time: QueryTime,
-    pub group: String,
+    pub group_id: usize,
     pub interval_unit: TimeIntervalUnit,
     pub chart_type: ChartType,
     pub analysis: Analysis,
     pub compare: Option<Compare>,
     pub events: Vec<Event>,
-    pub filters: Option<Vec<EventFilter>>,
+    pub filters: Option<Vec<PropValueFilter>>,
     pub breakdowns: Option<Vec<Breakdown>>,
     pub segments: Option<Vec<Segment>>,
 }
@@ -217,17 +217,5 @@ impl EventSegmentation {
     pub fn time_columns(&self, cur_time: DateTime<Utc>) -> Vec<String> {
         let (from, to) = self.time.range(cur_time);
         time_columns(from, to, &self.interval_unit)
-    }
-
-    pub fn groups(&self) -> Vec<String> {
-        match &self.breakdowns {
-            Some(breakdowns) => breakdowns
-                .iter()
-                .map(|b| match b {
-                    Breakdown::Property(p) => p.name(),
-                })
-                .collect(),
-            None => vec![self.group.clone()],
-        }
     }
 }
