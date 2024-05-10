@@ -81,11 +81,24 @@ impl From<PropValue> for crate::PropValue {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct IdentifyRequest {
-    pub timestamp: Option<DateTime<Utc>>,
+    pub user_id: Option<String>,
+    pub anonymous_id: Option<String>,
+    pub sent_at: DateTime<Utc>,
     pub context: Context,
-    pub group: String,
-    pub id: String,
-    pub properties: Option<HashMap<String, PropValue>>,
+    #[serde(rename = "type")]
+    pub typ: String,
+    pub event: Option<String>,
+    #[serde(rename = "traits")]
+    pub user_properties: Option<HashMap<String, PropValue>>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Type {
+    Track,
+    Identify,
+    Page,
+    Screen,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -93,11 +106,14 @@ pub struct IdentifyRequest {
 pub struct TrackRequest {
     pub user_id: Option<String>,
     pub anonymous_id: Option<String>,
+    pub sent_at: Option<DateTime<Utc>>,
     pub timestamp: Option<DateTime<Utc>>,
     pub context: Context,
-    pub event: String,
+    #[serde(rename = "type")]
+    pub typ: Type,
+    pub event: Option<String>,
     pub properties: Option<HashMap<String, PropValue>>,
-    pub groups: Option<HashMap<String, String>>,
+    pub user_properties: Option<HashMap<String, PropValue>>,
 }
 
 #[debug_handler]
@@ -136,7 +152,7 @@ async fn identify(
         token,
     };
     app.identify(&ctx, request)?;
-    Ok(StatusCode::NO_CONTENT)
+    Ok(StatusCode::CREATED)
 }
 
 #[derive(Clone)]
@@ -168,20 +184,24 @@ impl App {
                 .map(|(k, v)| (k.to_owned(), v.into()))
                 .collect::<_>()
         });
-
+        let raw_user_properties = req.user_properties.map(|v| {
+            v.into_iter()
+                .map(|(k, v)| (k.to_owned(), v.into()))
+                .collect::<_>()
+        });
         let track = crate::Track {
             user_id: req.user_id.clone(),
             anonymous_id: req.anonymous_id.clone(),
             resolved_user_id: None,
+            sent_at: req.sent_at.unwrap_or_else(Utc::now),
             timestamp: req.timestamp.unwrap_or_else(Utc::now),
             context,
-            event: req.event.clone(),
+            event: req.event.clone().unwrap(),
             resolved_event: None,
             properties: raw_properties,
+            user_properties: raw_user_properties,
             resolved_properties: None,
             resolved_user_properties: None,
-            groups: req.groups.clone(),
-            resolved_groups: None,
         };
 
         self.track.lock().unwrap().execute(ctx, track)
@@ -204,20 +224,19 @@ impl App {
             ip: req.context.ip,
         };
 
-        let raw_props = req.properties.map(|v| {
+        let raw_user_properties = req.user_properties.map(|v| {
             v.into_iter()
                 .map(|(k, v)| (k.to_owned(), v.into()))
                 .collect::<_>()
         });
         let track = crate::Identify {
-            timestamp: req.timestamp.unwrap_or_else(Utc::now),
+            user_id: req.user_id.clone(),
+            resolved_user_id: None,
+            sent_at: req.sent_at,
             context,
-            group: req.group,
-            group_id: 0,
-            resolved_group: None,
-            id: req.id,
-            properties: raw_props,
-            resolved_properties: None,
+            event: req.event.clone().unwrap(),
+            user_properties: raw_user_properties,
+            resolved_user_properties: None,
         };
 
         self.identify.lock().unwrap().execute(ctx, track)

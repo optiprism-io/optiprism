@@ -58,9 +58,7 @@ async fn test_event_properties() {
         dictionary_type: Some(DictionaryType::Int8),
         is_system: false,
         typ: Type::Event,
-        group_id: None,
         order: 0,
-        hidden: false,
     };
 
     // list without props should be empty
@@ -102,7 +100,7 @@ async fn test_event_properties() {
             name: prop1.name.clone(),
             description: prop1.description.clone(),
             display_name: prop1.display_name.clone(),
-            typ: metadata::properties::Type::Event,
+            typ: prop1.typ.clone().into(),
             data_type: DType::String,
             status: prop1.status.clone().into(),
             nullable: prop1.nullable,
@@ -115,7 +113,6 @@ async fn test_event_properties() {
                 .transpose()
                 .unwrap(),
             is_system: false,
-            hidden: false,
         };
 
         let resp = md.event_properties.create(1, req).unwrap();

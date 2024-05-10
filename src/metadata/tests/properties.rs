@@ -141,31 +141,3 @@ fn test_properties() -> Result<()> {
 
     Ok(())
 }
-#[test]
-fn test_groups() {
-    let (md, _opti_db) = init_db().unwrap();
-
-    let create_prop_req = CreatePropertyRequest {
-        created_by: 0,
-        tags: Some(vec![]),
-        name: "prop1".to_string(),
-        description: Some("".to_string()),
-        display_name: None,
-        typ: Type::Group(0),
-        data_type: DType::String,
-        status: Status::Enabled,
-        hidden: false,
-        is_system: false,
-        nullable: false,
-        is_array: false,
-        is_dictionary: false,
-        dictionary_type: None,
-    };
-
-    md.group_properties[0].get_by_name(1, "prop1").unwrap_err();
-    md.group_properties[0]
-        .get_or_create(1, create_prop_req.clone())
-        .unwrap();
-    md.group_properties[0].get_by_name(1, "prop1").ok();
-    md.group_properties[1].get_by_name(1, "prop1").unwrap_err();
-}

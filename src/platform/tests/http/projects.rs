@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
+    use axum::http::StatusCode;
     use reqwest::Client;
-    use reqwest::StatusCode;
 
     use crate::assert_response_status_eq;
     use crate::http::tests::create_admin_acc_and_login;

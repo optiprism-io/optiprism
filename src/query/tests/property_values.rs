@@ -34,7 +34,7 @@ mod tests {
         let input = events_provider(db, proj_id).await?;
 
         let req = PropertyValues {
-            property: PropertyRef::Group("Is Premium".to_string()),
+            property: PropertyRef::User("Is Premium".to_string()),
             event: Some(EventRef::RegularName("View Product".to_string())),
             filter: Some(Filter {
                 operation: PropValueOperation::True,
@@ -130,7 +130,7 @@ mod tests {
         let input = events_provider(db, proj_id).await?;
 
         let req = PropertyValues {
-            property: PropertyRef::Group("Country".to_string()),
+            property: PropertyRef::User("Country".to_string()),
             event: Some(EventRef::RegularName("View Product".to_string())),
             filter: Some(Filter {
                 operation: PropValueOperation::Like,
@@ -160,7 +160,7 @@ mod tests {
         let input = events_provider(db, proj_id).await?;
 
         let req = PropertyValues {
-            property: PropertyRef::Group("Country".to_string()),
+            property: PropertyRef::User("Country".to_string()),
             event: Some(EventRef::RegularName("View Product".to_string())),
             filter: None,
         };

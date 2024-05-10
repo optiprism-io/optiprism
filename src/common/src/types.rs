@@ -1,5 +1,3 @@
-use std::string::ToString;
-
 use arrow::datatypes;
 use arrow2::datatypes::DataType as DataType2;
 use arrow_schema::DataType;
@@ -18,17 +16,14 @@ pub const DECIMAL_MULTIPLIER: i128 = 10i128.pow(DECIMAL_SCALE as u32);
 pub const TIME_UNIT: TimeUnit = TimeUnit::Millisecond;
 
 pub const TABLE_EVENTS: &str = "events";
+pub const TABLE_USERS: &str = "users";
 
 pub const COLUMN_PROJECT_ID: &str = "project_id";
+pub const COLUMN_USER_ID: &str = "user_id";
 pub const COLUMN_CREATED_AT: &str = "created_at";
 pub const COLUMN_EVENT_ID: &str = "event_id";
 pub const COLUMN_EVENT: &str = "event";
 pub const COLUMN_SEGMENT: &str = "segment";
-
-pub const GROUP_COLUMN_PROJECT_ID: &str = "project_id";
-pub const GROUP_COLUMN_ID: &str = "id";
-pub const GROUP_COLUMN_VERSION: &str = "version";
-pub const GROUP_COLUMN_CREATED_AT: &str = "created_at";
 
 pub const EVENT_PROPERTY_NAME: &str = "Name";
 pub const EVENT_PROPERTY_HREF: &str = "Href";
@@ -58,6 +53,8 @@ pub const USER_PROPERTY_OS_VERSION_PATCH: &str = "OS Version Patch";
 pub const USER_PROPERTY_OS_VERSION_PATCH_MINOR: &str = "OS Version Patch Minor";
 pub const USER_PROPERTY_COUNTRY: &str = "Country";
 pub const USER_PROPERTY_CITY: &str = "City";
+
+pub const DICT_USERS: &str = "users";
 
 lazy_static! {
     pub static ref USER_PROPERTIES: Vec<&'static str> = vec![
@@ -96,9 +93,7 @@ pub const RESERVED_COLUMN_AGG: &str = "agg";
 pub const RESERVED_COLUMN_COUNT: &str = "count";
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-#[derive(Default)]
 pub enum DType {
-    #[default]
     String,
     Int8,
     Int16,
@@ -320,13 +315,7 @@ where T: Deserialize<'de>
         a.map(OptionalProperty::Some)
     }
 }
-#[derive(Serialize, Deserialize, Clone, PartialEq, PartialOrd, Eq, Ord, Debug, Hash, Default)]
-#[serde(rename_all = "camelCase")]
-pub enum SortDirection {
-    #[default]
-    Asc,
-    Desc,
-}
+
 #[cfg(test)]
 mod tests {
     use serde::Deserialize;

@@ -24,13 +24,13 @@ use arrow::record_batch::RecordBatch;
 use arrow_row::SortField;
 use axum::async_trait;
 use common::types::COLUMN_PROJECT_ID;
+use common::types::COLUMN_USER_ID;
 use datafusion::execution::context::TaskContext;
 use datafusion::physical_expr::expressions::col;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::expressions::Max;
 use datafusion::physical_expr::Distribution;
 use datafusion::physical_expr::PhysicalExpr;
-use datafusion::physical_expr::PhysicalExprRef;
 use datafusion::physical_expr::PhysicalSortRequirement;
 use datafusion::physical_optimizer::PhysicalOptimizerRule;
 use datafusion::physical_plan::aggregates::AggregateExec as DFAggregateExec;
@@ -233,7 +233,7 @@ impl ExecutionPlan for SegmentedAggregatePartialExec {
                 options: None,
             },
             PhysicalSortRequirement {
-                expr: Arc::new(self.partition_col.clone()) as PhysicalExprRef,
+                expr: col(COLUMN_USER_ID, &self.input.schema()).unwrap(),
                 options: None,
             },
         ];
@@ -252,7 +252,7 @@ impl ExecutionPlan for SegmentedAggregatePartialExec {
         // todo make it configurable, don't use project_id and user_id entities
         vec![Distribution::HashPartitioned(vec![
             Arc::new(Column::new_with_schema("project_id", &self.input.schema()).unwrap()),
-            Arc::new(self.partition_col.clone()) as PhysicalExprRef,
+            Arc::new(Column::new_with_schema("user_id", &self.input.schema()).unwrap()),
         ])]
     }
 

@@ -7,9 +7,9 @@ use serde::Serialize;
 use crate::queries::validation::validate_event;
 use crate::queries::validation::validate_event_filter;
 use crate::queries::QueryTime;
+use crate::EventFilter;
 use crate::EventRef;
 use crate::PlatformError;
-use crate::PropValueFilter;
 use crate::PropertyRef;
 use crate::Result;
 
@@ -17,7 +17,7 @@ use crate::Result;
 pub struct Event {
     #[serde(flatten)]
     pub event: EventRef,
-    pub filters: Option<Vec<PropValueFilter>>,
+    pub filters: Option<Vec<EventFilter>>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -25,9 +25,8 @@ pub struct Event {
 pub struct EventRecordsSearchRequest {
     pub time: QueryTime,
     pub events: Option<Vec<Event>>,
-    pub filters: Option<Vec<PropValueFilter>>,
+    pub filters: Option<Vec<EventFilter>>,
     pub properties: Option<Vec<PropertyRef>>,
-    pub group: usize,
 }
 
 impl Into<query::queries::event_records_search::Event> for Event {
@@ -48,7 +47,6 @@ impl Into<query::queries::event_records_search::EventRecordsSearch> for EventRec
     fn into(self) -> query::queries::event_records_search::EventRecordsSearch {
         query::queries::event_records_search::EventRecordsSearch {
             time: self.time.into(),
-            group_id: self.group,
             events: self.events.map(|events| {
                 events
                     .into_iter()
@@ -111,52 +109,51 @@ pub(crate) fn validate(
                 None => {}
             }
         }
-    }
-    match &req.filters {
-        None => {}
-        Some(filters) => {
-            for (filter_id, filter) in filters.iter().enumerate() {
-                validate_event_filter(md, project_id, filter, filter_id, "".to_string())?;
+
+        match &req.filters {
+            None => {}
+            Some(filters) => {
+                for (filter_id, filter) in filters.iter().enumerate() {
+                    validate_event_filter(md, project_id, filter, filter_id, "".to_string())?;
+                }
             }
         }
-    }
 
-    match &req.properties {
-        None => {}
-        Some(props) => {
-            if props.is_empty() {
-                return Err(PlatformError::BadRequest(
-                    "props field can't be empty".to_string(),
-                ));
-            }
-            for (idx, prop) in props.iter().enumerate() {
-                match prop {
-                    PropertyRef::Group {
-                        property_name,
-                        group,
-                    } => md.group_properties[*group]
-                        .get_by_name(project_id, &property_name)
-                        .map_err(|err| {
-                            PlatformError::BadRequest(format!("property {idx}: {err}"))
-                        })?,
-                    PropertyRef::Event { property_name } => md
-                        .event_properties
-                        .get_by_name(project_id, &property_name)
-                        .map_err(|err| {
-                            PlatformError::BadRequest(format!("property {idx}: {err}"))
-                        })?,
-                    PropertyRef::System { property_name } => md
-                        .system_properties
-                        .get_by_name(project_id, &property_name)
-                        .map_err(|err| {
-                            PlatformError::BadRequest(format!("property {idx}: {err}"))
-                        })?,
-                    _ => {
-                        return Err(PlatformError::Unimplemented(
-                            "invalid property type".to_string(),
-                        ));
-                    }
-                };
+        match &req.properties {
+            None => {}
+            Some(props) => {
+                if events.is_empty() {
+                    return Err(PlatformError::BadRequest(
+                        "props field can't be empty".to_string(),
+                    ));
+                }
+                for (idx, prop) in props.iter().enumerate() {
+                    match prop {
+                        PropertyRef::User { property_name } => md
+                            .user_properties
+                            .get_by_name(project_id, &property_name)
+                            .map_err(|err| {
+                                PlatformError::BadRequest(format!("property {idx}: {err}"))
+                            })?,
+                        PropertyRef::Event { property_name } => md
+                            .event_properties
+                            .get_by_name(project_id, &property_name)
+                            .map_err(|err| {
+                                PlatformError::BadRequest(format!("property {idx}: {err}"))
+                            })?,
+                        PropertyRef::System { property_name } => md
+                            .system_properties
+                            .get_by_name(project_id, &property_name)
+                            .map_err(|err| {
+                                PlatformError::BadRequest(format!("property {idx}: {err}"))
+                            })?,
+                        PropertyRef::Custom { .. } => {
+                            return Err(PlatformError::Unimplemented(
+                                "custom property is unimplemented".to_string(),
+                            ));
+                        }
+                    };
+                }
             }
         }
     }

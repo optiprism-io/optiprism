@@ -1,21 +1,12 @@
 use std::collections::HashMap;
 use std::net::IpAddr;
-use std::sync::Arc;
 
 use chrono::DateTime;
 use chrono::Utc;
-use common::types::DType;
 use error::Result;
-use metadata::dictionaries::Dictionaries;
 use metadata::events;
-use metadata::groups::Group;
 use metadata::properties;
-use metadata::properties::DictionaryType;
-use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
-use storage::Value;
-
-use crate::error::IngesterError;
 
 pub mod destinations;
 pub mod error;
@@ -80,60 +71,15 @@ pub enum PropValue {
     Bool(bool),
 }
 
-fn property_to_value(
-    ctx: &RequestContext,
-    prop: &PropertyAndValue,
-    dict: &Arc<Dictionaries>,
-) -> Result<Value> {
-    let val = if prop.property.is_dictionary {
-        if let PropValue::String(str_v) = &prop.value {
-            let dict_id = dict.get_key_or_create(
-                ctx.project_id.unwrap(),
-                prop.property.column_name().as_str(),
-                str_v.as_str(),
-            )?;
-            match prop.property.dictionary_type.clone().unwrap() {
-                DictionaryType::Int8 => Value::Int8(Some(dict_id as i8)),
-                DictionaryType::Int16 => Value::Int16(Some(dict_id as i16)),
-                DictionaryType::Int32 => Value::Int32(Some(dict_id as i32)),
-                DictionaryType::Int64 => Value::Int64(Some(dict_id as i64)),
-            }
-        } else {
-            return Err(IngesterError::Internal(
-                "property should be string".to_string(),
-            ));
-        }
-    } else {
-        match (&prop.property.data_type, &prop.value) {
-            (DType::String, PropValue::String(v)) => Value::String(Some(v.to_owned())),
-            (DType::Int8, PropValue::Number(v)) => Value::Int8(Some(v.to_i8().unwrap())),
-            (DType::Int16, PropValue::Number(v)) => Value::Int16(Some(v.to_i16().unwrap())),
-            (DType::Int32, PropValue::Number(v)) => Value::Int32(Some(v.to_i32().unwrap())),
-            (DType::Int64, PropValue::Number(v)) => Value::Int64(Some(v.to_i64().unwrap())),
-            (DType::Decimal, PropValue::Number(v)) => Value::Decimal(Some(v.to_i128().unwrap())),
-            (DType::Boolean, PropValue::Bool(v)) => Value::Boolean(Some(*v)),
-            (DType::Timestamp, PropValue::Date(v)) => Value::Int64(Some(v.timestamp())),
-            _ => {
-                return Err(IngesterError::Internal(
-                    "property should be a string".to_string(),
-                ));
-            }
-        }
-    };
-
-    Ok(val)
-}
-
 #[derive(Debug, Clone)]
 pub struct Identify {
-    pub timestamp: DateTime<Utc>,
+    pub user_id: Option<String>,
+    pub resolved_user_id: Option<i64>,
+    pub sent_at: DateTime<Utc>,
     pub context: Context,
-    pub group: String,
-    pub group_id: u64,
-    pub resolved_group: Option<Group>,
-    pub id: String,
-    pub properties: Option<HashMap<String, PropValue>>,
-    pub resolved_properties: Option<Vec<PropertyAndValue>>,
+    pub event: String,
+    pub user_properties: Option<HashMap<String, PropValue>>,
+    pub resolved_user_properties: Option<Vec<PropertyAndValue>>,
 }
 
 #[derive(Debug, Clone)]
@@ -141,13 +87,13 @@ pub struct Track {
     pub user_id: Option<String>,
     pub anonymous_id: Option<String>,
     pub resolved_user_id: Option<i64>,
+    pub sent_at: DateTime<Utc>,
     pub timestamp: DateTime<Utc>,
     pub context: Context,
     pub event: String,
     pub resolved_event: Option<events::Event>,
     pub properties: Option<HashMap<String, PropValue>>,
+    pub user_properties: Option<HashMap<String, PropValue>>,
     pub resolved_properties: Option<Vec<PropertyAndValue>>,
     pub resolved_user_properties: Option<Vec<PropertyAndValue>>,
-    pub groups: Option<HashMap<String, String>>,
-    pub resolved_groups: Option<Vec<(usize, Group)>>,
 }

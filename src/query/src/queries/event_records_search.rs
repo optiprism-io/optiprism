@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use common::query::EventFilter;
 use common::query::EventRef;
-use common::query::PropValueFilter;
 use common::query::PropertyRef;
 use common::query::QueryTime;
 use common::types::COLUMN_CREATED_AT;
@@ -26,7 +26,6 @@ use datafusion_expr::Sort;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
 
-use crate::error::QueryError;
 use crate::error::Result;
 use crate::expr::event_expression;
 use crate::expr::event_filters_expression;
@@ -65,17 +64,13 @@ pub fn build(
                 PropertyRef::System(n) => metadata
                     .system_properties
                     .get_by_name(ctx.project_id, n.as_ref())?,
-                PropertyRef::Group(n, group_id) => {
-                    metadata.group_properties[*group_id].get_by_name(ctx.project_id, n.as_ref())?
-                }
+                PropertyRef::User(n) => metadata
+                    .user_properties
+                    .get_by_name(ctx.project_id, n.as_ref())?,
                 PropertyRef::Event(n) => metadata
                     .event_properties
                     .get_by_name(ctx.project_id, n.as_ref())?,
-                _ => {
-                    return Err(QueryError::Unimplemented(
-                        "invalid property type".to_string(),
-                    ));
-                }
+                PropertyRef::Custom(_) => unimplemented!(),
             };
             if prop_names.contains(&p.column_name()) {
                 continue;
@@ -118,7 +113,7 @@ pub fn build(
         let mut exprs = vec![];
         for event in events {
             // event expression
-            let mut expr = event_expression(&ctx, &metadata, &event.event, req.group_id)?;
+            let mut expr = event_expression(&ctx, &metadata, &event.event)?;
             // apply event filters
             if let Some(filters) = &event.filters
                 && !filters.is_empty()
@@ -169,9 +164,7 @@ pub fn build(
         properties.append(&mut (l));
         let mut l = metadata.event_properties.list(ctx.project_id)?.data;
         properties.append(&mut (l));
-        let mut l = metadata.group_properties[req.group_id]
-            .list(ctx.project_id)?
-            .data;
+        let mut l = metadata.user_properties.list(ctx.project_id)?.data;
         properties.append(&mut (l));
     }
 
@@ -219,7 +212,7 @@ fn decode_filter_dictionaries(
     ctx: &Context,
     metadata: &Arc<MetadataProvider>,
     events: Option<&Vec<Event>>,
-    filters: Option<&Vec<PropValueFilter>>,
+    filters: Option<&Vec<EventFilter>>,
     input: LogicalPlan,
     cols_hash: &mut HashMap<String, ()>,
 ) -> Result<LogicalPlan> {
@@ -258,14 +251,13 @@ fn decode_filter_dictionaries(
 #[derive(Clone, Debug)]
 pub struct Event {
     pub event: EventRef,
-    pub filters: Option<Vec<PropValueFilter>>,
+    pub filters: Option<Vec<EventFilter>>,
 }
 
 #[derive(Clone, Debug)]
 pub struct EventRecordsSearch {
     pub time: QueryTime,
-    pub group_id: usize,
     pub events: Option<Vec<Event>>,
-    pub filters: Option<Vec<PropValueFilter>>,
+    pub filters: Option<Vec<EventFilter>>,
     pub properties: Option<Vec<PropertyRef>>,
 }

@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use common::GROUPS_COUNT;
 use metadata::MetadataProvider;
 use rust_decimal::Decimal;
 use serde::Deserialize;
@@ -11,23 +10,23 @@ use crate::error::Result;
 use crate::queries::event_records_search::EventRecordsSearchRequest;
 use crate::queries::validation::validate_event;
 use crate::queries::validation::validate_event_filter;
-use crate::queries::validation::validate_event_property;
+use crate::queries::validation::validate_property;
 use crate::queries::Breakdown;
 use crate::queries::QueryTime;
 use crate::queries::Segment;
 use crate::queries::TimeIntervalUnit;
+use crate::EventFilter;
 use crate::EventGroupedFilterGroup;
 use crate::EventGroupedFilters;
 use crate::EventRef;
 use crate::PlatformError;
-use crate::PropValueFilter;
 use crate::PropertyRef;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Funnel {
     pub time: QueryTime,
-    pub group: usize,
+    pub group: String,
     pub steps: Vec<Step>,
     pub time_window: TimeWindow,
     pub chart_type: ChartType,
@@ -101,7 +100,7 @@ pub struct Event {
     #[serde(flatten)]
     pub event: EventRef,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub filters: Option<Vec<PropValueFilter>>,
+    pub filters: Option<Vec<EventFilter>>,
 }
 
 impl Into<common::query::funnel::Event> for Event {
@@ -433,7 +432,7 @@ impl Into<common::query::funnel::Funnel> for Funnel {
     fn into(self) -> common::query::funnel::Funnel {
         common::query::funnel::Funnel {
             time: self.time.into(),
-            group_id: self.group,
+            group: self.group.clone(),
             steps: self
                 .steps
                 .iter()
@@ -472,7 +471,7 @@ impl Into<Funnel> for common::query::funnel::Funnel {
     fn into(self) -> Funnel {
         Funnel {
             time: self.time.into(),
-            group: self.group_id,
+            group: self.group.clone(),
             steps: self
                 .steps
                 .iter()
@@ -512,12 +511,6 @@ impl Into<Funnel> for common::query::funnel::Funnel {
 }
 
 pub(crate) fn validate(md: &Arc<MetadataProvider>, project_id: u64, req: &Funnel) -> Result<()> {
-    if req.group > GROUPS_COUNT - 1 {
-        return Err(PlatformError::BadRequest(
-            "group id is out of range".to_string(),
-        ));
-    }
-
     match req.time {
         QueryTime::Between { from, to } => {
             if from > to {
@@ -652,12 +645,7 @@ pub(crate) fn validate(md: &Arc<MetadataProvider>, project_id: u64, req: &Funnel
             for (idx, breakdown) in breakdowns.iter().enumerate() {
                 match breakdown {
                     Breakdown::Property { property } => {
-                        validate_event_property(
-                            md,
-                            project_id,
-                            property,
-                            format!("breakdown {idx}"),
-                        )?;
+                        validate_property(md, project_id, property, format!("breakdown {idx}"))?;
                     }
                 }
             }
@@ -677,7 +665,7 @@ pub(crate) fn validate(md: &Arc<MetadataProvider>, project_id: u64, req: &Funnel
             ));
         }
         for (idx, prop) in hc.iter().enumerate() {
-            validate_event_property(md, project_id, prop, format!("holding constant {idx}"))?;
+            validate_property(md, project_id, prop, format!("holding constant {idx}"))?;
         }
     }
 

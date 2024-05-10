@@ -492,6 +492,7 @@ pub fn merge_two_primitives<T1: NativeType + Ord, T2: NativeType + Ord>(
         }
     }
     while let Some(TwoColMergeRow(arr_id, v1, v2)) = sort.pop() {
+        // dbg!((v1, v2));
         if is_replacing {
             if let Some(v) = sort.peek() {
                 if v1 == v.1 {

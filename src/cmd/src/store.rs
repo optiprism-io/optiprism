@@ -14,20 +14,16 @@ use chrono::Duration;
 use chrono::NaiveDateTime;
 use chrono::Utc;
 use clap::Parser;
-use common::group_col;
 use common::types::COLUMN_EVENT;
 use common::types::EVENT_PROPERTY_PAGE_PATH;
 use common::types::EVENT_PROPERTY_PAGE_TITLE;
 use common::types::EVENT_PROPERTY_PAGE_URL;
-use common::types::TABLE_EVENTS;
 use common::types::USER_PROPERTY_CITY;
 use common::types::USER_PROPERTY_COUNTRY;
 use common::types::USER_PROPERTY_DEVICE_MODEL;
 use common::types::USER_PROPERTY_OS;
 use common::types::USER_PROPERTY_OS_FAMILY;
 use common::types::USER_PROPERTY_OS_VERSION_MAJOR;
-use common::GROUPS_COUNT;
-use common::GROUP_USER_ID;
 use crossbeam_channel::bounded;
 use dateparser::DateTimeUtc;
 use enum_iterator::all;
@@ -42,7 +38,6 @@ use events_gen::store::scenario::Scenario;
 use events_gen::store::schema::create_properties;
 use metadata::MetadataProvider;
 use platform::projects::init_project;
-use query::col_name;
 use rand::thread_rng;
 use storage::db::OptiDBImpl;
 use storage::db::Options;
@@ -194,7 +189,7 @@ pub async fn start(args: &Store) -> Result<()> {
             };
 
             gen(md_clone, db_clone.clone(), store_cfg).unwrap();
-            db_clone.flush(TABLE_EVENTS).unwrap();
+            db_clone.flush().unwrap();
         });
 
         info!("successfully generated!");
@@ -258,7 +253,7 @@ where R: io::Read {
     let profiles = ProfileProvider::try_new_from_csv(
         cfg.project_id,
         &md.dictionaries,
-        &md.group_properties[0],
+        &md.user_properties,
         cfg.geo_rdr,
         cfg.device_rdr,
     )?;
@@ -334,7 +329,7 @@ where R: io::Read {
     let profiles = ProfileProvider::try_new_from_csv(
         cfg.project_id,
         &md.dictionaries,
-        &md.group_properties[0],
+        &md.user_properties,
         cfg.geo_rdr,
         cfg.device_rdr,
     )?;
@@ -423,170 +418,156 @@ fn write_event(
     event: EventRecord,
     idx: i64,
 ) -> Result<()> {
-    let groups = (1..GROUPS_COUNT)
-        .into_iter()
-        .map(|gid| NamedValue::new(group_col(gid), Value::Int64(None)))
-        .collect::<Vec<_>>();
-
     let vals = vec![
-        vec![
-            NamedValue::new("project_id".to_string(), Value::Int64(Some(proj_id as i64))),
-            NamedValue::new(
-                group_col(GROUP_USER_ID).to_string(),
-                Value::Int64(Some(event.user_id)),
-            ),
-        ],
-        groups,
-        vec![
-            NamedValue::new(
-                "created_at".to_string(),
-                Value::Timestamp(Some(event.created_at)),
-            ),
-            NamedValue::new("event_id".to_string(), Value::Int64(Some(idx))),
-            NamedValue::new("event".to_string(), Value::Int64(Some(event.event))),
-            NamedValue::new(
-                md.event_properties
-                    .get_by_name(proj_id, EVENT_PROPERTY_PAGE_PATH)
-                    .unwrap()
-                    .column_name(),
-                Value::String(Some(event.page_path)),
-            ),
-            NamedValue::new(
-                md.event_properties
-                    .get_by_name(proj_id, EVENT_PROPERTY_PAGE_TITLE)
-                    .unwrap()
-                    .column_name(),
-                Value::String(Some(event.page_title)),
-            ),
-            NamedValue::new(
-                md.event_properties
-                    .get_by_name(proj_id, EVENT_PROPERTY_PAGE_URL)
-                    .unwrap()
-                    .column_name(),
-                Value::String(Some(event.page_url)),
-            ),
-            NamedValue::new(
-                md.event_properties
-                    .get_by_name(proj_id, "Product Name")
-                    .unwrap()
-                    .column_name(),
-                Value::Int16(event.product_name),
-            ),
-            NamedValue::new(
-                md.event_properties
-                    .get_by_name(proj_id, "Product Category")
-                    .unwrap()
-                    .column_name(),
-                Value::Int16(event.product_category),
-            ),
-            NamedValue::new(
-                md.event_properties
-                    .get_by_name(proj_id, "Product Subcategory")
-                    .unwrap()
-                    .column_name(),
-                Value::Int16(event.product_subcategory),
-            ),
-            NamedValue::new(
-                md.event_properties
-                    .get_by_name(proj_id, "Product Brand")
-                    .unwrap()
-                    .column_name(),
-                Value::Int16(event.product_brand),
-            ),
-            NamedValue::new(
-                md.event_properties
-                    .get_by_name(proj_id, "Product Price")
-                    .unwrap()
-                    .column_name(),
-                Value::Decimal(event.product_price),
-            ),
-            NamedValue::new(
-                md.event_properties
-                    .get_by_name(proj_id, "Product Discount Price")
-                    .unwrap()
-                    .column_name(),
-                Value::Decimal(event.product_discount_price),
-            ),
-            NamedValue::new(
-                md.event_properties
-                    .get_by_name(proj_id, "Revenue")
-                    .unwrap()
-                    .column_name(),
-                Value::Decimal(event.revenue),
-            ),
-            NamedValue::new(
-                md.group_properties[0]
-                    .get_by_name(proj_id, "Spent Total")
-                    .unwrap()
-                    .column_name(),
-                Value::Decimal(event.spent_total),
-            ),
-            NamedValue::new(
-                md.group_properties[0]
-                    .get_by_name(proj_id, "Products Bought")
-                    .unwrap()
-                    .column_name(),
-                Value::Int8(event.products_bought),
-            ),
-            NamedValue::new(
-                md.group_properties[0]
-                    .get_by_name(proj_id, "Cart Items Number")
-                    .unwrap()
-                    .column_name(),
-                Value::Int8(event.cart_items_number),
-            ),
-            NamedValue::new(
-                md.group_properties[0]
-                    .get_by_name(proj_id, "Cart Amount")
-                    .unwrap()
-                    .column_name(),
-                Value::Decimal(event.cart_amount),
-            ),
-            NamedValue::new(
-                md.group_properties[0]
-                    .get_by_name(proj_id, USER_PROPERTY_COUNTRY)
-                    .unwrap()
-                    .column_name(),
-                Value::Int64(event.country.map(|v| v as i64)),
-            ),
-            NamedValue::new(
-                md.group_properties[0]
-                    .get_by_name(proj_id, USER_PROPERTY_CITY)
-                    .unwrap()
-                    .column_name(),
-                Value::Int64(event.city.map(|v| v as i64)),
-            ),
-            NamedValue::new(
-                md.group_properties[0]
-                    .get_by_name(proj_id, USER_PROPERTY_DEVICE_MODEL)
-                    .unwrap()
-                    .column_name(),
-                Value::Int64(event.device.map(|v| v as i64)),
-            ),
-            NamedValue::new(
-                md.group_properties[0]
-                    .get_by_name(proj_id, USER_PROPERTY_OS_FAMILY)
-                    .unwrap()
-                    .column_name(),
-                Value::Int64(event.device_category.map(|v| v as i64)),
-            ),
-            NamedValue::new(
-                md.group_properties[0]
-                    .get_by_name(proj_id, USER_PROPERTY_OS)
-                    .unwrap()
-                    .column_name(),
-                Value::Int64(event.os.map(|v| v as i64)),
-            ),
-            NamedValue::new(
-                md.group_properties[0]
-                    .get_by_name(proj_id, USER_PROPERTY_OS_VERSION_MAJOR)
-                    .unwrap()
-                    .column_name(),
-                Value::Int64(event.os_version.map(|v| v as i64)),
-            ),
-        ],
-    ]
-    .concat();
+        NamedValue::new("project_id".to_string(), Value::Int64(Some(proj_id as i64))),
+        NamedValue::new("user_id".to_string(), Value::Int64(Some(event.user_id))),
+        NamedValue::new(
+            "created_at".to_string(),
+            Value::Timestamp(Some(event.created_at)),
+        ),
+        NamedValue::new("event_id".to_string(), Value::Int64(Some(idx))),
+        NamedValue::new("event".to_string(), Value::Int64(Some(event.event))),
+        NamedValue::new(
+            md.event_properties
+                .get_by_name(proj_id, EVENT_PROPERTY_PAGE_PATH)
+                .unwrap()
+                .column_name(),
+            Value::String(Some(event.page_path)),
+        ),
+        NamedValue::new(
+            md.event_properties
+                .get_by_name(proj_id, EVENT_PROPERTY_PAGE_TITLE)
+                .unwrap()
+                .column_name(),
+            Value::String(Some(event.page_title)),
+        ),
+        NamedValue::new(
+            md.event_properties
+                .get_by_name(proj_id, EVENT_PROPERTY_PAGE_URL)
+                .unwrap()
+                .column_name(),
+            Value::String(Some(event.page_url)),
+        ),
+        NamedValue::new(
+            md.event_properties
+                .get_by_name(proj_id, "Product Name")
+                .unwrap()
+                .column_name(),
+            Value::Int16(event.product_name),
+        ),
+        NamedValue::new(
+            md.event_properties
+                .get_by_name(proj_id, "Product Category")
+                .unwrap()
+                .column_name(),
+            Value::Int16(event.product_category),
+        ),
+        NamedValue::new(
+            md.event_properties
+                .get_by_name(proj_id, "Product Subcategory")
+                .unwrap()
+                .column_name(),
+            Value::Int16(event.product_subcategory),
+        ),
+        NamedValue::new(
+            md.event_properties
+                .get_by_name(proj_id, "Product Brand")
+                .unwrap()
+                .column_name(),
+            Value::Int16(event.product_brand),
+        ),
+        NamedValue::new(
+            md.event_properties
+                .get_by_name(proj_id, "Product Price")
+                .unwrap()
+                .column_name(),
+            Value::Decimal(event.product_price),
+        ),
+        NamedValue::new(
+            md.event_properties
+                .get_by_name(proj_id, "Product Discount Price")
+                .unwrap()
+                .column_name(),
+            Value::Decimal(event.product_discount_price),
+        ),
+        NamedValue::new(
+            md.event_properties
+                .get_by_name(proj_id, "Revenue")
+                .unwrap()
+                .column_name(),
+            Value::Decimal(event.revenue),
+        ),
+        NamedValue::new(
+            md.user_properties
+                .get_by_name(proj_id, "Spent Total")
+                .unwrap()
+                .column_name(),
+            Value::Decimal(event.spent_total),
+        ),
+        NamedValue::new(
+            md.user_properties
+                .get_by_name(proj_id, "Products Bought")
+                .unwrap()
+                .column_name(),
+            Value::Int8(event.products_bought),
+        ),
+        NamedValue::new(
+            md.user_properties
+                .get_by_name(proj_id, "Cart Items Number")
+                .unwrap()
+                .column_name(),
+            Value::Int8(event.cart_items_number),
+        ),
+        NamedValue::new(
+            md.user_properties
+                .get_by_name(proj_id, "Cart Amount")
+                .unwrap()
+                .column_name(),
+            Value::Decimal(event.cart_amount),
+        ),
+        NamedValue::new(
+            md.user_properties
+                .get_by_name(proj_id, USER_PROPERTY_COUNTRY)
+                .unwrap()
+                .column_name(),
+            Value::Int64(event.country.map(|v| v as i64)),
+        ),
+        NamedValue::new(
+            md.user_properties
+                .get_by_name(proj_id, USER_PROPERTY_CITY)
+                .unwrap()
+                .column_name(),
+            Value::Int64(event.city.map(|v| v as i64)),
+        ),
+        NamedValue::new(
+            md.user_properties
+                .get_by_name(proj_id, USER_PROPERTY_DEVICE_MODEL)
+                .unwrap()
+                .column_name(),
+            Value::Int64(event.device.map(|v| v as i64)),
+        ),
+        NamedValue::new(
+            md.user_properties
+                .get_by_name(proj_id, USER_PROPERTY_OS_FAMILY)
+                .unwrap()
+                .column_name(),
+            Value::Int64(event.device_category.map(|v| v as i64)),
+        ),
+        NamedValue::new(
+            md.user_properties
+                .get_by_name(proj_id, USER_PROPERTY_OS)
+                .unwrap()
+                .column_name(),
+            Value::Int64(event.os.map(|v| v as i64)),
+        ),
+        NamedValue::new(
+            md.user_properties
+                .get_by_name(proj_id, USER_PROPERTY_OS_VERSION_MAJOR)
+                .unwrap()
+                .column_name(),
+            Value::Int64(event.os_version.map(|v| v as i64)),
+        ),
+    ];
     db.insert("events", vals)?;
 
     Ok(())

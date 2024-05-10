@@ -1,24 +1,23 @@
 #[cfg(test)]
 mod tests {
+    use axum::http::StatusCode;
     use chrono::DateTime;
     use chrono::Utc;
-    use common::GROUP_USER_ID;
     use platform::queries::event_segmentation::Analysis;
+    use platform::queries::event_segmentation::Breakdown;
     use platform::queries::event_segmentation::ChartType;
     use platform::queries::event_segmentation::Event;
     use platform::queries::event_segmentation::EventSegmentation;
     use platform::queries::event_segmentation::Query;
     use platform::queries::AggregateFunction;
-    use platform::queries::Breakdown;
     use platform::queries::PartitionedAggregateFunction;
     use platform::queries::QueryTime;
     use platform::queries::TimeIntervalUnit;
+    use platform::EventFilter;
     use platform::EventRef;
-    use platform::PropValueFilter;
     use platform::PropValueOperation;
     use platform::PropertyRef;
     use reqwest::Client;
-    use reqwest::StatusCode;
     use serde_json::Value;
     use tracing::debug;
 
@@ -43,8 +42,8 @@ mod tests {
 
         let es = EventSegmentation {
             time: QueryTime::Between { from, to },
-            group: GROUP_USER_ID,
-            interval_unit: TimeIntervalUnit::Hour,
+            group: "event_user_id".to_string(),
+            interval_unit: TimeIntervalUnit::Minute,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
             compare: None,
@@ -53,15 +52,15 @@ mod tests {
                     event: EventRef::Regular {
                         event_name: "View Product".to_string(),
                     },
-                    filters: Some(vec![PropValueFilter::Property {
-                        property: PropertyRef::Group {
+                    filters: Some(vec![EventFilter::Property {
+                        property: PropertyRef::User {
                             property_name: "Is Premium".to_string(),
                         },
                         operation: PropValueOperation::Eq,
                         value: Some(vec![Value::Bool(true)]),
                     }]),
                     breakdowns: Some(vec![Breakdown::Property {
-                        property: PropertyRef::Group {
+                        property: PropertyRef::User {
                             property_name: "Device".to_string(),
                         },
                     }]),
@@ -97,7 +96,7 @@ mod tests {
             ],
             filters: None,
             breakdowns: Some(vec![Breakdown::Property {
-                property: PropertyRef::Group {
+                property: PropertyRef::User {
                     property_name: "Country".to_string(),
                 },
             }]),

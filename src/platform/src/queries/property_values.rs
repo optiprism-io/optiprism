@@ -10,7 +10,7 @@ use crate::array_ref_to_json_values;
 use crate::json_value_to_scalar;
 use crate::queries::event_records_search::EventRecordsSearchRequest;
 use crate::queries::validation::validate_event_filter;
-use crate::queries::validation::validate_event_filter_property;
+use crate::queries::validation::validate_filter_property;
 use crate::EventRef;
 use crate::ListResponse;
 use crate::PlatformError;
@@ -34,14 +34,12 @@ pub struct ListPropertyValuesRequest {
     #[serde(flatten)]
     pub event: Option<EventRef>,
     pub filter: Option<Filter>,
-    pub group: usize,
 }
 
 impl Into<query::queries::property_values::PropertyValues> for ListPropertyValuesRequest {
     fn into(self) -> query::queries::property_values::PropertyValues {
         query::queries::property_values::PropertyValues {
             property: self.property.into(),
-            group_id: self.group,
             event: self.event.map(|event| event.into()),
             filter: self.filter.map(|filter| filter.into()),
         }
@@ -74,11 +72,8 @@ pub(crate) fn validate(
     req: &ListPropertyValuesRequest,
 ) -> Result<()> {
     match &req.property {
-        PropertyRef::Group {
-            property_name,
-            group,
-        } => {
-            md.group_properties[*group]
+        PropertyRef::User { property_name } => {
+            md.user_properties
                 .get_by_name(project_id, &property_name)
                 .map_err(|err| PlatformError::BadRequest(format!("{err}")))?;
         }
@@ -92,9 +87,9 @@ pub(crate) fn validate(
                 .get_by_name(project_id, &property_name)
                 .map_err(|err| PlatformError::BadRequest(format!("{err}")))?;
         }
-        _ => {
+        PropertyRef::Custom { .. } => {
             return Err(PlatformError::Unimplemented(
-                "invalid property type".to_string(),
+                "custom property is unimplemented".to_string(),
             ));
         }
     }
@@ -115,7 +110,7 @@ pub(crate) fn validate(
     }
 
     if let Some(filter) = &req.filter {
-        validate_event_filter_property(
+        validate_filter_property(
             md,
             project_id,
             &req.property,

@@ -1066,15 +1066,14 @@ impl OptiDBImpl {
             .unwrap();
     }
 
-    pub fn flush(&self, tbl_name: &str) -> Result<()> {
-        let tables = self.tables.read();
-        let tbl = tables.iter().find(|t| t.name == tbl_name).cloned().unwrap();
-        drop(tables);
-
-        let mut log = tbl.log.lock();
-        let mut memtable = tbl.memtable.lock();
-        let mut metadata = tbl.metadata.lock();
-        flush(log.get_mut(), &mut memtable, &mut metadata, &self.path)?;
+    pub fn flush(&self) -> Result<()> {
+        let tbls = self.tables.read();
+        for tbl in tbls.iter() {
+            let mut log = tbl.log.lock();
+            let mut memtable = tbl.memtable.lock();
+            let mut metadata = tbl.metadata.lock();
+            flush(log.get_mut(), &mut memtable, &mut metadata, &self.path)?;
+        }
 
         Ok(())
     }
@@ -1221,7 +1220,6 @@ mod tests {
     use arrow2::array::Int64Array;
     use arrow2::chunk::Chunk;
     use common::types::DType;
-    use common::types::TABLE_EVENTS;
 
     use crate::db::OptiDBImpl;
     use crate::db::Options;
@@ -1402,7 +1400,7 @@ mod tests {
             .unwrap();
 
             if i % 150 == 0 {
-                db.flush(TABLE_EVENTS).unwrap();
+                db.flush().unwrap();
                 db.compact();
                 db.add_field("t1", format!("f{f}").as_str(), DType::Int64, true)
                     .unwrap();
@@ -1487,7 +1485,7 @@ mod tests {
             .unwrap();
         assert!(r.is_none());
 
-        db.flush("t1").unwrap();
+        db.flush().unwrap();
 
         let r = db.get("t1", vec![KeyValue::Int64(1)]).unwrap();
         assert_eq!(
@@ -1512,7 +1510,7 @@ mod tests {
         ])
         .unwrap();
 
-        db.flush("t1").unwrap();
+        db.flush().unwrap();
 
         db.insert("t1", vec![
             NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
@@ -1520,7 +1518,7 @@ mod tests {
             NamedValue::new("f3".to_string(), Value::Int64(Some(5))),
         ])
         .unwrap();
-        db.flush("t1").unwrap();
+        db.flush().unwrap();
 
         db.insert("t1", vec![
             NamedValue::new("f1".to_string(), Value::Int64(Some(2))),
@@ -1529,7 +1527,7 @@ mod tests {
         ])
         .unwrap();
 
-        db.flush("t1").unwrap();
+        db.flush().unwrap();
 
         db.insert("t1", vec![
             NamedValue::new("f1".to_string(), Value::Int64(Some(2))),
@@ -1538,7 +1536,7 @@ mod tests {
         ])
         .unwrap();
 
-        db.flush("t1").unwrap();
+        db.flush().unwrap();
         db.compact();
 
         let r = db.get("t1", vec![KeyValue::Int64(1)]).unwrap();
@@ -1586,7 +1584,7 @@ mod tests {
         ])
         .unwrap();
 
-        db.flush("t1").unwrap();
+        db.flush().unwrap();
 
         db.insert("t1", vec![
             NamedValue::new("f1".to_string(), Value::Int64(Some(1))), // pk
@@ -1594,7 +1592,7 @@ mod tests {
         ])
         .unwrap();
 
-        db.flush("t1").unwrap();
+        db.flush().unwrap();
 
         db.insert("t1", vec![
             NamedValue::new("f1".to_string(), Value::Int64(Some(1))), // pk
@@ -1659,7 +1657,7 @@ mod tests {
         ])
         .unwrap();
 
-        db.flush("t1").unwrap();
+        db.flush().unwrap();
     }
     // integration test is placed here and not in separate crate because conditional #[cfg(test)] is used
     // #[tokio::test]

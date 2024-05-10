@@ -92,7 +92,7 @@ pub fn create_properties(
     create_property(md, proj_id, CreatePropertyMainRequest {
         name: "Spent Total".to_string(),
         display_name: None,
-        typ: Type::Group(0),
+        typ: Type::User,
         data_type: DType::Decimal,
         nullable: true,
         hidden: false,
@@ -102,7 +102,7 @@ pub fn create_properties(
     create_property(md, proj_id, CreatePropertyMainRequest {
         name: "Products Bought".to_string(),
         display_name: None,
-        typ: Type::Group(0),
+        typ: Type::User,
         data_type: DType::Int8,
         nullable: true,
         hidden: false,
@@ -112,7 +112,7 @@ pub fn create_properties(
     create_property(md, proj_id, CreatePropertyMainRequest {
         name: "Cart Items Number".to_string(),
         display_name: None,
-        typ: Type::Group(0),
+        typ: Type::User,
         data_type: DType::Int8,
         nullable: true,
         hidden: false,
@@ -122,7 +122,7 @@ pub fn create_properties(
     create_property(md, proj_id, CreatePropertyMainRequest {
         name: "Cart Amount".to_string(),
         display_name: None,
-        typ: Type::Group(0),
+        typ: Type::User,
         data_type: DType::Decimal,
         nullable: true,
         hidden: false,

@@ -6,7 +6,7 @@ mod tests {
     use chrono::DateTime;
     use chrono::Duration;
     use chrono::Utc;
-    use common::query::PropValueFilter;
+    use common::query::EventFilter;
     use common::query::PropValueOperation;
     use common::query::PropertyRef;
     use common::query::QueryTime;
@@ -80,7 +80,7 @@ mod tests {
                 to,
             },
             events: None,
-            filters: Some(vec![PropValueFilter::Property {
+            filters: Some(vec![EventFilter::Property {
                 property: PropertyRef::Event("Revenue".to_string()),
                 operation: PropValueOperation::Eq,
                 value: Some(vec![ScalarValue::Decimal128(
@@ -122,8 +122,8 @@ mod tests {
                 to,
             },
             events: None,
-            filters: Some(vec![PropValueFilter::Property {
-                property: PropertyRef::Group("Country".to_string()),
+            filters: Some(vec![EventFilter::Property {
+                property: PropertyRef::User("Country".to_string()),
                 operation: PropValueOperation::Like,
                 value: Some(vec![ScalarValue::Utf8(Some("spa%".to_string()))]),
             }]),

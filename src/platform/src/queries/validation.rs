@@ -4,24 +4,21 @@ use common::types::DType;
 use metadata::MetadataProvider;
 use serde_json::Value;
 
+use crate::EventFilter;
 use crate::EventRef;
 use crate::PlatformError;
-use crate::PropValueFilter;
 use crate::PropValueOperation;
 use crate::PropertyRef;
 
-pub fn validate_event_property(
+pub fn validate_property(
     md: &Arc<MetadataProvider>,
     project_id: u64,
     property: &PropertyRef,
     err_prefix: String,
 ) -> crate::Result<()> {
     match property {
-        PropertyRef::Group {
-            property_name,
-            group,
-        } => {
-            md.group_properties[*group]
+        PropertyRef::User { property_name } => {
+            md.user_properties
                 .get_by_name(project_id, &property_name)
                 .map_err(|err| PlatformError::BadRequest(format!("{err_prefix}: {err}")))?;
         }
@@ -35,15 +32,15 @@ pub fn validate_event_property(
                 .get_by_name(project_id, &property_name)
                 .map_err(|err| PlatformError::BadRequest(format!("{err_prefix}: {err}")))?;
         }
-        _ => {
+        PropertyRef::Custom { .. } => {
             return Err(PlatformError::Unimplemented(
-                "invalid property type".to_string(),
+                "custom property is unimplemented".to_string(),
             ));
         }
     }
     Ok(())
 }
-pub fn validate_event_filter_property(
+pub fn validate_filter_property(
     md: &Arc<MetadataProvider>,
     project_id: u64,
     property: &PropertyRef,
@@ -52,10 +49,8 @@ pub fn validate_event_filter_property(
     err_prefix: String,
 ) -> crate::Result<()> {
     let prop = match property {
-        PropertyRef::Group {
-            property_name,
-            group,
-        } => md.group_properties[*group]
+        PropertyRef::User { property_name } => md
+            .user_properties
             .get_by_name(project_id, &property_name)
             .map_err(|err| PlatformError::BadRequest(format!("{err_prefix}: {err}")))?,
         PropertyRef::Event { property_name } => md
@@ -66,9 +61,9 @@ pub fn validate_event_filter_property(
             .system_properties
             .get_by_name(project_id, &property_name)
             .map_err(|err| PlatformError::BadRequest(format!("{err_prefix}: {err}")))?,
-        _ => {
+        PropertyRef::Custom { .. } => {
             return Err(PlatformError::Unimplemented(
-                "invalid custom type".to_string(),
+                "custom property is unimplemented".to_string(),
             ));
         }
     };
@@ -215,17 +210,17 @@ pub(crate) fn validate_event(
 pub(crate) fn validate_event_filter(
     md: &Arc<MetadataProvider>,
     project_id: u64,
-    filter: &PropValueFilter,
+    filter: &EventFilter,
     filter_id: usize,
     err_prefix: String,
 ) -> crate::Result<()> {
     match filter {
-        PropValueFilter::Property {
+        EventFilter::Property {
             property,
             operation,
             value,
         } => {
-            validate_event_filter_property(
+            validate_filter_property(
                 md,
                 project_id,
                 property,

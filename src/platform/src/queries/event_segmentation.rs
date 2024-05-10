@@ -4,7 +4,6 @@ use chrono::DateTime;
 use chrono::Utc;
 use common::query::event_segmentation::NamedQuery;
 use common::types::DType;
-use common::GROUPS_COUNT;
 use datafusion_common::ScalarValue;
 use metadata::MetadataProvider;
 use serde::Deserialize;
@@ -15,7 +14,7 @@ use crate::error::Result;
 use crate::json_value_to_scalar;
 use crate::queries::validation::validate_event;
 use crate::queries::validation::validate_event_filter;
-use crate::queries::validation::validate_event_property;
+use crate::queries::validation::validate_property;
 use crate::queries::AggregateFunction;
 use crate::queries::Breakdown;
 use crate::queries::PartitionedAggregateFunction;
@@ -24,11 +23,11 @@ use crate::queries::Segment;
 use crate::queries::TimeIntervalUnit;
 use crate::scalar_to_json_value;
 use crate::Context;
+use crate::EventFilter;
 use crate::EventGroupedFilterGroup;
 use crate::EventGroupedFilters;
 use crate::EventRef;
 use crate::PlatformError;
-use crate::PropValueFilter;
 use crate::PropValueOperation;
 use crate::PropertyRef;
 
@@ -372,7 +371,7 @@ pub struct Event {
     #[serde(flatten)]
     pub event: EventRef,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub filters: Option<Vec<PropValueFilter>>,
+    pub filters: Option<Vec<EventFilter>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub breakdowns: Option<Vec<Breakdown>>,
     pub queries: Vec<Query>,
@@ -452,7 +451,7 @@ impl Into<Event> for &common::query::event_segmentation::Event {
 #[serde(rename_all = "camelCase")]
 pub struct EventSegmentation {
     pub time: QueryTime,
-    pub group: usize,
+    pub group: String,
     pub interval_unit: TimeIntervalUnit,
     pub chart_type: ChartType,
     pub analysis: Analysis,
@@ -565,7 +564,7 @@ impl Into<common::query::event_segmentation::EventSegmentation> for EventSegment
     fn into(self) -> common::query::event_segmentation::EventSegmentation {
         common::query::event_segmentation::EventSegmentation {
             time: self.time.into(),
-            group_id: self.group,
+            group: self.group,
             interval_unit: self.interval_unit.into(),
             chart_type: self.chart_type.into(),
             analysis: self.analysis.into(),
@@ -606,7 +605,7 @@ impl Into<EventSegmentation> for common::query::event_segmentation::EventSegment
     fn into(self) -> EventSegmentation {
         EventSegmentation {
             time: self.time.into(),
-            group: self.group_id,
+            group: self.group,
             interval_unit: self.interval_unit.into(),
             chart_type: self.chart_type.into(),
             analysis: self.analysis.into(),
@@ -645,11 +644,6 @@ pub(crate) fn validate(
     project_id: u64,
     req: &EventSegmentation,
 ) -> Result<()> {
-    if req.group > GROUPS_COUNT - 1 {
-        return Err(PlatformError::BadRequest(
-            "group id is out of range".to_string(),
-        ));
-    }
     match req.time {
         QueryTime::Between { from, to } => {
             if from > to {
@@ -659,6 +653,12 @@ pub(crate) fn validate(
             }
         }
         _ => {}
+    }
+
+    if req.group == "" {
+        return Err(PlatformError::BadRequest(
+            "group cannot be empty".to_string(),
+        ));
     }
 
     if req.events.is_empty() {
@@ -723,12 +723,7 @@ pub(crate) fn validate(
             for (idx, breakdown) in breakdowns.iter().enumerate() {
                 match breakdown {
                     Breakdown::Property { property } => {
-                        validate_event_property(
-                            md,
-                            project_id,
-                            property,
-                            format!("breakdown {idx}"),
-                        )?;
+                        validate_property(md, project_id, property, format!("breakdown {idx}"))?;
                     }
                 }
             }
@@ -755,7 +750,7 @@ pub(crate) fn fix_types(
             let mut filters_out = vec![];
             for (filter_id, filter) in filters.iter().enumerate() {
                 match filter {
-                    common::query::PropValueFilter::Property {
+                    common::query::EventFilter::Property {
                         property,
                         value,
                         operation,
@@ -764,18 +759,13 @@ pub(crate) fn fix_types(
                             common::query::PropertyRef::System(name) => {
                                 md.system_properties.get_by_name(project_id, name)?
                             }
-
-                            common::query::PropertyRef::Group(name, group) => {
-                                md.group_properties[*group].get_by_name(project_id, name)?
+                            common::query::PropertyRef::User(name) => {
+                                md.user_properties.get_by_name(project_id, name)?
                             }
                             common::query::PropertyRef::Event(name) => {
                                 md.event_properties.get_by_name(project_id, name)?
                             }
-                            _ => {
-                                return Err(PlatformError::Unimplemented(
-                                    "invalid property type".to_string(),
-                                ));
-                            }
+                            common::query::PropertyRef::Custom(_) => unimplemented!(),
                         };
 
                         let mut ev = vec![];
@@ -787,9 +777,8 @@ pub(crate) fn fix_types(
                                             [filter_id]
                                             .clone()
                                         {
-                                            common::query::PropValueFilter::Property {
-                                                value,
-                                                ..
+                                            common::query::EventFilter::Property {
+                                                value, ..
                                             } => {
                                                 for value in value.unwrap().iter() {
                                                     if let ScalarValue::Decimal128(Some(ts), _, _) =
@@ -812,7 +801,7 @@ pub(crate) fn fix_types(
                             }
                         }
 
-                        let filter = common::query::PropValueFilter::Property {
+                        let filter = common::query::EventFilter::Property {
                             property: property.to_owned(),
                             operation: operation.to_owned(),
                             value: Some(ev),
@@ -837,7 +826,7 @@ pub(crate) fn fix_types(
 mod tests {
     use chrono::DateTime;
     use chrono::Utc;
-    use common::GROUP_USER_ID;
+    use common::types::COLUMN_USER_ID;
     use serde_json::json;
 
     use crate::error::Result;
@@ -847,9 +836,9 @@ mod tests {
     use crate::queries::event_segmentation::ChartType;
     use crate::queries::event_segmentation::Compare;
     use crate::queries::event_segmentation::Event;
+    use crate::queries::event_segmentation::EventFilter;
     use crate::queries::event_segmentation::EventSegmentation;
     use crate::queries::event_segmentation::PartitionedAggregateFunction;
-    use crate::queries::event_segmentation::PropValueFilter;
     use crate::queries::event_segmentation::Query;
     use crate::queries::event_segmentation::QueryTime;
     use crate::queries::event_segmentation::TimeIntervalUnit;
@@ -868,41 +857,41 @@ mod tests {
             .with_timezone(&Utc);
         let es = EventSegmentation {
             time: QueryTime::Between { from, to },
-            group: GROUP_USER_ID,
-            interval_unit: TimeIntervalUnit::Hour,
+            group: COLUMN_USER_ID.to_string(),
+            interval_unit: TimeIntervalUnit::Minute,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
             compare: Some(Compare {
                 offset: 1,
-                unit: TimeIntervalUnit::Hour,
+                unit: TimeIntervalUnit::Second,
             }),
             events: vec![Event {
                 event: EventRef::Regular {
                     event_name: "e1".to_string(),
                 },
                 filters: Some(vec![
-                    PropValueFilter::Property {
-                        property: PropertyRef::Group {
+                    EventFilter::Property {
+                        property: PropertyRef::User {
                             property_name: "p1".to_string(),
                         },
                         operation: PropValueOperation::Eq,
                         value: Some(vec![json!(true)]),
                     },
-                    PropValueFilter::Property {
+                    EventFilter::Property {
                         property: PropertyRef::Event {
                             property_name: "p2".to_string(),
                         },
                         operation: PropValueOperation::Eq,
                         value: Some(vec![json!(true)]),
                     },
-                    PropValueFilter::Property {
+                    EventFilter::Property {
                         property: PropertyRef::Event {
                             property_name: "p3".to_string(),
                         },
                         operation: PropValueOperation::Empty,
                         value: None,
                     },
-                    PropValueFilter::Property {
+                    EventFilter::Property {
                         property: PropertyRef::Event {
                             property_name: "p4".to_string(),
                         },
@@ -911,7 +900,7 @@ mod tests {
                     },
                 ]),
                 breakdowns: Some(vec![Breakdown::Property {
-                    property: PropertyRef::Group {
+                    property: PropertyRef::User {
                         property_name: "Device".to_string(),
                     },
                 }]),
@@ -948,7 +937,7 @@ mod tests {
             // value: Some(vec![json!(true)]),
             // }]),
             breakdowns: Some(vec![Breakdown::Property {
-                property: PropertyRef::Group {
+                property: PropertyRef::User {
                     property_name: "Device".to_string(),
                 },
             }]),

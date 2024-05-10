@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use common::group_col;
 use common::query::event_segmentation::Event;
 use common::query::event_segmentation::EventSegmentation;
 use common::query::event_segmentation::Query;
@@ -14,6 +13,7 @@ use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_PROJECT_ID;
 use common::types::COLUMN_SEGMENT;
+use common::types::COLUMN_USER_ID;
 use datafusion_common::Column;
 use datafusion_common::ScalarValue;
 use datafusion_expr::binary_expr;
@@ -37,7 +37,6 @@ use metadata::MetadataProvider;
 
 use crate::breakdowns_to_dicts;
 use crate::context::Format;
-use crate::error::QueryError;
 use crate::error::Result;
 use crate::expr::breakdown_expr;
 use crate::expr::event_expression;
@@ -97,7 +96,7 @@ impl LogicalPlanBuilder {
                 for conditions in segment.conditions {
                     let mut and: Option<SegmentExpr> = None;
                     for condition in conditions {
-                        let expr = builder.build_segment_condition(&condition, es.group_id)?;
+                        let expr = builder.build_segment_condition(&condition)?;
                         and = match and {
                             None => Some(expr),
                             Some(e) => Some(SegmentExpr::And(Box::new(e), Box::new(expr))),
@@ -113,7 +112,7 @@ impl LogicalPlanBuilder {
                 let node = SegmentNode::try_new(
                     input.clone(),
                     or.unwrap(),
-                    Column::from_qualified_name(group_col(es.group_id)),
+                    Column::from_qualified_name(COLUMN_USER_ID),
                 )?;
                 let input = LogicalPlan::Extension(Extension {
                     node: Arc::new(node),
@@ -132,12 +131,7 @@ impl LogicalPlanBuilder {
         // build main query
         input = match events.len() {
             1 => {
-                let input = builder.build_event_logical_plan(
-                    input.clone(),
-                    0,
-                    es.group_id,
-                    segment_inputs,
-                )?;
+                let input = builder.build_event_logical_plan(input.clone(), 0, segment_inputs)?;
 
                 if ctx.format != Format::Compact {
                     LogicalPlan::Extension(Extension {
@@ -156,7 +150,6 @@ impl LogicalPlanBuilder {
                     let input = builder.build_event_logical_plan(
                         input.clone(),
                         idx,
-                        es.group_id,
                         segment_inputs.clone(),
                     )?;
 
@@ -204,17 +197,13 @@ impl LogicalPlanBuilder {
                         PropertyRef::System(p) => {
                             metadata.system_properties.get_by_name(ctx.project_id, p)?
                         }
-                        PropertyRef::Group(p, group) => {
-                            metadata.group_properties[*group].get_by_name(ctx.project_id, p)?
+                        PropertyRef::User(p) => {
+                            metadata.user_properties.get_by_name(ctx.project_id, p)?
                         }
                         PropertyRef::Event(p) => {
                             metadata.event_properties.get_by_name(ctx.project_id, p)?
                         }
-                        _ => {
-                            return Err(QueryError::Unimplemented(
-                                "invalid property type".to_string(),
-                            ));
-                        }
+                        PropertyRef::Custom(_) => unimplemented!(),
                     },
                 };
                 let cn = prop.column_name();
@@ -233,17 +222,13 @@ impl LogicalPlanBuilder {
                             PropertyRef::System(p) => {
                                 metadata.system_properties.get_by_name(ctx.project_id, p)?
                             }
-                            PropertyRef::Group(p, group) => {
-                                metadata.group_properties[*group].get_by_name(ctx.project_id, p)?
+                            PropertyRef::User(p) => {
+                                metadata.user_properties.get_by_name(ctx.project_id, p)?
                             }
                             PropertyRef::Event(p) => {
                                 metadata.event_properties.get_by_name(ctx.project_id, p)?
                             }
-                            _ => {
-                                return Err(QueryError::Unimplemented(
-                                    "invalid property type".to_string(),
-                                ));
-                            }
+                            PropertyRef::Custom(_) => unimplemented!(),
                         },
                     };
                     let cn = prop.column_name();
@@ -267,11 +252,7 @@ impl LogicalPlanBuilder {
         Ok(input)
     }
 
-    fn build_segment_condition(
-        &self,
-        condition: &SegmentCondition,
-        group_id: usize,
-    ) -> Result<SegmentExpr> {
+    fn build_segment_condition(&self, condition: &SegmentCondition) -> Result<SegmentExpr> {
         let expr = match condition {
             SegmentCondition::HasPropertyValue { .. } => unimplemented!(),
             SegmentCondition::HadPropertyValue {
@@ -280,7 +261,7 @@ impl LogicalPlanBuilder {
                 value,
                 time,
             } => {
-                let property = PropertyRef::Group(property_name.to_owned(), group_id);
+                let property = PropertyRef::User(property_name.to_owned());
                 let filter = property_expression(
                     &self.ctx,
                     &self.metadata,
@@ -304,7 +285,7 @@ impl LogicalPlanBuilder {
                 aggregate,
             } => {
                 // event expression
-                let mut event_expr = event_expression(&self.ctx, &self.metadata, event, group_id)?;
+                let mut event_expr = event_expression(&self.ctx, &self.metadata, event)?;
                 // apply event filters
                 if let Some(filters) = &filters {
                     event_expr = and(
@@ -424,17 +405,14 @@ impl LogicalPlanBuilder {
         &self,
         input: LogicalPlan,
         event_id: usize,
-        group_id: usize,
         segment_inputs: Option<Vec<LogicalPlan>>,
     ) -> Result<LogicalPlan> {
-        let input =
-            self.build_filter_logical_plan(input.clone(), &self.es.events[event_id], group_id)?;
+        let input = self.build_filter_logical_plan(input.clone(), &self.es.events[event_id])?;
 
         let (mut input, group_expr) = self.build_aggregate_logical_plan(
             input,
             &self.es.events[event_id],
             event_id,
-            group_id,
             segment_inputs,
         )?;
         // unpivot aggregate values into value column
@@ -542,12 +520,7 @@ impl LogicalPlanBuilder {
     }
 
     /// builds filter plan
-    fn build_filter_logical_plan(
-        &self,
-        input: LogicalPlan,
-        event: &Event,
-        group_id: usize,
-    ) -> Result<LogicalPlan> {
+    fn build_filter_logical_plan(&self, input: LogicalPlan, event: &Event) -> Result<LogicalPlan> {
         let cur_time = self.ctx.cur_time;
         // todo add project_id filtering
         let mut expr = binary_expr(
@@ -563,7 +536,7 @@ impl LogicalPlanBuilder {
         // event expression
         expr = and(
             expr,
-            event_expression(&self.ctx, &self.metadata, &event.event, group_id)?,
+            event_expression(&self.ctx, &self.metadata, &event.event)?,
         );
         // apply event filters
         if let Some(filters) = &event.filters {
@@ -591,7 +564,6 @@ impl LogicalPlanBuilder {
         input: LogicalPlan,
         event: &Event,
         event_id: usize,
-        group_id: usize,
         segment_inputs: Option<Vec<LogicalPlan>>,
     ) -> Result<(LogicalPlan, Vec<Expr>)> {
         let mut group_expr: Vec<(Expr, String)> = vec![];
@@ -621,17 +593,15 @@ impl LogicalPlanBuilder {
                             .metadata
                             .system_properties
                             .get_by_name(self.ctx.project_id, p)?,
-                        PropertyRef::Group(p, group) => self.metadata.group_properties[*group]
+                        PropertyRef::User(p) => self
+                            .metadata
+                            .user_properties
                             .get_by_name(self.ctx.project_id, p)?,
                         PropertyRef::Event(p) => self
                             .metadata
                             .event_properties
                             .get_by_name(self.ctx.project_id, p)?,
-                        _ => {
-                            return Err(QueryError::Unimplemented(
-                                "invalid property type".to_string(),
-                            ));
-                        }
+                        PropertyRef::Custom(_) => unimplemented!(),
                     },
                 };
                 group_expr.push((
@@ -650,17 +620,15 @@ impl LogicalPlanBuilder {
                             .metadata
                             .system_properties
                             .get_by_name(self.ctx.project_id, p)?,
-                        PropertyRef::Group(p, group) => self.metadata.group_properties[*group]
+                        PropertyRef::User(p) => self
+                            .metadata
+                            .user_properties
                             .get_by_name(self.ctx.project_id, p)?,
                         PropertyRef::Event(p) => self
                             .metadata
                             .event_properties
                             .get_by_name(self.ctx.project_id, p)?,
-                        _ => {
-                            return Err(QueryError::Unimplemented(
-                                "invalid property type".to_string(),
-                            ));
-                        }
+                        PropertyRef::Custom(_) => unimplemented!(),
                     },
                 };
                 group_expr.push((
@@ -693,7 +661,7 @@ impl LogicalPlanBuilder {
                     filter: None,
                     groups: Some(group_expr.clone()),
                     predicate: col(COLUMN_EVENT).try_into_col()?,
-                    partition_col: col(group_col(group_id)).try_into_col()?,
+                    partition_col: col(COLUMN_USER_ID).try_into_col()?,
                     distinct: false,
                 },
                 Query::CountUniqueGroups | Query::DailyActiveGroups => {
@@ -701,7 +669,7 @@ impl LogicalPlanBuilder {
                         filter: None,
                         outer_fn: partitioned_aggregate::AggregateFunction::Count,
                         groups: Some(group_expr.clone()),
-                        partition_col: col(group_col(group_id)).try_into_col()?,
+                        partition_col: col(COLUMN_USER_ID).try_into_col()?,
                         distinct: true,
                     }
                 }
@@ -711,7 +679,7 @@ impl LogicalPlanBuilder {
                     filter: None,
                     outer_fn: aggregate.into(),
                     groups: Some(group_expr.clone()),
-                    partition_col: col(group_col(group_id)).try_into_col()?,
+                    partition_col: col(COLUMN_USER_ID).try_into_col()?,
                     distinct: false,
                 },
                 Query::AggregatePropertyPerGroup {
@@ -724,7 +692,7 @@ impl LogicalPlanBuilder {
                     outer_fn: aggregate.into(),
                     predicate: property_col(&self.ctx, &self.metadata, property)?.try_into_col()?,
                     groups: Some(group_expr.clone()),
-                    partition_col: col(group_col(group_id)).try_into_col()?,
+                    partition_col: col(COLUMN_USER_ID).try_into_col()?,
                 },
                 Query::AggregateProperty {
                     property,
@@ -732,7 +700,7 @@ impl LogicalPlanBuilder {
                 } => AggregateExpr::Aggregate {
                     filter: None,
                     groups: Some(group_expr.clone()),
-                    partition_col: col(group_col(group_id)).try_into_col()?,
+                    partition_col: col(COLUMN_USER_ID).try_into_col()?,
                     predicate: property_col(&self.ctx, &self.metadata, property)?.try_into_col()?,
                     agg: aggregate.into(),
                 },
@@ -745,7 +713,7 @@ impl LogicalPlanBuilder {
         let agg = PartitionedAggregatePartialNode::try_new(
             input,
             segment_inputs.clone(),
-            Column::from_qualified_name(group_col(group_id)),
+            Column::from_qualified_name(COLUMN_USER_ID),
             agg_expr.clone(),
         )?;
 

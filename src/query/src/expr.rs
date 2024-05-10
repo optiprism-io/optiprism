@@ -6,8 +6,8 @@ use chrono::NaiveDateTime;
 use chrono::TimeZone;
 use chrono::Utc;
 use common::query::Breakdown;
+use common::query::EventFilter;
 use common::query::EventRef;
-use common::query::PropValueFilter;
 use common::query::PropValueOperation;
 use common::query::PropertyRef;
 use common::query::QueryTime;
@@ -61,7 +61,6 @@ pub fn event_expression(
     ctx: &Context,
     metadata: &Arc<MetadataProvider>,
     event: &EventRef,
-    group_id: usize,
 ) -> Result<Expr> {
     Ok(match &event {
         // regular event
@@ -84,17 +83,14 @@ pub fn event_expression(
             let mut exprs: Vec<Expr> = Vec::new();
             for event in e.events.iter() {
                 let mut expr = match &event.event {
-                    EventRef::RegularName(name) => event_expression(
-                        ctx,
-                        metadata,
-                        &EventRef::RegularName(name.to_owned()),
-                        group_id,
-                    )?,
+                    EventRef::RegularName(name) => {
+                        event_expression(ctx, metadata, &EventRef::RegularName(name.to_owned()))?
+                    }
                     EventRef::Regular(id) => {
-                        event_expression(ctx, metadata, &EventRef::Regular(*id), group_id)?
+                        event_expression(ctx, metadata, &EventRef::Regular(*id))?
                     }
                     EventRef::Custom(id) => {
-                        event_expression(ctx, metadata, &EventRef::Custom(*id), group_id)?
+                        event_expression(ctx, metadata, &EventRef::Custom(*id))?
                     }
                 };
 
@@ -122,7 +118,7 @@ pub fn event_expression(
 pub fn event_filters_expression(
     ctx: &Context,
     metadata: &Arc<MetadataProvider>,
-    filters: &[PropValueFilter],
+    filters: &[EventFilter],
 ) -> Result<Expr> {
     // iterate over filters
     let filters_exprs = filters
@@ -130,7 +126,7 @@ pub fn event_filters_expression(
         .map(|filter| {
             // match filter type
             match filter {
-                PropValueFilter::Property {
+                EventFilter::Property {
                     property,
                     operation,
                     value,
@@ -154,10 +150,12 @@ pub fn breakdown_expr(
 ) -> crate::Result<Expr> {
     match breakdown {
         Breakdown::Property(prop_ref) => match prop_ref {
-            PropertyRef::System(..)
-            | PropertyRef::Group(..)
-            | PropertyRef::SystemGroup(..)
-            | PropertyRef::Event(..) => Ok(property_col(ctx, metadata, prop_ref)?),
+            PropertyRef::System(_prop_name)
+            | PropertyRef::User(_prop_name)
+            | PropertyRef::Event(_prop_name) => {
+                let prop_col = property_col(ctx, metadata, prop_ref)?;
+                Ok(prop_col)
+            }
             PropertyRef::Custom(_) => unimplemented!(),
         },
     }
@@ -256,17 +254,9 @@ pub fn property_expression(
             operation,
             values,
         ),
-        PropertyRef::SystemGroup(prop_name) => prop_expression(
+        PropertyRef::User(prop_name) => prop_expression(
             ctx,
-            &md.system_group_properties,
-            &md.dictionaries,
-            prop_name,
-            operation,
-            values,
-        ),
-        PropertyRef::Group(prop_name, group) => prop_expression(
-            ctx,
-            &md.group_properties[*group],
+            &md.user_properties,
             &md.dictionaries,
             prop_name,
             operation,
@@ -296,14 +286,8 @@ pub fn property_col(
                 .get_by_name(ctx.project_id, prop_name)?;
             col(prop.column_name().as_str())
         }
-        PropertyRef::SystemGroup(prop_name) => {
-            let prop = md
-                .system_group_properties
-                .get_by_name(ctx.project_id, prop_name)?;
-            col(prop.column_name().as_str())
-        }
-        PropertyRef::Group(prop_name, group_id) => {
-            let prop = md.group_properties[*group_id].get_by_name(ctx.project_id, prop_name)?;
+        PropertyRef::User(prop_name) => {
+            let prop = md.user_properties.get_by_name(ctx.project_id, prop_name)?;
             col(prop.column_name().as_str())
         }
         PropertyRef::Event(prop_name) => {

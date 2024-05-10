@@ -12,7 +12,6 @@ use axum::Router;
 use chrono::Duration;
 use chrono::Utc;
 use common::config::Config;
-use common::group_col;
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::rbac::Role;
@@ -21,6 +20,7 @@ use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_EVENT_ID;
 use common::types::COLUMN_PROJECT_ID;
+use common::types::COLUMN_USER_ID;
 use common::types::EVENT_CLICK;
 use common::types::EVENT_PAGE;
 use common::types::EVENT_PROPERTY_CLASS;
@@ -36,10 +36,6 @@ use common::types::EVENT_PROPERTY_SESSION_LENGTH;
 use common::types::EVENT_SCREEN;
 use common::types::EVENT_SESSION_BEGIN;
 use common::types::EVENT_SESSION_END;
-use common::types::GROUP_COLUMN_CREATED_AT;
-use common::types::GROUP_COLUMN_ID;
-use common::types::GROUP_COLUMN_PROJECT_ID;
-use common::types::GROUP_COLUMN_VERSION;
 use common::types::TABLE_EVENTS;
 use common::types::USER_PROPERTY_CITY;
 use common::types::USER_PROPERTY_CLIENT_FAMILY;
@@ -56,8 +52,6 @@ use common::types::USER_PROPERTY_OS_VERSION_MAJOR;
 use common::types::USER_PROPERTY_OS_VERSION_MINOR;
 use common::types::USER_PROPERTY_OS_VERSION_PATCH;
 use common::types::USER_PROPERTY_OS_VERSION_PATCH_MINOR;
-use common::GROUPS_COUNT;
-use common::GROUP_USER_ID;
 use ingester::error::IngesterError;
 use ingester::executor::Executor;
 use ingester::transformers::geo;
@@ -135,7 +129,7 @@ pub fn init_system(
     db: &Arc<OptiDBImpl>,
     partitions: usize,
 ) -> error::Result<()> {
-    let events_table = TableOptions {
+    let topts = TableOptions {
         levels: 7,
         merge_array_size: 10000,
         parallelism: partitions,
@@ -153,7 +147,7 @@ pub fn init_system(
         merge_max_page_size: 1024 * 1024 * 10,
         is_replacing: false,
     };
-    match db.create_table(TABLE_EVENTS.to_string(), events_table) {
+    match db.create_table(TABLE_EVENTS.to_string(), topts) {
         Ok(_) => {}
         Err(err) => match err {
             StoreError::AlreadyExists(_) => {}
@@ -171,65 +165,15 @@ pub fn init_system(
         dict: None,
     })?;
 
-    for g in 0..GROUPS_COUNT {
-        let tbl = TableOptions {
-            levels: 7,
-            merge_array_size: 10000,
-            parallelism: partitions,
-            index_cols: 2,
-            l1_max_size_bytes: 1024 * 1024 * 10,
-            level_size_multiplier: 10,
-            l0_max_parts: 4,
-            max_log_length_bytes: 1024 * 1024 * 100,
-            merge_array_page_size: 100000,
-            merge_data_page_size_limit_bytes: Some(1024 * 1024 * 1000),
-            merge_max_l1_part_size_bytes: 1024 * 1024 * 10,
-            merge_part_size_multiplier: 10,
-            merge_row_group_values_limit: 1000,
-            merge_chunk_size: 1024 * 8 * 8,
-            merge_max_page_size: 1024 * 1024 * 10,
-            is_replacing: true,
-        };
-
-        let name = group_col(g);
-        match db.create_table(name.clone(), tbl) {
-            Ok(_) => {}
-            Err(err) => match err {
-                StoreError::AlreadyExists(_) => {}
-                other => return Err(other.into()),
-            },
-        }
-
-        create_property(md, 0, CreatePropertyMainRequest {
-            name,
-            display_name: Some(format!("Group {g}")),
-            typ: Type::System,
-            data_type: DType::String,
-            nullable: false,
-            hidden: false,
-            dict: Some(DictionaryType::Int64),
-        })?;
-
-        // create_property(md, 0, CreatePropertyMainRequest {
-        // name: GROUP_COLUMN_ID.to_string(),
-        // display_name: Some("Id".to_string()),
-        // typ: Type::SystemGroup(g),
-        // data_type: DType::String,
-        // nullable: false,
-        // hidden: false,
-        // dict: Some(DictionaryType::Int64),
-        // })?;
-        //
-        // create_property(md, 0, CreatePropertyMainRequest {
-        // name: GROUP_COLUMN_VERSION.to_string(),
-        // display_name: Some("Version".to_string()),
-        // typ: Type::SystemGroup(g),
-        // data_type: DType::String,
-        // nullable: false,
-        // hidden: false,
-        // dict: Some(DictionaryType::Int64),
-        // })?;
-    }
+    create_property(md, 0, CreatePropertyMainRequest {
+        name: COLUMN_USER_ID.to_string(),
+        display_name: Some("User".to_string()),
+        typ: Type::System,
+        data_type: DType::Int64,
+        nullable: false,
+        hidden: false,
+        dict: None,
+    })?;
 
     create_property(md, 0, CreatePropertyMainRequest {
         name: COLUMN_CREATED_AT.to_string(),
@@ -259,46 +203,6 @@ pub fn init_system(
         nullable: false,
         dict: Some(DictionaryType::Int64),
         hidden: true,
-    })?;
-
-    create_property(md, 0, CreatePropertyMainRequest {
-        name: GROUP_COLUMN_PROJECT_ID.to_string(),
-        display_name: Some("Project ID".to_string()),
-        typ: Type::SystemGroup,
-        data_type: DType::String,
-        nullable: false,
-        dict: Some(DictionaryType::Int64),
-        hidden: true,
-    })?;
-
-    create_property(md, 0, CreatePropertyMainRequest {
-        name: GROUP_COLUMN_ID.to_string(),
-        display_name: Some("ID".to_string()),
-        typ: Type::SystemGroup,
-        data_type: DType::String,
-        nullable: false,
-        dict: Some(DictionaryType::Int64),
-        hidden: true,
-    })?;
-
-    create_property(md, 0, CreatePropertyMainRequest {
-        name: GROUP_COLUMN_VERSION.to_string(),
-        display_name: Some("Version".to_string()),
-        typ: Type::SystemGroup,
-        data_type: DType::Int64,
-        nullable: false,
-        dict: None,
-        hidden: true,
-    })?;
-
-    create_property(md, 0, CreatePropertyMainRequest {
-        name: GROUP_COLUMN_CREATED_AT.to_string(),
-        display_name: Some("Created At".to_string()),
-        typ: Type::SystemGroup,
-        data_type: DType::Timestamp,
-        nullable: false,
-        hidden: false,
-        dict: None,
     })?;
 
     Ok(())
@@ -337,15 +241,12 @@ fn init_ingester(
     let mut track_transformers = Vec::new();
     let ua_parser = UserAgentParser::from_file(File::open(ua_db_path)?)
         .map_err(|e| Error::Internal(e.to_string()))?;
-    let ua = user_agent::track::UserAgent::try_new(
-        md.group_properties[GROUP_USER_ID].clone(),
-        ua_parser,
-    )?;
+    let ua = user_agent::track::UserAgent::try_new(md.user_properties.clone(), ua_parser)?;
     track_transformers.push(Arc::new(ua) as Arc<dyn Transformer<Track>>);
 
     // todo make common
     let city_rdr = maxminddb::Reader::open_readfile(geo_city_path)?;
-    let geo = geo::track::Geo::try_new(md.group_properties[GROUP_USER_ID].clone(), city_rdr)?;
+    let geo = geo::track::Geo::try_new(md.user_properties.clone(), city_rdr)?;
     track_transformers.push(Arc::new(geo) as Arc<dyn Transformer<Track>>);
 
     let mut track_destinations = Vec::new();
@@ -362,19 +263,15 @@ fn init_ingester(
     info!("initializing ua parser...");
     let ua_parser = UserAgentParser::from_file(File::open(ua_db_path)?)
         .map_err(|e| IngesterError::Internal(e.to_string()))?;
-    let ua = user_agent::identify::UserAgent::try_new(
-        md.group_properties[GROUP_USER_ID].clone(),
-        ua_parser,
-    )?;
+    let ua = user_agent::identify::UserAgent::try_new(md.user_properties.clone(), ua_parser)?;
     identify_transformers.push(Arc::new(ua) as Arc<dyn Transformer<Identify>>);
 
     info!("initializing geo...");
     let city_rdr = maxminddb::Reader::open_readfile(geo_city_path)?;
-    let geo = geo::identify::Geo::try_new(md.group_properties[GROUP_USER_ID].clone(), city_rdr)?;
+    let geo = geo::identify::Geo::try_new(md.user_properties.clone(), city_rdr)?;
     identify_transformers.push(Arc::new(geo) as Arc<dyn Transformer<Identify>>);
     let mut identify_destinations = Vec::new();
-    let identify_debug_dst =
-        ingester::destinations::local::identify::Local::new(db.clone(), md.clone());
+    let identify_debug_dst = ingester::destinations::debug::identify::Debug::new();
     identify_destinations.push(Arc::new(identify_debug_dst) as Arc<dyn Destination<Identify>>);
     let identify_exec = Executor::<Identify>::new(
         identify_transformers,
@@ -407,11 +304,6 @@ fn init_session_cleaner(
                         if sess_len.num_seconds() < project.session_duration_seconds as i64 {
                             return Ok(false);
                         }
-                        let groups = (1..GROUPS_COUNT)
-                            .into_iter()
-                            .map(|gid| NamedValue::new(group_col(gid), Value::Int64(None)))
-                            .collect::<Vec<_>>();
-
                         let record_id = md.events.next_record_sequence(project.id).unwrap();
 
                         let event_id = md
@@ -421,40 +313,34 @@ fn init_session_cleaner(
                             .id;
 
                         let values = vec![
-                            vec![
-                                NamedValue::new(
-                                    COLUMN_PROJECT_ID.to_string(),
-                                    Value::Int64(Some(project.id as i64)),
-                                ),
-                                NamedValue::new(
-                                    group_col(GROUP_USER_ID),
-                                    Value::Int64(Some(sess.user_id as i64)),
-                                ),
-                            ],
-                            groups.clone(),
-                            vec![
-                                NamedValue::new(
-                                    COLUMN_CREATED_AT.to_string(),
-                                    Value::Timestamp(Some(now.timestamp())),
-                                ),
-                                NamedValue::new(
-                                    COLUMN_EVENT_ID.to_string(),
-                                    Value::Int64(Some(record_id as i64)),
-                                ),
-                                NamedValue::new(
-                                    COLUMN_EVENT.to_string(),
-                                    Value::Int64(Some(event_id as i64)),
-                                ),
-                                NamedValue::new(
-                                    md.event_properties
-                                        .get_by_name(project.id, EVENT_PROPERTY_SESSION_LENGTH)
-                                        .unwrap()
-                                        .column_name(),
-                                    Value::Timestamp(Some(sess_len.num_seconds())),
-                                ),
-                            ],
-                        ]
-                        .concat();
+                            NamedValue::new(
+                                COLUMN_PROJECT_ID.to_string(),
+                                Value::Int64(Some(project.id as i64)),
+                            ),
+                            NamedValue::new(
+                                COLUMN_USER_ID.to_string(),
+                                Value::Int64(Some(sess.user_id as i64)),
+                            ),
+                            NamedValue::new(
+                                COLUMN_CREATED_AT.to_string(),
+                                Value::Timestamp(Some(now.timestamp())),
+                            ),
+                            NamedValue::new(
+                                COLUMN_EVENT_ID.to_string(),
+                                Value::Int64(Some(record_id as i64)),
+                            ),
+                            NamedValue::new(
+                                COLUMN_EVENT.to_string(),
+                                Value::Int64(Some(event_id as i64)),
+                            ),
+                            NamedValue::new(
+                                md.event_properties
+                                    .get_by_name(project.id, EVENT_PROPERTY_SESSION_LENGTH)
+                                    .unwrap()
+                                    .column_name(),
+                                Value::Timestamp(Some(sess_len.num_seconds())),
+                            ),
+                        ];
 
                         db.insert("events", values).unwrap();
 

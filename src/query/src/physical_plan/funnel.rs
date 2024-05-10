@@ -34,6 +34,7 @@ use arrow_row::SortField;
 use async_trait::async_trait;
 use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_PROJECT_ID;
+use common::types::COLUMN_USER_ID;
 use common::types::RESERVED_COLUMN_FUNNEL_AVG_TIME_TO_CONVERT;
 use common::types::RESERVED_COLUMN_FUNNEL_COMPLETED;
 use common::types::RESERVED_COLUMN_FUNNEL_CONVERSION_RATIO;
@@ -349,7 +350,7 @@ impl ExecutionPlan for FunnelPartialExec {
                 options: None,
             },
             PhysicalSortRequirement {
-                expr: Arc::new(self.partition_col.clone()) as PhysicalExprRef,
+                expr: col(COLUMN_USER_ID, &self.input.schema()).unwrap(),
                 options: None,
             },
             PhysicalSortRequirement {
@@ -372,7 +373,7 @@ impl ExecutionPlan for FunnelPartialExec {
         // todo make it configurable, don't use project_id and user_id entities
         vec![Distribution::HashPartitioned(vec![
             Arc::new(Column::new_with_schema("project_id", &self.input.schema()).unwrap()),
-            Arc::new(self.partition_col.clone()) as PhysicalExprRef,
+            Arc::new(Column::new_with_schema("user_id", &self.input.schema()).unwrap()),
         ])]
     }
 

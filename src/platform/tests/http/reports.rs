@@ -1,6 +1,5 @@
 use chrono::Utc;
 use common::types::OptionalProperty;
-use common::GROUP_USER_ID;
 use platform::queries::event_segmentation::Analysis;
 use platform::queries::event_segmentation::ChartType;
 use platform::queries::event_segmentation::EventSegmentation;
@@ -52,8 +51,8 @@ async fn test_reports() {
         typ: Type::EventSegmentation,
         query: Query::EventSegmentation(EventSegmentation {
             time: QueryTime::From { from: Utc::now() },
-            group: GROUP_USER_ID,
-            interval_unit: TimeIntervalUnit::Day,
+            group: "user".to_string(),
+            interval_unit: TimeIntervalUnit::Second,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
             compare: None,
@@ -130,10 +129,10 @@ async fn test_reports() {
         report.query = Query::EventSegmentation(EventSegmentation {
             time: QueryTime::Last {
                 last: 1,
-                unit: TimeIntervalUnit::Day,
+                unit: TimeIntervalUnit::Second,
             },
-            group: GROUP_USER_ID,
-            interval_unit: TimeIntervalUnit::Day,
+            group: "some".to_string(),
+            interval_unit: TimeIntervalUnit::Second,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
             compare: None,
