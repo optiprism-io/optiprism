@@ -23,6 +23,7 @@ pub const COLUMN_PROJECT_ID: &str = "project_id";
 pub const COLUMN_CREATED_AT: &str = "created_at";
 pub const COLUMN_EVENT_ID: &str = "event_id";
 pub const COLUMN_EVENT: &str = "event";
+pub const COLUMN_IP: &str = "ip";
 pub const COLUMN_SEGMENT: &str = "segment";
 
 pub const GROUP_COLUMN_PROJECT_ID: &str = "project_id";

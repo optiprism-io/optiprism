@@ -33,9 +33,9 @@ pub trait Destination<T>: Send + Sync {
 
 #[derive(Debug, Clone)]
 pub struct RequestContext {
-    project_id: Option<u64>,
-    client_ip: IpAddr,
-    token: String,
+    pub project_id: Option<u64>,
+    pub client_ip: IpAddr,
+    pub token: String,
 }
 
 #[derive(Debug, Clone)]
@@ -43,7 +43,7 @@ pub struct Context {
     pub library: Option<Library>,
     pub page: Option<Page>,
     pub user_agent: Option<String>,
-    pub ip: Option<IpAddr>,
+    pub ip: IpAddr,
 }
 
 #[derive(Debug, Clone)]

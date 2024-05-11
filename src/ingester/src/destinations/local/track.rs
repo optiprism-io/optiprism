@@ -7,6 +7,7 @@ use common::types::DType;
 use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_EVENT_ID;
+use common::types::COLUMN_IP;
 use common::types::COLUMN_PROJECT_ID;
 use common::types::EVENT_SESSION_BEGIN;
 use common::GROUPS_COUNT;
@@ -150,6 +151,10 @@ impl Destination<Track> for Local {
                     NamedValue::new(
                         COLUMN_EVENT.to_string(),
                         Value::Int64(Some(event_id as i64)),
+                    ),
+                    NamedValue::new(
+                        COLUMN_IP.to_string(),
+                        Value::String(Some(req.context.ip.to_string())),
                     ),
                 ],
                 prop_values.clone(),

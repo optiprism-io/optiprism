@@ -28,14 +28,10 @@ struct CSVProduct {
 #[derive(Debug, Clone, Deserialize, Default)]
 #[serde(default)]
 pub struct Product {
-    pub id: usize,
-    pub name: u64,
-    pub name_str: String,
-    pub category: u64,
-    pub category_str: String,
-    pub subcategory: Option<u64>,
-    pub subcategory_str: Option<String>,
-    pub brand: Option<u64>,
+    pub name: String,
+    pub category: String,
+    pub subcategory: Option<String>,
+    pub brand: Option<String>,
     pub price: Decimal,
     pub discount_price: Option<Decimal>,
     pub margin: f64,
@@ -50,38 +46,28 @@ impl Product {
         self.discount_price.unwrap_or(self.price)
     }
     pub fn path(&self) -> String {
-        self.name_str.replace(' ', "-").to_lowercase()
+        self.name.replace(' ', "-").to_lowercase()
     }
 }
 
 pub struct ProductProvider {
-    dicts: Arc<Dictionaries>,
-    properties: Arc<metadata::properties::Properties>,
-
-    proj_id: u64,
     pub products: Vec<Product>,
     product_weight_idx: WeightedIndex<f64>,
     pub product_weights: Vec<f64>,
-    pub promoted_products: Vec<usize>,
+    pub promoted_products: Vec<Product>,
     promoted_product_weight_idx: WeightedIndex<f64>,
-    pub deal_products: Vec<usize>,
+    pub deal_products: Vec<Product>,
     deal_product_weight_idx: WeightedIndex<f64>,
-    pub categories: Vec<u64>,
+    pub categories: Vec<String>,
     pub category_weight_idx: WeightedIndex<f64>,
     pub rating_weights: Vec<f64>,
 }
 
 impl ProductProvider {
-    pub fn try_new_from_csv<R: io::Read>(
-        proj_id: u64,
-        rng: &mut ThreadRng,
-        dicts: Arc<Dictionaries>,
-        properties: Arc<metadata::properties::Properties>,
-        rdr: R,
-    ) -> Result<Self> {
+    pub fn try_new_from_csv<R: io::Read>(rng: &mut ThreadRng, rdr: R) -> Result<Self> {
         let mut rdr = csv::Reader::from_reader(rdr);
         let mut products = Vec::with_capacity(1000);
-        for (id, res) in rdr.deserialize().enumerate() {
+        for res in rdr.deserialize() {
             let mut rec: CSVProduct = res?;
             rec.price.rescale(DECIMAL_SCALE as u32);
             let discount_price = if rng.gen::<f64>() < 0.3 {
@@ -91,57 +77,10 @@ impl ProductProvider {
             };
 
             let product = Product {
-                id: id + 1,
-                name: dicts.get_key_or_create(
-                    proj_id,
-                    properties
-                        .get_by_name(proj_id, "Product Name")
-                        .unwrap()
-                        .column_name()
-                        .as_str(),
-                    rec.name.as_str(),
-                )?,
-                name_str: rec.name,
-                category: dicts.get_key_or_create(
-                    proj_id,
-                    properties
-                        .get_by_name(proj_id, "Product Category")
-                        .unwrap()
-                        .column_name()
-                        .as_str(),
-                    rec.category.as_str(),
-                )?,
-                category_str: rec.category,
-                subcategory: rec
-                    .subcategory
-                    .clone()
-                    .map(|v| {
-                        dicts.get_key_or_create(
-                            proj_id,
-                            properties
-                                .get_by_name(proj_id, "Product Subcategory")
-                                .unwrap()
-                                .column_name()
-                                .as_str(),
-                            v.as_str(),
-                        )
-                    })
-                    .transpose()?,
-                subcategory_str: rec.subcategory,
-                brand: rec
-                    .brand
-                    .map(|v| {
-                        dicts.get_key_or_create(
-                            proj_id,
-                            properties
-                                .get_by_name(proj_id, "Product Brand")
-                                .unwrap()
-                                .column_name()
-                                .as_str(),
-                            v.as_str(),
-                        )
-                    })
-                    .transpose()?,
+                name: rec.name,
+                category: rec.category.clone(),
+                subcategory: rec.subcategory,
+                brand: rec.brand.map(|v| v.clone()),
                 price: rec.price,
                 discount_price,
                 margin: 0.,
@@ -158,22 +97,22 @@ impl ProductProvider {
             probability::calc_cubic_spline(products.len(), vec![1., 0.5, 0.3, 0.1])?;
         let product_weight_idx = WeightedIndex::new([1., 0.5, 0.3, 0.1]).unwrap();
 
-        let promoted_products = products[0..5].iter().map(|p| p.id).collect();
+        let promoted_products = products[0..5].iter().map(|p| p.clone()).collect();
         let promoted_product_weight_idx = WeightedIndex::new([1., 0.3, 0.2, 0.1, 0.1]).unwrap();
 
         let deal_products = products
             .iter()
             .filter(|p| p.discount_price.is_some())
-            .map(|p| p.id)
+            .map(|p| p.clone())
             .collect();
         let deal_product_weight_idx = WeightedIndex::new([1., 0.3, 0.2, 0.1, 0.1]).unwrap();
 
         let mut categories = products
             .iter()
-            .map(|p| p.category)
+            .map(|p| p.category.clone())
             .collect::<HashSet<_>>()
             .into_iter()
-            .collect::<Vec<u64>>();
+            .collect::<Vec<String>>();
         categories.shuffle(rng);
 
         let category_weight_idx =
@@ -185,10 +124,6 @@ impl ProductProvider {
         // make rating weights from 0 to 5 with 10 bins for each int value
         let rating_weights = probability::calc_cubic_spline(50, vec![0.01, 0.01, 0.1, 0.7, 1.])?;
         Ok(Self {
-            dicts,
-            properties,
-
-            proj_id,
             products,
             product_weights,
             product_weight_idx,
@@ -203,14 +138,14 @@ impl ProductProvider {
     }
 
     pub fn deal_product_sample(&self, rng: &mut ThreadRng) -> &Product {
-        &self.products[self.deal_products[self.deal_product_weight_idx.sample(rng)]]
+        &self.deal_products[self.deal_product_weight_idx.sample(rng)]
     }
 
     pub fn product_sample(&self, rng: &mut ThreadRng) -> &Product {
         &self.products[self.product_weight_idx.sample(rng)]
     }
     pub fn promoted_product_sample(&self, rng: &mut ThreadRng) -> &Product {
-        &self.products[self.promoted_products[self.promoted_product_weight_idx.sample(rng)]]
+        &self.promoted_products[self.promoted_product_weight_idx.sample(rng)]
     }
 
     #[allow(dead_code)]
@@ -223,17 +158,5 @@ impl ProductProvider {
         let product = &mut self.products[id];
         product.rating_count += 1;
         product.rating_sum += rating;
-    }
-
-    pub fn string_name(&self, key: u64) -> Result<String> {
-        Ok(self.dicts.get_value(
-            self.proj_id,
-            self.properties
-                .get_by_name(self.proj_id, "Product Name")
-                .unwrap()
-                .column_name()
-                .as_str(),
-            key,
-        )?)
     }
 }

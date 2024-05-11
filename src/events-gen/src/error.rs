@@ -1,8 +1,10 @@
 use std::result;
 
 use arrow::error::ArrowError;
+use ingester::error::IngesterError;
 use metadata::error::MetadataError;
 use thiserror::Error;
+
 pub type Result<T> = result::Result<T, EventsGenError>;
 
 #[derive(Error, Debug)]
@@ -17,6 +19,8 @@ pub enum EventsGenError {
     CSVError(#[from] csv::Error),
     #[error("MetadataError: {0:?}")]
     MetadataError(#[from] MetadataError),
+    #[error("IngesterError: {0:?}")]
+    IngesterError(#[from] IngesterError),
     #[error("UserSessionEnded")]
     UserSessionEnded,
     #[error("General {0:?}")]

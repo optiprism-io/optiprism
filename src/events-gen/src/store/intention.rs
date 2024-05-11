@@ -5,7 +5,7 @@ use crate::store::products::Product;
 use crate::store::products::ProductProvider;
 use crate::store::scenario::State;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub enum Intention<'a> {
     BuyCertainProduct(&'a Product),
     BuyAnyProduct,
@@ -19,9 +19,21 @@ pub fn select_intention<'a>(
     rng: &mut ThreadRng,
 ) -> Intention<'a> {
     if state.session_id > 0 && !state.products_bought.is_empty() && rng.gen::<f64>() < 0.1 {
-        for (id, _) in state.products_bought.iter() {
-            if rng.gen::<f64>() < 0.5 && !state.products_refunded.contains_key(id) {
-                return Intention::MakeRefund(&products.products[*id - 1]);
+        for (product, _) in state.products_bought.iter() {
+            if rng.gen::<f64>() < 0.5
+                && state
+                    .products_refunded
+                    .iter()
+                    .find(|(p, _)| p.name == product.name)
+                    .is_none()
+            {
+                return Intention::MakeRefund(
+                    products
+                        .products
+                        .iter()
+                        .find(|p| p.name == product.name)
+                        .unwrap(),
+                );
             }
         }
     }

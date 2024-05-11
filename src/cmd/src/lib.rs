@@ -20,6 +20,7 @@ use common::types::DType;
 use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_EVENT_ID;
+use common::types::COLUMN_IP;
 use common::types::COLUMN_PROJECT_ID;
 use common::types::EVENT_CLICK;
 use common::types::EVENT_PAGE;
@@ -262,6 +263,16 @@ pub fn init_system(
     })?;
 
     create_property(md, 0, CreatePropertyMainRequest {
+        name: COLUMN_IP.to_string(),
+        display_name: Some("Ip".to_string()),
+        typ: Type::System,
+        data_type: DType::String,
+        nullable: false,
+        dict: None,
+        hidden: true,
+    })?;
+
+    create_property(md, 0, CreatePropertyMainRequest {
         name: GROUP_COLUMN_PROJECT_ID.to_string(),
         display_name: Some("Project ID".to_string()),
         typ: Type::SystemGroup,
@@ -373,9 +384,8 @@ fn init_ingester(
     let geo = geo::identify::Geo::try_new(md.group_properties[GROUP_USER_ID].clone(), city_rdr)?;
     identify_transformers.push(Arc::new(geo) as Arc<dyn Transformer<Identify>>);
     let mut identify_destinations = Vec::new();
-    let identify_debug_dst =
-        ingester::destinations::local::identify::Local::new(db.clone(), md.clone());
-    identify_destinations.push(Arc::new(identify_debug_dst) as Arc<dyn Destination<Identify>>);
+    let identify_dst = ingester::destinations::local::identify::Local::new(db.clone(), md.clone());
+    identify_destinations.push(Arc::new(identify_dst) as Arc<dyn Destination<Identify>>);
     let identify_exec = Executor::<Identify>::new(
         identify_transformers,
         identify_destinations,
@@ -468,7 +478,7 @@ fn init_session_cleaner(
     Ok(())
 }
 
-fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<u64> {
+fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<Project> {
     let admin = match md.accounts.create(CreateAccountRequest {
         created_by: None,
         password_hash: make_password_hash("admin")?,
@@ -520,5 +530,5 @@ fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<u
         Err(_err) => md.accounts.get_by_email("user@test.com")?,
     };
 
-    Ok(proj.id)
+    Ok(proj.clone())
 }
