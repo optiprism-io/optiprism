@@ -37,9 +37,15 @@ use events_gen::store::events::Event;
 use events_gen::store::products::ProductProvider;
 use events_gen::store::profiles::ProfileProvider;
 use events_gen::store::scenario;
-use events_gen::store::scenario::EventRecord;
 use events_gen::store::scenario::Scenario;
-use events_gen::store::schema::create_properties;
+use ingester::error::IngesterError;
+use ingester::executor::Executor;
+use ingester::transformers::geo;
+use ingester::transformers::user_agent;
+use ingester::Destination;
+use ingester::Identify;
+use ingester::Track;
+use ingester::Transformer;
 use metadata::MetadataProvider;
 use platform::projects::init_project;
 use query::col_name;
@@ -53,6 +59,7 @@ use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tracing::debug;
 use tracing::info;
+use uaparser::UserAgentParser;
 
 use crate::error::Error;
 use crate::error::Result;
@@ -92,6 +99,7 @@ pub struct Store {
 
 pub struct Config<R> {
     pub project_id: u64,
+    pub token: String,
     pub from_date: DateTime<Utc>,
     pub to_date: DateTime<Utc>,
     pub products_rdr: R,
@@ -149,15 +157,32 @@ pub async fn start(args: &Store) -> Result<()> {
     let from_date = to_date - duration;
 
     info!("creating org structure and admin account...");
-    let proj_id = crate::init_test_org_structure(&md)?;
+    let proj = crate::init_test_org_structure(&md)?;
     info!("project initialization...");
 
-    init_project(proj_id, &md)?;
+    init_project(proj.id, &md)?;
 
     info!("store initialization...");
     debug!("demo data path: {:?}", args.demo_data_path);
     // todo move outside
     if args.generate {
+        info!("ingester initialization...");
+        // todo make common
+        let mut track_destinations = Vec::new();
+        let track_local_dst =
+            ingester::destinations::local::track::Local::new(db.clone(), md.clone());
+        track_destinations.push(Arc::new(track_local_dst) as Arc<dyn Destination<Track>>);
+        let track_exec =
+            Executor::<Track>::new(vec![], track_destinations.clone(), db.clone(), md.clone());
+
+        let mut identify_destinations = Vec::new();
+        let identify_dst =
+            ingester::destinations::local::identify::Local::new(db.clone(), md.clone());
+        identify_destinations.push(Arc::new(identify_dst) as Arc<dyn Destination<Identify>>);
+        let identify_exec =
+            Executor::<Identify>::new(vec![], identify_destinations, db.clone(), md.clone());
+
+        info!("generate events...");
         debug!("from date {}", from_date);
         let date_diff = to_date - from_date;
         debug!("to date {}", to_date);
@@ -170,13 +195,12 @@ pub async fn start(args: &Store) -> Result<()> {
         info!("expecting total unique users: {total_users}");
         info!("starting sample data generation...");
 
-        let _db_clone = db.clone();
         let md_clone = md.clone();
-        let db_clone = db.clone();
         let args_clone = args.clone();
         thread::spawn(move || {
             let store_cfg = Config {
-                project_id: proj_id,
+                project_id: proj.id,
+                token: proj.token.clone(),
                 from_date,
                 to_date,
                 products_rdr: File::open(args_clone.demo_data_path.join("products.csv"))
@@ -193,28 +217,10 @@ pub async fn start(args: &Store) -> Result<()> {
                 partitions: args_clone.partitions.unwrap_or_else(num_cpus::get),
             };
 
-            gen(md_clone, db_clone.clone(), store_cfg).unwrap();
-            db_clone.flush(TABLE_EVENTS).unwrap();
+            gen(md_clone, track_exec, identify_exec, store_cfg).unwrap();
         });
 
         info!("successfully generated!");
-
-        info!("starting future data generation...");
-        let store_cfg = Config {
-            project_id: proj_id,
-            from_date: to_date,
-            to_date: to_date + future_duration,
-            products_rdr: File::open(args.demo_data_path.join("products.csv"))
-                .map_err(|err| Error::Internal(format!("can't open products.csv: {err}")))?,
-            geo_rdr: File::open(args.demo_data_path.join("geo.csv"))
-                .map_err(|err| Error::Internal(format!("can't open geo.csv: {err}")))?,
-            device_rdr: File::open(args.demo_data_path.join("device.csv"))
-                .map_err(|err| Error::Internal(format!("can't open device.csv: {err}")))?,
-            new_daily_users: args.new_daily_users,
-            batch_size: 4096,
-            partitions: args.partitions.unwrap_or_else(num_cpus::get),
-        };
-        future_gen(md.clone(), db.clone(), store_cfg)?;
     }
 
     let cfg = common::config::Config::default();
@@ -246,39 +252,21 @@ pub async fn start(args: &Store) -> Result<()> {
     .await?)
 }
 
-pub fn gen<R>(md: Arc<MetadataProvider>, db: Arc<OptiDBImpl>, cfg: Config<R>) -> Result<()>
-where R: io::Read {
+pub fn gen<R>(
+    md: Arc<MetadataProvider>,
+    track: Executor<Track>,
+    identify: Executor<Identify>,
+    cfg: Config<R>,
+) -> Result<()>
+where
+    R: io::Read,
+{
     let mut rng = thread_rng();
-    info!("creating entities...");
-
-    info!("creating properties...");
-    create_properties(cfg.project_id, &md, &db)?;
-
     info!("loading profiles...");
-    let profiles = ProfileProvider::try_new_from_csv(
-        cfg.project_id,
-        &md.dictionaries,
-        &md.group_properties[0],
-        cfg.geo_rdr,
-        cfg.device_rdr,
-    )?;
+    let profiles = ProfileProvider::try_new_from_csv(cfg.geo_rdr, cfg.device_rdr)?;
     info!("loading products...");
-    let products = ProductProvider::try_new_from_csv(
-        cfg.project_id,
-        &mut rng,
-        md.dictionaries.clone(),
-        md.event_properties.clone(),
-        cfg.products_rdr,
-    )?;
-    let mut events_map: HashMap<Event, u64> = HashMap::default();
-    for event in all::<Event>() {
-        let e = md
-            .events
-            .get_by_name(cfg.project_id, event.to_string().as_str())?;
-        events_map.insert(event, e.id);
-    }
+    let products = ProductProvider::try_new_from_csv(&mut rng, cfg.products_rdr)?;
 
-    let (rx, tx) = bounded(1);
     // move init to thread because thread_rng is not movable
     thread::spawn(move || {
         let rng = thread_rng();
@@ -301,10 +289,13 @@ where R: io::Read {
         let run_cfg = scenario::Config {
             rng: rng.clone(),
             gen,
-            events_map,
             products,
             to: cfg.to_date,
-            out: rx,
+            track,
+            identify,
+            user_props_prov: md.group_properties[GROUP_USER_ID].clone(),
+            project_id: cfg.project_id,
+            token: cfg.token,
         };
 
         let mut scenario = Scenario::new(run_cfg);
@@ -315,279 +306,6 @@ where R: io::Read {
             Err(err) => println!("generation error: {:?}", err),
         }
     });
-
-    let mut idx = 0;
-    while let Some(event) = tx.recv()? {
-        write_event(cfg.project_id, &db, &md, event, idx)?;
-        idx += 1;
-        if idx % 1000000 == 0 {
-            println!("{idx}");
-        }
-    }
-
-    Ok(())
-}
-
-pub fn future_gen<R>(md: Arc<MetadataProvider>, db: Arc<OptiDBImpl>, cfg: Config<R>) -> Result<()>
-where R: io::Read {
-    let mut rng = thread_rng();
-    let profiles = ProfileProvider::try_new_from_csv(
-        cfg.project_id,
-        &md.dictionaries,
-        &md.group_properties[0],
-        cfg.geo_rdr,
-        cfg.device_rdr,
-    )?;
-    let products = ProductProvider::try_new_from_csv(
-        cfg.project_id,
-        &mut rng,
-        md.dictionaries.clone(),
-        md.event_properties.clone(),
-        cfg.products_rdr,
-    )?;
-    let mut events_map: HashMap<Event, u64> = HashMap::default();
-    for event in all::<Event>() {
-        let md_event = md
-            .events
-            .get_by_name(cfg.project_id, event.to_string().as_str())
-            .unwrap();
-        events_map.insert(event, md_event.id);
-        md.dictionaries
-            .get_key_or_create(1, "event_event", event.to_string().as_str())
-            .unwrap();
-    }
-
-    let (rx, tx) = bounded(1);
-
-    // todo parallelize?
-    thread::spawn(move || {
-        let rng = thread_rng();
-        let gen_cfg = generator::Config {
-            rng: rng.clone(),
-            profiles,
-            from: cfg.from_date,
-            to: cfg.to_date,
-            new_daily_users: cfg.new_daily_users,
-            traffic_hourly_weights: [
-                0.4, 0.37, 0.39, 0.43, 0.45, 0.47, 0.52, 0.6, 0.8, 0.9, 0.85, 0.8, 0.75, 0.85, 1.,
-                0.85, 0.7, 0.63, 0.62, 0.61, 0.59, 0.57, 0.48, 0.4,
-            ],
-        };
-
-        let gen = Generator::new(gen_cfg);
-
-        let run_cfg = scenario::Config {
-            rng: rng.clone(),
-            gen,
-            events_map,
-            products,
-            to: cfg.to_date,
-            out: rx,
-        };
-
-        let mut scenario = Scenario::new(run_cfg);
-
-        let res = scenario.run();
-        match res {
-            Ok(_) => {}
-            Err(err) => println!("generation error: {:?}", err),
-        }
-    });
-
-    let mut out = BTreeMap::new();
-    while let Some(event) = tx.recv()? {
-        out.insert(event.created_at, event);
-    }
-    thread::spawn(move || {
-        loop {
-            match out.pop_first() {
-                None => break,
-                Some((ts, event)) => {
-                    let cur = Utc::now().timestamp();
-                    let ts = ts / 1000000000;
-                    if ts > cur {
-                        thread::sleep(std::time::Duration::from_secs((ts - cur) as u64));
-                    }
-                    write_event(cfg.project_id, &db, &md, event, 0).unwrap();
-                }
-            }
-        }
-    });
-    Ok(())
-}
-
-fn write_event(
-    proj_id: u64,
-    db: &Arc<OptiDBImpl>,
-    md: &Arc<MetadataProvider>,
-    event: EventRecord,
-    idx: i64,
-) -> Result<()> {
-    let groups = (1..GROUPS_COUNT)
-        .into_iter()
-        .map(|gid| NamedValue::new(group_col(gid), Value::Int64(None)))
-        .collect::<Vec<_>>();
-
-    let vals = vec![
-        vec![
-            NamedValue::new("project_id".to_string(), Value::Int64(Some(proj_id as i64))),
-            NamedValue::new(
-                group_col(GROUP_USER_ID).to_string(),
-                Value::Int64(Some(event.user_id)),
-            ),
-        ],
-        groups,
-        vec![
-            NamedValue::new(
-                "created_at".to_string(),
-                Value::Timestamp(Some(event.created_at)),
-            ),
-            NamedValue::new("event_id".to_string(), Value::Int64(Some(idx))),
-            NamedValue::new("event".to_string(), Value::Int64(Some(event.event))),
-            NamedValue::new(
-                md.event_properties
-                    .get_by_name(proj_id, EVENT_PROPERTY_PAGE_PATH)
-                    .unwrap()
-                    .column_name(),
-                Value::String(Some(event.page_path)),
-            ),
-            NamedValue::new(
-                md.event_properties
-                    .get_by_name(proj_id, EVENT_PROPERTY_PAGE_TITLE)
-                    .unwrap()
-                    .column_name(),
-                Value::String(Some(event.page_title)),
-            ),
-            NamedValue::new(
-                md.event_properties
-                    .get_by_name(proj_id, EVENT_PROPERTY_PAGE_URL)
-                    .unwrap()
-                    .column_name(),
-                Value::String(Some(event.page_url)),
-            ),
-            NamedValue::new(
-                md.event_properties
-                    .get_by_name(proj_id, "Product Name")
-                    .unwrap()
-                    .column_name(),
-                Value::Int16(event.product_name),
-            ),
-            NamedValue::new(
-                md.event_properties
-                    .get_by_name(proj_id, "Product Category")
-                    .unwrap()
-                    .column_name(),
-                Value::Int16(event.product_category),
-            ),
-            NamedValue::new(
-                md.event_properties
-                    .get_by_name(proj_id, "Product Subcategory")
-                    .unwrap()
-                    .column_name(),
-                Value::Int16(event.product_subcategory),
-            ),
-            NamedValue::new(
-                md.event_properties
-                    .get_by_name(proj_id, "Product Brand")
-                    .unwrap()
-                    .column_name(),
-                Value::Int16(event.product_brand),
-            ),
-            NamedValue::new(
-                md.event_properties
-                    .get_by_name(proj_id, "Product Price")
-                    .unwrap()
-                    .column_name(),
-                Value::Decimal(event.product_price),
-            ),
-            NamedValue::new(
-                md.event_properties
-                    .get_by_name(proj_id, "Product Discount Price")
-                    .unwrap()
-                    .column_name(),
-                Value::Decimal(event.product_discount_price),
-            ),
-            NamedValue::new(
-                md.event_properties
-                    .get_by_name(proj_id, "Revenue")
-                    .unwrap()
-                    .column_name(),
-                Value::Decimal(event.revenue),
-            ),
-            NamedValue::new(
-                md.group_properties[0]
-                    .get_by_name(proj_id, "Spent Total")
-                    .unwrap()
-                    .column_name(),
-                Value::Decimal(event.spent_total),
-            ),
-            NamedValue::new(
-                md.group_properties[0]
-                    .get_by_name(proj_id, "Products Bought")
-                    .unwrap()
-                    .column_name(),
-                Value::Int8(event.products_bought),
-            ),
-            NamedValue::new(
-                md.group_properties[0]
-                    .get_by_name(proj_id, "Cart Items Number")
-                    .unwrap()
-                    .column_name(),
-                Value::Int8(event.cart_items_number),
-            ),
-            NamedValue::new(
-                md.group_properties[0]
-                    .get_by_name(proj_id, "Cart Amount")
-                    .unwrap()
-                    .column_name(),
-                Value::Decimal(event.cart_amount),
-            ),
-            NamedValue::new(
-                md.group_properties[0]
-                    .get_by_name(proj_id, USER_PROPERTY_COUNTRY)
-                    .unwrap()
-                    .column_name(),
-                Value::Int64(event.country.map(|v| v as i64)),
-            ),
-            NamedValue::new(
-                md.group_properties[0]
-                    .get_by_name(proj_id, USER_PROPERTY_CITY)
-                    .unwrap()
-                    .column_name(),
-                Value::Int64(event.city.map(|v| v as i64)),
-            ),
-            NamedValue::new(
-                md.group_properties[0]
-                    .get_by_name(proj_id, USER_PROPERTY_DEVICE_MODEL)
-                    .unwrap()
-                    .column_name(),
-                Value::Int64(event.device.map(|v| v as i64)),
-            ),
-            NamedValue::new(
-                md.group_properties[0]
-                    .get_by_name(proj_id, USER_PROPERTY_OS_FAMILY)
-                    .unwrap()
-                    .column_name(),
-                Value::Int64(event.device_category.map(|v| v as i64)),
-            ),
-            NamedValue::new(
-                md.group_properties[0]
-                    .get_by_name(proj_id, USER_PROPERTY_OS)
-                    .unwrap()
-                    .column_name(),
-                Value::Int64(event.os.map(|v| v as i64)),
-            ),
-            NamedValue::new(
-                md.group_properties[0]
-                    .get_by_name(proj_id, USER_PROPERTY_OS_VERSION_MAJOR)
-                    .unwrap()
-                    .column_name(),
-                Value::Int64(event.os_version.map(|v| v as i64)),
-            ),
-        ],
-    ]
-    .concat();
-    db.insert("events", vals)?;
 
     Ok(())
 }

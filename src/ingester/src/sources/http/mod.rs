@@ -160,7 +160,7 @@ impl App {
                 url: page.url.clone(),
             }),
             user_agent: req.context.user_agent.clone(),
-            ip: req.context.ip,
+            ip: req.context.ip.unwrap_or_else(|| ctx.client_ip.clone()),
         };
 
         let raw_properties = req.properties.map(|v| {
@@ -201,7 +201,7 @@ impl App {
                 url: page.url.clone(),
             }),
             user_agent: req.context.user_agent.clone(),
-            ip: req.context.ip,
+            ip: req.context.ip.unwrap_or_else(|| ctx.client_ip.clone()),
         };
 
         let raw_props = req.properties.map(|v| {

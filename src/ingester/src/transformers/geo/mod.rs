@@ -24,11 +24,7 @@ pub fn resolve_properties(
 ) -> Result<Vec<PropertyAndValue>> {
     let proj_id = ctx.project_id.unwrap();
 
-    let ip = match context.ip {
-        Some(ip) => ip,
-        None => ctx.client_ip,
-    };
-    let city: geoip2::City = city_rdr.lookup(ip)?;
+    let city: geoip2::City = city_rdr.lookup(context.ip)?;
     if let Some(country) = city.country {
         if let Some(names) = country.names {
             if let Some(name) = names.get("en") {

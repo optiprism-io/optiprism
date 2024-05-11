@@ -66,10 +66,10 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
     init_system(&md, &db, num_cpus::get())?;
 
     info!("creating org structure and admin account...");
-    let proj_id = crate::init_test_org_structure(&md)?;
+    let proj = crate::init_test_org_structure(&md)?;
 
     info!("project initialization...");
-    init_project(proj_id, &md)?;
+    init_project(proj.id, &md)?;
 
     info!("starting sample data generation...");
     let _partitions = args.partitions.unwrap_or_else(num_cpus::get);
@@ -89,7 +89,7 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
     ];
 
     for (name, dt) in props {
-        create_property(&md, proj_id, CreatePropertyMainRequest {
+        create_property(&md, proj.id, CreatePropertyMainRequest {
             name: name.to_string(),
             display_name: None,
             typ: Type::System, // do this to keep property names as is
@@ -100,7 +100,7 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
         })?;
     }
 
-    create_property(&md, proj_id, CreatePropertyMainRequest {
+    create_property(&md, proj.id, CreatePropertyMainRequest {
         name: "string_dict".to_string(),
         display_name: None,
         typ: Type::System,
@@ -113,7 +113,7 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
     md.dictionaries
         .get_key_or_create(1, "string_dict", "привет")?;
     md.dictionaries.get_key_or_create(1, "string_dict", "мир")?;
-    let e = create_event(&md, proj_id, "event".to_string())?;
+    let e = create_event(&md, proj.id, "event".to_string())?;
     let now = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0)
         .unwrap()
         .duration_trunc(Duration::days(1))?;
@@ -147,7 +147,7 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
                     vals.truncate(0);
                     vals.push(NamedValue::new(
                         "project_id".to_string(),
-                        Value::Int64(Some(proj_id as i64)),
+                        Value::Int64(Some(proj.id as i64)),
                     ));
                     vals.push(NamedValue::new(
                         "user_id".to_string(),

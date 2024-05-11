@@ -1,4 +1,5 @@
 use std::io;
+use std::net::IpAddr;
 use std::sync::Arc;
 
 use common::types::USER_PROPERTY_CITY;
@@ -7,6 +8,13 @@ use common::types::USER_PROPERTY_DEVICE_MODEL;
 use common::types::USER_PROPERTY_OS;
 use common::types::USER_PROPERTY_OS_FAMILY;
 use common::types::USER_PROPERTY_OS_VERSION_MAJOR;
+use fake::faker::internet::en::FreeEmail;
+use fake::faker::internet::en::IP;
+use fake::faker::name::en::FirstName;
+use fake::faker::name::en::LastName;
+use fake::faker::name::en::Name;
+use fake::locales::EN;
+use fake::Fake;
 use metadata::dictionaries::Dictionaries;
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
@@ -19,8 +27,8 @@ use crate::error::Result;
 
 #[derive(Clone)]
 pub struct Geo {
-    pub country: Option<u64>,
-    pub city: Option<u64>,
+    pub country: Option<String>,
+    pub city: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -33,10 +41,10 @@ struct CSVGeo {
 
 #[derive(Clone)]
 pub struct Device {
-    pub device: Option<u64>,
-    pub device_category: Option<u64>,
-    pub os: Option<u64>,
-    pub os_version: Option<u64>,
+    pub device: Option<String>,
+    pub device_category: Option<String>,
+    pub os: Option<String>,
+    pub os_version: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -52,6 +60,11 @@ pub struct CSVDevice {
 pub struct Profile {
     pub geo: Geo,
     pub device: Device,
+    pub first_name: String,
+    pub last_name: String,
+    pub email: String,
+    pub age: usize,
+    pub ip: IpAddr,
 }
 
 pub struct ProfileProvider {
@@ -62,13 +75,7 @@ pub struct ProfileProvider {
 }
 
 impl ProfileProvider {
-    pub fn try_new_from_csv<R: io::Read>(
-        proj_id: u64,
-        dicts: &Arc<Dictionaries>,
-        properties: &Arc<metadata::properties::Properties>,
-        geo_rdr: R,
-        device_rdr: R,
-    ) -> Result<Self> {
+    pub fn try_new_from_csv<R: io::Read>(geo_rdr: R, device_rdr: R) -> Result<Self> {
         let mut geo_weights: Vec<i32> = Vec::with_capacity(1000);
         info!("loading geo");
         let geo = {
@@ -78,34 +85,8 @@ impl ProfileProvider {
                 let rec: CSVGeo = res?;
                 geo_weights.push(rec.weight);
                 let geo = Geo {
-                    country: rec
-                        .country
-                        .map(|v| {
-                            dicts.get_key_or_create(
-                                proj_id,
-                                properties
-                                    .get_by_name(proj_id, USER_PROPERTY_COUNTRY)
-                                    .unwrap()
-                                    .column_name()
-                                    .as_str(),
-                                v.as_str(),
-                            )
-                        })
-                        .transpose()?,
-                    city: rec
-                        .city
-                        .map(|v| {
-                            dicts.get_key_or_create(
-                                proj_id,
-                                properties
-                                    .get_by_name(proj_id, USER_PROPERTY_CITY)
-                                    .unwrap()
-                                    .column_name()
-                                    .as_str(),
-                                v.as_str(),
-                            )
-                        })
-                        .transpose()?,
+                    country: rec.country.clone(),
+                    city: rec.city.clone(),
                 };
                 result.push(geo);
             }
@@ -125,62 +106,10 @@ impl ProfileProvider {
                 let rec: CSVDevice = res?;
                 device_weights.push(rec.weight);
                 let device = Device {
-                    device: rec
-                        .device
-                        .map(|v| {
-                            dicts.get_key_or_create(
-                                proj_id,
-                                properties
-                                    .get_by_name(proj_id, USER_PROPERTY_DEVICE_MODEL)
-                                    .unwrap()
-                                    .column_name()
-                                    .as_str(),
-                                v.as_str(),
-                            )
-                        })
-                        .transpose()?,
-                    device_category: rec
-                        .device_category
-                        .map(|v| {
-                            dicts.get_key_or_create(
-                                proj_id,
-                                properties
-                                    .get_by_name(proj_id, USER_PROPERTY_OS_FAMILY)
-                                    .unwrap()
-                                    .column_name()
-                                    .as_str(),
-                                v.as_str(),
-                            )
-                        })
-                        .transpose()?,
-                    os: rec
-                        .os
-                        .map(|v| {
-                            dicts.get_key_or_create(
-                                proj_id,
-                                properties
-                                    .get_by_name(proj_id, USER_PROPERTY_OS)
-                                    .unwrap()
-                                    .column_name()
-                                    .as_str(),
-                                v.as_str(),
-                            )
-                        })
-                        .transpose()?,
-                    os_version: rec
-                        .os_version
-                        .map(|v| {
-                            dicts.get_key_or_create(
-                                proj_id,
-                                properties
-                                    .get_by_name(proj_id, USER_PROPERTY_OS_VERSION_MAJOR)
-                                    .unwrap()
-                                    .column_name()
-                                    .as_str(),
-                                v.as_str(),
-                            )
-                        })
-                        .transpose()?,
+                    device: rec.device.clone(),
+                    device_category: rec.device_category.clone(),
+                    os: rec.os.clone(),
+                    os_version: rec.os_version.clone(),
                 };
 
                 result.push(device);
@@ -205,6 +134,11 @@ impl ProfileProvider {
         Profile {
             geo: self.geo[self.geo_weight_idx.sample(rng)].clone(),
             device: self.device[self.device_weight_idx.sample(rng)].clone(),
+            first_name: FirstName().fake(),
+            last_name: LastName().fake(),
+            email: FreeEmail().fake(),
+            age: rng.gen_range(18..50),
+            ip: IP().fake(),
         }
     }
 }

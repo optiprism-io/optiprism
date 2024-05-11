@@ -9,9 +9,20 @@ use std::time::Duration as StdDuration;
 use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
+use common::types;
 use common::DECIMAL_SCALE;
 use crossbeam_channel::tick;
 use crossbeam_channel::Sender;
+use ingester::executor::Executor;
+use ingester::Context;
+use ingester::Identify;
+use ingester::Page;
+use ingester::PropValue;
+use ingester::PropertyAndValue;
+use ingester::RequestContext;
+use ingester::Track;
+use metadata::properties::Properties;
+use metadata::MetadataProvider;
 use rand::prelude::*;
 use rand::rngs::ThreadRng;
 use rust_decimal::Decimal;
@@ -29,66 +40,42 @@ use crate::store::products::ProductProvider;
 use crate::store::profiles::Profile;
 use crate::store::transitions::make_transitions;
 
-#[derive(Debug, Clone)]
-pub struct EventRecord {
-    pub user_id: i64,
-    pub created_at: i64,
-    pub event: i64,
-    pub page_path: String,
-    pub page_search: String,
-    pub page_title: String,
-    pub page_url: String,
-    pub a_name: String,
-    pub a_href: String,
-    pub product_name: Option<i16>,
-    pub product_category: Option<i16>,
-    pub product_subcategory: Option<i16>,
-    pub product_brand: Option<i16>,
-    pub product_price: Option<i128>,
-    pub product_discount_price: Option<i128>,
-    pub spent_total: Option<i128>,
-    pub products_bought: Option<i8>,
-    pub cart_items_number: Option<i8>,
-    pub cart_amount: Option<i128>,
-    pub revenue: Option<i128>,
-    pub country: Option<i16>,
-    pub city: Option<i16>,
-    pub device: Option<i16>,
-    pub device_category: Option<i16>,
-    pub os: Option<i16>,
-    pub os_version: Option<i16>,
-}
-
 pub struct State<'a> {
     pub session_id: usize,
     pub event_id: usize,
     pub user_id: i64,
     pub cur_timestamp: i64,
     pub selected_product: Option<&'a Product>,
-    pub products_bought: HashMap<usize, usize>,
-    pub products_viewed: HashMap<usize, usize>,
-    pub products_refunded: HashMap<usize, ()>,
+    pub products_bought: HashMap<&'a Product, usize>,
+    pub products_viewed: HashMap<&'a Product, usize>,
+    pub products_refunded: HashMap<&'a Product, ()>,
     pub cart: Vec<&'a Product>,
-    pub search_query: Option<String>,
+    pub search_query: Option<&'a String>,
     pub spent_total: Decimal,
 }
 
 pub struct Config {
     pub rng: ThreadRng,
     pub gen: Generator,
-    pub events_map: HashMap<Event, u64>,
     pub products: ProductProvider,
     pub to: DateTime<Utc>,
-    pub out: Sender<Option<EventRecord>>,
+    pub track: Executor<Track>,
+    pub identify: Executor<Identify>,
+    pub user_props_prov: Arc<Properties>,
+    pub project_id: u64,
+    pub token: String,
 }
 
 pub struct Scenario {
     pub rng: ThreadRng,
     pub gen: Generator,
-    pub events_map: HashMap<Event, u64>,
     pub products: ProductProvider,
     pub to: DateTime<Utc>,
-    pub out: Sender<Option<EventRecord>>,
+    pub track: Executor<Track>,
+    pub identify: Executor<Identify>,
+    pub props_prov: Arc<Properties>,
+    pub project_id: u64,
+    pub token: String,
 }
 
 impl Scenario {
@@ -96,10 +83,13 @@ impl Scenario {
         Self {
             rng: cfg.rng,
             gen: cfg.gen,
-            events_map: cfg.events_map,
             products: cfg.products,
             to: cfg.to,
-            out: cfg.out,
+            track: cfg.track,
+            identify: cfg.identify,
+            props_prov: cfg.user_props_prov,
+            project_id: cfg.project_id,
+            token: cfg.token,
         }
     }
 
@@ -147,9 +137,8 @@ impl Scenario {
                 state.search_query = None;
                 state.selected_product = None;
 
-                let products = &self.products;
                 let rng = &mut self.rng;
-                let intention = select_intention(&state, products, rng);
+                let intention = select_intention(&state, &self.products, rng);
                 if state.session_id > 0 {
                     let add_time = match intention {
                         Intention::BuyCertainProduct(_) => Duration::weeks(2).num_seconds(),
@@ -172,7 +161,7 @@ impl Scenario {
 
                 'events: loop {
                     events_per_sec.fetch_add(1, Ordering::SeqCst);
-                    match (prev_action, action, intention) {
+                    match (prev_action, action, &intention) {
                         (
                             _,
                             Action::EndSession,
@@ -194,18 +183,22 @@ impl Scenario {
                             Action::ViewProduct,
                             Intention::BuyCertainProduct(product),
                         ) => {
-                            state.search_query = Some(self.products.string_name(product.name)?);
+                            state.search_query = Some(&product.name);
                             state.selected_product = Some(product);
                         }
                         (Some(Action::SearchProduct), Action::ViewProduct, _) => {
                             for (idx, product) in self.products.products.iter().enumerate() {
-                                if state.products_viewed.contains_key(&product.id) {
+                                if state
+                                    .products_viewed
+                                    .iter()
+                                    .find(|(p, _)| p.name == product.name)
+                                    .is_some()
+                                {
                                     continue;
                                 }
                                 if self.rng.gen::<f64>() < self.products.product_weights[idx] {
                                     state.selected_product = Some(product);
-                                    state.search_query =
-                                        Some(self.products.string_name(product.name)?);
+                                    state.search_query = Some(&product.name);
                                     break;
                                 }
                             }
@@ -217,7 +210,12 @@ impl Scenario {
                         }
                         (Some(Action::ViewIndexPromotions), Action::ViewProduct, _) => {
                             let sp = self.products.promoted_product_sample(&mut self.rng);
-                            if state.products_viewed.contains_key(&sp.id) {
+                            if state
+                                .products_viewed
+                                .iter()
+                                .find(|(p, _)| p.name == sp.name)
+                                .is_some()
+                            {
                                 action = Action::EndSession;
                                 continue;
                             }
@@ -228,39 +226,49 @@ impl Scenario {
                         }
                         (_, Action::CompleteOrder, _) => {
                             for product in state.cart.iter() {
-                                *state.products_bought.entry(product.id).or_insert(0) += 1;
+                                state
+                                    .products_bought
+                                    .iter_mut()
+                                    .find(|(p, _)| p.name == product.name)
+                                    .map(|(_, v)| *v += 1);
                                 state.spent_total += product.final_price();
                             }
                         }
                         (Some(Action::ViewDeals), Action::ViewProduct, _) => {
                             let sp = self.products.deal_product_sample(&mut self.rng);
-                            if state.products_viewed.contains_key(&sp.id) {
+                            if state
+                                .products_viewed
+                                .iter()
+                                .find(|(p, _)| p.name == sp.name)
+                                .is_some()
+                            {
                                 action = Action::EndSession;
                                 continue;
                             }
                             let _ = state.selected_product.insert(sp);
-                            *state
+                            state
                                 .products_viewed
-                                .entry(state.selected_product.unwrap().id)
-                                .or_insert(0) += 1;
+                                .iter_mut()
+                                .find(|(p, _)| p.name == state.selected_product.unwrap().name)
+                                .map(|(_, v)| *v += 1);
                         }
                         (_, Action::ViewRelatedProduct, _) => {
                             let product = &state.selected_product.unwrap();
-                            let found = self
-                                .products
-                                .products
-                                .iter()
-                                .find(|p| p.category == product.category && p.id != product.id);
+                            let found =
+                                self.products.products.iter().find(|p| {
+                                    p.category == product.category && p.name != product.name
+                                });
 
                             if found.is_none() {
                                 action = Action::EndSession;
                                 continue;
                             }
                             state.selected_product = found;
-                            *state
+                            state
                                 .products_viewed
-                                .entry(state.selected_product.unwrap().id)
-                                .or_insert(0) += 1;
+                                .iter_mut()
+                                .find(|(p, _)| p.name == state.selected_product.unwrap().name)
+                                .map(|(_, v)| *v += 1);
                         }
                         (
                             Some(Action::ViewOrders),
@@ -283,7 +291,7 @@ impl Scenario {
 
                     if let Some(event) = prev_action.unwrap().to_event() {
                         overall_events += 1;
-                        self.write_event(event, &state, &sample.profile);
+                        self.write_event(event, &state, &sample.profile)?;
                     }
 
                     #[allow(clippy::single_match)]
@@ -314,166 +322,269 @@ impl Scenario {
 
         info!("total events: {overall_events}");
 
-        self.out.send(None).unwrap();
-
         Ok(())
     }
 
-    fn write_event(&self, event: Event, state: &State, profile: &Profile) {
-        let event_id = *self.events_map.get(&event).unwrap();
-        let mut rec = EventRecord {
-            user_id: state.user_id,
-            created_at: state.cur_timestamp * 10i64.pow(3),
-            event: event_id as i64,
-            page_path: "".to_string(),
-            page_search: "".to_string(),
-            page_title: "".to_string(),
-            page_url: "".to_string(),
-            a_name: "".to_string(),
-            a_href: "".to_string(),
-            product_name: None,
-            product_category: None,
-            product_subcategory: None,
-            product_brand: None,
-            product_price: None,
-            product_discount_price: None,
-            spent_total: None,
-            products_bought: None,
-            cart_items_number: None,
-            cart_amount: None,
-            revenue: None,
-            country: None,
-            city: None,
-            device: None,
-            device_category: None,
-            os: None,
-            os_version: None,
+    fn write_event(&self, event: Event, state: &State, profile: &Profile) -> Result<()> {
+        let mut page = Page {
+            path: None,
+            referrer: None,
+            search: None,
+            title: None,
+            url: None,
         };
-        match event {
+
+        match &event {
             Event::UserRegistered => {
-                rec.page_path = "register".to_string();
-                rec.page_title = "user registration".to_string();
+                page.path = Some("register".to_string());
+                page.title = Some("user registration".to_string());
             }
             Event::UserLoggedIn => {
-                rec.page_path = "login".to_string();
-                rec.page_title = "user login".to_string();
+                page.path = Some("login".to_string());
+                page.title = Some("user login".to_string());
             }
             Event::SubscribedForNewsletter => {
-                rec.page_path = "subscribe".to_string();
-                rec.page_title = "newsletter subscription".to_string();
+                page.path = Some("subscribe".to_string());
+                page.title = Some("newsletter subscription".to_string());
             }
             Event::IndexPageViewed => {
-                rec.page_path = "index".to_string();
-                rec.page_title = "index page".to_string();
+                page.path = Some("index".to_string());
+                page.title = Some("index page".to_string());
             }
             Event::DealsViewed => {
-                rec.page_path = "deals".to_string();
-                rec.page_title = "deals".to_string();
+                page.path = Some("deals".to_string());
+                page.title = Some("deals".to_string());
             }
             Event::ProductSearched => {
-                rec.page_path = "search".to_string();
-                rec.page_title = "search product".to_string();
-                if let Some(query) = &state.search_query {
-                    rec.page_search = query.to_owned();
+                page.path = Some("search".to_string());
+                page.title = Some("search product".to_string());
+                if let Some(query) = state.search_query {
+                    page.search = Some(query.to_owned());
                 }
             }
             Event::NotFound => {
-                rec.page_path = "not-found".to_string();
-                rec.page_title = "404 not found".to_string();
+                page.path = Some("not-found".to_string());
+                page.title = Some("404 not found".to_string());
             }
             Event::ProductViewed => {
-                rec.page_path = state.selected_product.unwrap().path();
-                rec.page_title = state.selected_product.unwrap().name_str.clone();
+                page.path = Some(state.selected_product.unwrap().path());
+                page.title = Some(state.selected_product.unwrap().name.clone());
             }
             Event::ProductAddedToCart => {
-                rec.page_path = state.selected_product.unwrap().path();
-                rec.page_title = state.selected_product.unwrap().name_str.clone();
+                page.path = Some(state.selected_product.unwrap().path());
+                page.title = Some(state.selected_product.unwrap().name.clone());
             }
             Event::BuyNowProduct => {
-                rec.page_path = state.selected_product.unwrap().path();
-                rec.page_title = state.selected_product.unwrap().name_str.clone();
+                page.path = Some(state.selected_product.unwrap().path());
+                page.title = Some(state.selected_product.unwrap().name.clone());
             }
             Event::ProductRated => {
-                rec.page_path = state.selected_product.unwrap().path();
-                rec.page_title = state.selected_product.unwrap().name_str.clone();
+                page.path = Some(state.selected_product.unwrap().path());
+                page.title = Some(state.selected_product.unwrap().name.clone());
             }
             Event::CartViewed => {
-                rec.page_path = "cart".to_string();
-                rec.page_title = "cart".to_string();
+                page.path = Some("cart".to_string());
+                page.title = Some("cart".to_string());
             }
             Event::CouponApplied => {
-                rec.page_path = "coupons".to_string();
-                rec.page_title = "coupons".to_string();
+                page.path = Some("coupons".to_string());
+                page.title = Some("coupons".to_string());
             }
             Event::CustomerInformationEntered => {
-                rec.page_path = "checkout".to_string();
-                rec.page_title = "checkout".to_string();
+                page.path = Some("checkout".to_string());
+                page.title = Some("checkout".to_string());
             }
             Event::ShippingMethodEntered => {
-                rec.page_path = "checkout".to_string();
-                rec.page_title = "checkout".to_string();
+                page.path = Some("checkout".to_string());
+                page.title = Some("checkout".to_string());
             }
             Event::PaymentMethodEntered => {
-                rec.page_path = "checkout".to_string();
-                rec.page_title = "checkout".to_string();
+                page.path = Some("checkout".to_string());
+                page.title = Some("checkout".to_string());
             }
             Event::OrderVerified => {}
             Event::OrderCompleted => {
-                rec.page_path = "order-completed".to_string();
-                rec.page_title = "orders".to_string();
+                page.path = Some("order-completed".to_string());
+                page.title = Some("orders".to_string());
             }
             Event::ProductRefunded => {}
             Event::OrdersViewed => {
-                rec.page_path = "orders".to_string();
-                rec.page_title = "my orders".to_string();
+                page.path = Some("orders".to_string());
+                page.title = Some("my orders".to_string());
             }
         }
 
-        if let Some(product) = state.selected_product {
-            rec.product_name = Some(product.name as i16);
-            rec.product_category = Some(product.category as i16);
-            rec.product_subcategory = product.subcategory.map(|v| v as i16);
-            rec.product_brand = product.brand.map(|v| v as i16);
-            rec.product_price = Some(product.price.mantissa());
+        let context = Context {
+            library: None,
+            page: Some(page),
+            user_agent: None,
+            ip: profile.ip.clone(),
+        };
 
+        let mut properties = HashMap::default();
+        if let Some(product) = state.selected_product {
+            properties.insert(
+                "Product Name".to_string(),
+                PropValue::String(product.name.clone()),
+            );
+            properties.insert(
+                "Product Category".to_string(),
+                PropValue::String(product.category.clone()),
+            );
+            if let Some(subcategory) = &product.subcategory {
+                properties.insert(
+                    "Product Subcategory".to_string(),
+                    PropValue::String(subcategory.clone()),
+                );
+            }
+            if let Some(brand) = &product.brand {
+                properties.insert(
+                    "Product Brand".to_string(),
+                    PropValue::String(brand.clone()),
+                );
+            }
+            properties.insert(
+                "Product Price".to_string(),
+                PropValue::Number(product.price),
+            );
             if let Some(price) = product.discount_price {
-                rec.product_discount_price = Some(price.mantissa());
+                properties.insert(
+                    "Product Discount Price".to_string(),
+                    PropValue::Number(price),
+                );
             }
         }
 
         if !state.spent_total.is_zero() {
-            rec.spent_total = Some(state.spent_total.mantissa());
+            properties.insert(
+                "Spent Total".to_string(),
+                PropValue::Number(state.spent_total.clone()),
+            );
         }
-
         if !state.products_bought.is_empty() {
-            rec.products_bought = Some(state.products_bought.len() as i8);
+            properties.insert(
+                "Products Bought".to_string(),
+                PropValue::Number(Decimal::new(
+                    state.products_bought.len() as i64,
+                    DECIMAL_SCALE as u32,
+                )),
+            );
         }
-
         let mut cart_amount: Option<Decimal> = None;
         if !state.cart.is_empty() {
-            rec.cart_items_number = Some(state.cart.len() as i8);
+            properties.insert(
+                "Cart Items Number".to_string(),
+                PropValue::Number(Decimal::new(state.cart.len() as i64, DECIMAL_SCALE as u32)),
+            );
             let cart_amount_: Decimal = state
                 .cart
                 .iter()
                 .map(|p| p.discount_price.unwrap_or(p.price))
                 .sum();
 
-            rec.cart_amount = Some(cart_amount_.mantissa());
+            properties.insert(
+                "Cart Amount".to_string(),
+                PropValue::Number(cart_amount_.clone()),
+            );
             cart_amount = Some(cart_amount_);
         }
 
         if event == Event::OrderCompleted {
-            rec.revenue = Some(cart_amount.unwrap().mantissa());
+            properties.insert(
+                "Revenue".to_string(),
+                PropValue::Number(cart_amount.unwrap()),
+            );
         }
 
-        rec.country = profile.geo.country.map(|v| v as i16);
-        rec.city = profile.geo.city.map(|v| v as i16);
-        rec.device = profile.device.device.map(|v| v as i16);
-        rec.device_category = profile.device.device_category.map(|v| v as i16);
-        rec.os = profile.device.os.map(|v| v as i16);
-        rec.os_version = profile.device.os_version.map(|v| v as i16);
+        let mut user_props = vec![];
+        if let Some(country) = &profile.geo.country {
+            let prop = self
+                .props_prov
+                .get_by_name(self.project_id, types::USER_PROPERTY_COUNTRY)?;
 
-        self.out.send(Some(rec)).unwrap();
+            let prop = PropertyAndValue {
+                property: prop,
+                value: PropValue::String(country.to_owned()),
+            };
+            user_props.push(prop);
+        }
+        if let Some(city) = &profile.geo.city {
+            let prop = self
+                .props_prov
+                .get_by_name(self.project_id, types::USER_PROPERTY_CITY)?;
+
+            let prop = PropertyAndValue {
+                property: prop,
+                value: PropValue::String(city.to_owned()),
+            };
+            user_props.push(prop);
+        }
+        if let Some(device) = &profile.device.device {
+            let prop = self
+                .props_prov
+                .get_by_name(self.project_id, types::USER_PROPERTY_DEVICE_MODEL)?;
+
+            let prop = PropertyAndValue {
+                property: prop,
+                value: PropValue::String(device.to_owned()),
+            };
+            user_props.push(prop);
+        }
+        if let Some(device_category) = &profile.device.device_category {
+            let prop = self
+                .props_prov
+                .get_by_name(self.project_id, types::USER_PROPERTY_OS_FAMILY)?;
+
+            let prop = PropertyAndValue {
+                property: prop,
+                value: PropValue::String(device_category.to_owned()),
+            };
+            user_props.push(prop);
+        }
+        if let Some(os) = &profile.device.os {
+            let prop = self
+                .props_prov
+                .get_by_name(self.project_id, types::USER_PROPERTY_OS)?;
+
+            let prop = PropertyAndValue {
+                property: prop,
+                value: PropValue::String(os.to_owned()),
+            };
+            user_props.push(prop);
+        }
+        if let Some(os_version) = &profile.device.os_version {
+            let prop = self
+                .props_prov
+                .get_by_name(self.project_id, types::USER_PROPERTY_OS_VERSION_MAJOR)?;
+
+            let prop = PropertyAndValue {
+                property: prop,
+                value: PropValue::String(os_version.to_owned()),
+            };
+            user_props.push(prop);
+        }
+
+        let req = Track {
+            user_id: Some(profile.email.clone()),
+            anonymous_id: None,
+            resolved_user_id: None,
+            timestamp: DateTime::from_timestamp_millis(state.cur_timestamp * 10i64.pow(3)).unwrap(),
+            context,
+            event: event.to_string(),
+            resolved_event: None,
+            properties: Some(properties),
+            resolved_properties: None,
+            resolved_user_properties: Some(user_props),
+            groups: None,
+            resolved_groups: None,
+        };
+        let req_ctx = RequestContext {
+            project_id: Some(self.project_id),
+            client_ip: profile.ip.clone(),
+            token: self.token.clone(),
+        };
+
+        self.track.execute(&req_ctx, req).map_err(|err| err.into())
     }
 }
 

@@ -107,11 +107,10 @@ impl Executor<Track> {
         }
     }
 
-    pub fn execute(&mut self, ctx: &RequestContext, mut req: Track) -> Result<()> {
+    pub fn execute(&self, ctx: &RequestContext, mut req: Track) -> Result<()> {
         let project = self.md.projects.get_by_token(ctx.token.as_str())?;
         let mut ctx = ctx.to_owned();
         ctx.project_id = Some(project.id);
-
         if let Some(props) = &req.properties {
             req.resolved_properties = Some(resolve_properties(
                 &ctx,
@@ -121,7 +120,6 @@ impl Executor<Track> {
                 props,
             )?);
         }
-
         let (user_id, user_group) = match (&req.user_id, &req.anonymous_id) {
             (Some(user_id), None) => {
                 let group = self.md.groups.get_or_create(
@@ -185,7 +183,6 @@ impl Executor<Track> {
             }
             req.resolved_groups = Some(resolved_groups);
         }
-
         let event_req = CreateEventRequest {
             created_by: 1,
             tags: None,
@@ -201,7 +198,6 @@ impl Executor<Track> {
             user_properties: None,
             custom_properties: None,
         };
-
         let md_event = self
             .md
             .events
@@ -216,11 +212,10 @@ impl Executor<Track> {
             )?;
         }
 
-        for transformer in &mut self.transformers {
+        for transformer in &self.transformers {
             req = transformer.process(&ctx, req)?;
         }
-
-        for dest in &mut self.destinations {
+        for dest in &self.destinations {
             dest.send(&ctx, req.clone())?;
         }
 
@@ -246,7 +241,7 @@ impl Executor<Identify> {
         }
     }
 
-    pub fn execute(&mut self, ctx: &RequestContext, mut req: Identify) -> Result<()> {
+    pub fn execute(&self, ctx: &RequestContext, mut req: Identify) -> Result<()> {
         let ctx = ctx.to_owned();
         let project = self.md.projects.get_by_token(ctx.token.as_str())?;
         let mut ctx = ctx.to_owned();
@@ -316,11 +311,11 @@ impl Executor<Identify> {
         req.group_id = group_id;
         req.resolved_group = Some(resolved_group);
 
-        for transformer in &mut self.transformers {
+        for transformer in &self.transformers {
             req = transformer.process(&ctx, req)?;
         }
 
-        for dest in &mut self.destinations {
+        for dest in &self.destinations {
             dest.send(&ctx, req.clone())?;
         }
         Ok(())
