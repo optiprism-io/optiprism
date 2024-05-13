@@ -38,6 +38,7 @@ use common::types::EVENT_PROPERTY_TEXT;
 use common::types::EVENT_SCREEN;
 use common::types::EVENT_SESSION_BEGIN;
 use common::types::EVENT_SESSION_END;
+use common::GROUP_USER;
 use common::GROUP_USER_ID;
 use metadata::projects::Projects as MDProjects;
 use metadata::properties::DictionaryType;
@@ -266,5 +267,6 @@ pub fn init_project(project_id: u64, md: &Arc<MetadataProvider>) -> error::Resul
         dict: None,
     })?;
 
+    md.groups.get_or_create_group_name(project_id, GROUP_USER)?;
     Ok(())
 }
