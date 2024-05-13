@@ -44,41 +44,22 @@ pub const EVENT_PROPERTY_PAGE_TITLE: &str = "Page Title";
 pub const EVENT_PROPERTY_PAGE_URL: &str = "Page URL";
 pub const EVENT_PROPERTY_SESSION_LENGTH: &str = "Session Length";
 
-pub const USER_PROPERTY_CLIENT_FAMILY: &str = "Client Family";
-pub const USER_PROPERTY_CLIENT_VERSION_MINOR: &str = "Client Version Minor";
-pub const USER_PROPERTY_CLIENT_VERSION_MAJOR: &str = "Client Version Major";
-pub const USER_PROPERTY_CLIENT_VERSION_PATCH: &str = "Version Patch";
-pub const USER_PROPERTY_DEVICE_FAMILY: &str = "Device Family";
-pub const USER_PROPERTY_DEVICE_BRAND: &str = "Device Brand";
-pub const USER_PROPERTY_DEVICE_MODEL: &str = "Device Model";
-pub const USER_PROPERTY_OS: &str = "OS";
-pub const USER_PROPERTY_OS_FAMILY: &str = "OS Family";
-pub const USER_PROPERTY_OS_VERSION_MAJOR: &str = "OS Version Major";
-pub const USER_PROPERTY_OS_VERSION_MINOR: &str = "OS Version Minor";
-pub const USER_PROPERTY_OS_VERSION_PATCH: &str = "OS Version Patch";
-pub const USER_PROPERTY_OS_VERSION_PATCH_MINOR: &str = "OS Version Patch Minor";
-pub const USER_PROPERTY_COUNTRY: &str = "Country";
-pub const USER_PROPERTY_CITY: &str = "City";
+pub const EVENT_PROPERTY_CLIENT_FAMILY: &str = "Client Family";
+pub const EVENT_PROPERTY_CLIENT_VERSION_MINOR: &str = "Client Version Minor";
+pub const EVENT_PROPERTY_CLIENT_VERSION_MAJOR: &str = "Client Version Major";
+pub const EVENT_PROPERTY_CLIENT_VERSION_PATCH: &str = "Version Patch";
+pub const EVENT_PROPERTY_DEVICE_FAMILY: &str = "Device Family";
+pub const EVENT_PROPERTY_DEVICE_BRAND: &str = "Device Brand";
+pub const EVENT_PROPERTY_DEVICE_MODEL: &str = "Device Model";
+pub const EVENT_PROPERTY_OS: &str = "OS";
+pub const EVENT_PROPERTY_OS_FAMILY: &str = "OS Family";
+pub const EVENT_PROPERTY_OS_VERSION_MAJOR: &str = "OS Version Major";
+pub const EVENT_PROPERTY_OS_VERSION_MINOR: &str = "OS Version Minor";
+pub const EVENT_PROPERTY_OS_VERSION_PATCH: &str = "OS Version Patch";
+pub const EVENT_PROPERTY_OS_VERSION_PATCH_MINOR: &str = "OS Version Patch Minor";
+pub const EVENT_PROPERTY_COUNTRY: &str = "Country";
+pub const EVENT_PROPERTY_CITY: &str = "City";
 
-lazy_static! {
-    pub static ref USER_PROPERTIES: Vec<&'static str> = vec![
-        USER_PROPERTY_CLIENT_FAMILY,
-        USER_PROPERTY_CLIENT_VERSION_MINOR,
-        USER_PROPERTY_CLIENT_VERSION_MAJOR,
-        USER_PROPERTY_CLIENT_VERSION_PATCH,
-        USER_PROPERTY_DEVICE_FAMILY,
-        USER_PROPERTY_DEVICE_BRAND,
-        USER_PROPERTY_DEVICE_MODEL,
-        USER_PROPERTY_OS,
-        USER_PROPERTY_OS_FAMILY,
-        USER_PROPERTY_OS_VERSION_MAJOR,
-        USER_PROPERTY_OS_VERSION_MINOR,
-        USER_PROPERTY_OS_VERSION_PATCH,
-        USER_PROPERTY_OS_VERSION_PATCH_MINOR,
-        USER_PROPERTY_COUNTRY,
-        USER_PROPERTY_CITY
-    ];
-}
 pub const EVENT_CLICK: &str = "Click";
 pub const EVENT_PAGE: &str = "Page";
 pub const EVENT_SCREEN: &str = "Screen";

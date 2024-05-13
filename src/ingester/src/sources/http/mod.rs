@@ -179,7 +179,6 @@ impl App {
             resolved_event: None,
             properties: raw_properties,
             resolved_properties: None,
-            resolved_user_properties: None,
             groups: req.groups.clone(),
             resolved_groups: None,
         };

@@ -1,4 +1,3 @@
-pub mod identify;
 pub mod track;
 
 use std::sync::Arc;
@@ -18,7 +17,7 @@ use crate::RequestContext;
 pub fn resolve_properties(
     ctx: &RequestContext,
     context: &Context,
-    mut user_props: Vec<PropertyAndValue>,
+    mut props: Vec<PropertyAndValue>,
     props_prov: &Arc<Properties>,
     city_rdr: &maxminddb::Reader<Vec<u8>>,
 ) -> Result<Vec<PropertyAndValue>> {
@@ -28,13 +27,13 @@ pub fn resolve_properties(
     if let Some(country) = city.country {
         if let Some(names) = country.names {
             if let Some(name) = names.get("en") {
-                let prop = props_prov.get_by_name(proj_id, types::USER_PROPERTY_COUNTRY)?;
+                let prop = props_prov.get_by_name(proj_id, types::EVENT_PROPERTY_COUNTRY)?;
 
                 let prop = PropertyAndValue {
                     property: prop,
                     value: PropValue::String(name.to_string()),
                 };
-                user_props.push(prop);
+                props.push(prop);
             }
         }
     }
@@ -42,16 +41,16 @@ pub fn resolve_properties(
     if let Some(city) = city.city {
         if let Some(names) = city.names {
             if let Some(name) = names.get("en") {
-                let prop = props_prov.get_by_name(proj_id, types::USER_PROPERTY_CITY)?;
+                let prop = props_prov.get_by_name(proj_id, types::EVENT_PROPERTY_CITY)?;
 
                 let prop = PropertyAndValue {
                     property: prop,
                     value: PropValue::String(name.to_string()),
                 };
-                user_props.push(prop);
+                props.push(prop);
             }
         }
     }
 
-    Ok(user_props)
+    Ok(props)
 }

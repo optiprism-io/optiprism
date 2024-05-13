@@ -147,7 +147,6 @@ pub struct Track {
     pub resolved_event: Option<events::Event>,
     pub properties: Option<HashMap<String, PropValue>>,
     pub resolved_properties: Option<Vec<PropertyAndValue>>,
-    pub resolved_user_properties: Option<Vec<PropertyAndValue>>,
     pub groups: Option<HashMap<String, String>>,
     pub resolved_groups: Option<Vec<(usize, Group)>>,
 }
