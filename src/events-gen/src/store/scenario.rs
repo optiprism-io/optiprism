@@ -71,7 +71,6 @@ pub struct Scenario {
     pub rng: ThreadRng,
     pub gen: Generator,
     pub products: ProductProvider,
-    pub companies: CompanyProvider,
     pub to: DateTime<Utc>,
     pub track: Executor<Track>,
     pub identify: Executor<Identify>,
@@ -119,8 +118,6 @@ impl Scenario {
         let mut overall_events: usize = 0;
         while let Some(sample) = self.gen.next_sample() {
             let profile = &sample.profile;
-            let company = self.companies.sample(&mut self.rng);
-            let project = format!("Project {}", &mut self.rng.gen_range(1..=10));
             users_per_sec.fetch_add(1, Ordering::SeqCst);
             user_id += 1;
 
@@ -428,6 +425,43 @@ impl Scenario {
         };
 
         let mut properties = HashMap::default();
+        if let Some(country) = &profile.geo.country {
+            properties.insert(
+                types::EVENT_PROPERTY_COUNTRY.to_string(),
+                PropValue::String(country.to_owned()),
+            );
+        }
+        if let Some(city) = &profile.geo.city {
+            properties.insert(
+                types::EVENT_PROPERTY_CITY.to_string(),
+                PropValue::String(city.to_owned()),
+            );
+        }
+        if let Some(device) = &profile.device.device {
+            properties.insert(
+                types::EVENT_PROPERTY_DEVICE_MODEL.to_string(),
+                PropValue::String(device.to_owned()),
+            );
+        }
+        if let Some(device_category) = &profile.device.device_category {
+            properties.insert(
+                types::EVENT_PROPERTY_OS_FAMILY.to_string(),
+                PropValue::String(device_category.to_owned()),
+            );
+        }
+        if let Some(os) = &profile.device.os {
+            properties.insert(
+                types::EVENT_PROPERTY_OS.to_string(),
+                PropValue::String(os.to_owned()),
+            );
+        }
+        if let Some(os_version) = &profile.device.os_version {
+            properties.insert(
+                types::EVENT_PROPERTY_OS_VERSION_MAJOR.to_string(),
+                PropValue::String(os_version.to_owned()),
+            );
+        }
+
         if let Some(product) = state.selected_product {
             properties.insert(
                 "Product Name".to_string(),
@@ -502,74 +536,6 @@ impl Scenario {
             );
         }
 
-        let mut user_props = vec![];
-        if let Some(country) = &profile.geo.country {
-            let prop = self
-                .props_prov
-                .get_by_name(self.project_id, types::EVENT_PROPERTY_COUNTRY)?;
-
-            let prop = PropertyAndValue {
-                property: prop,
-                value: PropValue::String(country.to_owned()),
-            };
-            user_props.push(prop);
-        }
-        if let Some(city) = &profile.geo.city {
-            let prop = self
-                .props_prov
-                .get_by_name(self.project_id, types::EVENT_PROPERTY_CITY)?;
-
-            let prop = PropertyAndValue {
-                property: prop,
-                value: PropValue::String(city.to_owned()),
-            };
-            user_props.push(prop);
-        }
-        if let Some(device) = &profile.device.device {
-            let prop = self
-                .props_prov
-                .get_by_name(self.project_id, types::EVENT_PROPERTY_DEVICE_MODEL)?;
-
-            let prop = PropertyAndValue {
-                property: prop,
-                value: PropValue::String(device.to_owned()),
-            };
-            user_props.push(prop);
-        }
-        if let Some(device_category) = &profile.device.device_category {
-            let prop = self
-                .props_prov
-                .get_by_name(self.project_id, types::EVENT_PROPERTY_OS_FAMILY)?;
-
-            let prop = PropertyAndValue {
-                property: prop,
-                value: PropValue::String(device_category.to_owned()),
-            };
-            user_props.push(prop);
-        }
-        if let Some(os) = &profile.device.os {
-            let prop = self
-                .props_prov
-                .get_by_name(self.project_id, types::EVENT_PROPERTY_OS)?;
-
-            let prop = PropertyAndValue {
-                property: prop,
-                value: PropValue::String(os.to_owned()),
-            };
-            user_props.push(prop);
-        }
-        if let Some(os_version) = &profile.device.os_version {
-            let prop = self
-                .props_prov
-                .get_by_name(self.project_id, types::EVENT_PROPERTY_OS_VERSION_MAJOR)?;
-
-            let prop = PropertyAndValue {
-                property: prop,
-                value: PropValue::String(os_version.to_owned()),
-            };
-            user_props.push(prop);
-        }
-
         let req = Track {
             user_id: Some(profile.email.clone()),
             anonymous_id: None,
@@ -580,7 +546,6 @@ impl Scenario {
             resolved_event: None,
             properties: Some(properties),
             resolved_properties: None,
-            resolved_user_properties: Some(user_props),
             groups: None,
             resolved_groups: None,
         };

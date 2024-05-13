@@ -52,7 +52,7 @@ impl CompanyProvider {
         Ok(Self { companies })
     }
 
-    pub fn sample(&self, rng: &mut ThreadRng) -> &Company {
-        &self.companies.choose(rng).unwrap()
+    pub fn sample(&self, rng: &mut ThreadRng) -> Company {
+        self.companies.choose(rng).unwrap().to_owned()
     }
 }
