@@ -24,10 +24,25 @@ use common::types::COLUMN_IP;
 use common::types::COLUMN_PROJECT_ID;
 use common::types::EVENT_CLICK;
 use common::types::EVENT_PAGE;
+use common::types::EVENT_PROPERTY_CITY;
 use common::types::EVENT_PROPERTY_CLASS;
+use common::types::EVENT_PROPERTY_CLIENT_FAMILY;
+use common::types::EVENT_PROPERTY_CLIENT_VERSION_MAJOR;
+use common::types::EVENT_PROPERTY_CLIENT_VERSION_MINOR;
+use common::types::EVENT_PROPERTY_CLIENT_VERSION_PATCH;
+use common::types::EVENT_PROPERTY_COUNTRY;
+use common::types::EVENT_PROPERTY_DEVICE_BRAND;
+use common::types::EVENT_PROPERTY_DEVICE_FAMILY;
+use common::types::EVENT_PROPERTY_DEVICE_MODEL;
 use common::types::EVENT_PROPERTY_HREF;
 use common::types::EVENT_PROPERTY_ID;
 use common::types::EVENT_PROPERTY_NAME;
+use common::types::EVENT_PROPERTY_OS;
+use common::types::EVENT_PROPERTY_OS_FAMILY;
+use common::types::EVENT_PROPERTY_OS_VERSION_MAJOR;
+use common::types::EVENT_PROPERTY_OS_VERSION_MINOR;
+use common::types::EVENT_PROPERTY_OS_VERSION_PATCH;
+use common::types::EVENT_PROPERTY_OS_VERSION_PATCH_MINOR;
 use common::types::EVENT_PROPERTY_PAGE_PATH;
 use common::types::EVENT_PROPERTY_PAGE_REFERER;
 use common::types::EVENT_PROPERTY_PAGE_SEARCH;
@@ -42,21 +57,6 @@ use common::types::GROUP_COLUMN_ID;
 use common::types::GROUP_COLUMN_PROJECT_ID;
 use common::types::GROUP_COLUMN_VERSION;
 use common::types::TABLE_EVENTS;
-use common::types::USER_PROPERTY_CITY;
-use common::types::USER_PROPERTY_CLIENT_FAMILY;
-use common::types::USER_PROPERTY_CLIENT_VERSION_MAJOR;
-use common::types::USER_PROPERTY_CLIENT_VERSION_MINOR;
-use common::types::USER_PROPERTY_CLIENT_VERSION_PATCH;
-use common::types::USER_PROPERTY_COUNTRY;
-use common::types::USER_PROPERTY_DEVICE_BRAND;
-use common::types::USER_PROPERTY_DEVICE_FAMILY;
-use common::types::USER_PROPERTY_DEVICE_MODEL;
-use common::types::USER_PROPERTY_OS;
-use common::types::USER_PROPERTY_OS_FAMILY;
-use common::types::USER_PROPERTY_OS_VERSION_MAJOR;
-use common::types::USER_PROPERTY_OS_VERSION_MINOR;
-use common::types::USER_PROPERTY_OS_VERSION_PATCH;
-use common::types::USER_PROPERTY_OS_VERSION_PATCH_MINOR;
 use common::GROUPS_COUNT;
 use common::GROUP_USER_ID;
 use ingester::error::IngesterError;
@@ -346,17 +346,16 @@ fn init_ingester(
     router: Router,
 ) -> crate::error::Result<Router> {
     let mut track_transformers = Vec::new();
+
+    info!("initializing ua parser...");
     let ua_parser = UserAgentParser::from_file(File::open(ua_db_path)?)
         .map_err(|e| Error::Internal(e.to_string()))?;
-    let ua = user_agent::track::UserAgent::try_new(
-        md.group_properties[GROUP_USER_ID].clone(),
-        ua_parser,
-    )?;
+    let ua = user_agent::track::UserAgent::try_new(md.event_properties.clone(), ua_parser)?;
     track_transformers.push(Arc::new(ua) as Arc<dyn Transformer<Track>>);
 
-    // todo make common
+    info!("initializing geo...");
     let city_rdr = maxminddb::Reader::open_readfile(geo_city_path)?;
-    let geo = geo::track::Geo::try_new(md.group_properties[GROUP_USER_ID].clone(), city_rdr)?;
+    let geo = geo::track::Geo::try_new(md.event_properties.clone(), city_rdr)?;
     track_transformers.push(Arc::new(geo) as Arc<dyn Transformer<Track>>);
 
     let mut track_destinations = Vec::new();
@@ -369,29 +368,11 @@ fn init_ingester(
         md.clone(),
     );
 
-    let mut identify_transformers = Vec::new();
-    info!("initializing ua parser...");
-    let ua_parser = UserAgentParser::from_file(File::open(ua_db_path)?)
-        .map_err(|e| IngesterError::Internal(e.to_string()))?;
-    let ua = user_agent::identify::UserAgent::try_new(
-        md.group_properties[GROUP_USER_ID].clone(),
-        ua_parser,
-    )?;
-    identify_transformers.push(Arc::new(ua) as Arc<dyn Transformer<Identify>>);
-
-    info!("initializing geo...");
-    let city_rdr = maxminddb::Reader::open_readfile(geo_city_path)?;
-    let geo = geo::identify::Geo::try_new(md.group_properties[GROUP_USER_ID].clone(), city_rdr)?;
-    identify_transformers.push(Arc::new(geo) as Arc<dyn Transformer<Identify>>);
     let mut identify_destinations = Vec::new();
     let identify_dst = ingester::destinations::local::identify::Local::new(db.clone(), md.clone());
     identify_destinations.push(Arc::new(identify_dst) as Arc<dyn Destination<Identify>>);
-    let identify_exec = Executor::<Identify>::new(
-        identify_transformers,
-        identify_destinations,
-        db.clone(),
-        md.clone(),
-    );
+    let identify_exec =
+        Executor::<Identify>::new(vec![], identify_destinations, db.clone(), md.clone());
 
     info!("attaching ingester routes...");
     Ok(ingester::sources::http::attach_routes(

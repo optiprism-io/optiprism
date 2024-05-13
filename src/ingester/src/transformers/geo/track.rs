@@ -12,39 +12,33 @@ use crate::Transformer;
 
 pub struct Geo {
     city_rdr: maxminddb::Reader<Vec<u8>>,
-    user_properties: Arc<Properties>,
+    properties: Arc<Properties>,
 }
 
 impl Geo {
     pub fn try_new(
-        user_properties: Arc<Properties>,
+        properties: Arc<Properties>,
         city_rdr: maxminddb::Reader<Vec<u8>>,
     ) -> Result<Self> {
         Ok(Self {
             city_rdr,
-            user_properties,
+            properties,
         })
     }
 }
 
 impl Transformer<Track> for Geo {
     fn process(&self, ctx: &RequestContext, mut req: Track) -> Result<Track> {
-        let mut user_props = if let Some(props) = &req.resolved_user_properties {
+        let props = if let Some(props) = &req.resolved_properties {
             props.to_owned()
         } else {
             vec![]
         };
 
-        match resolve_properties(
-            ctx,
-            &req.context,
-            user_props,
-            &self.user_properties,
-            &self.city_rdr,
-        ) {
-            Ok(user_props) => {
-                if !user_props.is_empty() {
-                    req.resolved_user_properties = Some(user_props);
+        match resolve_properties(ctx, &req.context, props, &self.properties, &self.city_rdr) {
+            Ok(p) => {
+                if !p.is_empty() {
+                    req.resolved_properties = Some(p);
                 }
             }
             Err(e) => match e {

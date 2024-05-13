@@ -506,7 +506,7 @@ impl Scenario {
         if let Some(country) = &profile.geo.country {
             let prop = self
                 .props_prov
-                .get_by_name(self.project_id, types::USER_PROPERTY_COUNTRY)?;
+                .get_by_name(self.project_id, types::EVENT_PROPERTY_COUNTRY)?;
 
             let prop = PropertyAndValue {
                 property: prop,
@@ -517,7 +517,7 @@ impl Scenario {
         if let Some(city) = &profile.geo.city {
             let prop = self
                 .props_prov
-                .get_by_name(self.project_id, types::USER_PROPERTY_CITY)?;
+                .get_by_name(self.project_id, types::EVENT_PROPERTY_CITY)?;
 
             let prop = PropertyAndValue {
                 property: prop,
@@ -528,7 +528,7 @@ impl Scenario {
         if let Some(device) = &profile.device.device {
             let prop = self
                 .props_prov
-                .get_by_name(self.project_id, types::USER_PROPERTY_DEVICE_MODEL)?;
+                .get_by_name(self.project_id, types::EVENT_PROPERTY_DEVICE_MODEL)?;
 
             let prop = PropertyAndValue {
                 property: prop,
@@ -539,7 +539,7 @@ impl Scenario {
         if let Some(device_category) = &profile.device.device_category {
             let prop = self
                 .props_prov
-                .get_by_name(self.project_id, types::USER_PROPERTY_OS_FAMILY)?;
+                .get_by_name(self.project_id, types::EVENT_PROPERTY_OS_FAMILY)?;
 
             let prop = PropertyAndValue {
                 property: prop,
@@ -550,7 +550,7 @@ impl Scenario {
         if let Some(os) = &profile.device.os {
             let prop = self
                 .props_prov
-                .get_by_name(self.project_id, types::USER_PROPERTY_OS)?;
+                .get_by_name(self.project_id, types::EVENT_PROPERTY_OS)?;
 
             let prop = PropertyAndValue {
                 property: prop,
@@ -561,7 +561,7 @@ impl Scenario {
         if let Some(os_version) = &profile.device.os_version {
             let prop = self
                 .props_prov
-                .get_by_name(self.project_id, types::USER_PROPERTY_OS_VERSION_MAJOR)?;
+                .get_by_name(self.project_id, types::EVENT_PROPERTY_OS_VERSION_MAJOR)?;
 
             let prop = PropertyAndValue {
                 property: prop,

@@ -8,11 +8,26 @@ use common::types::DType;
 use common::types::OptionalProperty;
 use common::types::EVENT_CLICK;
 use common::types::EVENT_PAGE;
+use common::types::EVENT_PROPERTY_CITY;
 use common::types::EVENT_PROPERTY_CLASS;
+use common::types::EVENT_PROPERTY_CLIENT_FAMILY;
+use common::types::EVENT_PROPERTY_CLIENT_VERSION_MAJOR;
+use common::types::EVENT_PROPERTY_CLIENT_VERSION_MINOR;
+use common::types::EVENT_PROPERTY_CLIENT_VERSION_PATCH;
+use common::types::EVENT_PROPERTY_COUNTRY;
+use common::types::EVENT_PROPERTY_DEVICE_BRAND;
+use common::types::EVENT_PROPERTY_DEVICE_FAMILY;
+use common::types::EVENT_PROPERTY_DEVICE_MODEL;
 use common::types::EVENT_PROPERTY_ELEMENT;
 use common::types::EVENT_PROPERTY_HREF;
 use common::types::EVENT_PROPERTY_ID;
 use common::types::EVENT_PROPERTY_NAME;
+use common::types::EVENT_PROPERTY_OS;
+use common::types::EVENT_PROPERTY_OS_FAMILY;
+use common::types::EVENT_PROPERTY_OS_VERSION_MAJOR;
+use common::types::EVENT_PROPERTY_OS_VERSION_MINOR;
+use common::types::EVENT_PROPERTY_OS_VERSION_PATCH;
+use common::types::EVENT_PROPERTY_OS_VERSION_PATCH_MINOR;
 use common::types::EVENT_PROPERTY_PAGE_PATH;
 use common::types::EVENT_PROPERTY_PAGE_REFERER;
 use common::types::EVENT_PROPERTY_PAGE_SEARCH;
@@ -23,21 +38,6 @@ use common::types::EVENT_PROPERTY_TEXT;
 use common::types::EVENT_SCREEN;
 use common::types::EVENT_SESSION_BEGIN;
 use common::types::EVENT_SESSION_END;
-use common::types::USER_PROPERTY_CITY;
-use common::types::USER_PROPERTY_CLIENT_FAMILY;
-use common::types::USER_PROPERTY_CLIENT_VERSION_MAJOR;
-use common::types::USER_PROPERTY_CLIENT_VERSION_MINOR;
-use common::types::USER_PROPERTY_CLIENT_VERSION_PATCH;
-use common::types::USER_PROPERTY_COUNTRY;
-use common::types::USER_PROPERTY_DEVICE_BRAND;
-use common::types::USER_PROPERTY_DEVICE_FAMILY;
-use common::types::USER_PROPERTY_DEVICE_MODEL;
-use common::types::USER_PROPERTY_OS;
-use common::types::USER_PROPERTY_OS_FAMILY;
-use common::types::USER_PROPERTY_OS_VERSION_MAJOR;
-use common::types::USER_PROPERTY_OS_VERSION_MINOR;
-use common::types::USER_PROPERTY_OS_VERSION_PATCH;
-use common::types::USER_PROPERTY_OS_VERSION_PATCH_MINOR;
 use common::GROUP_USER_ID;
 use metadata::projects::Projects as MDProjects;
 use metadata::properties::DictionaryType;
@@ -201,28 +201,28 @@ pub fn init_project(project_id: u64, md: &Arc<MetadataProvider>) -> error::Resul
     create_event(md, project_id, EVENT_SCREEN.to_string())?;
     create_event(md, project_id, EVENT_SESSION_BEGIN.to_string())?;
     create_event(md, project_id, EVENT_SESSION_END.to_string())?;
-    let user_dict_props = vec![
-        USER_PROPERTY_CLIENT_FAMILY,
-        USER_PROPERTY_CLIENT_VERSION_MINOR,
-        USER_PROPERTY_CLIENT_VERSION_MAJOR,
-        USER_PROPERTY_CLIENT_VERSION_PATCH,
-        USER_PROPERTY_DEVICE_FAMILY,
-        USER_PROPERTY_DEVICE_BRAND,
-        USER_PROPERTY_DEVICE_MODEL,
-        USER_PROPERTY_OS,
-        USER_PROPERTY_OS_FAMILY,
-        USER_PROPERTY_OS_VERSION_MAJOR,
-        USER_PROPERTY_OS_VERSION_MINOR,
-        USER_PROPERTY_OS_VERSION_PATCH,
-        USER_PROPERTY_OS_VERSION_PATCH_MINOR,
-        USER_PROPERTY_COUNTRY,
-        USER_PROPERTY_CITY,
+    let event_dict_props = vec![
+        EVENT_PROPERTY_CLIENT_FAMILY,
+        EVENT_PROPERTY_CLIENT_VERSION_MINOR,
+        EVENT_PROPERTY_CLIENT_VERSION_MAJOR,
+        EVENT_PROPERTY_CLIENT_VERSION_PATCH,
+        EVENT_PROPERTY_DEVICE_FAMILY,
+        EVENT_PROPERTY_DEVICE_BRAND,
+        EVENT_PROPERTY_DEVICE_MODEL,
+        EVENT_PROPERTY_OS,
+        EVENT_PROPERTY_OS_FAMILY,
+        EVENT_PROPERTY_OS_VERSION_MAJOR,
+        EVENT_PROPERTY_OS_VERSION_MINOR,
+        EVENT_PROPERTY_OS_VERSION_PATCH,
+        EVENT_PROPERTY_OS_VERSION_PATCH_MINOR,
+        EVENT_PROPERTY_COUNTRY,
+        EVENT_PROPERTY_CITY,
     ];
-    for prop in user_dict_props {
+    for prop in event_dict_props {
         create_property(md, project_id, CreatePropertyMainRequest {
             name: prop.to_string(),
             display_name: None,
-            typ: Type::Group(GROUP_USER_ID),
+            typ: Type::Event,
             data_type: DType::String,
             nullable: true,
             hidden: false,
