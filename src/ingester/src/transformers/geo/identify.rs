@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use common::GROUP_USER;
+use common::GROUP_USER_ID;
 use maxminddb::MaxMindDBError;
 use metadata::properties::Properties;
 
@@ -31,7 +33,7 @@ impl Geo {
 impl Transformer<Identify> for Geo {
     fn process(&self, ctx: &RequestContext, mut req: Identify) -> Result<Identify> {
         // enrich only user
-        if req.group != "user".to_string() {
+        if req.group != GROUP_USER.to_string() {
             return Ok(req);
         }
         let mut user_props = if let Some(props) = &req.resolved_properties {
