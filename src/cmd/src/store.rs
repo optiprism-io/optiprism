@@ -307,11 +307,18 @@ where
 
         let mut scenario = Scenario::new(run_cfg);
 
+        let now = Utc::now();
         let res = scenario.run();
         match res {
             Ok(_) => {}
             Err(err) => println!("generation error: {:?}", err),
         }
+        let diff = Utc::now() - now;
+
+        info!(
+            "generation finished in {}",
+            humantime::format_duration(diff.to_std().unwrap())
+        );
     });
 
     Ok(())

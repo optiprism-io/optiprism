@@ -11,6 +11,7 @@ use chrono::Duration;
 use chrono::Utc;
 use common::types;
 use common::DECIMAL_SCALE;
+use common::GROUP_USER;
 use crossbeam_channel::tick;
 use crossbeam_channel::Sender;
 use ingester::executor::Executor;
@@ -134,6 +135,94 @@ impl Scenario {
                 search_query: None,
                 spent_total: Decimal::new(0, DECIMAL_SCALE as u32),
             };
+
+            // identify user
+            let context = Context {
+                library: None,
+                page: None,
+                user_agent: None,
+                ip: profile.ip.clone(),
+            };
+            let mut props = HashMap::default();
+            props.insert(
+                "First Name".to_string(),
+                PropValue::String(profile.first_name.clone()),
+            );
+            props.insert(
+                "Last Name".to_string(),
+                PropValue::String(profile.last_name.clone()),
+            );
+            props.insert(
+                "Age".to_string(),
+                PropValue::Number(Decimal::new(
+                    profile.age as i64 * 10i64.pow(16),
+                    DECIMAL_SCALE as u32,
+                )),
+            );
+            let identify = Identify {
+                timestamp: DateTime::from_timestamp_millis(state.cur_timestamp * 10i64.pow(3))
+                    .unwrap(),
+                context: context.clone(),
+                group: GROUP_USER.to_string(),
+                group_id: 0,
+                resolved_group: None,
+                id: profile.email.clone(),
+                properties: Some(props),
+                resolved_properties: None,
+            };
+
+            let req_ctx = RequestContext {
+                project_id: Some(self.project_id),
+                client_ip: profile.ip.clone(),
+                token: self.token.clone(),
+            };
+            self.identify.execute(&req_ctx, identify)?;
+
+            let mut props = HashMap::default();
+            props.insert(
+                "Staff".to_string(),
+                PropValue::Number(Decimal::new(
+                    profile.company.staff as i64 * 10i64.pow(16),
+                    DECIMAL_SCALE as u32,
+                )),
+            );
+            let identify = Identify {
+                timestamp: DateTime::from_timestamp_millis(state.cur_timestamp * 10i64.pow(3))
+                    .unwrap(),
+                context: context.clone(),
+                group: "Company".to_string(),
+                group_id: 0,
+                resolved_group: None,
+                id: profile.company.name.clone(),
+                properties: Some(props),
+                resolved_properties: None,
+            };
+
+            let req_ctx = RequestContext {
+                project_id: Some(self.project_id),
+                client_ip: profile.ip.clone(),
+                token: self.token.clone(),
+            };
+            self.identify.execute(&req_ctx, identify)?;
+
+            let identify = Identify {
+                timestamp: DateTime::from_timestamp_millis(state.cur_timestamp * 10i64.pow(3))
+                    .unwrap(),
+                context: context.clone(),
+                group: "Project".to_string(),
+                group_id: 0,
+                resolved_group: None,
+                id: profile.project.clone(),
+                properties: None,
+                resolved_properties: None,
+            };
+
+            let req_ctx = RequestContext {
+                project_id: Some(self.project_id),
+                client_ip: profile.ip.clone(),
+                token: self.token.clone(),
+            };
+            self.identify.execute(&req_ctx, identify)?;
 
             'session: loop {
                 state.search_query = None;
@@ -327,7 +416,6 @@ impl Scenario {
         Ok(())
     }
 
-    fn write_group(&self) {}
     fn write_event(&self, event: Event, state: &State, profile: &Profile) -> Result<()> {
         let mut page = Page {
             path: None,
@@ -505,7 +593,7 @@ impl Scenario {
             properties.insert(
                 "Products Bought".to_string(),
                 PropValue::Number(Decimal::new(
-                    state.products_bought.len() as i64,
+                    state.products_bought.len() as i64 * 10i64.pow(16),
                     DECIMAL_SCALE as u32,
                 )),
             );
@@ -514,7 +602,10 @@ impl Scenario {
         if !state.cart.is_empty() {
             properties.insert(
                 "Cart Items Number".to_string(),
-                PropValue::Number(Decimal::new(state.cart.len() as i64, DECIMAL_SCALE as u32)),
+                PropValue::Number(Decimal::new(
+                    state.cart.len() as i64 * 10i64.pow(16),
+                    DECIMAL_SCALE as u32,
+                )),
             );
             let cart_amount_: Decimal = state
                 .cart
@@ -536,6 +627,10 @@ impl Scenario {
             );
         }
 
+        let mut groups = HashMap::default();
+        groups.insert(GROUP_USER.to_string(), profile.email.clone());
+        groups.insert("Company".to_string(), profile.company.name.clone());
+        groups.insert("Project".to_string(), profile.project.clone());
         let req = Track {
             user_id: Some(profile.email.clone()),
             anonymous_id: None,
@@ -546,7 +641,7 @@ impl Scenario {
             resolved_event: None,
             properties: Some(properties),
             resolved_properties: None,
-            groups: None,
+            groups: Some(groups),
             resolved_groups: None,
         };
         let req_ctx = RequestContext {

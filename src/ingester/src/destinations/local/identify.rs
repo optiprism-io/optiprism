@@ -50,7 +50,7 @@ impl Destination<Identify> for Local {
 
         prop_values.push(NamedValue::new(
             GROUP_COLUMN_CREATED_AT.to_string(),
-            Value::Int64(Some(req.timestamp.timestamp())),
+            Value::Timestamp(Some(req.timestamp.timestamp_millis())),
         ));
 
         for value in &req.resolved_group.unwrap().values {
