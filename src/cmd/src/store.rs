@@ -105,6 +105,7 @@ pub struct Config<R> {
     pub products_rdr: R,
     pub geo_rdr: R,
     pub device_rdr: R,
+    pub companies_rdr: R,
     pub new_daily_users: usize,
     pub batch_size: usize,
     pub partitions: usize,
@@ -211,6 +212,9 @@ pub async fn start(args: &Store) -> Result<()> {
                     .unwrap(),
                 device_rdr: File::open(args_clone.demo_data_path.join("device.csv"))
                     .map_err(|err| Error::Internal(format!("can't open device.csv: {err}")))
+                    .unwrap(),
+                companies_rdr: File::open(args_clone.demo_data_path.join("companies.csv"))
+                    .map_err(|err| Error::Internal(format!("can't open companies.csv: {err}")))
                     .unwrap(),
                 new_daily_users: args_clone.new_daily_users,
                 batch_size: 4096,

@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use common::GROUP_USER;
 use metadata::properties::Properties;
 use uaparser::UserAgentParser;
 
@@ -26,7 +27,7 @@ impl UserAgent {
 impl Transformer<Identify> for UserAgent {
     fn process(&self, ctx: &RequestContext, mut req: Identify) -> Result<Identify> {
         // enrich only user
-        if req.group != "user".to_string() {
+        if req.group != GROUP_USER.to_string() {
             return Ok(req);
         }
         if req.context.user_agent.is_none() {

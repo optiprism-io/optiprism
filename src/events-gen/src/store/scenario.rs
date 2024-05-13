@@ -32,6 +32,7 @@ use crate::error::Result;
 use crate::generator::Generator;
 use crate::store::actions::Action;
 use crate::store::coefficients::make_coefficients;
+use crate::store::companies::CompanyProvider;
 use crate::store::events::Event;
 use crate::store::intention::select_intention;
 use crate::store::intention::Intention;
@@ -70,6 +71,7 @@ pub struct Scenario {
     pub rng: ThreadRng,
     pub gen: Generator,
     pub products: ProductProvider,
+    pub companies: CompanyProvider,
     pub to: DateTime<Utc>,
     pub track: Executor<Track>,
     pub identify: Executor<Identify>,
@@ -116,6 +118,9 @@ impl Scenario {
         let mut user_id: i64 = 0;
         let mut overall_events: usize = 0;
         while let Some(sample) = self.gen.next_sample() {
+            let profile = &sample.profile;
+            let company = self.companies.sample(&mut self.rng);
+            let project = format!("Project {}", &mut self.rng.gen_range(1..=10));
             users_per_sec.fetch_add(1, Ordering::SeqCst);
             user_id += 1;
 
@@ -291,7 +296,7 @@ impl Scenario {
 
                     if let Some(event) = prev_action.unwrap().to_event() {
                         overall_events += 1;
-                        self.write_event(event, &state, &sample.profile)?;
+                        self.write_event(event, &state, profile)?;
                     }
 
                     #[allow(clippy::single_match)]
@@ -325,6 +330,7 @@ impl Scenario {
         Ok(())
     }
 
+    fn write_group(&self) {}
     fn write_event(&self, event: Event, state: &State, profile: &Profile) -> Result<()> {
         let mut page = Page {
             path: None,

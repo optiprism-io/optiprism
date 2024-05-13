@@ -78,9 +78,9 @@ impl ProductProvider {
 
             let product = Product {
                 name: rec.name,
-                category: rec.category.clone(),
+                category: rec.category,
                 subcategory: rec.subcategory,
-                brand: rec.brand.map(|v| v.clone()),
+                brand: rec.brand,
                 price: rec.price,
                 discount_price,
                 margin: 0.,

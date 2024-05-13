@@ -24,6 +24,8 @@ use tracing::info;
 
 use crate::error::EventsGenError;
 use crate::error::Result;
+use crate::store::companies::Company;
+use crate::store::companies::CompanyProvider;
 
 #[derive(Clone)]
 pub struct Geo {
@@ -65,6 +67,8 @@ pub struct Profile {
     pub email: String,
     pub age: usize,
     pub ip: IpAddr,
+    pub company: Company,
+    pub project: String,
 }
 
 pub struct ProfileProvider {
@@ -72,10 +76,15 @@ pub struct ProfileProvider {
     geo_weight_idx: WeightedIndex<i32>,
     device: Vec<Device>,
     device_weight_idx: WeightedIndex<i32>,
+    companies: CompanyProvider,
 }
 
 impl ProfileProvider {
-    pub fn try_new_from_csv<R: io::Read>(geo_rdr: R, device_rdr: R) -> Result<Self> {
+    pub fn try_new_from_csv<R: io::Read>(
+        geo_rdr: R,
+        device_rdr: R,
+        companies: CompanyProvider,
+    ) -> Result<Self> {
         let mut geo_weights: Vec<i32> = Vec::with_capacity(1000);
         info!("loading geo");
         let geo = {
@@ -127,6 +136,7 @@ impl ProfileProvider {
             device,
             device_weight_idx: WeightedIndex::new(device_weights)
                 .map_err(|err| EventsGenError::Internal(err.to_string()))?,
+            companies,
         })
     }
 
@@ -139,6 +149,8 @@ impl ProfileProvider {
             email: FreeEmail().fake(),
             age: rng.gen_range(18..50),
             ip: IP().fake(),
+            company: self.companies.sample(rng),
+            project: format!("Project {}", rng.gen_range(1..=10)),
         }
     }
 }
