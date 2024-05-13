@@ -33,6 +33,7 @@ use dateparser::DateTimeUtc;
 use enum_iterator::all;
 use events_gen::generator;
 use events_gen::generator::Generator;
+use events_gen::store::companies::CompanyProvider;
 use events_gen::store::events::Event;
 use events_gen::store::products::ProductProvider;
 use events_gen::store::profiles::ProfileProvider;
@@ -266,10 +267,12 @@ where
     R: io::Read,
 {
     let mut rng = thread_rng();
-    info!("loading profiles...");
-    let profiles = ProfileProvider::try_new_from_csv(cfg.geo_rdr, cfg.device_rdr)?;
     info!("loading products...");
     let products = ProductProvider::try_new_from_csv(&mut rng, cfg.products_rdr)?;
+    info!("loading companies...");
+    let companies = CompanyProvider::try_new_from_csv(&mut rng, cfg.companies_rdr)?;
+    info!("loading profiles...");
+    let profiles = ProfileProvider::try_new_from_csv(cfg.geo_rdr, cfg.device_rdr, companies)?;
 
     // move init to thread because thread_rng is not movable
     thread::spawn(move || {
