@@ -59,6 +59,11 @@ pub const EVENT_PROPERTY_OS_VERSION_PATCH: &str = "OS Version Patch";
 pub const EVENT_PROPERTY_OS_VERSION_PATCH_MINOR: &str = "OS Version Patch Minor";
 pub const EVENT_PROPERTY_COUNTRY: &str = "Country";
 pub const EVENT_PROPERTY_CITY: &str = "City";
+pub const EVENT_PROPERTY_UTM_SOURCE: &str = "UTM Source";
+pub const EVENT_PROPERTY_UTM_MEDIUM: &str = "UTM Medium";
+pub const EVENT_PROPERTY_UTM_CAMPAIGN: &str = "UTM Campaign";
+pub const EVENT_PROPERTY_UTM_TERM: &str = "UTM Term";
+pub const EVENT_PROPERTY_UTM_CONTENT: &str = "UTM Content";
 
 pub const EVENT_CLICK: &str = "Click";
 pub const EVENT_PAGE: &str = "Page";
