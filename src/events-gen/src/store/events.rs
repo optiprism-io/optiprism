@@ -43,4 +43,6 @@ pub enum Event {
     ProductRefunded,
     #[strum(serialize = "Orders Viewed")]
     OrdersViewed,
+    #[strum(serialize = "Session End")]
+    SessionEnd,
 }

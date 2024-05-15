@@ -12,14 +12,18 @@ pub struct Coefficients {
     pub buy_multiple_products: f64,
     pub search_quality: f64,
     pub view_product_to_buy: f64,
+    pub view_cart: f64,
     pub refund: f64,
     pub product_rating: f64,
+    pub register: f64,
+    pub login: f64,
+    pub logout: f64,
 }
 
 pub fn make_coefficients(intention: &Intention) -> Coefficients {
     match intention {
         Intention::BuyCertainProduct(_) => Coefficients {
-            abandon_cart: 0.1,
+            abandon_cart: 0.01,
             cart_completion: 0.9,
             discover: 0.7,
             search_for_product: 0.0,
@@ -30,11 +34,15 @@ pub fn make_coefficients(intention: &Intention) -> Coefficients {
             buy_multiple_products: 0.0,
             search_quality: 0.9,
             view_product_to_buy: 0.5,
+            view_cart: 0.5,
             refund: 0.0,
             product_rating: 0.9,
+            register: 0.8,
+            login: 0.8,
+            logout: 0.1,
         },
         Intention::BuyAnyProduct => Coefficients {
-            abandon_cart: 0.1,
+            abandon_cart: 0.01,
             cart_completion: 0.9,
             discover: 0.7,
             search_for_product: 0.0,
@@ -45,8 +53,12 @@ pub fn make_coefficients(intention: &Intention) -> Coefficients {
             buy_multiple_products: 0.1,
             search_quality: 0.9,
             view_product_to_buy: 0.5,
+            view_cart: 0.5,
             refund: 0.0,
             product_rating: 0.9,
+            register: 0.8,
+            login: 0.8,
+            logout: 0.1,
         },
         Intention::JustBrowse => Coefficients {
             abandon_cart: 0.1,
@@ -60,8 +72,12 @@ pub fn make_coefficients(intention: &Intention) -> Coefficients {
             buy_multiple_products: 0.1,
             search_quality: 0.9,
             view_product_to_buy: 0.1,
+            view_cart: 0.5,
             refund: 0.0,
             product_rating: 0.9,
+            register: 0.2,
+            login: 0.2,
+            logout: 0.1,
         },
         Intention::MakeRefund(_) => Coefficients {
             abandon_cart: 0.,
@@ -75,8 +91,12 @@ pub fn make_coefficients(intention: &Intention) -> Coefficients {
             buy_multiple_products: 0.,
             search_quality: 0.,
             view_product_to_buy: 0.,
+            view_cart: 0.,
             refund: 1.0,
             product_rating: 0.,
+            register: 0.0,
+            login: 1.,
+            logout: 0.0,
         },
     }
 }

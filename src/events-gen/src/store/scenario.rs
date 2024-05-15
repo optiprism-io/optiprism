@@ -8,8 +8,10 @@ use std::time::Duration as StdDuration;
 
 use chrono::DateTime;
 use chrono::Duration;
+use chrono::TimeZone;
 use chrono::Utc;
 use common::types;
+use common::types::EVENT_SESSION_BEGIN;
 use common::DECIMAL_SCALE;
 use common::GROUP_USER;
 use crossbeam_channel::tick;
@@ -23,6 +25,7 @@ use ingester::PropertyAndValue;
 use ingester::RequestContext;
 use ingester::Track;
 use metadata::properties::Properties;
+use metadata::sessions::Sessions;
 use metadata::MetadataProvider;
 use rand::prelude::*;
 use rand::rngs::ThreadRng;
@@ -45,8 +48,8 @@ use crate::store::transitions::make_transitions;
 pub struct State<'a> {
     pub session_id: usize,
     pub event_id: usize,
-    pub user_id: i64,
     pub cur_timestamp: i64,
+    pub start_timestamp: i64,
     pub selected_product: Option<&'a Product>,
     pub products_bought: HashMap<&'a Product, usize>,
     pub products_viewed: HashMap<&'a Product, usize>,
@@ -54,6 +57,8 @@ pub struct State<'a> {
     pub cart: Vec<&'a Product>,
     pub search_query: Option<&'a String>,
     pub spent_total: Decimal,
+    pub is_registered: bool,
+    pub is_logged_in: bool,
 }
 
 pub struct Config {
@@ -64,6 +69,7 @@ pub struct Config {
     pub track: Executor<Track>,
     pub identify: Executor<Identify>,
     pub user_props_prov: Arc<Properties>,
+    pub session: Arc<Sessions>,
     pub project_id: u64,
     pub token: String,
 }
@@ -76,6 +82,7 @@ pub struct Scenario {
     pub track: Executor<Track>,
     pub identify: Executor<Identify>,
     pub props_prov: Arc<Properties>,
+    pub session: Arc<Sessions>,
     pub project_id: u64,
     pub token: String,
 }
@@ -90,6 +97,7 @@ impl Scenario {
             track: cfg.track,
             identify: cfg.identify,
             props_prov: cfg.user_props_prov,
+            session: cfg.session,
             project_id: cfg.project_id,
             token: cfg.token,
         }
@@ -115,18 +123,16 @@ impl Scenario {
             }
         });
 
-        let mut user_id: i64 = 0;
         let mut overall_events: usize = 0;
-        while let Some(sample) = self.gen.next_sample() {
+        'main: while let Some(sample) = self.gen.next_sample() {
             let profile = &sample.profile;
             users_per_sec.fetch_add(1, Ordering::SeqCst);
-            user_id += 1;
 
             let mut state = State {
                 session_id: 0,
                 event_id: 0,
-                user_id,
                 cur_timestamp: sample.cur_timestamp,
+                start_timestamp: sample.cur_timestamp,
                 selected_product: None,
                 products_bought: Default::default(),
                 products_viewed: Default::default(),
@@ -134,6 +140,8 @@ impl Scenario {
                 cart: vec![],
                 search_query: None,
                 spent_total: Decimal::new(0, DECIMAL_SCALE as u32),
+                is_registered: false,
+                is_logged_in: false,
             };
 
             // identify user
@@ -143,40 +151,6 @@ impl Scenario {
                 user_agent: None,
                 ip: profile.ip.clone(),
             };
-            let mut props = HashMap::default();
-            props.insert(
-                "First Name".to_string(),
-                PropValue::String(profile.first_name.clone()),
-            );
-            props.insert(
-                "Last Name".to_string(),
-                PropValue::String(profile.last_name.clone()),
-            );
-            props.insert(
-                "Age".to_string(),
-                PropValue::Number(Decimal::new(
-                    profile.age as i64 * 10i64.pow(16),
-                    DECIMAL_SCALE as u32,
-                )),
-            );
-            let identify = Identify {
-                timestamp: DateTime::from_timestamp_millis(state.cur_timestamp * 10i64.pow(3))
-                    .unwrap(),
-                context: context.clone(),
-                group: GROUP_USER.to_string(),
-                group_id: 0,
-                resolved_group: None,
-                id: profile.email.clone(),
-                properties: Some(props),
-                resolved_properties: None,
-            };
-
-            let req_ctx = RequestContext {
-                project_id: Some(self.project_id),
-                client_ip: profile.ip.clone(),
-                token: self.token.clone(),
-            };
-            self.identify.execute(&req_ctx, identify)?;
 
             let mut props = HashMap::default();
             props.insert(
@@ -249,7 +223,7 @@ impl Scenario {
                 let mut prev_action: Option<Action> = None;
                 let mut action = Action::ViewIndex;
                 let mut wait_time: u64;
-
+                let session_start_time = DateTime::from_timestamp(state.cur_timestamp, 0).unwrap();
                 'events: loop {
                     events_per_sec.fetch_add(1, Ordering::SeqCst);
                     match (prev_action, action, &intention) {
@@ -315,6 +289,83 @@ impl Scenario {
                         (_, Action::AddProductToCart, _) => {
                             state.cart.push(state.selected_product.unwrap());
                         }
+                        (prev, Action::Login, _) => {
+                            if !state.is_registered {
+                                action = Action::Register;
+                                continue;
+                            }
+                            if !state.is_logged_in {
+                                self.write_event(
+                                    Action::Login.to_event().unwrap(),
+                                    &state,
+                                    profile,
+                                )?;
+                                state.is_logged_in = true;
+                            }
+                            action = prev.unwrap();
+                            coefficients.login = 0.;
+                            transitions = make_transitions(&coefficients);
+                            continue;
+                        }
+                        (prev, Action::Register, _) => {
+                            coefficients.register = 0.;
+                            coefficients.login = 0.;
+                            transitions = make_transitions(&coefficients);
+                            if !state.is_registered {
+                                state.is_registered = true;
+                                state.is_logged_in = true;
+                                self.write_event(
+                                    Action::Register.to_event().unwrap(),
+                                    &state,
+                                    profile,
+                                )?;
+
+                                let mut props = HashMap::default();
+                                props.insert(
+                                    "First Name".to_string(),
+                                    PropValue::String(profile.first_name.clone()),
+                                );
+                                props.insert(
+                                    "Last Name".to_string(),
+                                    PropValue::String(profile.last_name.clone()),
+                                );
+                                props.insert(
+                                    "Age".to_string(),
+                                    PropValue::Number(Decimal::new(
+                                        profile.age as i64 * 10i64.pow(16),
+                                        DECIMAL_SCALE as u32,
+                                    )),
+                                );
+                                let identify = Identify {
+                                    timestamp: DateTime::from_timestamp_millis(
+                                        state.cur_timestamp * 10i64.pow(3),
+                                    )
+                                    .unwrap(),
+                                    context: context.clone(),
+                                    group: GROUP_USER.to_string(),
+                                    group_id: 0,
+                                    resolved_group: None,
+                                    id: profile.email.clone(),
+                                    properties: Some(props),
+                                    resolved_properties: None,
+                                };
+
+                                let req_ctx = RequestContext {
+                                    project_id: Some(self.project_id),
+                                    client_ip: profile.ip.clone(),
+                                    token: self.token.clone(),
+                                };
+                                self.identify.execute(&req_ctx, identify)?;
+
+                                self.write_event(
+                                    Action::Login.to_event().unwrap(),
+                                    &state,
+                                    profile,
+                                )?;
+                            }
+                            action = prev.unwrap();
+                        }
+
                         (_, Action::CompleteOrder, _) => {
                             for product in state.cart.iter() {
                                 state
@@ -403,7 +454,19 @@ impl Scenario {
                         transitions = make_transitions(&coefficients);
                     }
                     state.event_id += 1;
+
+                    // let tdiff = DateTime::from_timestamp(state.cur_timestamp, 0).unwrap()
+                    //   - session_start_time;
+
+                    // println!(
+                    // "{} {}: {action}",
+                    // DateTime::from_timestamp(state.cur_timestamp, 0).unwrap(),
+                    // humantime::format_duration(tdiff.to_std().unwrap())
+                    // );
                 }
+                // clean real session so the session cleaner won't set SESSION_END event
+                self.session.clear_project(self.project_id)?;
+                self.write_event(Event::SessionEnd, &state, profile)?;
 
                 state.session_id += 1;
             }
@@ -428,11 +491,11 @@ impl Scenario {
         match &event {
             Event::UserRegistered => {
                 page.path = Some("register".to_string());
-                page.title = Some("user registration".to_string());
+                page.title = Some("registration".to_string());
             }
             Event::UserLoggedIn => {
                 page.path = Some("login".to_string());
-                page.title = Some("user login".to_string());
+                page.title = Some("login".to_string());
             }
             Event::SubscribedForNewsletter => {
                 page.path = Some("subscribe".to_string());
@@ -503,6 +566,7 @@ impl Scenario {
                 page.path = Some("orders".to_string());
                 page.title = Some("my orders".to_string());
             }
+            Event::SessionEnd => {}
         }
 
         let context = Context {
@@ -628,12 +692,17 @@ impl Scenario {
         }
 
         let mut groups = HashMap::default();
-        groups.insert(GROUP_USER.to_string(), profile.email.clone());
         groups.insert("Company".to_string(), profile.company.name.clone());
         groups.insert("Project".to_string(), profile.project.clone());
+        let (user_id, anonymous_id) = if state.is_registered {
+            (Some(profile.email.clone()), None)
+        } else {
+            (None, Some(profile.anonymous_id.clone()))
+        };
+
         let req = Track {
-            user_id: Some(profile.email.clone()),
-            anonymous_id: None,
+            user_id,
+            anonymous_id,
             resolved_user_id: None,
             timestamp: DateTime::from_timestamp_millis(state.cur_timestamp * 10i64.pow(3)).unwrap(),
             context,
@@ -659,6 +728,9 @@ pub type Transition = (Action, Vec<(Action, f64, u64)>);
 
 pub fn next_action(from: Action, transitions: &[Transition], rng: &mut ThreadRng) -> (Action, u64) {
     for (t_from, to) in transitions.iter() {
+        if to.is_empty() {
+            return (t_from.to_owned(), 0);
+        }
         if *t_from != from {
             continue;
         }

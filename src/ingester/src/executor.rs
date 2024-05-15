@@ -305,7 +305,7 @@ impl Executor<Identify> {
             ctx.project_id.unwrap(),
             group_id,
             req.id.as_str(),
-            vals.clone(),
+            vals,
         )?;
 
         req.group_id = group_id;
