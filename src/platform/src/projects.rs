@@ -35,6 +35,11 @@ use common::types::EVENT_PROPERTY_PAGE_TITLE;
 use common::types::EVENT_PROPERTY_PAGE_URL;
 use common::types::EVENT_PROPERTY_SESSION_LENGTH;
 use common::types::EVENT_PROPERTY_TEXT;
+use common::types::EVENT_PROPERTY_UTM_CAMPAIGN;
+use common::types::EVENT_PROPERTY_UTM_CONTENT;
+use common::types::EVENT_PROPERTY_UTM_MEDIUM;
+use common::types::EVENT_PROPERTY_UTM_SOURCE;
+use common::types::EVENT_PROPERTY_UTM_TERM;
 use common::types::EVENT_SCREEN;
 use common::types::EVENT_SESSION_BEGIN;
 use common::types::EVENT_SESSION_END;
@@ -218,6 +223,11 @@ pub fn init_project(project_id: u64, md: &Arc<MetadataProvider>) -> error::Resul
         EVENT_PROPERTY_OS_VERSION_PATCH_MINOR,
         EVENT_PROPERTY_COUNTRY,
         EVENT_PROPERTY_CITY,
+        EVENT_PROPERTY_UTM_SOURCE,
+        EVENT_PROPERTY_UTM_MEDIUM,
+        EVENT_PROPERTY_UTM_CAMPAIGN,
+        EVENT_PROPERTY_UTM_TERM,
+        EVENT_PROPERTY_UTM_CONTENT,
     ];
     for prop in event_dict_props {
         create_property(md, project_id, CreatePropertyMainRequest {

@@ -36,6 +36,7 @@ use crate::error::Result;
 use crate::generator::Generator;
 use crate::store::actions::Action;
 use crate::store::coefficients::make_coefficients;
+use crate::store::coefficients::AdSource;
 use crate::store::companies::CompanyProvider;
 use crate::store::events::Event;
 use crate::store::intention::select_intention;
@@ -59,6 +60,7 @@ pub struct State<'a> {
     pub spent_total: Decimal,
     pub is_registered: bool,
     pub is_logged_in: bool,
+    pub ad: Option<AdSource>,
 }
 
 pub struct Config {
@@ -124,7 +126,7 @@ impl Scenario {
         });
 
         let mut overall_events: usize = 0;
-        'main: while let Some(sample) = self.gen.next_sample() {
+        while let Some(sample) = self.gen.next_sample() {
             let profile = &sample.profile;
             users_per_sec.fetch_add(1, Ordering::SeqCst);
 
@@ -142,6 +144,7 @@ impl Scenario {
                 spent_total: Decimal::new(0, DECIMAL_SCALE as u32),
                 is_registered: false,
                 is_logged_in: false,
+                ad: None,
             };
 
             // identify user
@@ -201,7 +204,6 @@ impl Scenario {
             'session: loop {
                 state.search_query = None;
                 state.selected_product = None;
-
                 let rng = &mut self.rng;
                 let intention = select_intention(&state, &self.products, rng);
                 if state.session_id > 0 {
@@ -214,10 +216,18 @@ impl Scenario {
 
                     state.cur_timestamp += self.rng.gen_range(add_time..=add_time + add_time / 10);
                 }
-                let mut coefficients = make_coefficients(&intention);
+                if self.rng.gen::<f64>() < 0.3 {
+                    if self.rng.gen::<f64>() < 0.5 {
+                        state.ad = Some(AdSource::AdWords);
+                    } else {
+                        state.ad = Some(AdSource::FacebookText);
+                    }
+                }
+                let mut coefficients = make_coefficients(&intention, &state.ad);
                 if self.rng.gen::<f64>() < coefficients.global_bounce_rate {
                     break 'session;
                 }
+                coefficients.global_bounce_rate = 0.;
 
                 let mut transitions = make_transitions(&coefficients);
                 let mut prev_action: Option<Action> = None;
@@ -577,6 +587,29 @@ impl Scenario {
         };
 
         let mut properties = HashMap::default();
+        if let Some(ad) = &state.ad {
+            properties.insert(
+                types::EVENT_PROPERTY_UTM_SOURCE.to_string(),
+                PropValue::String(ad.to_string()),
+            );
+            properties.insert(
+                types::EVENT_PROPERTY_UTM_MEDIUM.to_string(),
+                PropValue::String("cpc".to_string()),
+            );
+            properties.insert(
+                types::EVENT_PROPERTY_UTM_CAMPAIGN.to_string(),
+                PropValue::String("campaign".to_string()),
+            );
+            properties.insert(
+                types::EVENT_PROPERTY_UTM_TERM.to_string(),
+                PropValue::String("tech".to_string()),
+            );
+            properties.insert(
+                types::EVENT_PROPERTY_UTM_CONTENT.to_string(),
+                PropValue::String("textlink".to_string()),
+            );
+        }
+
         if let Some(country) = &profile.geo.country {
             properties.insert(
                 types::EVENT_PROPERTY_COUNTRY.to_string(),
