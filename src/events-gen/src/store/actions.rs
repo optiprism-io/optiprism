@@ -4,6 +4,9 @@ use crate::store::events::Event;
 
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, Display)]
 pub enum Action {
+    Register,
+    Login,
+    Logout,
     ViewIndex,
     ViewIndexPromotions,
     ViewDeals,
@@ -22,6 +25,7 @@ pub enum Action {
     RefundProduct,
     ViewOrders,
     Bounce,
+    GoToPreviousPage,
     AbandonCart,
     EndSession,
 }
@@ -44,6 +48,8 @@ impl Action {
             Action::CompleteOrder => Some(Event::OrderCompleted),
             Action::RefundProduct => Some(Event::ProductRefunded),
             Action::ViewOrders => Some(Event::OrdersViewed),
+            Action::Register => Some(Event::UserRegistered),
+            Action::Login => Some(Event::UserLoggedIn),
             _ => None,
         }
     }

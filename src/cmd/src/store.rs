@@ -301,6 +301,7 @@ where
             track,
             identify,
             user_props_prov: md.group_properties[GROUP_USER_ID].clone(),
+            session: md.sessions.clone(),
             project_id: cfg.project_id,
             token: cfg.token,
         };

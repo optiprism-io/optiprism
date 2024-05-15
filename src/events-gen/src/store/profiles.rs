@@ -21,6 +21,7 @@ use rand::prelude::*;
 use rand::rngs::ThreadRng;
 use serde::Deserialize;
 use tracing::info;
+use uuid::Uuid;
 
 use crate::error::EventsGenError;
 use crate::error::Result;
@@ -65,6 +66,7 @@ pub struct Profile {
     pub first_name: String,
     pub last_name: String,
     pub email: String,
+    pub anonymous_id: String,
     pub age: usize,
     pub ip: IpAddr,
     pub company: Company,
@@ -147,6 +149,7 @@ impl ProfileProvider {
             first_name: FirstName().fake(),
             last_name: LastName().fake(),
             email: FreeEmail().fake(),
+            anonymous_id: Uuid::new_v4().to_string(),
             age: rng.gen_range(18..50),
             ip: IP().fake(),
             company: self.companies.sample(rng),

@@ -14,7 +14,7 @@ pub mod projects;
 pub mod properties;
 pub mod reports;
 pub mod rocksdb;
-mod sessions;
+pub mod sessions;
 pub mod teams;
 pub mod util;
 

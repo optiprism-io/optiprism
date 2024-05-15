@@ -45,6 +45,17 @@ impl Sessions {
         }
     }
 
+    pub fn clear_project(&self, project_id: u64) -> Result<()> {
+        let tx = self.db.transaction();
+        let list: ListResponse<Session> = list(&tx, project_ns(project_id, NAMESPACE).as_ref())?;
+        let tx = self.db.transaction();
+        for s in list.into_iter() {
+            tx.delete(make_data_key(project_id, s.user_id).as_slice())?;
+        }
+        tx.commit()?;
+
+        Ok(())
+    }
     // returns true if session is new
     pub fn set_current_time(
         &self,

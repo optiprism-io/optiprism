@@ -10,6 +10,7 @@ use common::types::COLUMN_EVENT_ID;
 use common::types::COLUMN_IP;
 use common::types::COLUMN_PROJECT_ID;
 use common::types::EVENT_SESSION_BEGIN;
+use common::types::TABLE_EVENTS;
 use common::GROUPS_COUNT;
 use common::GROUP_USER_ID;
 use metadata::dictionaries::Dictionaries;
@@ -161,7 +162,7 @@ impl Destination<Track> for Local {
             ]
             .concat();
 
-            self.db.insert("events", values)?;
+            self.db.insert(TABLE_EVENTS, values)?;
         }
 
         let record_id = self
