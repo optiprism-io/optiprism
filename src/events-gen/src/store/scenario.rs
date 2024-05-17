@@ -17,6 +17,7 @@ use common::GROUP_USER;
 use crossbeam_channel::tick;
 use crossbeam_channel::Sender;
 use ingester::executor::Executor;
+use ingester::Campaign;
 use ingester::Context;
 use ingester::Identify;
 use ingester::Page;
@@ -153,6 +154,7 @@ impl Scenario {
                 page: None,
                 user_agent: None,
                 ip: profile.ip.clone(),
+                campaign: None,
             };
 
             let mut props = HashMap::default();
@@ -579,37 +581,23 @@ impl Scenario {
             Event::SessionEnd => {}
         }
 
+        let campaign = state.ad.map(|ad| Campaign {
+            source: ad.to_string(),
+            medium: Some("cpc".to_string()),
+            campaign: Some("campaign".to_string()),
+            term: Some("tech".to_string()),
+            content: Some("textlink".to_string()),
+        });
+
         let context = Context {
             library: None,
             page: Some(page),
             user_agent: None,
             ip: profile.ip.clone(),
+            campaign,
         };
 
         let mut properties = HashMap::default();
-        if let Some(ad) = &state.ad {
-            properties.insert(
-                types::EVENT_PROPERTY_UTM_SOURCE.to_string(),
-                PropValue::String(ad.to_string()),
-            );
-            properties.insert(
-                types::EVENT_PROPERTY_UTM_MEDIUM.to_string(),
-                PropValue::String("cpc".to_string()),
-            );
-            properties.insert(
-                types::EVENT_PROPERTY_UTM_CAMPAIGN.to_string(),
-                PropValue::String("campaign".to_string()),
-            );
-            properties.insert(
-                types::EVENT_PROPERTY_UTM_TERM.to_string(),
-                PropValue::String("tech".to_string()),
-            );
-            properties.insert(
-                types::EVENT_PROPERTY_UTM_CONTENT.to_string(),
-                PropValue::String("textlink".to_string()),
-            );
-        }
-
         if let Some(country) = &profile.geo.country {
             properties.insert(
                 types::EVENT_PROPERTY_COUNTRY.to_string(),

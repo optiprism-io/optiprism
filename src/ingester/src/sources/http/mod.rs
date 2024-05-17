@@ -34,11 +34,22 @@ use crate::RequestContext;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct Campaign {
+    pub source: String,
+    pub medium: Option<String>,
+    pub campaign: Option<String>,
+    pub term: Option<String>,
+    pub content: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Context {
     pub library: Option<Library>,
     pub page: Option<Page>,
     pub user_agent: Option<String>,
     pub ip: Option<IpAddr>,
+    pub campaign: Option<Campaign>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -161,6 +172,13 @@ impl App {
             }),
             user_agent: req.context.user_agent.clone(),
             ip: req.context.ip.unwrap_or_else(|| ctx.client_ip.clone()),
+            campaign: req.context.campaign.map(|cmp| crate::Campaign {
+                source: cmp.source.clone(),
+                medium: cmp.medium.clone(),
+                campaign: cmp.campaign.clone(),
+                term: cmp.term.clone(),
+                content: cmp.content.clone(),
+            }),
         };
 
         let raw_properties = req.properties.map(|v| {
@@ -201,6 +219,14 @@ impl App {
             }),
             user_agent: req.context.user_agent.clone(),
             ip: req.context.ip.unwrap_or_else(|| ctx.client_ip.clone()),
+            campaign: req.context.campaign.map(|cmp| crate::Campaign {
+                // todo do we need to add utm to user profiles?
+                campaign: cmp.campaign.clone(),
+                source: cmp.source.clone(),
+                medium: cmp.medium.clone(),
+                term: cmp.term.clone(),
+                content: cmp.content.clone(),
+            }),
         };
 
         let raw_props = req.properties.map(|v| {
