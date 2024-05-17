@@ -9,6 +9,11 @@ use common::types::COLUMN_EVENT;
 use common::types::COLUMN_EVENT_ID;
 use common::types::COLUMN_IP;
 use common::types::COLUMN_PROJECT_ID;
+use common::types::EVENT_PROPERTY_UTM_CAMPAIGN;
+use common::types::EVENT_PROPERTY_UTM_CONTENT;
+use common::types::EVENT_PROPERTY_UTM_MEDIUM;
+use common::types::EVENT_PROPERTY_UTM_SOURCE;
+use common::types::EVENT_PROPERTY_UTM_TERM;
 use common::types::EVENT_SESSION_BEGIN;
 use common::types::TABLE_EVENTS;
 use common::GROUPS_COUNT;
@@ -116,6 +121,33 @@ impl Destination<Track> for Local {
             }
         }
 
+        let utm = if let Some(campaign) = &req.context.campaign {
+            let mut utm = vec![];
+            utm.push(NamedValue::new(
+                EVENT_PROPERTY_UTM_SOURCE.to_string(),
+                Value::String(Some(campaign.source.to_string())),
+            ));
+            utm.push(NamedValue::new(
+                EVENT_PROPERTY_UTM_MEDIUM.to_string(),
+                Value::String(campaign.medium.clone()),
+            ));
+            utm.push(NamedValue::new(
+                EVENT_PROPERTY_UTM_CAMPAIGN.to_string(),
+                Value::String(campaign.campaign.clone()),
+            ));
+            utm.push(NamedValue::new(
+                EVENT_PROPERTY_UTM_TERM.to_string(),
+                Value::String(campaign.term.clone()),
+            ));
+            utm.push(NamedValue::new(
+                EVENT_PROPERTY_UTM_CONTENT.to_string(),
+                Value::String(campaign.content.clone()),
+            ));
+
+            utm
+        } else {
+            vec![]
+        };
         if is_new_session {
             let record_id = self
                 .md
@@ -140,6 +172,7 @@ impl Destination<Track> for Local {
                     ),
                 ],
                 groups.clone(),
+                utm,
                 vec![
                     NamedValue::new(
                         COLUMN_CREATED_AT.to_string(),

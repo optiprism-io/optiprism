@@ -37,6 +37,14 @@ pub struct RequestContext {
     pub client_ip: IpAddr,
     pub token: String,
 }
+#[derive(Debug, Clone)]
+pub struct Campaign {
+    pub source: String,
+    pub medium: Option<String>,
+    pub campaign: Option<String>,
+    pub term: Option<String>,
+    pub content: Option<String>,
+}
 
 #[derive(Debug, Clone)]
 pub struct Context {
@@ -44,6 +52,7 @@ pub struct Context {
     pub page: Option<Page>,
     pub user_agent: Option<String>,
     pub ip: IpAddr,
+    pub campaign: Option<Campaign>,
 }
 
 #[derive(Debug, Clone)]

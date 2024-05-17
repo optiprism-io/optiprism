@@ -17,6 +17,7 @@ use common::GROUP_USER;
 use crossbeam_channel::tick;
 use crossbeam_channel::Sender;
 use ingester::executor::Executor;
+use ingester::Campaign;
 use ingester::Context;
 use ingester::Identify;
 use ingester::Page;
@@ -153,6 +154,7 @@ impl Scenario {
                 page: None,
                 user_agent: None,
                 ip: profile.ip.clone(),
+                campaign: None,
             };
 
             let mut props = HashMap::default();
@@ -579,11 +581,20 @@ impl Scenario {
             Event::SessionEnd => {}
         }
 
+        let campaign = state.ad.map(|ad| Campaign {
+            source: ad.to_string(),
+            medium: Some("cpc".to_string()),
+            campaign: Some("campaign".to_string()),
+            term: Some("tech".to_string()),
+            content: Some("textlink".to_string()),
+        });
+
         let context = Context {
             library: None,
             page: Some(page),
             user_agent: None,
             ip: profile.ip.clone(),
+            campaign,
         };
 
         let mut properties = HashMap::default();
