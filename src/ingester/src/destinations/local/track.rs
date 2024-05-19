@@ -123,26 +123,89 @@ impl Destination<Track> for Local {
 
         let utm = if let Some(campaign) = &req.context.campaign {
             let mut utm = vec![];
-            utm.push(NamedValue::new(
-                EVENT_PROPERTY_UTM_SOURCE.to_string(),
-                Value::String(Some(campaign.source.to_string())),
-            ));
-            utm.push(NamedValue::new(
-                EVENT_PROPERTY_UTM_MEDIUM.to_string(),
-                Value::String(campaign.medium.clone()),
-            ));
-            utm.push(NamedValue::new(
-                EVENT_PROPERTY_UTM_CAMPAIGN.to_string(),
-                Value::String(campaign.campaign.clone()),
-            ));
-            utm.push(NamedValue::new(
-                EVENT_PROPERTY_UTM_TERM.to_string(),
-                Value::String(campaign.term.clone()),
-            ));
-            utm.push(NamedValue::new(
-                EVENT_PROPERTY_UTM_CONTENT.to_string(),
-                Value::String(campaign.content.clone()),
-            ));
+            let property = self
+                .md
+                .event_properties
+                .get_by_name(ctx.project_id.unwrap(), EVENT_PROPERTY_UTM_SOURCE)?;
+            let value = PropValue::String(campaign.source.clone());
+
+            let value = property_to_value(
+                ctx,
+                &PropertyAndValue {
+                    property: property.clone(),
+                    value,
+                },
+                &self.md.dictionaries,
+            )?;
+            utm.push(NamedValue::new(property.column_name(), value));
+            if let Some(medium) = &campaign.medium {
+                let property = self
+                    .md
+                    .event_properties
+                    .get_by_name(ctx.project_id.unwrap(), EVENT_PROPERTY_UTM_MEDIUM)?;
+                let value = PropValue::String(medium.to_owned());
+
+                let value = property_to_value(
+                    ctx,
+                    &PropertyAndValue {
+                        property: property.clone(),
+                        value,
+                    },
+                    &self.md.dictionaries,
+                )?;
+                utm.push(NamedValue::new(property.column_name(), value));
+            }
+
+            if let Some(campaign) = &campaign.campaign {
+                let property = self
+                    .md
+                    .event_properties
+                    .get_by_name(ctx.project_id.unwrap(), EVENT_PROPERTY_UTM_CAMPAIGN)?;
+                let value = PropValue::String(campaign.to_owned());
+                let value = property_to_value(
+                    ctx,
+                    &PropertyAndValue {
+                        property: property.clone(),
+                        value,
+                    },
+                    &self.md.dictionaries,
+                )?;
+                utm.push(NamedValue::new(property.column_name(), value));
+            }
+
+            if let Some(term) = &campaign.term {
+                let property = self
+                    .md
+                    .event_properties
+                    .get_by_name(ctx.project_id.unwrap(), EVENT_PROPERTY_UTM_TERM)?;
+                let value = PropValue::String(term.to_owned());
+                let value = property_to_value(
+                    ctx,
+                    &PropertyAndValue {
+                        property: property.clone(),
+                        value,
+                    },
+                    &self.md.dictionaries,
+                )?;
+                utm.push(NamedValue::new(property.column_name(), value));
+            }
+
+            if let Some(content) = &campaign.content {
+                let property = self
+                    .md
+                    .event_properties
+                    .get_by_name(ctx.project_id.unwrap(), EVENT_PROPERTY_UTM_CONTENT)?;
+                let value = PropValue::String(content.to_owned());
+                let value = property_to_value(
+                    ctx,
+                    &PropertyAndValue {
+                        property: property.clone(),
+                        value,
+                    },
+                    &self.md.dictionaries,
+                )?;
+                utm.push(NamedValue::new(property.column_name(), value));
+            }
 
             utm
         } else {
