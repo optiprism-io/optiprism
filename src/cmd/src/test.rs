@@ -27,6 +27,7 @@ use metadata::util::CreatePropertyMainRequest;
 use metadata::MetadataProvider;
 use platform::auth;
 use platform::projects::init_project;
+use platform::rbac::RBAC;
 use query::QueryProvider;
 use scan_dir::ScanDir;
 use storage::db::OptiDBImpl;
@@ -279,9 +280,11 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
     let cfg = Config::default();
     let query_provider = Arc::new(QueryProvider::new(md.clone(), db.clone()));
 
+    let rbac = Arc::new(RBAC::new(md.clone()));
     let platform_provider = Arc::new(platform::PlatformProvider::new(
         md.clone(),
         query_provider,
+        rbac,
         cfg.clone(),
     ));
 

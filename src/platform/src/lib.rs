@@ -17,6 +17,7 @@ pub mod organizations;
 pub mod projects;
 pub mod properties;
 pub mod queries;
+pub mod rbac;
 pub mod reports;
 // pub mod stub;
 
@@ -72,6 +73,7 @@ use crate::organizations::Organizations;
 use crate::projects::Projects;
 use crate::properties::Properties;
 use crate::queries::Queries;
+use crate::rbac::RBAC;
 use crate::reports::Reports;
 
 pub struct PlatformProvider {
@@ -97,30 +99,43 @@ impl PlatformProvider {
     pub fn new(
         md: Arc<MetadataProvider>,
         query_prov: Arc<query::QueryProvider>,
+        rbac: Arc<RBAC>,
         cfg: Config,
     ) -> Self {
         let group_properties = (0..GROUPS_COUNT)
-            .map(|gid| Arc::new(Properties::new_group(md.group_properties[gid].clone())))
+            .map(|gid| {
+                Arc::new(Properties::new_group(
+                    md.group_properties[gid].clone(),
+                    rbac.clone(),
+                ))
+            })
             .collect::<Vec<_>>();
         Self {
-            events: Arc::new(Events::new(md.events.clone())),
-            custom_events: Arc::new(CustomEvents::new(md.custom_events.clone())),
-            groups: Arc::new(Groups::new(md.groups.clone())),
-            event_properties: Arc::new(Properties::new_event(md.event_properties.clone())),
+            events: Arc::new(Events::new(md.events.clone(), rbac.clone())),
+            custom_events: Arc::new(CustomEvents::new(md.custom_events.clone(), rbac.clone())),
+            groups: Arc::new(Groups::new(md.groups.clone(), rbac.clone())),
+            event_properties: Arc::new(Properties::new_event(
+                md.event_properties.clone(),
+                rbac.clone(),
+            )),
             group_properties,
-            system_properties: Arc::new(Properties::new_system(md.system_properties.clone())),
+            system_properties: Arc::new(Properties::new_system(
+                md.system_properties.clone(),
+                rbac.clone(),
+            )),
             system_group_properties: Arc::new(Properties::new_system_group(
                 md.system_group_properties.clone(),
+                rbac.clone(),
             )),
-            accounts: Arc::new(Accounts::new(md.accounts.clone())),
+            accounts: Arc::new(Accounts::new(md.accounts.clone(), rbac.clone())),
             auth: Arc::new(Auth::new(md.accounts.clone(), cfg.clone())),
-            query: Arc::new(Queries::new(query_prov, md.clone())),
-            dashboards: Arc::new(Dashboards::new(md.dashboards.clone())),
-            reports: Arc::new(Reports::new(md.reports.clone())),
+            query: Arc::new(Queries::new(query_prov, md.clone(), rbac.clone())),
+            dashboards: Arc::new(Dashboards::new(md.dashboards.clone(), rbac.clone())),
+            reports: Arc::new(Reports::new(md.reports.clone(), rbac.clone())),
             // event_records: Arc::new(stub::EventRecords {}),
             // group_records: Arc::new(stub::GroupRecords {}),
-            projects: Arc::new(Projects::new(md.clone(), cfg.clone())),
-            organizations: Arc::new(Organizations::new(md.clone(), cfg.clone())),
+            projects: Arc::new(Projects::new(md.clone(), rbac.clone(), cfg.clone())),
+            organizations: Arc::new(Organizations::new(md.clone(), rbac.clone(), cfg.clone())),
         }
     }
 }

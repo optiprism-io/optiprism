@@ -81,6 +81,8 @@ pub const RESERVED_COLUMN_AGG_PARTITIONED_AGGREGATE: &str = "partitioned_agg";
 pub const RESERVED_COLUMN_AGG_PARTITIONED_COUNT: &str = "partitioned_count";
 pub const RESERVED_COLUMN_AGG: &str = "agg";
 pub const RESERVED_COLUMN_COUNT: &str = "count";
+
+pub const ADMIN_ACCOUNT_ID: u64 = 1;
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 #[derive(Default)]

@@ -3,7 +3,6 @@ use std::sync::Arc;
 use chrono::DateTime;
 use chrono::Utc;
 use common::config::Config;
-use common::rbac::OrganizationPermission;
 use common::types::DType;
 use common::types::OptionalProperty;
 use common::types::EVENT_CLICK;
@@ -59,26 +58,37 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::error;
+use crate::rbac::OrganizationPermission;
+use crate::rbac::RBAC;
 use crate::Context;
 use crate::ListResponse;
 use crate::Result;
 
 pub struct Projects {
     md: Arc<MetadataProvider>,
+    rbac: Arc<RBAC>,
     cfg: Config,
 }
 
 impl Projects {
-    pub fn new(prov: Arc<MetadataProvider>, cfg: Config) -> Self {
-        Self { md: prov, cfg }
+    pub fn new(prov: Arc<MetadataProvider>, rbac: Arc<RBAC>, cfg: Config) -> Self {
+        Self {
+            md: prov,
+            rbac,
+            cfg,
+        }
     }
     pub async fn create(&self, ctx: Context, request: CreateProjectRequest) -> Result<Project> {
-        ctx.check_organization_permission(OrganizationPermission::ManageProjects)?;
+        self.rbac.check_organization_permission(
+            ctx.account_id,
+            ctx.organization_id,
+            OrganizationPermission::ManageProjects,
+        )?;
 
         let token = Alphanumeric.sample_string(&mut thread_rng(), 64);
 
         let md = metadata::projects::CreateProjectRequest {
-            created_by: ctx.account_id.unwrap(),
+            created_by: ctx.account_id,
             tags: request.tags,
             name: request.name,
             description: request.description,
@@ -95,7 +105,11 @@ impl Projects {
     }
 
     pub async fn get_by_id(&self, ctx: Context, id: u64) -> Result<Project> {
-        ctx.check_organization_permission(OrganizationPermission::ExploreProjects)?;
+        self.rbac.check_organization_permission(
+            ctx.account_id,
+            ctx.organization_id,
+            OrganizationPermission::ExploreProjects,
+        )?;
 
         Ok(self.md.projects.get_by_id(id)?.into())
     }
@@ -105,7 +119,11 @@ impl Projects {
         ctx: Context,
         organization_id: Option<u64>,
     ) -> Result<ListResponse<Project>> {
-        ctx.check_organization_permission(OrganizationPermission::ExploreProjects)?;
+        self.rbac.check_organization_permission(
+            ctx.account_id,
+            ctx.organization_id,
+            OrganizationPermission::ExploreProjects,
+        )?;
         let resp = self.md.projects.list(organization_id)?;
 
         Ok(ListResponse {
@@ -120,10 +138,14 @@ impl Projects {
         project_id: u64,
         req: UpdateProjectRequest,
     ) -> Result<Project> {
-        ctx.check_organization_permission(OrganizationPermission::ManageProjects)?;
+        self.rbac.check_organization_permission(
+            ctx.account_id,
+            ctx.organization_id,
+            OrganizationPermission::ManageProjects,
+        )?;
 
         let md_req = metadata::projects::UpdateProjectRequest {
-            updated_by: ctx.account_id.unwrap(),
+            updated_by: ctx.account_id,
             tags: req.tags,
             name: req.name,
             description: req.description,
@@ -137,7 +159,11 @@ impl Projects {
     }
 
     pub async fn delete(&self, ctx: Context, project_id: u64) -> Result<Project> {
-        ctx.check_organization_permission(OrganizationPermission::ManageProjects)?;
+        self.rbac.check_organization_permission(
+            ctx.account_id,
+            ctx.organization_id,
+            OrganizationPermission::ManageProjects,
+        )?;
 
         Ok(self.md.projects.delete(project_id)?.into())
     }

@@ -13,10 +13,8 @@ use chrono::Duration;
 use chrono::Utc;
 use common::config::Config;
 use common::group_col;
-use common::rbac::OrganizationRole;
-use common::rbac::ProjectRole;
-use common::rbac::Role;
 use common::types::DType;
+use common::types::ADMIN_ACCOUNT_ID;
 use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_EVENT_ID;
@@ -85,6 +83,7 @@ use metrics::Unit;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use platform::auth;
 use platform::auth::password::make_password_hash;
+use platform::rbac::RBAC;
 use platform::PlatformProvider;
 use query::QueryProvider;
 use rand::distributions::Alphanumeric;
@@ -323,9 +322,12 @@ fn init_platform(
 ) -> crate::error::Result<Router> {
     let query_provider = Arc::new(QueryProvider::new(md.clone(), db.clone()));
 
+    let rbac = Arc::new(RBAC::new(md.clone()));
+
     let platform_provider = Arc::new(PlatformProvider::new(
         md.clone(),
         query_provider,
+        rbac,
         cfg.clone(),
     ));
 
@@ -461,14 +463,10 @@ fn init_session_cleaner(
 
 fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<Project> {
     let admin = match md.accounts.create(CreateAccountRequest {
-        created_by: None,
+        created_by: ADMIN_ACCOUNT_ID,
         password_hash: make_password_hash("admin")?,
         email: "admin@admin.com".to_string(),
         name: Some("admin".to_string()),
-        role: Some(Role::Admin),
-        organizations: None,
-        projects: None,
-        teams: None,
     }) {
         Ok(acc) => acc,
         Err(_err) => md.accounts.get_by_email("admin@admin.com")?,
@@ -498,14 +496,10 @@ fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<P
 
     info!("token: {}", token);
     let _user = match md.accounts.create(CreateAccountRequest {
-        created_by: Some(admin.id),
+        created_by: admin.id,
         password_hash: make_password_hash("test")?,
         email: "user@test.com".to_string(),
         name: Some("user".to_string()),
-        role: None,
-        organizations: Some(vec![(org.id, OrganizationRole::Member)]),
-        projects: Some(vec![(proj.id, ProjectRole::Reader)]),
-        teams: None,
     }) {
         Ok(acc) => acc,
         Err(_err) => md.accounts.get_by_email("user@test.com")?,

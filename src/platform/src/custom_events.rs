@@ -2,12 +2,13 @@ use std::sync::Arc;
 
 use chrono::DateTime;
 use chrono::Utc;
-use common::rbac::ProjectPermission;
 use common::types::OptionalProperty;
 use metadata::custom_events::CustomEvents as MDCustomEvents;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::rbac::ProjectPermission;
+use crate::rbac::RBAC;
 use crate::Context;
 use crate::EventRef;
 use crate::ListResponse;
@@ -17,11 +18,12 @@ use crate::Result;
 
 pub struct CustomEvents {
     prov: Arc<MDCustomEvents>,
+    rbac: Arc<RBAC>,
 }
 
 impl CustomEvents {
-    pub fn new(prov: Arc<MDCustomEvents>) -> Self {
-        Self { prov }
+    pub fn new(prov: Arc<MDCustomEvents>, rbac: Arc<RBAC>) -> Self {
+        Self { prov, rbac }
     }
 
     pub async fn create(
@@ -31,10 +33,14 @@ impl CustomEvents {
         project_id: u64,
         req: CreateCustomEventRequest,
     ) -> Result<CustomEvent> {
-        ctx.check_project_permission(project_id, ProjectPermission::ManageSchema)?;
+        self.rbac.check_project_permission(
+            ctx.account_id,
+            project_id,
+            ProjectPermission::ManageSchema,
+        )?;
 
         let md_req = metadata::custom_events::CreateCustomEventRequest {
-            created_by: ctx.account_id.unwrap(),
+            created_by: ctx.account_id,
             tags: req.tags,
             name: req.name,
             description: req.description,
@@ -53,12 +59,20 @@ impl CustomEvents {
     }
 
     pub async fn get_by_id(&self, ctx: Context, project_id: u64, id: u64) -> Result<CustomEvent> {
-        ctx.check_project_permission(project_id, ProjectPermission::ViewSchema)?;
+        self.rbac.check_project_permission(
+            ctx.account_id,
+            project_id,
+            ProjectPermission::ViewSchema,
+        )?;
         Ok(self.prov.get_by_id(project_id, id)?.into())
     }
 
     pub async fn list(&self, ctx: Context, project_id: u64) -> Result<ListResponse<CustomEvent>> {
-        ctx.check_project_permission(project_id, ProjectPermission::ViewSchema)?;
+        self.rbac.check_project_permission(
+            ctx.account_id,
+            project_id,
+            ProjectPermission::ViewSchema,
+        )?;
         let resp = self.prov.list(project_id)?;
 
         Ok(resp.into())
@@ -72,9 +86,13 @@ impl CustomEvents {
         event_id: u64,
         req: UpdateCustomEventRequest,
     ) -> Result<CustomEvent> {
-        ctx.check_project_permission(project_id, ProjectPermission::ManageSchema)?;
+        self.rbac.check_project_permission(
+            ctx.account_id,
+            project_id,
+            ProjectPermission::ManageSchema,
+        )?;
         let mut md_req = metadata::custom_events::UpdateCustomEventRequest {
-            updated_by: ctx.account_id.unwrap(),
+            updated_by: ctx.account_id,
             tags: req.tags,
             name: req.name,
             description: req.description,
@@ -96,7 +114,11 @@ impl CustomEvents {
     }
 
     pub async fn delete(&self, ctx: Context, project_id: u64, id: u64) -> Result<CustomEvent> {
-        ctx.check_project_permission(project_id, ProjectPermission::DeleteSchema)?;
+        self.rbac.check_project_permission(
+            ctx.account_id,
+            project_id,
+            ProjectPermission::DeleteSchema,
+        )?;
 
         Ok(self.prov.delete(project_id, id)?.into())
     }

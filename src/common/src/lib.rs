@@ -3,7 +3,6 @@ pub mod config;
 pub mod error;
 pub mod http;
 pub mod query;
-pub mod rbac;
 pub mod scalar;
 pub mod types;
 

@@ -4,9 +4,6 @@ use bincode::deserialize;
 use bincode::serialize;
 use chrono::DateTime;
 use chrono::Utc;
-use common::rbac::OrganizationRole;
-use common::rbac::ProjectRole;
-use common::rbac::Role;
 use common::types::OptionalProperty;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
@@ -117,15 +114,7 @@ impl Accounts {
         if let OptionalProperty::Some(name) = req.name {
             account.name = name;
         }
-        if let OptionalProperty::Some(organizations) = req.organizations {
-            account.organizations = organizations;
-        }
-        if let OptionalProperty::Some(projects) = req.projects {
-            account.projects = projects;
-        }
-        if let OptionalProperty::Some(teams) = req.teams {
-            account.teams = teams;
-        }
+
         if let OptionalProperty::Some(hash) = req.password_hash {
             account.password_hash = hash;
         }
@@ -152,28 +141,20 @@ impl Accounts {
 pub struct Account {
     pub id: u64,
     pub created_at: DateTime<Utc>,
-    pub created_by: Option<u64>,
+    pub created_by: u64,
     pub updated_at: Option<DateTime<Utc>>,
     pub updated_by: Option<u64>,
     pub password_hash: String,
     pub email: String,
     pub name: Option<String>,
-    pub role: Option<Role>,
-    pub organizations: Option<Vec<(u64, OrganizationRole)>>,
-    pub projects: Option<Vec<(u64, ProjectRole)>>,
-    pub teams: Option<Vec<(u64, Role)>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct CreateAccountRequest {
-    pub created_by: Option<u64>,
+    pub created_by: u64,
     pub password_hash: String,
     pub email: String,
     pub name: Option<String>,
-    pub role: Option<Role>,
-    pub organizations: Option<Vec<(u64, OrganizationRole)>>,
-    pub projects: Option<Vec<(u64, ProjectRole)>>,
-    pub teams: Option<Vec<(u64, Role)>>,
 }
 
 impl CreateAccountRequest {
@@ -187,10 +168,6 @@ impl CreateAccountRequest {
             password_hash: self.password_hash,
             email: self.email,
             name: self.name,
-            role: self.role,
-            organizations: self.organizations,
-            projects: self.projects,
-            teams: self.teams,
         }
     }
 }
@@ -201,8 +178,4 @@ pub struct UpdateAccountRequest {
     pub password_hash: OptionalProperty<String>,
     pub email: OptionalProperty<String>,
     pub name: OptionalProperty<Option<String>>,
-    pub role: OptionalProperty<Option<Role>>,
-    pub organizations: OptionalProperty<Option<Vec<(u64, OrganizationRole)>>>,
-    pub projects: OptionalProperty<Option<Vec<(u64, ProjectRole)>>>,
-    pub teams: OptionalProperty<Option<Vec<(u64, Role)>>>,
 }

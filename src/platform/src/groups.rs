@@ -2,21 +2,23 @@ use std::sync::Arc;
 
 use chrono::DateTime;
 use chrono::Utc;
-use common::rbac::ProjectPermission;
 use metadata::groups::Groups as MDGroups;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::rbac::ProjectPermission;
+use crate::rbac::RBAC;
 use crate::Context;
 use crate::ListResponse;
 
 pub struct Groups {
     prov: Arc<MDGroups>,
+    rbac: Arc<RBAC>,
 }
 
 impl crate::groups::Groups {
-    pub fn new(prov: Arc<MDGroups>) -> Self {
-        Self { prov }
+    pub fn new(prov: Arc<MDGroups>, rbac: Arc<RBAC>) -> Self {
+        Self { prov, rbac }
     }
     pub async fn create(
         &self,
@@ -24,7 +26,11 @@ impl crate::groups::Groups {
         project_id: u64,
         request: CreateGroupRequest,
     ) -> crate::Result<crate::groups::Group> {
-        ctx.check_project_permission(project_id, ProjectPermission::ManageSchema)?;
+        self.rbac.check_project_permission(
+            project_id,
+            ctx.account_id,
+            ProjectPermission::ManageSchema,
+        )?;
 
         let gid = self
             .prov
@@ -37,7 +43,11 @@ impl crate::groups::Groups {
     }
 
     pub async fn list(&self, ctx: Context, project_id: u64) -> crate::Result<ListResponse<Group>> {
-        ctx.check_project_permission(project_id, ProjectPermission::ViewSchema)?;
+        self.rbac.check_project_permission(
+            project_id,
+            ctx.account_id,
+            ProjectPermission::ViewSchema,
+        )?;
         let resp = self.prov.list_names(project_id)?;
 
         let mut data = vec![];

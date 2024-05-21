@@ -2,12 +2,13 @@ use std::sync::Arc;
 
 use chrono::DateTime;
 use chrono::Utc;
-use common::rbac::ProjectPermission;
 use common::types::OptionalProperty;
 use metadata::events::Events as MDEvents;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::rbac::ProjectPermission;
+use crate::rbac::RBAC;
 use crate::Context;
 use crate::ListResponse;
 use crate::PlatformError;
@@ -15,25 +16,29 @@ use crate::Result;
 
 pub struct Events {
     prov: Arc<MDEvents>,
+    rbac: Arc<RBAC>,
 }
 
 impl Events {
-    pub fn new(prov: Arc<MDEvents>) -> Self {
-        Self { prov }
+    pub fn new(prov: Arc<MDEvents>, rbac: Arc<RBAC>) -> Self {
+        Self { prov, rbac }
     }
     pub async fn create(
         &self,
         ctx: Context,
-
         project_id: u64,
         request: CreateEventRequest,
     ) -> Result<Event> {
-        ctx.check_project_permission(project_id, ProjectPermission::ManageSchema)?;
+        self.rbac.check_project_permission(
+            ctx.account_id,
+            project_id,
+            ProjectPermission::ManageSchema,
+        )?;
 
         let event = self
             .prov
             .create(project_id, metadata::events::CreateEventRequest {
-                created_by: ctx.account_id.unwrap(),
+                created_by: ctx.account_id,
                 tags: request.tags,
                 name: request.name,
                 display_name: request.display_name,
@@ -49,13 +54,21 @@ impl Events {
     }
 
     pub async fn get_by_id(&self, ctx: Context, project_id: u64, id: u64) -> Result<Event> {
-        ctx.check_project_permission(project_id, ProjectPermission::ViewSchema)?;
+        self.rbac.check_project_permission(
+            ctx.account_id,
+            project_id,
+            ProjectPermission::ViewSchema,
+        )?;
 
         Ok(self.prov.get_by_id(project_id, id)?.into())
     }
 
     pub async fn get_by_name(&self, ctx: Context, project_id: u64, name: &str) -> Result<Event> {
-        ctx.check_project_permission(project_id, ProjectPermission::ViewSchema)?;
+        self.rbac.check_project_permission(
+            ctx.account_id,
+            project_id,
+            ProjectPermission::ViewSchema,
+        )?;
 
         let event = self.prov.get_by_name(project_id, name)?;
 
@@ -63,7 +76,11 @@ impl Events {
     }
 
     pub async fn list(&self, ctx: Context, project_id: u64) -> Result<ListResponse<Event>> {
-        ctx.check_project_permission(project_id, ProjectPermission::ViewSchema)?;
+        self.rbac.check_project_permission(
+            ctx.account_id,
+            project_id,
+            ProjectPermission::ViewSchema,
+        )?;
         let resp = self.prov.list(project_id)?;
 
         Ok(resp.into())
@@ -77,10 +94,14 @@ impl Events {
         event_id: u64,
         req: UpdateEventRequest,
     ) -> Result<Event> {
-        ctx.check_project_permission(project_id, ProjectPermission::ManageSchema)?;
+        self.rbac.check_project_permission(
+            ctx.account_id,
+            project_id,
+            ProjectPermission::ManageSchema,
+        )?;
 
         let md_req = metadata::events::UpdateEventRequest {
-            updated_by: ctx.account_id.unwrap(),
+            updated_by: ctx.account_id,
             tags: req.tags,
             display_name: req.display_name,
             description: req.description,
@@ -100,7 +121,11 @@ impl Events {
         event_id: u64,
         prop_id: u64,
     ) -> Result<Event> {
-        ctx.check_project_permission(project_id, ProjectPermission::ManageSchema)?;
+        self.rbac.check_project_permission(
+            ctx.account_id,
+            project_id,
+            ProjectPermission::ManageSchema,
+        )?;
 
         Ok(self
             .prov
@@ -115,7 +140,11 @@ impl Events {
         event_id: u64,
         prop_id: u64,
     ) -> Result<Event> {
-        ctx.check_project_permission(project_id, ProjectPermission::ManageSchema)?;
+        self.rbac.check_project_permission(
+            ctx.account_id,
+            project_id,
+            ProjectPermission::ManageSchema,
+        )?;
 
         Ok(self
             .prov
@@ -124,7 +153,11 @@ impl Events {
     }
 
     pub async fn delete(&self, ctx: Context, project_id: u64, id: u64) -> Result<Event> {
-        ctx.check_project_permission(project_id, ProjectPermission::DeleteSchema)?;
+        self.rbac.check_project_permission(
+            ctx.account_id,
+            project_id,
+            ProjectPermission::DeleteSchema,
+        )?;
 
         Ok(self.prov.delete(project_id, id)?.into())
     }

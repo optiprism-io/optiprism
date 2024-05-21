@@ -3,7 +3,6 @@ use std::sync::Arc;
 use arrow::array::Array;
 use chrono::DateTime;
 use chrono::Utc;
-use common::rbac::ProjectPermission;
 use metadata::MetadataProvider;
 use query::context::Format;
 use query::queries::funnel::StepData;
@@ -21,6 +20,8 @@ use crate::queries::group_records_search::GroupRecordsSearchRequest;
 use crate::queries::property_values::ListPropertyValuesRequest;
 use crate::queries::QueryParams;
 use crate::queries::QueryResponseFormat;
+use crate::rbac::ProjectPermission;
+use crate::rbac::RBAC;
 use crate::Context;
 use crate::FunnelResponse;
 use crate::FunnelStep;
@@ -32,11 +33,12 @@ use crate::Result;
 pub struct Queries {
     query: Arc<QueryProvider>,
     md: Arc<MetadataProvider>,
+    rbac: Arc<RBAC>,
 }
 
 impl Queries {
-    pub fn new(query: Arc<QueryProvider>, md: Arc<MetadataProvider>) -> Self {
-        Self { query, md }
+    pub fn new(query: Arc<QueryProvider>, md: Arc<MetadataProvider>, rbac: Arc<RBAC>) -> Self {
+        Self { query, md, rbac }
     }
 
     pub async fn event_segmentation(
@@ -46,7 +48,11 @@ impl Queries {
         req: EventSegmentation,
         query: QueryParams,
     ) -> Result<QueryResponse> {
-        ctx.check_project_permission(project_id, ProjectPermission::ExploreReports)?;
+        self.rbac.check_project_permission(
+            ctx.account_id,
+            project_id,
+            ProjectPermission::ExploreReports,
+        )?;
         event_segmentation::validate(&self.md, project_id, &req)?;
         let lreq = req.into();
         let lreq = event_segmentation::fix_types(&self.md, project_id, lreq)?;
@@ -95,7 +101,11 @@ impl Queries {
         req: Funnel,
         query: QueryParams,
     ) -> Result<FunnelResponse> {
-        ctx.check_project_permission(project_id, ProjectPermission::ExploreReports)?;
+        self.rbac.check_project_permission(
+            ctx.account_id,
+            project_id,
+            ProjectPermission::ExploreReports,
+        )?;
         funnel::validate(&self.md, project_id, &req)?;
 
         let lreq = req.into();
@@ -156,7 +166,11 @@ impl Queries {
         req: EventRecordsSearchRequest,
         query: QueryParams,
     ) -> Result<QueryResponse> {
-        ctx.check_project_permission(project_id, ProjectPermission::ExploreReports)?;
+        self.rbac.check_project_permission(
+            ctx.account_id,
+            project_id,
+            ProjectPermission::ExploreReports,
+        )?;
         event_records_search::validate(&self.md, project_id, &req)?;
         let lreq = req.into();
         let cur_time = match query.timestamp {
@@ -202,7 +216,11 @@ impl Queries {
         req: GroupRecordsSearchRequest,
         query: QueryParams,
     ) -> Result<QueryResponse> {
-        ctx.check_project_permission(project_id, ProjectPermission::ExploreReports)?;
+        self.rbac.check_project_permission(
+            ctx.account_id,
+            project_id,
+            ProjectPermission::ExploreReports,
+        )?;
         group_records_search::validate(&self.md, project_id, &req)?;
         let lreq = req.into();
         let cur_time = match query.timestamp {
@@ -247,7 +265,11 @@ impl Queries {
         project_id: u64,
         req: ListPropertyValuesRequest,
     ) -> Result<ListResponse<Value>> {
-        ctx.check_project_permission(project_id, ProjectPermission::ExploreReports)?;
+        self.rbac.check_project_permission(
+            ctx.account_id,
+            project_id,
+            ProjectPermission::ExploreReports,
+        )?;
 
         let lreq = req.into();
         let result = self

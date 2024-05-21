@@ -20,15 +20,6 @@ use axum_extra::headers::Authorization;
 use axum_extra::TypedHeader;
 use bytes::Bytes;
 use common::config::Config;
-use common::rbac::OrganizationPermission;
-use common::rbac::OrganizationRole;
-use common::rbac::Permission;
-use common::rbac::ProjectPermission;
-use common::rbac::ProjectRole;
-use common::rbac::Role;
-use common::rbac::ORGANIZATION_PERMISSIONS;
-use common::rbac::PERMISSIONS;
-use common::rbac::PROJECT_PERMISSIONS;
 use serde_json::Value;
 
 use crate::auth::token::parse_access_token;
@@ -37,119 +28,9 @@ use crate::PlatformError;
 use crate::Result;
 
 #[derive(Default, Clone)]
-pub struct AuthContext {
-    pub account_id: u64,
-}
-
-#[derive(Default, Clone)]
 pub struct Context {
-    pub account_id: Option<u64>,
+    pub account_id: u64,
     pub organization_id: u64,
-    pub role: Option<Role>,
-    pub organizations: Option<Vec<(u64, OrganizationRole)>>,
-    pub projects: Option<Vec<(u64, ProjectRole)>>,
-    pub teams: Option<Vec<(u64, Role)>>,
-}
-
-impl Context {
-    pub fn check_permission(&self, permission: Permission) -> Result<()> {
-        if let Some(role) = &self.role {
-            for (root_role, role_permission) in PERMISSIONS.iter() {
-                if *root_role != *role {
-                    continue;
-                }
-                if role_permission.contains(&Permission::All) {
-                    return Ok(());
-                }
-                if role_permission.contains(&permission) {
-                    return Ok(());
-                }
-            }
-        }
-
-        Err(PlatformError::Forbidden("forbidden".to_string()))
-    }
-
-    pub fn check_organization_permission(&self, permission: OrganizationPermission) -> Result<()> {
-        if self
-            .check_permission(Permission::ManageOrganizations)
-            .is_ok()
-        {
-            return Ok(());
-        }
-        let role = self.get_organization_role()?;
-        for (org_role, role_permission) in ORGANIZATION_PERMISSIONS.iter() {
-            if *org_role != role {
-                continue;
-            }
-
-            if role_permission.contains(&OrganizationPermission::All) {
-                return Ok(());
-            }
-            if role_permission.contains(&permission) {
-                return Ok(());
-            }
-        }
-
-        Err(PlatformError::Forbidden("forbidden".to_string()))
-    }
-
-    pub fn check_project_permission(
-        &self,
-        project_id: u64,
-        permission: ProjectPermission,
-    ) -> Result<()> {
-        if self.check_permission(Permission::ManageProjects).is_ok() {
-            return Ok(());
-        }
-        if let Ok(role) = self.get_organization_role() {
-            match role {
-                OrganizationRole::Owner => return Ok(()),
-                OrganizationRole::Admin => return Ok(()),
-                OrganizationRole::Member => {}
-            }
-        }
-
-        let role = self.get_project_role(project_id)?;
-
-        for (proj_role, role_permission) in PROJECT_PERMISSIONS.iter() {
-            if *proj_role != role {
-                continue;
-            }
-
-            if role_permission.contains(&ProjectPermission::All) {
-                return Ok(());
-            }
-            if role_permission.contains(&permission) {
-                return Ok(());
-            }
-        }
-
-        Err(PlatformError::Forbidden("forbidden".to_string()))
-    }
-
-    fn get_organization_role(&self) -> Result<OrganizationRole> {
-        if let Some(organizations) = &self.organizations {
-            for (org_id, role) in organizations.iter() {
-                if *org_id == self.organization_id {
-                    return Ok(role.to_owned());
-                }
-            }
-        }
-
-        Err(PlatformError::Forbidden("forbidden".to_string()))
-    }
-    fn get_project_role(&self, project_id: u64) -> Result<ProjectRole> {
-        if let Some(projects) = &self.projects {
-            for (proj_id, role) in projects.iter() {
-                if *proj_id == project_id {
-                    return Ok(role.to_owned());
-                }
-            }
-        }
-
-        Err(PlatformError::Forbidden("forbidden".to_string()))
-    }
 }
 
 #[async_trait]
@@ -180,12 +61,8 @@ where S: Send + Sync
 
         let acc = md_acc_prov.get_by_id(claims.account_id)?;
         let ctx = Context {
-            account_id: Some(acc.id),
+            account_id: acc.id,
             organization_id: claims.organization_id,
-            role: acc.role,
-            organizations: acc.organizations,
-            projects: acc.projects,
-            teams: acc.teams,
         };
 
         Ok(ctx)

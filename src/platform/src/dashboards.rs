@@ -2,37 +2,42 @@ use std::sync::Arc;
 
 use chrono::DateTime;
 use chrono::Utc;
-use common::rbac::ProjectPermission;
 use common::types::OptionalProperty;
 use metadata::dashboards::Dashboards as MDDashboards;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::rbac::ProjectPermission;
+use crate::rbac::RBAC;
 use crate::Context;
 use crate::ListResponse;
 use crate::Result;
 
 pub struct Dashboards {
     prov: Arc<MDDashboards>,
+    rbac: Arc<RBAC>,
 }
 
 impl Dashboards {
-    pub fn new(prov: Arc<MDDashboards>) -> Self {
-        Self { prov }
+    pub fn new(prov: Arc<MDDashboards>, rbac: Arc<RBAC>) -> Self {
+        Self { prov, rbac }
     }
     pub async fn create(
         &self,
         ctx: Context,
-
         project_id: u64,
         request: CreateDashboardRequest,
     ) -> Result<Dashboard> {
-        ctx.check_project_permission(project_id, ProjectPermission::ManageReports)?;
+        self.rbac.check_project_permission(
+            project_id,
+            ctx.account_id,
+            ProjectPermission::ManageReports,
+        )?;
 
         let dashboard =
             self.prov
                 .create(project_id, metadata::dashboards::CreateDashboardRequest {
-                    created_by: ctx.account_id.unwrap(),
+                    created_by: ctx.account_id,
                     tags: request.tags,
                     name: request.name,
                     description: request.description,
@@ -43,13 +48,21 @@ impl Dashboards {
     }
 
     pub async fn get_by_id(&self, ctx: Context, project_id: u64, id: u64) -> Result<Dashboard> {
-        ctx.check_project_permission(project_id, ProjectPermission::ExploreReports)?;
+        self.rbac.check_project_permission(
+            project_id,
+            ctx.account_id,
+            ProjectPermission::ExploreReports,
+        )?;
 
         Ok(self.prov.get_by_id(project_id, id)?.into())
     }
 
     pub async fn list(&self, ctx: Context, project_id: u64) -> Result<ListResponse<Dashboard>> {
-        ctx.check_project_permission(project_id, ProjectPermission::ExploreReports)?;
+        self.rbac.check_project_permission(
+            project_id,
+            ctx.account_id,
+            ProjectPermission::ExploreReports,
+        )?;
         let resp = self.prov.list(project_id)?;
 
         Ok(ListResponse {
@@ -66,10 +79,14 @@ impl Dashboards {
         dashboard_id: u64,
         req: UpdateDashboardRequest,
     ) -> Result<Dashboard> {
-        ctx.check_project_permission(project_id, ProjectPermission::ManageReports)?;
+        self.rbac.check_project_permission(
+            project_id,
+            ctx.account_id,
+            ProjectPermission::ManageReports,
+        )?;
 
         let md_req = metadata::dashboards::UpdateDashboardRequest {
-            updated_by: ctx.account_id.unwrap(),
+            updated_by: ctx.account_id,
             tags: req.tags,
             name: req.name,
             description: req.description,
@@ -84,7 +101,11 @@ impl Dashboards {
     }
 
     pub async fn delete(&self, ctx: Context, project_id: u64, id: u64) -> Result<Dashboard> {
-        ctx.check_project_permission(project_id, ProjectPermission::ManageReports)?;
+        self.rbac.check_project_permission(
+            project_id,
+            ctx.account_id,
+            ProjectPermission::ManageReports,
+        )?;
 
         Ok(self.prov.delete(project_id, id)?.into())
     }

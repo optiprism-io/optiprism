@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use axum::Router;
 use common::config::Config;
-use common::rbac::Role;
+use common::types::ADMIN_ACCOUNT_ID;
 use hyper::Server;
 use metadata::accounts::CreateAccountRequest;
 use metadata::error::MetadataError;
@@ -55,14 +55,10 @@ pub async fn start(cfg: Config) -> Result<()> {
     let just_initialized = if md.accounts.list()?.is_empty() {
         info!("creating admin account...");
         let acc = md.accounts.create(CreateAccountRequest {
-            created_by: None,
+            created_by: ADMIN_ACCOUNT_ID,
             password_hash: make_password_hash("admin")?,
             email: "admin@admin.com".to_string(),
             name: Some("admin".to_string()),
-            role: Some(Role::Admin),
-            organizations: None,
-            projects: None,
-            teams: None,
         })?;
 
         info!("creating organization...");

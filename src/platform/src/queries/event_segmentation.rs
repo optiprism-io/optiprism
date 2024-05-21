@@ -884,6 +884,7 @@ mod tests {
                     PropValueFilter::Property {
                         property: PropertyRef::Group {
                             property_name: "p1".to_string(),
+                            group: 0,
                         },
                         operation: PropValueOperation::Eq,
                         value: Some(vec![json!(true)]),
@@ -913,6 +914,7 @@ mod tests {
                 breakdowns: Some(vec![Breakdown::Property {
                     property: PropertyRef::Group {
                         property_name: "Device".to_string(),
+                        group: 0,
                     },
                 }]),
                 queries: vec![
@@ -950,6 +952,7 @@ mod tests {
             breakdowns: Some(vec![Breakdown::Property {
                 property: PropertyRef::Group {
                     property_name: "Device".to_string(),
+                    group: GROUP_USER_ID,
                 },
             }]),
             segments: None,

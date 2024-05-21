@@ -3,8 +3,6 @@ use std::sync::Arc;
 use chrono::DateTime;
 use chrono::Utc;
 use common::config::Config;
-use common::rbac::OrganizationPermission;
-use common::rbac::Permission;
 use common::types::DType;
 use common::types::OptionalProperty;
 use common::types::EVENT_CLICK;
@@ -48,28 +46,36 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::error;
+use crate::rbac::Permission;
+use crate::rbac::RBAC;
 use crate::Context;
 use crate::ListResponse;
 use crate::Result;
 
 pub struct Organizations {
     md: Arc<MetadataProvider>,
+    rbac: Arc<RBAC>,
     cfg: Config,
 }
 
 impl Organizations {
-    pub fn new(prov: Arc<MetadataProvider>, cfg: Config) -> Self {
-        Self { md: prov, cfg }
+    pub fn new(prov: Arc<MetadataProvider>, rbac: Arc<RBAC>, cfg: Config) -> Self {
+        Self {
+            md: prov,
+            rbac,
+            cfg,
+        }
     }
     pub async fn create(
         &self,
         ctx: Context,
         request: CreateOrganizationRequest,
     ) -> Result<Organization> {
-        ctx.check_permission(Permission::ManageOrganizations)?;
+        self.rbac
+            .check_permission(ctx.account_id, Permission::ManageOrganizations)?;
 
         let md = metadata::organizations::CreateOrganizationRequest {
-            created_by: ctx.account_id.unwrap(),
+            created_by: ctx.account_id,
             name: request.name,
         };
 
@@ -78,13 +84,15 @@ impl Organizations {
     }
 
     pub async fn get_by_id(&self, ctx: Context, id: u64) -> Result<Organization> {
-        ctx.check_permission(Permission::ViewOrganizations)?;
+        self.rbac
+            .check_permission(ctx.account_id, Permission::ViewOrganizations)?;
 
         Ok(self.md.organizations.get_by_id(id)?.into())
     }
 
     pub async fn list(&self, ctx: Context) -> Result<ListResponse<Organization>> {
-        ctx.check_permission(Permission::ViewOrganizations)?;
+        self.rbac
+            .check_permission(ctx.account_id, Permission::ViewOrganizations)?;
         let resp = self.md.organizations.list()?;
 
         Ok(ListResponse {
@@ -99,10 +107,11 @@ impl Organizations {
         org_id: u64,
         req: UpdateOrganizationRequest,
     ) -> Result<Organization> {
-        ctx.check_permission(Permission::ManageOrganizations)?;
+        self.rbac
+            .check_permission(ctx.account_id, Permission::ManageOrganizations)?;
 
         let md_req = metadata::organizations::UpdateOrganizationRequest {
-            updated_by: ctx.account_id.unwrap(),
+            updated_by: ctx.account_id,
             name: req.name,
         };
 
@@ -112,7 +121,8 @@ impl Organizations {
     }
 
     pub async fn delete(&self, ctx: Context, org_id: u64) -> Result<Organization> {
-        ctx.check_permission(Permission::ManageOrganizations)?;
+        self.rbac
+            .check_permission(ctx.account_id, Permission::ManageOrganizations)?;
 
         Ok(self.md.organizations.delete(org_id)?.into())
     }

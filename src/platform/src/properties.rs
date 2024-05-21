@@ -2,13 +2,14 @@ use std::sync::Arc;
 
 use chrono::DateTime;
 use chrono::Utc;
-use common::rbac::ProjectPermission;
 use common::types::DType;
 use common::types::OptionalProperty;
 use metadata::properties;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::rbac::ProjectPermission;
+use crate::rbac::RBAC;
 use crate::Context;
 use crate::ListResponse;
 use crate::PlatformError;
@@ -16,30 +17,39 @@ use crate::Result;
 
 pub struct Properties {
     prov: Arc<metadata::properties::Properties>,
+    rbac: Arc<RBAC>,
 }
 
 impl Properties {
-    pub fn new_group(prov: Arc<metadata::properties::Properties>) -> Self {
-        Self { prov }
+    pub fn new_group(prov: Arc<metadata::properties::Properties>, rbac: Arc<RBAC>) -> Self {
+        Self { prov, rbac }
     }
 
-    pub fn new_event(prov: Arc<metadata::properties::Properties>) -> Self {
-        Self { prov }
+    pub fn new_event(prov: Arc<metadata::properties::Properties>, rbac: Arc<RBAC>) -> Self {
+        Self { prov, rbac }
     }
-    pub fn new_system(prov: Arc<metadata::properties::Properties>) -> Self {
-        Self { prov }
+    pub fn new_system(prov: Arc<metadata::properties::Properties>, rbac: Arc<RBAC>) -> Self {
+        Self { prov, rbac }
     }
-    pub fn new_system_group(prov: Arc<metadata::properties::Properties>) -> Self {
-        Self { prov }
+    pub fn new_system_group(prov: Arc<metadata::properties::Properties>, rbac: Arc<RBAC>) -> Self {
+        Self { prov, rbac }
     }
     pub async fn get_by_id(&self, ctx: Context, project_id: u64, id: u64) -> Result<Property> {
-        ctx.check_project_permission(project_id, ProjectPermission::ViewSchema)?;
+        self.rbac.check_project_permission(
+            ctx.account_id,
+            project_id,
+            ProjectPermission::ViewSchema,
+        )?;
 
         Ok(self.prov.get_by_id(project_id, id)?.into())
     }
 
     pub async fn get_by_name(&self, ctx: Context, project_id: u64, name: &str) -> Result<Property> {
-        ctx.check_project_permission(project_id, ProjectPermission::ViewSchema)?;
+        self.rbac.check_project_permission(
+            ctx.account_id,
+            project_id,
+            ProjectPermission::ViewSchema,
+        )?;
 
         let event = self.prov.get_by_name(project_id, name)?;
 
@@ -47,7 +57,11 @@ impl Properties {
     }
 
     pub async fn list(&self, ctx: Context, project_id: u64) -> Result<ListResponse<Property>> {
-        ctx.check_project_permission(project_id, ProjectPermission::ViewSchema)?;
+        self.rbac.check_project_permission(
+            ctx.account_id,
+            project_id,
+            ProjectPermission::ViewSchema,
+        )?;
         let resp = self.prov.list(project_id)?;
 
         Ok(resp.into())
@@ -60,10 +74,14 @@ impl Properties {
         property_id: u64,
         req: UpdatePropertyRequest,
     ) -> Result<Property> {
-        ctx.check_project_permission(project_id, ProjectPermission::ManageSchema)?;
+        self.rbac.check_project_permission(
+            ctx.account_id,
+            project_id,
+            ProjectPermission::ManageSchema,
+        )?;
 
         let md_req = metadata::properties::UpdatePropertyRequest {
-            updated_by: ctx.account_id.unwrap(),
+            updated_by: ctx.account_id,
             tags: req.tags,
             description: req.description,
             display_name: req.display_name,
@@ -79,7 +97,11 @@ impl Properties {
     }
 
     pub async fn delete(&self, ctx: Context, project_id: u64, id: u64) -> Result<Property> {
-        ctx.check_project_permission(project_id, ProjectPermission::DeleteSchema)?;
+        self.rbac.check_project_permission(
+            ctx.account_id,
+            project_id,
+            ProjectPermission::DeleteSchema,
+        )?;
 
         Ok(self.prov.delete(project_id, id)?.into())
     }
