@@ -38,7 +38,7 @@ serde = { version = "1.0.149", features = ["derive"] }
 serde_json = "1.0.89"
 serde_with = "3.0.0"
 thiserror = "1.0.37"
-time = "0.3.17"
+time = "0.3.36"
 tokio = { version = "1.23.0", features = ["full"] }
 tower = "0.4.13"
 tower-cookies = { version = "0.10.0", features = ["axum-core"] }

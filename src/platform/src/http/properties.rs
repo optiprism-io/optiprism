@@ -249,6 +249,7 @@ pub fn attach_group_routes(router: Router) -> Router {
     router.clone().nest(
         "/api/v1/projects/:project_id/schema/group-properties/:group_id",
         router
+            .route("/", routing::get(list_group))
             .route(
                 "/:prop_id",
                 routing::get(get_group_by_id)
