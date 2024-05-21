@@ -1,3 +1,4 @@
+use std::str::pattern::Pattern;
 use std::sync::Arc;
 
 use bincode::deserialize;
@@ -204,14 +205,14 @@ impl Groups {
         let tx = self.db.transaction();
         let mut res = vec![];
         let key = format!("projects/{project_id}/groups/names");
-        for i in tx.prefix_iterator(key) {
+        for i in tx.prefix_iterator(key.as_str()) {
             let i = i?;
+            let v = String::from_utf8(i.0.to_vec())?;
+            if !key.is_prefix_of(v.as_ref()) {
+                break;
+            }
+            let v = v.split("/").last().unwrap().to_string();
             let k = u64::from_le_bytes(i.1.as_ref().try_into().unwrap());
-            let v = String::from_utf8(i.0.to_vec())?
-                .split("/")
-                .last()
-                .unwrap()
-                .to_string();
             res.push((k, v));
         }
 

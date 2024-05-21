@@ -5,6 +5,7 @@ pub mod dashboards;
 pub mod event_records;
 pub mod events;
 pub mod group_records;
+mod groups;
 pub mod organizations;
 pub mod projects;
 pub mod properties;
@@ -54,6 +55,7 @@ pub fn attach_routes(
     router = auth::attach_routes(router);
     router = events::attach_routes(router);
     router = custom_events::attach_routes(router);
+    router = groups::attach_routes(router);
     router = properties::attach_event_routes(router);
     router = properties::attach_group_routes(router);
     router = properties::attach_system_routes(router);
@@ -79,6 +81,7 @@ pub fn attach_routes(
         .layer(Extension(platform.auth.clone()))
         .layer(Extension(platform.events.clone()))
         .layer(Extension(platform.custom_events.clone()))
+        .layer(Extension(platform.groups.clone()))
         .layer(Extension(PropertiesLayer {
             events: platform.event_properties.clone(),
             groups: platform.group_properties.clone(),

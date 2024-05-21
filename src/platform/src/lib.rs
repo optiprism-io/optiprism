@@ -11,6 +11,7 @@ pub mod error;
 pub mod event_records;
 pub mod events;
 mod group_records;
+mod groups;
 pub mod http;
 pub mod organizations;
 pub mod projects;
@@ -66,6 +67,7 @@ use crate::auth::Auth;
 use crate::custom_events::CustomEvents;
 use crate::dashboards::Dashboards;
 use crate::events::Events;
+use crate::groups::Groups;
 use crate::organizations::Organizations;
 use crate::projects::Projects;
 use crate::properties::Properties;
@@ -75,6 +77,7 @@ use crate::reports::Reports;
 pub struct PlatformProvider {
     pub events: Arc<Events>,
     pub custom_events: Arc<CustomEvents>,
+    pub groups: Arc<Groups>,
     pub event_properties: Arc<Properties>,
     pub group_properties: Vec<Arc<Properties>>,
     pub system_properties: Arc<Properties>,
@@ -102,6 +105,7 @@ impl PlatformProvider {
         Self {
             events: Arc::new(Events::new(md.events.clone())),
             custom_events: Arc::new(CustomEvents::new(md.custom_events.clone())),
+            groups: Arc::new(Groups::new(md.groups.clone())),
             event_properties: Arc::new(Properties::new_event(md.event_properties.clone())),
             group_properties,
             system_properties: Arc::new(Properties::new_system(md.system_properties.clone())),

@@ -1,3 +1,5 @@
+#![feature(pattern)]
+
 extern crate core;
 
 pub mod accounts;
