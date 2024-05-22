@@ -197,8 +197,8 @@ impl App {
             resolved_event: None,
             properties: raw_properties,
             resolved_properties: None,
-            groups: req.groups.clone(),
-            resolved_groups: None,
+            group_values: req.groups.clone(),
+            resolved_group_values: None,
         };
 
         self.track.lock().unwrap().execute(ctx, track)
@@ -239,7 +239,7 @@ impl App {
             context,
             group: req.group,
             group_id: 0,
-            resolved_group: None,
+            resolved_group_values: None,
             id: req.id,
             properties: raw_props,
             resolved_properties: None,

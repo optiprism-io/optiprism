@@ -36,7 +36,7 @@ impl Destination<Identify> for Local {
         ));
         prop_values.push(NamedValue::new(
             GROUP_COLUMN_ID.to_string(),
-            Value::Int64(Some(req.resolved_group.clone().unwrap().id as i64)),
+            Value::Int64(Some(req.resolved_group_values.clone().unwrap().id as i64)),
         ));
         let version = self
             .md
@@ -53,7 +53,7 @@ impl Destination<Identify> for Local {
             Value::Timestamp(Some(req.timestamp.timestamp_millis())),
         ));
 
-        for value in &req.resolved_group.unwrap().values {
+        for value in &req.resolved_group_values.unwrap().values {
             let prop = self.md.group_properties[req.group_id as usize]
                 .get_by_id(ctx.project_id.unwrap(), value.property_id)?;
             let value = match value.value.clone() {

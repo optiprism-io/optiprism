@@ -56,7 +56,7 @@ impl Destination<Track> for Local {
         )?;
 
         // fill group id for each of GROUPS_COUNT groups
-        let groups = if let Some(groups) = &req.resolved_groups {
+        let groups = if let Some(groups) = &req.resolved_group_values {
             let mut found = HashMap::new();
             let mut groups = groups
                 .iter()
@@ -92,7 +92,7 @@ impl Destination<Track> for Local {
             prop_values.push(NamedValue::new(prop.property.column_name(), value));
         }
 
-        if let Some(resolved_groups) = &req.resolved_groups {
+        if let Some(resolved_groups) = &req.resolved_group_values {
             for (group_id, group) in resolved_groups {
                 for value in &group.values {
                     let prop = self.md.group_properties[*group_id]

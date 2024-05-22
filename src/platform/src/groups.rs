@@ -26,25 +26,25 @@ impl crate::groups::Groups {
     ) -> crate::Result<crate::groups::Group> {
         ctx.check_project_permission(project_id, ProjectPermission::ManageSchema)?;
 
-        let gid = self
+        let g = self
             .prov
-            .get_or_create_group_name(project_id, request.name.as_str())?;
+            .get_or_create_group(project_id, request.name, request.display_name)?;
 
         Ok(Group {
-            id: gid,
-            name: request.name,
+            id: g.id,
+            name: g.name,
         })
     }
 
     pub async fn list(&self, ctx: Context, project_id: u64) -> crate::Result<ListResponse<Group>> {
         ctx.check_project_permission(project_id, ProjectPermission::ViewSchema)?;
-        let resp = self.prov.list_names(project_id)?;
+        let resp = self.prov.list_groups(project_id)?;
 
         let mut data = vec![];
-        for (id, name) in resp.data.iter() {
+        for g in resp.data.iter() {
             let g = Group {
-                id: *id,
-                name: name.clone(),
+                id: g.id,
+                name: g.name.clone(),
             };
             data.push(g);
         }
@@ -65,4 +65,5 @@ pub struct Group {
 #[serde(rename_all = "camelCase")]
 pub struct CreateGroupRequest {
     pub name: String,
+    pub display_name: String,
 }
