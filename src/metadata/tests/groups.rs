@@ -48,13 +48,13 @@ fn test_groups() -> Result<()> {
         .unwrap();
     assert_eq!(group.id, 3);
 
-    groups.get_or_create_group_name(1, "n1").unwrap();
-    groups.get_or_create_group_name(1, "n2").unwrap();
-    groups.get_or_create_group_name(1, "n3").unwrap();
-    groups.get_or_create_group_name(1, "n4").unwrap();
-    groups.get_or_create_group_name(1, "n5").unwrap();
-    assert!(groups.get_or_create_group_name(1, "n6").is_err());
+    groups.get_or_create_group(1, "n1").unwrap();
+    groups.get_or_create_group(1, "n2").unwrap();
+    groups.get_or_create_group(1, "n3").unwrap();
+    groups.get_or_create_group(1, "n4").unwrap();
+    groups.get_or_create_group(1, "n5").unwrap();
+    assert!(groups.get_or_create_group(1, "n6").is_err());
 
-    let resp = groups.list_names(1).unwrap();
+    let resp = groups.list_groups(1).unwrap();
     Ok(())
 }

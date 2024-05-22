@@ -277,6 +277,7 @@ pub fn init_project(project_id: u64, md: &Arc<MetadataProvider>) -> error::Resul
         dict: None,
     })?;
 
-    md.groups.get_or_create_group_name(project_id, GROUP_USER)?;
+    md.groups
+        .get_or_create_group(project_id, GROUP_USER.to_string(), GROUP_USER.to_string())?;
     Ok(())
 }

@@ -8,7 +8,7 @@ use common::types::DType;
 use error::Result;
 use metadata::dictionaries::Dictionaries;
 use metadata::events;
-use metadata::groups::Group;
+use metadata::groups::GroupValues;
 use metadata::properties;
 use metadata::properties::DictionaryType;
 use rust_decimal::prelude::ToPrimitive;
@@ -139,7 +139,7 @@ pub struct Identify {
     pub context: Context,
     pub group: String,
     pub group_id: u64,
-    pub resolved_group: Option<Group>,
+    pub resolved_group_values: Option<GroupValues>,
     pub id: String,
     pub properties: Option<HashMap<String, PropValue>>,
     pub resolved_properties: Option<Vec<PropertyAndValue>>,
@@ -156,6 +156,6 @@ pub struct Track {
     pub resolved_event: Option<events::Event>,
     pub properties: Option<HashMap<String, PropValue>>,
     pub resolved_properties: Option<Vec<PropertyAndValue>>,
-    pub groups: Option<HashMap<String, String>>,
-    pub resolved_groups: Option<Vec<(usize, Group)>>,
+    pub group_values: Option<HashMap<String, String>>,
+    pub resolved_group_values: Option<Vec<(usize, GroupValues)>>,
 }

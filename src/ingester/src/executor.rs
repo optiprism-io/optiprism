@@ -159,29 +159,30 @@ impl Executor<Track> {
 
         req.resolved_user_id = Some(user_id as i64);
 
-        if let Some(groups) = &req.groups {
+        if let Some(groups) = &req.group_values {
             let mut resolved_groups = vec![];
             // add user as a first group
             if let Some(user_group) = user_group {
                 resolved_groups.push((0, user_group));
             }
 
-            for (group_name, group) in groups {
-                let group_id = self
-                    .md
-                    .groups
-                    .get_or_create_group_name(ctx.project_id.unwrap(), group_name)?;
+            for (group_name, group_val) in groups {
+                let group = self.md.groups.get_or_create_group(
+                    ctx.project_id.unwrap(),
+                    group_name.to_owned(),
+                    group_name.to_owned(),
+                )?;
 
                 let resolved_group = self.md.groups.get_or_create(
                     ctx.project_id.unwrap(),
-                    group_id,
-                    group,
+                    group.id,
+                    group_val,
                     vec![],
                 )?;
 
-                resolved_groups.push((group_id as usize, resolved_group));
+                resolved_groups.push((group.id as usize, resolved_group));
             }
-            req.resolved_groups = Some(resolved_groups);
+            req.resolved_group_values = Some(resolved_groups);
         }
         let event_req = CreateEventRequest {
             created_by: 1,
@@ -247,17 +248,18 @@ impl Executor<Identify> {
         let mut ctx = ctx.to_owned();
         ctx.project_id = Some(project.id);
 
-        let group_id = self
-            .md
-            .groups
-            .get_or_create_group_name(ctx.project_id.unwrap(), req.group.as_str())?;
+        let group = self.md.groups.get_or_create_group(
+            ctx.project_id.unwrap(),
+            req.group.to_owned(),
+            req.group.to_owned(),
+        )?;
 
         if let Some(props) = &req.properties {
             req.resolved_properties = Some(resolve_properties(
                 &ctx,
-                &self.md.group_properties[group_id as usize],
+                &self.md.group_properties[group.id as usize],
                 &self.db,
-                properties::Type::Group(group_id as usize),
+                properties::Type::Group(group.id as usize),
                 props,
             )?);
         }
@@ -303,13 +305,13 @@ impl Executor<Identify> {
 
         let resolved_group = self.md.groups.create_or_update(
             ctx.project_id.unwrap(),
-            group_id,
+            group.id,
             req.id.as_str(),
             vals,
         )?;
 
-        req.group_id = group_id;
-        req.resolved_group = Some(resolved_group);
+        req.group_id = group.id;
+        req.resolved_group_values = Some(resolved_group);
 
         for transformer in &self.transformers {
             req = transformer.process(&ctx, req)?;

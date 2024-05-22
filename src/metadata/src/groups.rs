@@ -83,7 +83,7 @@ impl Groups {
         anonymous: &str,
         id: &str,
         values: Vec<PropertyValue>,
-    ) -> Result<Group> {
+    ) -> Result<GroupValues> {
         let tx = self.db.transaction();
         let user_key = format!("projects/{project_id}/groups/{group_id}/real/keys/{id}");
         let res = match tx.get(user_key.as_bytes())? {
@@ -94,7 +94,7 @@ impl Groups {
                 let seq_key =
                     make_id_seq_key(project_ns(project_id, group_key.as_bytes()).as_slice());
                 tx.put(&seq_key, anonymous_id.to_le_bytes().as_ref())?;
-                let group = Group {
+                let group = GroupValues {
                     id: anonymous_id,
                     values,
                 };
@@ -116,7 +116,7 @@ impl Groups {
         group_id: u64,
         key: &str,
         values: Vec<PropertyValue>,
-    ) -> Result<Group> {
+    ) -> Result<GroupValues> {
         let key = format!("projects/{project_id}/groups/{group_id}/real/keys/{key}");
         let res = match tx.get(key.as_bytes())? {
             None => {
@@ -126,7 +126,7 @@ impl Groups {
                     make_id_seq_key(project_ns(project_id, group_key.as_bytes()).as_slice()),
                 )?;
 
-                let group = Group { id, values };
+                let group = GroupValues { id, values };
                 tx.put(key.as_bytes(), serialize(&group)?)?;
 
                 group
@@ -144,7 +144,7 @@ impl Groups {
         group_id: u64,
         key: &str,
         values: Vec<PropertyValue>,
-    ) -> Result<Group> {
+    ) -> Result<GroupValues> {
         let tx = self.db.transaction();
         let id = self.get_or_create_(&tx, project_id, group_id, key, values)?;
         tx.commit()?;
@@ -157,7 +157,7 @@ impl Groups {
         group_id: u64,
         key: &str,
         values: Vec<PropertyValue>,
-    ) -> Result<Group> {
+    ) -> Result<GroupValues> {
         let tx = self.db.transaction();
         let key = format!("projects/{project_id}/groups/{group_id}/real/keys/{key}");
         let group = match tx.get(key.as_bytes())? {
@@ -168,12 +168,12 @@ impl Groups {
                     make_id_seq_key(project_ns(project_id, group_key.as_bytes()).as_slice()),
                 )?;
 
-                let group = Group { id, values };
+                let group = GroupValues { id, values };
                 tx.put(key.as_bytes(), serialize(&group)?)?;
                 group
             }
             Some(value) => {
-                let group: Group = deserialize(&value)?;
+                let group: GroupValues = deserialize(&value)?;
                 let mut vals = group.values.clone();
                 for value in values {
                     let mut found = false;
@@ -188,7 +188,7 @@ impl Groups {
                         vals.push(value);
                     }
                 }
-                let group = Group {
+                let group = GroupValues {
                     id: group.id,
                     values: vals,
                 };
@@ -201,7 +201,7 @@ impl Groups {
         Ok(group)
     }
 
-    pub fn list_names(&self, project_id: u64) -> Result<ListResponse<(u64, String)>> {
+    pub fn list_groups(&self, project_id: u64) -> Result<ListResponse<Group>> {
         let tx = self.db.transaction();
         let mut res = vec![];
         let key = format!("projects/{project_id}/groups/names");
@@ -211,9 +211,8 @@ impl Groups {
             if !key.is_prefix_of(v.as_ref()) {
                 break;
             }
-            let v = v.split("/").last().unwrap().to_string();
-            let k = u64::from_le_bytes(i.1.as_ref().try_into().unwrap());
-            res.push((k, v));
+            let group = deserialize(&i.1)?;
+            res.push(group);
         }
 
         Ok(ListResponse {
@@ -222,10 +221,15 @@ impl Groups {
         })
     }
 
-    pub fn get_or_create_group_name(&self, project_id: u64, name: &str) -> Result<u64> {
+    pub fn get_or_create_group(
+        &self,
+        project_id: u64,
+        name: String,
+        display_name: String,
+    ) -> Result<Group> {
         let tx = self.db.transaction();
         let key = format!("projects/{project_id}/groups/names/{name}");
-        let id = match tx.get(key.as_bytes())? {
+        let group = match tx.get(key.as_bytes())? {
             None => {
                 let id = next_zero_seq(
                     &tx,
@@ -237,16 +241,21 @@ impl Groups {
                         "group name limit reached".to_string(),
                     ));
                 }
-                tx.put(key.as_bytes(), id.to_le_bytes().as_ref())?;
+                let group = Group {
+                    id,
+                    name,
+                    display_name,
+                };
+                tx.put(key.as_bytes(), serialize(&group)?)?;
 
-                id
+                group
             }
-            Some(value) => u64::from_le_bytes(value.try_into().unwrap()),
+            Some(value) => deserialize(&value)?,
         };
 
         tx.commit()?;
 
-        Ok(id)
+        Ok(group)
     }
 
     pub fn next_record_sequence(&self, project_id: u64, group_id: u64) -> Result<u64> {
@@ -291,7 +300,14 @@ pub struct PropertyValue {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
-pub struct Group {
+pub struct GroupValues {
     pub id: u64,
     pub values: Vec<PropertyValue>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
+pub struct Group {
+    pub id: u64,
+    pub name: String,
+    pub display_name: String,
 }
