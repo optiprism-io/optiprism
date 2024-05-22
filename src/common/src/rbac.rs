@@ -36,6 +36,7 @@ pub enum OrganizationRole {
 pub enum ProjectPermission {
     ManageProject,
     DeleteProject,
+    ViewProject,
     ManageSchema,
     DeleteSchema,
     ViewSchema,

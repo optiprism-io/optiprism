@@ -110,7 +110,7 @@ impl Projects {
         self.get_by_id_(&tx, id)
     }
 
-    pub fn list(&self, _organization_id: Option<u64>) -> Result<ListResponse<Project>> {
+    pub fn list(&self) -> Result<ListResponse<Project>> {
         let tx = self.db.transaction();
 
         list_data(&tx, NAMESPACE)

@@ -4,6 +4,8 @@ use chrono::DateTime;
 use chrono::Utc;
 use common::config::Config;
 use common::rbac::OrganizationPermission;
+use common::rbac::Permission;
+use common::rbac::ProjectPermission;
 use common::types::DType;
 use common::types::OptionalProperty;
 use common::types::EVENT_CLICK;
@@ -95,21 +97,30 @@ impl Projects {
     }
 
     pub async fn get_by_id(&self, ctx: Context, id: u64) -> Result<Project> {
-        ctx.check_organization_permission(OrganizationPermission::ExploreProjects)?;
+        ctx.check_project_permission(id, ProjectPermission::ViewProject)?;
 
         Ok(self.md.projects.get_by_id(id)?.into())
     }
 
-    pub async fn list(
-        &self,
-        ctx: Context,
-        organization_id: Option<u64>,
-    ) -> Result<ListResponse<Project>> {
+    pub async fn list(&self, ctx: Context) -> Result<ListResponse<Project>> {
         ctx.check_organization_permission(OrganizationPermission::ExploreProjects)?;
-        let resp = self.md.projects.list(organization_id)?;
+        let resp = self.md.projects.list()?;
 
+        let list = resp
+            .data
+            .into_iter()
+            .filter(|p| p.organization_id == ctx.organization_id)
+            .collect::<Vec<_>>();
+
+        let list = list
+            .into_iter()
+            .filter(|p| {
+                ctx.check_project_permission(p.id, ProjectPermission::ViewProject)
+                    .is_ok()
+            })
+            .collect::<Vec<_>>();
         Ok(ListResponse {
-            data: resp.data.into_iter().map(|v| v.into()).collect(),
+            data: list.into_iter().map(|v| v.into()).collect(),
             meta: resp.meta.into(),
         })
     }
@@ -120,7 +131,7 @@ impl Projects {
         project_id: u64,
         req: UpdateProjectRequest,
     ) -> Result<Project> {
-        ctx.check_organization_permission(OrganizationPermission::ManageProjects)?;
+        ctx.check_project_permission(project_id, ProjectPermission::ManageProject)?;
 
         let md_req = metadata::projects::UpdateProjectRequest {
             updated_by: ctx.account_id.unwrap(),
@@ -137,7 +148,7 @@ impl Projects {
     }
 
     pub async fn delete(&self, ctx: Context, project_id: u64) -> Result<Project> {
-        ctx.check_organization_permission(OrganizationPermission::ManageProjects)?;
+        ctx.check_project_permission(project_id, ProjectPermission::DeleteProject)?;
 
         Ok(self.md.projects.delete(project_id)?.into())
     }

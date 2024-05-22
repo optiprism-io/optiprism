@@ -390,7 +390,7 @@ fn init_session_cleaner(
     thread::spawn(move || {
         loop {
             thread::sleep(cfg.session_cleaner_interval.to_std().unwrap());
-            for project in md.projects.list(None).unwrap() {
+            for project in md.projects.list().unwrap() {
                 md.sessions
                     .check_for_deletion(project.id, |sess| {
                         let now = Utc::now();
