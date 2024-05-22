@@ -38,7 +38,7 @@ async fn list(
     ctx: Context,
     Extension(provider): Extension<Arc<Projects>>,
 ) -> Result<Json<ListResponse<Project>>> {
-    Ok(Json(provider.list(ctx, None).await?))
+    Ok(Json(provider.list(ctx).await?))
 }
 
 async fn update(
