@@ -83,7 +83,7 @@ impl Projects {
         let token = Alphanumeric.sample_string(&mut thread_rng(), 64);
 
         let md = metadata::projects::CreateProjectRequest {
-            created_by: ctx.account_id.unwrap(),
+            created_by: ctx.account_id,
             tags: request.tags,
             name: request.name,
             description: request.description,
@@ -148,7 +148,7 @@ impl Projects {
         )?;
 
         let md_req = metadata::projects::UpdateProjectRequest {
-            updated_by: ctx.account_id.unwrap(),
+            updated_by: ctx.account_id,
             tags: req.tags,
             name: req.name,
             description: req.description,

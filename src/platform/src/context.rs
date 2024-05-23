@@ -37,13 +37,8 @@ use crate::PlatformError;
 use crate::Result;
 
 #[derive(Default, Clone)]
-pub struct AuthContext {
-    pub account_id: u64,
-}
-
-#[derive(Default, Clone)]
 pub struct Context {
-    pub account_id: Option<u64>,
+    pub account_id: u64,
     pub organization_id: u64,
     pub role: Option<Role>,
     pub organizations: Option<Vec<(u64, OrganizationRole)>>,
@@ -185,7 +180,7 @@ where S: Send + Sync
 
         let acc = md_acc_prov.get_by_id(claims.account_id)?;
         let ctx = Context {
-            account_id: Some(acc.id),
+            account_id: acc.id,
             organization_id: claims.organization_id,
             role: acc.role,
             organizations: acc.organizations,

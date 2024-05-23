@@ -38,7 +38,7 @@ impl Reports {
         let report = self
             .prov
             .create(project_id, metadata::reports::CreateReportRequest {
-                created_by: ctx.account_id.unwrap(),
+                created_by: ctx.account_id,
                 tags: request.tags,
                 name: request.name,
                 description: request.description,
@@ -87,7 +87,7 @@ impl Reports {
         )?;
 
         let md_req = metadata::reports::UpdateReportRequest {
-            updated_by: ctx.account_id.unwrap(),
+            updated_by: ctx.account_id,
             tags: req.tags,
             name: req.name,
             description: req.description,

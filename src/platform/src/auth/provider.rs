@@ -3,6 +3,8 @@ use std::sync::Arc;
 use chrono::Duration;
 use common::config::Config;
 use common::types::OptionalProperty;
+use common::ADMIN_ID;
+use common::GROUP_USER_ID;
 use metadata::accounts::Accounts;
 use metadata::accounts::CreateAccountRequest;
 use metadata::accounts::UpdateAccountRequest;
@@ -72,7 +74,7 @@ impl Auth {
             .map_err(|err| err.wrap_into(AuthError::InvalidPasswordHashing))?;
 
         let maybe_account = self.accounts.create(CreateAccountRequest {
-            created_by: None,
+            created_by: ADMIN_ID,
             password_hash,
             email: req.email,
             name: req.name,
@@ -126,7 +128,7 @@ impl Auth {
     }
 
     pub async fn get(&self, ctx: Context) -> Result<Account> {
-        match self.accounts.get_by_id(ctx.account_id.unwrap()) {
+        match self.accounts.get_by_id(ctx.account_id) {
             Ok(acc) => Ok(acc.into()),
             Err(MetadataError::NotFound(_)) => {
                 Err(PlatformError::NotFound("account not found".to_string()))
@@ -140,7 +142,7 @@ impl Auth {
             return Err(PlatformError::invalid_field("name", "empty name"));
         }
         let md_req = UpdateAccountRequest {
-            updated_by: ctx.account_id.unwrap(),
+            updated_by: ctx.account_id,
             name: OptionalProperty::Some(Some(req)),
             email: OptionalProperty::None,
             role: OptionalProperty::None,
@@ -150,7 +152,7 @@ impl Auth {
             password_hash: OptionalProperty::None,
         };
 
-        self.accounts.update(ctx.account_id.unwrap(), md_req)?;
+        self.accounts.update(ctx.account_id, md_req)?;
 
         Ok(())
     }
@@ -164,7 +166,7 @@ impl Auth {
             return Err(PlatformError::invalid_field("email", "invalid email"));
         }
 
-        let account = self.accounts.get_by_id(ctx.account_id.unwrap())?;
+        let account = self.accounts.get_by_id(ctx.account_id)?;
 
         if let Err(err) = verify_password(
             &req.password,
@@ -174,7 +176,7 @@ impl Auth {
         }
 
         let md_req = UpdateAccountRequest {
-            updated_by: ctx.account_id.unwrap(),
+            updated_by: ctx.account_id,
             name: OptionalProperty::None,
             email: OptionalProperty::Some(req.email),
             role: OptionalProperty::None,
@@ -184,7 +186,7 @@ impl Auth {
             password_hash: OptionalProperty::None,
         };
 
-        match self.accounts.update(ctx.account_id.unwrap(), md_req) {
+        match self.accounts.update(ctx.account_id, md_req) {
             Ok(_) => {}
             Err(MetadataError::AlreadyExists(_)) => {
                 return Err(PlatformError::invalid_field(
@@ -205,7 +207,7 @@ impl Auth {
         ctx: Context,
         req: UpdatePasswordRequest,
     ) -> Result<TokensResponse> {
-        let account = self.accounts.get_by_id(ctx.account_id.unwrap())?;
+        let account = self.accounts.get_by_id(ctx.account_id)?;
 
         if verify_password(
             &req.password,
@@ -220,7 +222,7 @@ impl Auth {
             .map_err(|err| err.wrap_into(AuthError::InvalidPasswordHashing))?;
 
         let md_req = UpdateAccountRequest {
-            updated_by: ctx.account_id.unwrap(),
+            updated_by: ctx.account_id,
             name: OptionalProperty::None,
             email: OptionalProperty::None,
             role: OptionalProperty::None,
@@ -230,7 +232,7 @@ impl Auth {
             password_hash: OptionalProperty::Some(password_hash),
         };
 
-        self.accounts.update(ctx.account_id.unwrap(), md_req)?;
+        self.accounts.update(ctx.account_id, md_req)?;
 
         let tokens = self.make_tokens(account.id)?;
 
