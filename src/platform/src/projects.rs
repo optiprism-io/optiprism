@@ -75,7 +75,10 @@ impl Projects {
         Self { md: prov, cfg }
     }
     pub async fn create(&self, ctx: Context, request: CreateProjectRequest) -> Result<Project> {
-        ctx.check_organization_permission(OrganizationPermission::ManageProjects)?;
+        ctx.check_organization_permission(
+            ctx.organization_id,
+            OrganizationPermission::ManageProjects,
+        )?;
 
         let token = Alphanumeric.sample_string(&mut thread_rng(), 64);
 
@@ -97,13 +100,16 @@ impl Projects {
     }
 
     pub async fn get_by_id(&self, ctx: Context, id: u64) -> Result<Project> {
-        ctx.check_project_permission(id, ProjectPermission::ViewProject)?;
+        ctx.check_project_permission(ctx.organization_id, id, ProjectPermission::ViewProject)?;
 
         Ok(self.md.projects.get_by_id(id)?.into())
     }
 
     pub async fn list(&self, ctx: Context) -> Result<ListResponse<Project>> {
-        ctx.check_organization_permission(OrganizationPermission::ExploreProjects)?;
+        ctx.check_organization_permission(
+            ctx.organization_id,
+            OrganizationPermission::ExploreProjects,
+        )?;
         let resp = self.md.projects.list()?;
 
         let list = resp
@@ -115,8 +121,12 @@ impl Projects {
         let list = list
             .into_iter()
             .filter(|p| {
-                ctx.check_project_permission(p.id, ProjectPermission::ViewProject)
-                    .is_ok()
+                ctx.check_project_permission(
+                    ctx.organization_id,
+                    p.id,
+                    ProjectPermission::ViewProject,
+                )
+                .is_ok()
             })
             .collect::<Vec<_>>();
         Ok(ListResponse {
@@ -131,7 +141,11 @@ impl Projects {
         project_id: u64,
         req: UpdateProjectRequest,
     ) -> Result<Project> {
-        ctx.check_project_permission(project_id, ProjectPermission::ManageProject)?;
+        ctx.check_project_permission(
+            ctx.organization_id,
+            project_id,
+            ProjectPermission::ManageProject,
+        )?;
 
         let md_req = metadata::projects::UpdateProjectRequest {
             updated_by: ctx.account_id.unwrap(),
@@ -148,7 +162,11 @@ impl Projects {
     }
 
     pub async fn delete(&self, ctx: Context, project_id: u64) -> Result<Project> {
-        ctx.check_project_permission(project_id, ProjectPermission::DeleteProject)?;
+        ctx.check_project_permission(
+            ctx.organization_id,
+            project_id,
+            ProjectPermission::DeleteProject,
+        )?;
 
         Ok(self.md.projects.delete(project_id)?.into())
     }

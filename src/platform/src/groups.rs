@@ -24,7 +24,11 @@ impl crate::groups::Groups {
         project_id: u64,
         request: CreateGroupRequest,
     ) -> crate::Result<crate::groups::Group> {
-        ctx.check_project_permission(project_id, ProjectPermission::ManageSchema)?;
+        ctx.check_project_permission(
+            ctx.organization_id,
+            project_id,
+            ProjectPermission::ManageSchema,
+        )?;
 
         let g = self
             .prov
@@ -37,7 +41,11 @@ impl crate::groups::Groups {
     }
 
     pub async fn list(&self, ctx: Context, project_id: u64) -> crate::Result<ListResponse<Group>> {
-        ctx.check_project_permission(project_id, ProjectPermission::ViewSchema)?;
+        ctx.check_project_permission(
+            ctx.organization_id,
+            project_id,
+            ProjectPermission::ViewSchema,
+        )?;
         let resp = self.prov.list_groups(project_id)?;
 
         let mut data = vec![];

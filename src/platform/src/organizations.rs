@@ -5,6 +5,7 @@ use chrono::Utc;
 use common::config::Config;
 use common::rbac::OrganizationPermission;
 use common::rbac::Permission;
+use common::rbac::ProjectPermission;
 use common::types::DType;
 use common::types::OptionalProperty;
 use common::types::EVENT_CLICK;
@@ -67,7 +68,6 @@ impl Organizations {
         request: CreateOrganizationRequest,
     ) -> Result<Organization> {
         ctx.check_permission(Permission::ManageOrganizations)?;
-
         let md = metadata::organizations::CreateOrganizationRequest {
             created_by: ctx.account_id.unwrap(),
             name: request.name,
@@ -78,7 +78,7 @@ impl Organizations {
     }
 
     pub async fn get_by_id(&self, ctx: Context, id: u64) -> Result<Organization> {
-        ctx.check_permission(Permission::ViewOrganizations)?;
+        ctx.check_organization_permission(id, OrganizationPermission::ViewOrganization)?;
 
         Ok(self.md.organizations.get_by_id(id)?.into())
     }
@@ -87,8 +87,17 @@ impl Organizations {
         ctx.check_permission(Permission::ViewOrganizations)?;
         let resp = self.md.organizations.list()?;
 
+        let list = resp
+            .data
+            .into_iter()
+            .filter(|o| {
+                ctx.check_organization_permission(o.id, OrganizationPermission::ViewOrganization)
+                    .is_ok()
+            })
+            .collect::<Vec<_>>();
+
         Ok(ListResponse {
-            data: resp.data.into_iter().map(|v| v.into()).collect(),
+            data: list.into_iter().map(|v| v.into()).collect(),
             meta: resp.meta.into(),
         })
     }
@@ -99,7 +108,7 @@ impl Organizations {
         org_id: u64,
         req: UpdateOrganizationRequest,
     ) -> Result<Organization> {
-        ctx.check_permission(Permission::ManageOrganizations)?;
+        ctx.check_organization_permission(org_id, OrganizationPermission::ManageOrganization)?;
 
         let md_req = metadata::organizations::UpdateOrganizationRequest {
             updated_by: ctx.account_id.unwrap(),
