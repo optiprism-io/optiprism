@@ -48,7 +48,6 @@ impl Into<query::queries::event_records_search::EventRecordsSearch> for EventRec
     fn into(self) -> query::queries::event_records_search::EventRecordsSearch {
         query::queries::event_records_search::EventRecordsSearch {
             time: self.time.into(),
-            group_id: self.group,
             events: self.events.map(|events| {
                 events
                     .into_iter()

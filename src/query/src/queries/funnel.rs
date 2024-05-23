@@ -90,7 +90,7 @@ pub fn build(
         for step in req.steps.iter() {
             let mut exprs = vec![];
             for event in step.events.iter() {
-                let mut expr = event_expression(&ctx, &metadata, &event.event, req.group_id)?;
+                let mut expr = event_expression(&ctx, &metadata, &event.event)?;
                 if let Some(filters) = &event.filters {
                     expr = and(expr, event_filters_expression(&ctx, &metadata, &filters)?);
                 }
@@ -110,7 +110,7 @@ pub fn build(
     let exclude = if let Some(excludes) = &req.exclude {
         let mut out = vec![];
         for exclude in excludes {
-            let mut expr = event_expression(&ctx, &metadata, &exclude.event.event, req.group_id)?;
+            let mut expr = event_expression(&ctx, &metadata, &exclude.event.event)?;
             if let Some(filters) = &exclude.event.filters {
                 expr = and(expr, event_filters_expression(&ctx, &metadata, &filters)?);
             }
