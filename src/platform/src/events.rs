@@ -37,7 +37,7 @@ impl Events {
         let event = self
             .prov
             .create(project_id, metadata::events::CreateEventRequest {
-                created_by: ctx.account_id.unwrap(),
+                created_by: ctx.account_id,
                 tags: request.tags,
                 name: request.name,
                 display_name: request.display_name,
@@ -100,7 +100,7 @@ impl Events {
         )?;
 
         let md_req = metadata::events::UpdateEventRequest {
-            updated_by: ctx.account_id.unwrap(),
+            updated_by: ctx.account_id,
             tags: req.tags,
             display_name: req.display_name,
             description: req.description,

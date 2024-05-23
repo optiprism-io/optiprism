@@ -36,7 +36,7 @@ impl Dashboards {
         let dashboard =
             self.prov
                 .create(project_id, metadata::dashboards::CreateDashboardRequest {
-                    created_by: ctx.account_id.unwrap(),
+                    created_by: ctx.account_id,
                     tags: request.tags,
                     name: request.name,
                     description: request.description,
@@ -85,7 +85,7 @@ impl Dashboards {
         )?;
 
         let md_req = metadata::dashboards::UpdateDashboardRequest {
-            updated_by: ctx.account_id.unwrap(),
+            updated_by: ctx.account_id,
             tags: req.tags,
             name: req.name,
             description: req.description,

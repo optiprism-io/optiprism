@@ -69,7 +69,7 @@ impl Organizations {
     ) -> Result<Organization> {
         ctx.check_permission(Permission::ManageOrganizations)?;
         let md = metadata::organizations::CreateOrganizationRequest {
-            created_by: ctx.account_id.unwrap(),
+            created_by: ctx.account_id,
             name: request.name,
         };
 
@@ -111,7 +111,7 @@ impl Organizations {
         ctx.check_organization_permission(org_id, OrganizationPermission::ManageOrganization)?;
 
         let md_req = metadata::organizations::UpdateOrganizationRequest {
-            updated_by: ctx.account_id.unwrap(),
+            updated_by: ctx.account_id,
             name: req.name,
         };
 

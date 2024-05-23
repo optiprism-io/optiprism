@@ -79,7 +79,7 @@ impl Properties {
         )?;
 
         let md_req = metadata::properties::UpdatePropertyRequest {
-            updated_by: ctx.account_id.unwrap(),
+            updated_by: ctx.account_id,
             tags: req.tags,
             description: req.description,
             display_name: req.display_name,

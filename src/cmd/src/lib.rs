@@ -57,6 +57,7 @@ use common::types::GROUP_COLUMN_ID;
 use common::types::GROUP_COLUMN_PROJECT_ID;
 use common::types::GROUP_COLUMN_VERSION;
 use common::types::TABLE_EVENTS;
+use common::ADMIN_ID;
 use common::GROUPS_COUNT;
 use common::GROUP_USER_ID;
 use ingester::error::IngesterError;
@@ -461,7 +462,7 @@ fn init_session_cleaner(
 
 fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<Project> {
     let admin = match md.accounts.create(CreateAccountRequest {
-        created_by: None,
+        created_by: ADMIN_ID,
         password_hash: make_password_hash("admin")?,
         email: "admin@admin.com".to_string(),
         name: Some("admin".to_string()),
@@ -498,7 +499,7 @@ fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<P
 
     info!("token: {}", token);
     let _user = match md.accounts.create(CreateAccountRequest {
-        created_by: Some(admin.id),
+        created_by: admin.id,
         password_hash: make_password_hash("test")?,
         email: "user@test.com".to_string(),
         name: Some("user".to_string()),

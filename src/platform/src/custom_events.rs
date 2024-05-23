@@ -38,7 +38,7 @@ impl CustomEvents {
         )?;
 
         let md_req = metadata::custom_events::CreateCustomEventRequest {
-            created_by: ctx.account_id.unwrap(),
+            created_by: ctx.account_id,
             tags: req.tags,
             name: req.name,
             description: req.description,
@@ -90,7 +90,7 @@ impl CustomEvents {
             ProjectPermission::ManageSchema,
         )?;
         let mut md_req = metadata::custom_events::UpdateCustomEventRequest {
-            updated_by: ctx.account_id.unwrap(),
+            updated_by: ctx.account_id,
             tags: req.tags,
             name: req.name,
             description: req.description,

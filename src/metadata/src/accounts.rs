@@ -152,7 +152,7 @@ impl Accounts {
 pub struct Account {
     pub id: u64,
     pub created_at: DateTime<Utc>,
-    pub created_by: Option<u64>,
+    pub created_by: u64,
     pub updated_at: Option<DateTime<Utc>>,
     pub updated_by: Option<u64>,
     pub password_hash: String,
@@ -166,7 +166,7 @@ pub struct Account {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct CreateAccountRequest {
-    pub created_by: Option<u64>,
+    pub created_by: u64,
     pub password_hash: String,
     pub email: String,
     pub name: Option<String>,

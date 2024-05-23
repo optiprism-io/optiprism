@@ -66,7 +66,7 @@ impl Accounts {
         ctx.check_permission(Permission::ManageAccounts)?;
 
         let mut md_req = metadata::accounts::UpdateAccountRequest {
-            updated_by: ctx.account_id.unwrap(),
+            updated_by: ctx.account_id,
             email: req.email,
             name: req.first_name,
             role: req.role,
@@ -97,7 +97,7 @@ impl Accounts {
 pub struct Account {
     pub id: u64,
     pub created_at: DateTime<Utc>,
-    pub created_by: Option<u64>,
+    pub created_by: u64,
     pub updated_at: Option<DateTime<Utc>>,
     pub updated_by: Option<u64>,
     pub email: String,
