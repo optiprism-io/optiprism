@@ -304,7 +304,7 @@ impl LogicalPlanBuilder {
                 aggregate,
             } => {
                 // event expression
-                let mut event_expr = event_expression(&self.ctx, &self.metadata, event, group_id)?;
+                let mut event_expr = event_expression(&self.ctx, &self.metadata, event)?;
                 // apply event filters
                 if let Some(filters) = &filters {
                     event_expr = and(
@@ -563,7 +563,7 @@ impl LogicalPlanBuilder {
         // event expression
         expr = and(
             expr,
-            event_expression(&self.ctx, &self.metadata, &event.event, group_id)?,
+            event_expression(&self.ctx, &self.metadata, &event.event)?,
         );
         // apply event filters
         if let Some(filters) = &event.filters {

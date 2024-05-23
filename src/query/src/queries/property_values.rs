@@ -77,10 +77,7 @@ impl LogicalPlanBuilder {
         );
 
         if let Some(event) = &req.event {
-            expr = and(
-                expr,
-                event_expression(&ctx, &metadata, event, req.group_id)?,
-            );
+            expr = and(expr, event_expression(&ctx, &metadata, event)?);
         }
 
         let input = LogicalPlan::Filter(PlanFilter::try_new(expr, Arc::new(input))?);
@@ -155,7 +152,6 @@ pub struct Filter {
 #[derive(Clone, Debug)]
 pub struct PropertyValues {
     pub property: PropertyRef,
-    pub group_id: usize,
     pub event: Option<EventRef>,
     pub filter: Option<Filter>,
 }

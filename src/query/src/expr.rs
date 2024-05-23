@@ -61,7 +61,6 @@ pub fn event_expression(
     ctx: &Context,
     metadata: &Arc<MetadataProvider>,
     event: &EventRef,
-    group_id: usize,
 ) -> Result<Expr> {
     Ok(match &event {
         // regular event
@@ -84,17 +83,14 @@ pub fn event_expression(
             let mut exprs: Vec<Expr> = Vec::new();
             for event in e.events.iter() {
                 let mut expr = match &event.event {
-                    EventRef::RegularName(name) => event_expression(
-                        ctx,
-                        metadata,
-                        &EventRef::RegularName(name.to_owned()),
-                        group_id,
-                    )?,
+                    EventRef::RegularName(name) => {
+                        event_expression(ctx, metadata, &EventRef::RegularName(name.to_owned()))?
+                    }
                     EventRef::Regular(id) => {
-                        event_expression(ctx, metadata, &EventRef::Regular(*id), group_id)?
+                        event_expression(ctx, metadata, &EventRef::Regular(*id))?
                     }
                     EventRef::Custom(id) => {
-                        event_expression(ctx, metadata, &EventRef::Custom(*id), group_id)?
+                        event_expression(ctx, metadata, &EventRef::Custom(*id))?
                     }
                 };
 

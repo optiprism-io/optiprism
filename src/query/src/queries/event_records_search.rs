@@ -8,6 +8,7 @@ use common::query::QueryTime;
 use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT_ID;
 use common::types::COLUMN_PROJECT_ID;
+use common::GROUPS_COUNT;
 use datafusion_common::Column;
 use datafusion_common::ScalarValue;
 use datafusion_expr::and;
@@ -118,7 +119,7 @@ pub fn build(
         let mut exprs = vec![];
         for event in events {
             // event expression
-            let mut expr = event_expression(&ctx, &metadata, &event.event, req.group_id)?;
+            let mut expr = event_expression(&ctx, &metadata, &event.event)?;
             // apply event filters
             if let Some(filters) = &event.filters
                 && !filters.is_empty()
@@ -169,10 +170,10 @@ pub fn build(
         properties.append(&mut (l));
         let mut l = metadata.event_properties.list(ctx.project_id)?.data;
         properties.append(&mut (l));
-        let mut l = metadata.group_properties[req.group_id]
-            .list(ctx.project_id)?
-            .data;
-        properties.append(&mut (l));
+        for g in 0..GROUPS_COUNT {
+            let mut l = metadata.group_properties[g].list(ctx.project_id)?.data;
+            properties.append(&mut (l));
+        }
     }
 
     let dict_props = properties
@@ -264,7 +265,6 @@ pub struct Event {
 #[derive(Clone, Debug)]
 pub struct EventRecordsSearch {
     pub time: QueryTime,
-    pub group_id: usize,
     pub events: Option<Vec<Event>>,
     pub filters: Option<Vec<PropValueFilter>>,
     pub properties: Option<Vec<PropertyRef>>,

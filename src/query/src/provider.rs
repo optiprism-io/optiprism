@@ -408,11 +408,7 @@ fn property_values_projection(
     req: &PropertyValues,
     md: &Arc<MetadataProvider>,
 ) -> Result<Vec<String>> {
-    let mut fields = vec![
-        COLUMN_PROJECT_ID.to_string(),
-        group_col(req.group_id),
-        COLUMN_EVENT.to_string(),
-    ];
+    let mut fields = vec![COLUMN_PROJECT_ID.to_string(), COLUMN_EVENT.to_string()];
     fields.push(col_name(ctx, &req.property, md)?);
     fields.dedup();
     Ok(fields)
@@ -455,7 +451,6 @@ fn event_records_search_projection(
 ) -> Result<Vec<String>> {
     let mut fields = vec![
         COLUMN_PROJECT_ID.to_string(),
-        group_col(req.group_id),
         COLUMN_CREATED_AT.to_string(),
         COLUMN_EVENT.to_string(),
         COLUMN_EVENT_ID.to_string(),

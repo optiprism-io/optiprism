@@ -41,7 +41,6 @@ impl Into<query::queries::property_values::PropertyValues> for ListPropertyValue
     fn into(self) -> query::queries::property_values::PropertyValues {
         query::queries::property_values::PropertyValues {
             property: self.property.into(),
-            group_id: self.group,
             event: self.event.map(|event| event.into()),
             filter: self.filter.map(|filter| filter.into()),
         }
