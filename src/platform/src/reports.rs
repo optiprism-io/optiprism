@@ -29,7 +29,11 @@ impl Reports {
         project_id: u64,
         request: CreateReportRequest,
     ) -> Result<Report> {
-        ctx.check_project_permission(project_id, ProjectPermission::ManageReports)?;
+        ctx.check_project_permission(
+            ctx.organization_id,
+            project_id,
+            ProjectPermission::ManageReports,
+        )?;
 
         let report = self
             .prov
@@ -46,13 +50,21 @@ impl Reports {
     }
 
     pub async fn get_by_id(&self, ctx: Context, project_id: u64, id: u64) -> Result<Report> {
-        ctx.check_project_permission(project_id, ProjectPermission::ExploreReports)?;
+        ctx.check_project_permission(
+            ctx.organization_id,
+            project_id,
+            ProjectPermission::ExploreReports,
+        )?;
 
         Ok(self.prov.get_by_id(project_id, id)?.into())
     }
 
     pub async fn list(&self, ctx: Context, project_id: u64) -> Result<ListResponse<Report>> {
-        ctx.check_project_permission(project_id, ProjectPermission::ExploreReports)?;
+        ctx.check_project_permission(
+            ctx.organization_id,
+            project_id,
+            ProjectPermission::ExploreReports,
+        )?;
         let resp = self.prov.list(project_id)?;
         Ok(ListResponse {
             data: resp.data.into_iter().map(|v| v.into()).collect(),
@@ -68,7 +80,11 @@ impl Reports {
         report_id: u64,
         req: UpdateReportRequest,
     ) -> Result<Report> {
-        ctx.check_project_permission(project_id, ProjectPermission::ManageReports)?;
+        ctx.check_project_permission(
+            ctx.organization_id,
+            project_id,
+            ProjectPermission::ManageReports,
+        )?;
 
         let md_req = metadata::reports::UpdateReportRequest {
             updated_by: ctx.account_id.unwrap(),
@@ -85,7 +101,11 @@ impl Reports {
     }
 
     pub async fn delete(&self, ctx: Context, project_id: u64, id: u64) -> Result<Report> {
-        ctx.check_project_permission(project_id, ProjectPermission::ManageReports)?;
+        ctx.check_project_permission(
+            ctx.organization_id,
+            project_id,
+            ProjectPermission::ManageReports,
+        )?;
 
         Ok(self.prov.delete(project_id, id)?.into())
     }

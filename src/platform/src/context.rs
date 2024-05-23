@@ -70,14 +70,18 @@ impl Context {
         Err(PlatformError::Forbidden("forbidden".to_string()))
     }
 
-    pub fn check_organization_permission(&self, permission: OrganizationPermission) -> Result<()> {
+    pub fn check_organization_permission(
+        &self,
+        org_id: u64,
+        permission: OrganizationPermission,
+    ) -> Result<()> {
         if self
             .check_permission(Permission::ManageOrganizations)
             .is_ok()
         {
             return Ok(());
         }
-        let role = self.get_organization_role()?;
+        let role = self.get_organization_role(org_id)?;
         for (org_role, role_permission) in ORGANIZATION_PERMISSIONS.iter() {
             if *org_role != role {
                 continue;
@@ -96,13 +100,14 @@ impl Context {
 
     pub fn check_project_permission(
         &self,
+        org_id: u64,
         project_id: u64,
         permission: ProjectPermission,
     ) -> Result<()> {
         if self.check_permission(Permission::ManageProjects).is_ok() {
             return Ok(());
         }
-        if let Ok(role) = self.get_organization_role() {
+        if let Ok(role) = self.get_organization_role(org_id) {
             match role {
                 OrganizationRole::Owner => return Ok(()),
                 OrganizationRole::Admin => return Ok(()),
@@ -128,10 +133,10 @@ impl Context {
         Err(PlatformError::Forbidden("forbidden".to_string()))
     }
 
-    fn get_organization_role(&self) -> Result<OrganizationRole> {
+    fn get_organization_role(&self, organization_id: u64) -> Result<OrganizationRole> {
         if let Some(organizations) = &self.organizations {
             for (org_id, role) in organizations.iter() {
-                if *org_id == self.organization_id {
+                if *org_id == organization_id {
                     return Ok(role.to_owned());
                 }
             }

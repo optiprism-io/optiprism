@@ -46,7 +46,11 @@ impl Queries {
         req: EventSegmentation,
         query: QueryParams,
     ) -> Result<QueryResponse> {
-        ctx.check_project_permission(project_id, ProjectPermission::ExploreReports)?;
+        ctx.check_project_permission(
+            ctx.organization_id,
+            project_id,
+            ProjectPermission::ExploreReports,
+        )?;
         event_segmentation::validate(&self.md, project_id, &req)?;
         let lreq = req.into();
         let lreq = event_segmentation::fix_types(&self.md, project_id, lreq)?;
@@ -95,7 +99,11 @@ impl Queries {
         req: Funnel,
         query: QueryParams,
     ) -> Result<FunnelResponse> {
-        ctx.check_project_permission(project_id, ProjectPermission::ExploreReports)?;
+        ctx.check_project_permission(
+            ctx.organization_id,
+            project_id,
+            ProjectPermission::ExploreReports,
+        )?;
         funnel::validate(&self.md, project_id, &req)?;
 
         let lreq = req.into();
@@ -156,7 +164,11 @@ impl Queries {
         req: EventRecordsSearchRequest,
         query: QueryParams,
     ) -> Result<QueryResponse> {
-        ctx.check_project_permission(project_id, ProjectPermission::ExploreReports)?;
+        ctx.check_project_permission(
+            ctx.organization_id,
+            project_id,
+            ProjectPermission::ExploreReports,
+        )?;
         event_records_search::validate(&self.md, project_id, &req)?;
         let lreq = req.into();
         let cur_time = match query.timestamp {
@@ -202,7 +214,11 @@ impl Queries {
         req: GroupRecordsSearchRequest,
         query: QueryParams,
     ) -> Result<QueryResponse> {
-        ctx.check_project_permission(project_id, ProjectPermission::ExploreReports)?;
+        ctx.check_project_permission(
+            ctx.organization_id,
+            project_id,
+            ProjectPermission::ExploreReports,
+        )?;
         group_records_search::validate(&self.md, project_id, &req)?;
         let lreq = req.into();
         let cur_time = match query.timestamp {
@@ -247,7 +263,11 @@ impl Queries {
         project_id: u64,
         req: ListPropertyValuesRequest,
     ) -> Result<ListResponse<Value>> {
-        ctx.check_project_permission(project_id, ProjectPermission::ExploreReports)?;
+        ctx.check_project_permission(
+            ctx.organization_id,
+            project_id,
+            ProjectPermission::ExploreReports,
+        )?;
 
         let lreq = req.into();
         let result = self
