@@ -34,7 +34,6 @@ pub struct ListPropertyValuesRequest {
     #[serde(flatten)]
     pub event: Option<EventRef>,
     pub filter: Option<Filter>,
-    pub group: usize,
 }
 
 impl Into<query::queries::property_values::PropertyValues> for ListPropertyValuesRequest {

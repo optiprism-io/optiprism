@@ -27,7 +27,6 @@ pub struct EventRecordsSearchRequest {
     pub events: Option<Vec<Event>>,
     pub filters: Option<Vec<PropValueFilter>>,
     pub properties: Option<Vec<PropertyRef>>,
-    pub group: usize,
 }
 
 impl Into<query::queries::event_records_search::Event> for Event {
