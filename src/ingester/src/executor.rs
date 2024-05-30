@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use common::group_col;
 use common::types::DType;
 use common::GROUP_USER_ID;
 use metadata::events;
@@ -128,6 +129,12 @@ impl Executor<Track> {
                     user_id,
                     vec![],
                 )?;
+                self.md.dictionaries.get_key_or_create(
+                    ctx.project_id.unwrap(),
+                    group_col(GROUP_USER_ID).as_str(),
+                    user_id.as_str(),
+                )?;
+
                 (group.id, Some(group))
             }
             (None, Some(user_id)) => {
@@ -147,7 +154,6 @@ impl Executor<Track> {
                     uid.as_str(),
                     vec![],
                 )?;
-
                 (group.id, None)
             }
             _ => {
@@ -303,15 +309,23 @@ impl Executor<Identify> {
             vec![]
         };
 
-        let resolved_group = self.md.groups.create_or_update(
+        let resolved_group_values = self.md.groups.create_or_update(
             ctx.project_id.unwrap(),
             group.id,
             req.id.as_str(),
             vals,
         )?;
-
+        let group_vals_id = resolved_group_values.id;
         req.group_id = group.id;
-        req.resolved_group_values = Some(resolved_group);
+        req.resolved_group_values = Some(resolved_group_values);
+
+        // create dict for each group values so we can use it in property values
+        self.md.dictionaries.create_key(
+            ctx.project_id.unwrap(),
+            group_col(req.group_id as usize).as_str(),
+            group_vals_id,
+            req.id.as_str(),
+        )?;
 
         for transformer in &self.transformers {
             req = transformer.process(&ctx, req)?;
