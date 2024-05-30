@@ -83,6 +83,18 @@ impl Dictionaries {
         res
     }
 
+    pub fn create_key(&self, project_id: u64, dict: &str, key: u64, value: &str) -> Result<()> {
+        let tx = self.db.transaction();
+
+        tx.put(make_key_key(project_id, dict, key), value.as_bytes())?;
+        tx.put(
+            make_value_key(project_id, dict, value),
+            key.to_le_bytes().as_ref(),
+        )?;
+        tx.commit()?;
+        Ok(())
+    }
+
     pub fn get_key_or_create(&self, project_id: u64, dict: &str, value: &str) -> Result<u64> {
         let tx = self.db.transaction();
         let key = self._get_key_or_create(&tx, project_id, dict, value)?;
