@@ -24,6 +24,8 @@ use arrow::record_batch::RecordBatch;
 use arrow_row::SortField;
 use axum::async_trait;
 use common::types::COLUMN_PROJECT_ID;
+use common::DECIMAL_PRECISION;
+use common::DECIMAL_SCALE;
 use datafusion::execution::context::TaskContext;
 use datafusion::physical_expr::expressions::col;
 use datafusion::physical_expr::expressions::Column;
@@ -489,7 +491,23 @@ impl Stream for PartialAggregateStream {
                         |field| match batch.schema().index_of(field.name().as_str()) {
                             Ok(col_idx) => Ok(batch.column(col_idx).clone()),
                             Err(_) => {
-                                let v = ScalarValue::try_from(field.data_type())?;
+                                let v = match field.data_type() {
+                                    DataType::Int8 => ScalarValue::Int8(Some(0)),
+                                    DataType::Int16 => ScalarValue::Int16(Some(0)),
+                                    DataType::Int32 => ScalarValue::Int32(Some(0)),
+                                    DataType::Int64 => ScalarValue::Int64(Some(0)),
+                                    DataType::UInt8 => ScalarValue::UInt8(Some(0)),
+                                    DataType::UInt16 => ScalarValue::UInt16(Some(0)),
+                                    DataType::UInt32 => ScalarValue::UInt32(Some(0)),
+                                    DataType::UInt64 => ScalarValue::UInt64(Some(0)),
+                                    DataType::Decimal128(_, _) => ScalarValue::Decimal128(
+                                        Some(0),
+                                        DECIMAL_PRECISION,
+                                        DECIMAL_SCALE,
+                                    ),
+                                    DataType::Float64 => ScalarValue::Float64(Some(0.)),
+                                    _ => unimplemented!("{:?}", field.data_type()),
+                                };
                                 Ok(v.to_array_of_size(batch.column(0).len())?)
                             }
                         },
@@ -879,7 +897,6 @@ impl Stream for FinalAggregateStream {
         }
         // todo return multiple batches
         let result = concat_batches(&self.schema, &out_batches)?;
-
         self.finished = true;
         Poll::Ready(Some(Ok(result)))
     }
