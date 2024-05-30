@@ -139,8 +139,9 @@ async fn identify(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Extension(app): Extension<App>,
     Path(token): Path<String>,
-    common::http::Json(request): common::http::Json<IdentifyRequest>,
+    body: String,
 ) -> Result<StatusCode> {
+    let request: IdentifyRequest = serde_json::from_str(&body)?;
     let ctx = RequestContext {
         project_id: None,
         client_ip: addr.ip(),
