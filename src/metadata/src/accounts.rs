@@ -117,6 +117,9 @@ impl Accounts {
         if let OptionalProperty::Some(name) = req.name {
             account.name = name;
         }
+        if let OptionalProperty::Some(force_update_password) = req.force_update_password {
+            account.force_update_password = force_update_password;
+        }
         if let OptionalProperty::Some(organizations) = req.organizations {
             account.organizations = organizations;
         }
@@ -159,6 +162,7 @@ pub struct Account {
     pub email: String,
     pub name: Option<String>,
     pub role: Option<Role>,
+    pub force_update_password: bool,
     pub organizations: Option<Vec<(u64, OrganizationRole)>>,
     pub projects: Option<Vec<(u64, ProjectRole)>>,
     pub teams: Option<Vec<(u64, Role)>>,
@@ -170,6 +174,7 @@ pub struct CreateAccountRequest {
     pub password_hash: String,
     pub email: String,
     pub name: Option<String>,
+    pub force_update_password: bool,
     pub role: Option<Role>,
     pub organizations: Option<Vec<(u64, OrganizationRole)>>,
     pub projects: Option<Vec<(u64, ProjectRole)>>,
@@ -187,6 +192,7 @@ impl CreateAccountRequest {
             password_hash: self.password_hash,
             email: self.email,
             name: self.name,
+            force_update_password: self.force_update_password,
             role: self.role,
             organizations: self.organizations,
             projects: self.projects,
@@ -201,6 +207,7 @@ pub struct UpdateAccountRequest {
     pub password_hash: OptionalProperty<String>,
     pub email: OptionalProperty<String>,
     pub name: OptionalProperty<Option<String>>,
+    pub force_update_password: OptionalProperty<bool>,
     pub role: OptionalProperty<Option<Role>>,
     pub organizations: OptionalProperty<Option<Vec<(u64, OrganizationRole)>>>,
     pub projects: OptionalProperty<Option<Vec<(u64, ProjectRole)>>>,

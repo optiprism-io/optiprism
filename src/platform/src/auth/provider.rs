@@ -78,6 +78,7 @@ impl Auth {
             password_hash,
             email: req.email,
             name: req.name,
+            force_update_password: false,
             role: None,
             organizations: None,
             projects: None,
@@ -150,6 +151,7 @@ impl Auth {
             projects: OptionalProperty::None,
             teams: OptionalProperty::None,
             password_hash: OptionalProperty::None,
+            force_update_password: OptionalProperty::None,
         };
 
         self.accounts.update(ctx.account_id, md_req)?;
@@ -184,6 +186,7 @@ impl Auth {
             projects: OptionalProperty::None,
             teams: OptionalProperty::None,
             password_hash: OptionalProperty::None,
+            force_update_password: OptionalProperty::None,
         };
 
         match self.accounts.update(ctx.account_id, md_req) {
@@ -230,6 +233,38 @@ impl Auth {
             projects: OptionalProperty::None,
             teams: OptionalProperty::None,
             password_hash: OptionalProperty::Some(password_hash),
+            force_update_password: OptionalProperty::None,
+        };
+
+        self.accounts.update(ctx.account_id, md_req)?;
+
+        let tokens = self.make_tokens(account.id)?;
+
+        Ok(tokens)
+    }
+
+    pub async fn set_password(
+        &self,
+        ctx: Context,
+        req: SetPasswordRequest,
+    ) -> Result<TokensResponse> {
+        let account = self.accounts.get_by_id(ctx.account_id)?;
+        if !account.force_update_password {
+            return Err(PlatformError::Forbidden("forbidden".to_string()));
+        }
+        let password_hash = make_password_hash(req.password.as_str())
+            .map_err(|err| err.wrap_into(AuthError::InvalidPasswordHashing))?;
+
+        let md_req = UpdateAccountRequest {
+            updated_by: ctx.account_id,
+            name: OptionalProperty::None,
+            email: OptionalProperty::None,
+            role: OptionalProperty::None,
+            organizations: OptionalProperty::None,
+            projects: OptionalProperty::None,
+            teams: OptionalProperty::None,
+            password_hash: OptionalProperty::Some(password_hash),
+            force_update_password: OptionalProperty::Some(false),
         };
 
         self.accounts.update(ctx.account_id, md_req)?;
@@ -287,4 +322,18 @@ pub struct UpdateEmailRequest {
 pub struct UpdatePasswordRequest {
     pub password: String,
     pub new_password: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SetPasswordRequest {
+    pub password: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct Profile {
+    pub name: Option<String>,
+    pub email: String,
+    pub force_update_password: bool,
 }

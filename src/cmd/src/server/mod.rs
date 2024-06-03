@@ -60,6 +60,7 @@ pub async fn start(cfg: Config) -> Result<()> {
             password_hash: make_password_hash("admin")?,
             email: "admin@admin.com".to_string(),
             name: Some("admin".to_string()),
+            force_update_password: true,
             role: Some(Role::Admin),
             organizations: None,
             projects: None,
