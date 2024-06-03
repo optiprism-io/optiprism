@@ -119,7 +119,7 @@ fn property_to_value(
             (DType::Int16, PropValue::Number(v)) => Value::Int16(Some(v.to_i16().unwrap())),
             (DType::Int32, PropValue::Number(v)) => Value::Int32(Some(v.to_i32().unwrap())),
             (DType::Int64, PropValue::Number(v)) => Value::Int64(Some(v.to_i64().unwrap())),
-            (DType::Decimal, PropValue::Number(v)) => Value::Decimal(Some(v.to_i128().unwrap())),
+            (DType::Decimal, PropValue::Number(v)) => Value::Decimal(Some(v.mantissa())),
             (DType::Boolean, PropValue::Bool(v)) => Value::Boolean(Some(*v)),
             (DType::Timestamp, PropValue::Date(v)) => Value::Int64(Some(v.timestamp())),
             _ => {
