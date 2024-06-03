@@ -12,6 +12,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::auth::password::make_password_hash;
+use crate::auth::provider::Profile;
 use crate::Context;
 use crate::ListResponse;
 use crate::PlatformError;
@@ -34,6 +35,7 @@ impl Accounts {
             password_hash: make_password_hash(req.password.as_str())?,
             email: req.email,
             name: req.name,
+            force_update_password: req.force_update_password,
             role: req.role,
             organizations: req.organizations,
             projects: req.projects,
@@ -68,7 +70,7 @@ impl Accounts {
         let mut md_req = metadata::accounts::UpdateAccountRequest {
             updated_by: ctx.account_id,
             email: req.email,
-            name: req.first_name,
+            name: req.name,
             role: req.role,
             organizations: req.organizations,
             projects: req.projects,
@@ -102,6 +104,7 @@ pub struct Account {
     pub updated_by: Option<u64>,
     pub email: String,
     pub name: Option<String>,
+    pub force_update_password: bool,
     pub role: Option<Role>,
     pub organizations: Option<Vec<(u64, OrganizationRole)>>,
     pub projects: Option<Vec<(u64, ProjectRole)>>,
@@ -118,10 +121,21 @@ impl Into<Account> for metadata::accounts::Account {
             updated_by: self.updated_by,
             email: self.email,
             name: self.name,
+            force_update_password: self.force_update_password,
             role: self.role,
             organizations: self.organizations,
             projects: self.projects,
             teams: self.teams,
+        }
+    }
+}
+
+impl Into<Profile> for Account {
+    fn into(self) -> Profile {
+        Profile {
+            email: self.email,
+            name: self.name,
+            force_update_password: self.force_update_password,
         }
     }
 }
@@ -132,6 +146,7 @@ pub struct CreateAccountRequest {
     pub password: String,
     pub email: String,
     pub name: Option<String>,
+    pub force_update_password: bool,
     pub role: Option<Role>,
     pub organizations: Option<Vec<(u64, OrganizationRole)>>,
     pub projects: Option<Vec<(u64, ProjectRole)>>,
@@ -144,7 +159,8 @@ pub struct UpdateAccountRequest {
     pub salt: OptionalProperty<String>,
     pub password: OptionalProperty<String>,
     pub email: OptionalProperty<String>,
-    pub first_name: OptionalProperty<Option<String>>,
+    pub name: OptionalProperty<Option<String>>,
+    pub force_update_password: OptionalProperty<bool>,
     pub role: OptionalProperty<Option<Role>>,
     pub organizations: OptionalProperty<Option<Vec<(u64, OrganizationRole)>>>,
     pub projects: OptionalProperty<Option<Vec<(u64, ProjectRole)>>>,
