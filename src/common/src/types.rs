@@ -15,6 +15,7 @@ use crate::error::CommonError;
 pub const DECIMAL_PRECISION: u8 = 28;
 pub const DECIMAL_SCALE: i8 = 16;
 pub const DECIMAL_MULTIPLIER: i128 = 10i128.pow(DECIMAL_SCALE as u32);
+pub const ROUND_DIGITS: u8 = 3;
 pub const TIME_UNIT: TimeUnit = TimeUnit::Millisecond;
 
 pub const TABLE_EVENTS: &str = "events";

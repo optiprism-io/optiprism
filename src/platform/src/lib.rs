@@ -43,6 +43,7 @@ use arrow::datatypes::TimeUnit;
 use common::config::Config;
 use common::types::DType;
 use common::types::SortDirection;
+use common::types::ROUND_DIGITS;
 use common::types::TIME_UNIT;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
@@ -184,7 +185,8 @@ pub fn array_ref_to_json_values(arr: &ArrayRef) -> Vec<Value> {
                 .map(|value| match value {
                     None => Value::Number(Number::from_f64(0.0).unwrap()),
                     Some(v) => {
-                        let d = Decimal::from_i128_with_scale(v, DECIMAL_SCALE as u32);
+                        let d = Decimal::from_i128_with_scale(v, DECIMAL_SCALE as u32)
+                            .round_dp(ROUND_DIGITS.into());
                         let d_f = match d.to_f64() {
                             None => {
                                 panic!("can't convert decimal to f64");
