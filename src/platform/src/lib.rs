@@ -41,8 +41,9 @@ use arrow::array::UInt64Array;
 use arrow::array::UInt8Array;
 use arrow::datatypes::TimeUnit;
 use common::config::Config;
-use common::types::{DType, ROUND_DIGITS};
+use common::types::DType;
 use common::types::SortDirection;
+use common::types::ROUND_DIGITS;
 use common::types::TIME_UNIT;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
@@ -129,9 +130,10 @@ impl PlatformProvider {
 macro_rules! arr_to_json_values {
     ($array_ref:expr,$array_type:ident) => {{
         let arr = $array_ref.as_any().downcast_ref::<$array_type>().unwrap();
-        arr.iter()
-            .map(|value| json!(format!("{:.3}", value.unwrap())))
-            .collect()
+        arr.iter().map(|value| json!(value)).collect()
+        // arr.iter()
+        //     .map(|value| json!(format!("{:.3}", value.unwrap())))
+        //     .collect()
     }};
 }
 
@@ -186,7 +188,8 @@ pub fn array_ref_to_json_values(arr: &ArrayRef) -> Vec<Value> {
                 .map(|value| match value {
                     None => Value::Number(Number::from_f64(0.0).unwrap()),
                     Some(v) => {
-                        let d = Decimal::from_i128_with_scale(v, DECIMAL_SCALE as u32).round_dp(ROUND_DIGITS);
+                        let d = Decimal::from_i128_with_scale(v, DECIMAL_SCALE as u32)
+                            .round_dp(ROUND_DIGITS.into());
                         let d_f = match d.to_f64() {
                             None => {
                                 panic!("can't convert decimal to f64");
