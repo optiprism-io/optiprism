@@ -131,9 +131,6 @@ macro_rules! arr_to_json_values {
     ($array_ref:expr,$array_type:ident) => {{
         let arr = $array_ref.as_any().downcast_ref::<$array_type>().unwrap();
         arr.iter().map(|value| json!(value)).collect()
-        // arr.iter()
-        //     .map(|value| json!(format!("{:.3}", value.unwrap())))
-        //     .collect()
     }};
 }
 
