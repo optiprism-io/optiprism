@@ -23,6 +23,7 @@ use datafusion::physical_expr::PhysicalSortExpr;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::PlanProperties;
 use datafusion_common::Result as DFResult;
 use futures::Stream;
 use futures::StreamExt;
@@ -68,10 +69,6 @@ impl ExecutionPlan for RenameColumnRowsExec {
         self.input.schema().clone()
     }
 
-    fn output_partitioning(&self) -> Partitioning {
-        self.input.output_partitioning()
-    }
-
     fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {
         None
     }
@@ -102,6 +99,10 @@ impl ExecutionPlan for RenameColumnRowsExec {
             column: self.column.clone(),
             rename: self.rename.to_vec(),
         }))
+    }
+
+    fn properties(&self) -> &PlanProperties {
+        PlanProperties::new()
     }
 }
 

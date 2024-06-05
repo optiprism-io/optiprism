@@ -4,7 +4,8 @@ use std::hash::Hash;
 use std::hash::Hasher;
 use std::sync::Arc;
 
-use datafusion_common::DFField;
+use arrow::datatypes::Field;
+use arrow::datatypes::FieldRef;
 use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;
 use datafusion_expr::Expr;
@@ -33,11 +34,11 @@ impl RenameColumnsNode {
             .map(|v| {
                 for col in columns.iter() {
                     if v.name().to_string() == col.0 {
-                        return DFField::new_unqualified(
+                        return FieldRef::new(Field::new(
                             &col.1,
                             v.data_type().clone(),
                             v.is_nullable(),
-                        );
+                        ));
                     }
                 }
                 return v.to_owned();
@@ -47,7 +48,10 @@ impl RenameColumnsNode {
         Ok(Self {
             input,
             columns,
-            schema: Arc::new(DFSchema::new_with_metadata(fields, Default::default())?),
+            schema: Arc::new(DFSchema::from_unqualifed_fields(
+                fields.into(),
+                Default::default(),
+            )?),
         })
     }
 }

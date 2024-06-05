@@ -10,7 +10,6 @@ use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
-use datafusion_common::DFField;
 use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;
 use datafusion_expr::Expr;
@@ -35,19 +34,22 @@ impl AggregateAndSortColumnsNode {
         for (idx, f) in schema.fields().iter().enumerate() {
             cols.push(f.to_owned());
             if idx == groups - 1 {
-                let col = DFField::new_unqualified(
+                let col = Field::new(
                     "Average",
                     DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
                     false,
                 );
-                cols.push(col);
+                cols.push(Arc::new(col));
             }
         }
 
         Ok(Self {
             input,
             groups,
-            schema: Arc::new(DFSchema::new_with_metadata(cols, HashMap::default())?),
+            schema: Arc::new(DFSchema::from_unqualifed_fields(
+                cols.into(),
+                HashMap::default(),
+            )?),
         })
     }
 }

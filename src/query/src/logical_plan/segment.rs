@@ -96,7 +96,7 @@ pub struct SegmentNode {
 impl SegmentNode {
     pub fn try_new(input: LogicalPlan, expr: SegmentExpr, partition_col: Column) -> Result<Self> {
         let field = input.schema().field_from_column(&partition_col)?.to_owned();
-        let schema = DFSchema::new_with_metadata(vec![field], Default::default())?;
+        let schema = DFSchema::from_unqualifed_fields(vec![field].into(), Default::default())?;
         Ok(Self {
             input,
             expr,

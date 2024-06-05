@@ -6,9 +6,10 @@ use std::hash::Hasher;
 use std::sync::Arc;
 
 use arrow::datatypes::DataType;
+use arrow::datatypes::Field;
+use arrow::datatypes::FieldRef;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
-use datafusion_common::DFField;
 use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;
 use datafusion_expr::Expr;
@@ -37,22 +38,25 @@ impl UnpivotNode {
         let value_type = DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE);
 
         let schema = {
-            let mut fields: Vec<DFField> = input
+            let mut fields: Vec<_> = input
                 .schema()
                 .fields()
                 .iter()
                 .filter_map(|f| match cols.contains(f.name()) {
                     true => None,
-                    false => Some(f.clone()),
+                    false => Some(f.to_owned()),
                 })
                 .collect();
 
-            let name_field = DFField::new_unqualified(name_col.as_str(), DataType::Utf8, false);
+            let name_field = Arc::new(Field::new(name_col.as_str(), DataType::Utf8, false));
             fields.push(name_field);
-            let value_field = DFField::new_unqualified(value_col.as_str(), value_type, false);
+            let value_field = Arc::new(Field::new(value_col.as_str(), value_type, false));
             fields.push(value_field);
 
-            Arc::new(DFSchema::new_with_metadata(fields, HashMap::new())?)
+            Arc::new(DFSchema::from_unqualifed_fields(
+                fields.into(),
+                HashMap::new(),
+            )?)
         };
 
         Ok(Self {

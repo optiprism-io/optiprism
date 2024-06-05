@@ -7,6 +7,7 @@ use std::hash::Hasher;
 use std::sync::Arc;
 
 use arrow::datatypes::DataType;
+use arrow::datatypes::Field;
 use arrow::datatypes::TimeUnit;
 use chrono::DateTime;
 use chrono::Duration;
@@ -17,7 +18,6 @@ use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 use datafusion::physical_plan::common::collect;
 use datafusion_common::Column;
-use datafusion_common::DFField;
 use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;
 use datafusion_expr::Expr;
@@ -48,7 +48,7 @@ pub struct Funnel {
 
 impl Funnel {
     pub fn schema(&self, schema: &DFSchemaRef) -> DFSchemaRef {
-        let mut fields = vec![DFField::new_unqualified(
+        let mut fields = vec![Field::new(
             "ts",
             DataType::Timestamp(TIME_UNIT, None),
             false,
@@ -59,7 +59,7 @@ impl Funnel {
                 .iter()
                 .map(|(expr, name, sort_field)| {
                     let f = schema.field_with_name(None, name.as_str()).unwrap();
-                    DFField::new_unqualified(name, f.data_type().to_owned(), f.is_nullable())
+                    Field::new(name, f.data_type().to_owned(), f.is_nullable())
                 })
                 .collect::<Vec<_>>();
 
@@ -69,37 +69,37 @@ impl Funnel {
         let mut step_fields = (0..self.steps.len())
             .flat_map(|step_id| {
                 let fields = vec![
-                    DFField::new_unqualified(
+                    Field::new(
                         format!("step{}_total", step_id).as_str(),
                         DataType::Int64,
                         true,
                     ),
-                    DFField::new_unqualified(
+                    Field::new(
                         format!("step{}_conversion_ratio", step_id).as_str(),
                         DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
                         true,
                     ),
-                    DFField::new_unqualified(
+                    Field::new(
                         format!("step{}_avg_time_to_convert", step_id).as_str(),
                         DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
                         true,
                     ),
-                    DFField::new_unqualified(
+                    Field::new(
                         format!("step{}_dropped_off", step_id).as_str(),
                         DataType::Int64,
                         true,
                     ),
-                    DFField::new_unqualified(
+                    Field::new(
                         format!("step{}_drop_off_ratio", step_id).as_str(),
                         DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
                         true,
                     ),
-                    DFField::new_unqualified(
+                    Field::new(
                         format!("step{}_time_to_convert", step_id).as_str(),
                         DataType::Int64,
                         true,
                     ),
-                    DFField::new_unqualified(
+                    Field::new(
                         format!("step{}_time_to_convert_from_start", step_id).as_str(),
                         DataType::Int64,
                         true,
@@ -111,7 +111,7 @@ impl Funnel {
             .collect::<Vec<_>>();
         fields.append(&mut step_fields);
 
-        Arc::new(DFSchema::new_with_metadata(fields, Default::default()).unwrap())
+        Arc::new(DFSchema::from_unqualifed_fields(fields.into(), Default::default()).unwrap())
     }
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -178,8 +178,12 @@ impl FunnelNode {
         funnel: Funnel,
     ) -> Result<Self> {
         let schema = funnel.schema(input.schema());
-        let segment_field = DFField::new_unqualified("segment", DataType::Int64, false);
+        let segment_field = Arc::new(Field::new("segment", DataType::Int64, false));
         let fields = vec![vec![segment_field], schema.fields().to_vec()].concat();
+        let fields = fields
+            .iter()
+            .map(|f| (None, f.to_owned()))
+            .collect::<Vec<_>>();
         let schema = Arc::new(DFSchema::new_with_metadata(fields, Default::default())?);
         Ok(Self {
             input,

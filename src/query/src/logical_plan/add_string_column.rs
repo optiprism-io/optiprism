@@ -7,7 +7,8 @@ use std::hash::Hasher;
 use std::sync::Arc;
 
 use arrow::datatypes::DataType;
-use datafusion_common::DFField;
+use arrow::datatypes::Field;
+use arrow::datatypes::FieldRef;
 use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;
 use datafusion_expr::Expr;
@@ -27,8 +28,12 @@ impl AddStringColumnNode {
     pub fn try_new(input: LogicalPlan, col: (String, String)) -> Result<Self> {
         let schema = input.schema();
         let fields = [
-            vec![DFField::new_unqualified(&col.0, DataType::Utf8, false)],
-            schema.fields().to_vec(),
+            vec![(None, Arc::new(Field::new(&col.0, DataType::Utf8, false)))],
+            schema
+                .fields()
+                .iter()
+                .map(|f| (None, f.to_owned()))
+                .collect::<Vec<_>>(),
         ]
         .concat();
 

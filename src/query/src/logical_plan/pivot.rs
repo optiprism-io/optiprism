@@ -5,8 +5,9 @@ use std::fmt::Formatter;
 use std::hash::Hasher;
 use std::sync::Arc;
 
+use arrow::datatypes::Field;
+use arrow::datatypes::FieldRef;
 use datafusion_common::Column;
-use datafusion_common::DFField;
 use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;
 use datafusion_expr::Expr;
@@ -33,7 +34,7 @@ impl PivotNode {
         result_cols: Vec<String>,
     ) -> Result<Self> {
         let schema = {
-            let mut fields: Vec<DFField> = input
+            let mut fields = input
                 .schema()
                 .fields()
                 .iter()
@@ -43,7 +44,7 @@ impl PivotNode {
                         false => Some(f.to_owned()),
                     }
                 })
-                .collect();
+                .collect::<Vec<_>>();
 
             let value_type = input
                 .schema()
@@ -51,14 +52,17 @@ impl PivotNode {
                 .data_type()
                 .clone();
 
-            let result_fields: Vec<DFField> = result_cols
+            let mut result_fields = result_cols
                 .iter()
-                .map(|col| DFField::new_unqualified(col, value_type.clone(), true))
+                .map(|col| FieldRef::new(Field::new(col, value_type.clone(), true)))
                 .collect();
 
-            fields.extend_from_slice(&result_fields);
+            fields.append(&mut result_fields);
 
-            Arc::new(DFSchema::new_with_metadata(fields, HashMap::new())?)
+            Arc::new(DFSchema::from_unqualifed_fields(
+                fields.into(),
+                HashMap::new(),
+            )?)
         };
 
         Ok(Self {
