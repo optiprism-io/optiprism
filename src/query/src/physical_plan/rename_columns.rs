@@ -18,6 +18,8 @@ use datafusion::physical_expr::PhysicalSortExpr;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::ExecutionPlanProperties;
+use datafusion::physical_plan::PlanProperties;
 use datafusion_common::Result as DFResult;
 use futures::Stream;
 use futures::StreamExt;
@@ -31,10 +33,11 @@ pub struct RenameColumnsExec {
     input: Arc<dyn ExecutionPlan>,
     columns: Vec<(String, String)>,
     schema: SchemaRef,
+    cache: PlanProperties,
 }
 
 impl RenameColumnsExec {
-    pub fn new(input: Arc<dyn ExecutionPlan>, columns: Vec<(String, String)>) -> Self {
+    pub fn try_new(input: Arc<dyn ExecutionPlan>, columns: Vec<(String, String)>) -> Result<Self> {
         let schema = input.schema();
 
         let fields = schema
@@ -54,11 +57,23 @@ impl RenameColumnsExec {
                 return f.deref().clone();
             })
             .collect::<Vec<_>>();
-        Self {
+        let cache = Self::compute_properties(&input)?;
+        Ok(Self {
             input,
             columns,
             schema: Arc::new(Schema::new(fields)),
-        }
+            cache,
+        })
+    }
+
+    fn compute_properties(input: &Arc<dyn ExecutionPlan>) -> Result<PlanProperties> {
+        let eq_properties = input.equivalence_properties().clone();
+
+        Ok(PlanProperties::new(
+            eq_properties,
+            input.output_partitioning().clone(), // Output Partitioning
+            input.execution_mode(),              // Execution Mode
+        ))
     }
 }
 
@@ -78,14 +93,9 @@ impl ExecutionPlan for RenameColumnsExec {
         self.schema.clone()
     }
 
-    fn output_partitioning(&self) -> Partitioning {
-        self.input.output_partitioning()
+    fn properties(&self) -> &PlanProperties {
+        &self.cache
     }
-
-    fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {
-        None
-    }
-
     fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
         vec![self.input.clone()]
     }
@@ -94,7 +104,7 @@ impl ExecutionPlan for RenameColumnsExec {
         self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
-        Ok(Arc::new(RenameColumnsExec::new(
+        Ok(Arc::new(RenameColumnsExec::try_new(
             children[0].clone(),
             self.columns.clone(),
         )))

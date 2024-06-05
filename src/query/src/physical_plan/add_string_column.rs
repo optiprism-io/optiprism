@@ -19,6 +19,8 @@ use datafusion::physical_expr::PhysicalSortExpr;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::ExecutionPlanProperties;
+use datafusion::physical_plan::PlanProperties;
 use datafusion_common::Result as DFResult;
 use datafusion_common::ScalarValue;
 use futures::Stream;
@@ -28,6 +30,7 @@ use futures::StreamExt;
 pub struct AddStringColumnExec {
     input: Arc<dyn ExecutionPlan>,
     schema: SchemaRef,
+    cache: PlanProperties,
     col: (String, String),
 }
 
@@ -41,11 +44,23 @@ impl AddStringColumnExec {
         .concat();
 
         let schema = Schema::new(fields);
+        let cache = Self::compute_properties(&input)?;
         Self {
             input,
             schema: Arc::new(schema),
+            cache,
             col,
         }
+    }
+
+    fn compute_properties(input: &Arc<dyn ExecutionPlan>) -> crate::Result<PlanProperties> {
+        let eq_properties = input.equivalence_properties().clone();
+
+        Ok(PlanProperties::new(
+            eq_properties,
+            input.output_partitioning().clone(), // Output Partitioning
+            input.execution_mode(),              // Execution Mode
+        ))
     }
 }
 
@@ -64,12 +79,8 @@ impl ExecutionPlan for AddStringColumnExec {
         self.schema.clone()
     }
 
-    fn output_partitioning(&self) -> Partitioning {
-        self.input.output_partitioning()
-    }
-
-    fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {
-        None
+    fn properties(&self) -> &PlanProperties {
+        &self.cache
     }
 
     fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {

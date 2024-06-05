@@ -23,6 +23,7 @@ use datafusion::physical_expr::PhysicalSortExpr;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::ExecutionPlanProperties;
 use datafusion::physical_plan::PlanProperties;
 use datafusion_common::Result as DFResult;
 use futures::Stream;
@@ -37,19 +38,32 @@ pub struct RenameColumnRowsExec {
     input: Arc<dyn ExecutionPlan>,
     column: Column,
     rename: Vec<(String, String)>,
+    cache: PlanProperties,
 }
 
 impl RenameColumnRowsExec {
-    pub fn new(
+    pub fn try_new(
         input: Arc<dyn ExecutionPlan>,
         column: Column,
         rename: Vec<(String, String)>,
-    ) -> Self {
-        Self {
+    ) -> Result<RenameColumnRowsExec> {
+        let cache = Self::compute_properties(&input)?;
+        Ok(Self {
             input,
             column,
             rename,
-        }
+            cache,
+        })
+    }
+
+    fn compute_properties(input: &Arc<dyn ExecutionPlan>) -> Result<PlanProperties> {
+        let eq_properties = input.equivalence_properties().clone();
+
+        Ok(PlanProperties::new(
+            eq_properties,
+            input.output_partitioning().clone(), // Output Partitioning
+            input.execution_mode(),              // Execution Mode
+        ))
     }
 }
 
@@ -67,10 +81,6 @@ impl ExecutionPlan for RenameColumnRowsExec {
 
     fn schema(&self) -> SchemaRef {
         self.input.schema().clone()
-    }
-
-    fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {
-        None
     }
 
     fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
@@ -102,7 +112,7 @@ impl ExecutionPlan for RenameColumnRowsExec {
     }
 
     fn properties(&self) -> &PlanProperties {
-        PlanProperties::new()
+        &self.cache
     }
 }
 

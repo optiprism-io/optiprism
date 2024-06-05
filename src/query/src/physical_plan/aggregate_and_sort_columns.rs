@@ -36,6 +36,8 @@ use datafusion::physical_expr::PhysicalSortExpr;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::ExecutionPlanProperties;
+use datafusion::physical_plan::PlanProperties;
 use datafusion_common::DataFusionError;
 use datafusion_common::Result as DFResult;
 use futures::Stream;
@@ -65,6 +67,7 @@ impl Agg {
 pub struct AggregateAndSortColumnsExec {
     input: Arc<dyn ExecutionPlan>,
     groups: usize,
+    cache: PlanProperties,
     schema: SchemaRef,
 }
 
@@ -85,12 +88,24 @@ impl AggregateAndSortColumnsExec {
                 cols.push(col);
             }
         }
+        let cache = Self::compute_properties(&input)?;
 
         Self {
             input,
             groups,
+            cache,
             schema: Arc::new(Schema::new(cols)),
         }
+    }
+
+    fn compute_properties(input: &Arc<dyn ExecutionPlan>) -> Result<PlanProperties> {
+        let eq_properties = input.equivalence_properties().clone();
+
+        Ok(PlanProperties::new(
+            eq_properties,
+            input.output_partitioning().clone(), // Output Partitioning
+            input.execution_mode(),              // Execution Mode
+        ))
     }
 }
 
@@ -110,12 +125,8 @@ impl ExecutionPlan for AggregateAndSortColumnsExec {
         self.schema.clone()
     }
 
-    fn output_partitioning(&self) -> Partitioning {
-        self.input.output_partitioning()
-    }
-
-    fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {
-        None
+    fn properties(&self) -> &PlanProperties {
+        &self.cache
     }
 
     fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {

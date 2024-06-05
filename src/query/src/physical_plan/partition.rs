@@ -23,7 +23,9 @@ use datafusion::physical_plan::metrics::MetricsSet;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::ExecutionPlanProperties;
 use datafusion::physical_plan::Partitioning;
+use datafusion::physical_plan::PlanProperties;
 use datafusion::physical_plan::RecordBatchStream;
 use datafusion::physical_plan::SendableRecordBatchStream;
 use datafusion::physical_plan::Statistics;
@@ -40,6 +42,7 @@ pub struct PartitionExec {
     partition_expr: Vec<Arc<dyn PhysicalExpr>>,
     partition_col_name: String,
     schema: SchemaRef,
+    cache: PlanProperties,
     metrics: ExecutionPlanMetricsSet,
 }
 
@@ -56,13 +59,25 @@ impl PartitionExec {
         schema.fields = [vec![Arc::new(field)], schema.fields.to_vec()]
             .concat()
             .into();
+        let cache = Self::compute_properties(&input)?;
         Ok(Self {
             input,
             partition_expr,
             partition_col_name,
             schema: Arc::new(schema),
+            cache,
             metrics: ExecutionPlanMetricsSet::new(),
         })
+    }
+
+    fn compute_properties(input: &Arc<dyn ExecutionPlan>) -> Result<PlanProperties> {
+        let eq_properties = input.equivalence_properties().clone();
+
+        Ok(PlanProperties::new(
+            eq_properties,
+            input.output_partitioning().clone(), // Output Partitioning
+            input.execution_mode(),              // Execution Mode
+        ))
     }
 }
 
@@ -82,12 +97,8 @@ impl ExecutionPlan for PartitionExec {
         self.schema.clone()
     }
 
-    fn output_partitioning(&self) -> Partitioning {
-        self.input.output_partitioning()
-    }
-
-    fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {
-        None
+    fn properties(&self) -> &PlanProperties {
+        &self.cache
     }
 
     fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {

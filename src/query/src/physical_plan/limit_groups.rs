@@ -36,6 +36,8 @@ use datafusion::physical_expr::PhysicalSortExpr;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::ExecutionPlanProperties;
+use datafusion::physical_plan::PlanProperties;
 use datafusion_common::DataFusionError;
 use datafusion_common::Result as DFResult;
 use futures::Stream;
@@ -59,16 +61,34 @@ pub struct LimitGroupsExec {
     groups: usize,
     skip_cols: usize,
     limit: usize,
+    cache: PlanProperties,
 }
 
 impl LimitGroupsExec {
-    pub fn new(input: Arc<dyn ExecutionPlan>, skip: usize, groups: usize, limit: usize) -> Self {
-        Self {
+    pub fn try_new(
+        input: Arc<dyn ExecutionPlan>,
+        skip: usize,
+        groups: usize,
+        limit: usize,
+    ) -> Result<Self> {
+        let cache = Self::compute_properties(&input)?;
+        Ok(Self {
             input,
             skip_cols: skip,
             groups,
             limit,
-        }
+            cache,
+        })
+    }
+
+    fn compute_properties(input: &Arc<dyn ExecutionPlan>) -> Result<PlanProperties> {
+        let eq_properties = input.equivalence_properties().clone();
+
+        Ok(PlanProperties::new(
+            eq_properties,
+            input.output_partitioning().clone(), // Output Partitioning
+            input.execution_mode(),              // Execution Mode
+        ))
     }
 }
 
@@ -88,12 +108,8 @@ impl ExecutionPlan for LimitGroupsExec {
         self.input.schema().clone()
     }
 
-    fn output_partitioning(&self) -> Partitioning {
-        self.input.output_partitioning()
-    }
-
-    fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {
-        None
+    fn properties(&self) -> &PlanProperties {
+        &self.cache
     }
 
     fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {

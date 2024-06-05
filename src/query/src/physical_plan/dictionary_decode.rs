@@ -30,7 +30,9 @@ use datafusion::physical_plan::metrics::MetricsSet;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::ExecutionPlanProperties;
 use datafusion::physical_plan::Partitioning;
+use datafusion::physical_plan::PlanProperties;
 use datafusion::physical_plan::RecordBatchStream;
 use datafusion::physical_plan::SendableRecordBatchStream;
 use datafusion::physical_plan::Statistics;
@@ -39,19 +41,21 @@ use futures::Stream;
 use futures::StreamExt;
 use metadata::dictionaries::SingleDictionaryProvider;
 
+use crate::error::Result;
 #[derive(Debug)]
 pub struct DictionaryDecodeExec {
     input: Arc<dyn ExecutionPlan>,
     decode_cols: Vec<(Column, Arc<SingleDictionaryProvider>)>,
     schema: SchemaRef,
+    cache: PlanProperties,
     metrics: ExecutionPlanMetricsSet,
 }
 
 impl DictionaryDecodeExec {
-    pub fn new(
+    pub fn try_new(
         input: Arc<dyn ExecutionPlan>,
         decode_cols: Vec<(Column, Arc<SingleDictionaryProvider>)>,
-    ) -> Self {
+    ) -> Result<Self> {
         let fields = input
             .schema()
             .fields()
@@ -72,12 +76,24 @@ impl DictionaryDecodeExec {
             .collect::<Vec<_>>();
 
         let schema = Arc::new(Schema::new(fields));
-        Self {
+        let cache = Self::compute_properties(&input)?;
+        Ok(Self {
             input,
             decode_cols,
             schema,
+            cache,
             metrics: ExecutionPlanMetricsSet::new(),
-        }
+        })
+    }
+
+    fn compute_properties(input: &Arc<dyn ExecutionPlan>) -> Result<PlanProperties> {
+        let eq_properties = input.equivalence_properties().clone();
+
+        Ok(PlanProperties::new(
+            eq_properties,
+            input.output_partitioning().clone(), // Output Partitioning
+            input.execution_mode(),              // Execution Mode
+        ))
     }
 }
 
@@ -97,12 +113,8 @@ impl ExecutionPlan for DictionaryDecodeExec {
         self.schema.clone()
     }
 
-    fn output_partitioning(&self) -> Partitioning {
-        self.input.output_partitioning()
-    }
-
-    fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {
-        self.input.output_ordering()
+    fn properties(&self) -> &PlanProperties {
+        &self.cache
     }
 
     fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
@@ -113,7 +125,7 @@ impl ExecutionPlan for DictionaryDecodeExec {
         self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> DFResult<Arc<dyn ExecutionPlan>> {
-        Ok(Arc::new(DictionaryDecodeExec::new(
+        Ok(Arc::new(DictionaryDecodeExec::try_new(
             children[0].clone(),
             self.decode_cols.clone(),
         )))

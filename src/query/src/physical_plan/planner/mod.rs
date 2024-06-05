@@ -126,10 +126,11 @@ impl DFExtensionPlanner for ExtensionPlanner {
             let exec = AddStringColumnExec::new(physical_inputs[0].clone(), node.col.clone());
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<ReorderColumnsNode>() {
-            let exec = ReorderColumnsExec::new(physical_inputs[0].clone(), node.columns.clone());
+            let exec =
+                ReorderColumnsExec::try_new(physical_inputs[0].clone(), node.columns.clone());
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<RenameColumnsNode>() {
-            let exec = RenameColumnsExec::new(physical_inputs[0].clone(), node.columns.clone());
+            let exec = RenameColumnsExec::try_new(physical_inputs[0].clone(), node.columns.clone());
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<AggregateAndSortColumnsNode>() {
             let exec =
@@ -196,7 +197,7 @@ impl DFExtensionPlanner for ExtensionPlanner {
                     )
                 })
                 .collect();
-            let exec = DictionaryDecodeExec::new(physical_inputs[0].clone(), decode_cols);
+            let exec = DictionaryDecodeExec::try_new(physical_inputs[0].clone(), decode_cols);
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<FunnelNode>() {
             Some(Arc::new(

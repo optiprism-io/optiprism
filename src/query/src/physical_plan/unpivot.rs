@@ -58,7 +58,9 @@ use datafusion::physical_plan::metrics::MetricsSet;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::ExecutionPlanProperties;
 use datafusion::physical_plan::Partitioning;
+use datafusion::physical_plan::PlanProperties;
 use datafusion::physical_plan::RecordBatchStream;
 use datafusion::physical_plan::SendableRecordBatchStream;
 use datafusion::physical_plan::Statistics;
@@ -78,6 +80,7 @@ pub struct UnpivotExec {
     name_col: String,
     value_col: String,
     metrics: ExecutionPlanMetricsSet,
+    cache: PlanProperties,
 }
 
 impl UnpivotExec {
@@ -119,6 +122,7 @@ impl UnpivotExec {
             Arc::new(Schema::new(fields))
         };
 
+        let cache = Self::compute_properties(&input)?;
         Ok(Self {
             input,
             schema,
@@ -126,7 +130,18 @@ impl UnpivotExec {
             name_col,
             value_col,
             metrics: ExecutionPlanMetricsSet::new(),
+            cache,
         })
+    }
+
+    fn compute_properties(input: &Arc<dyn ExecutionPlan>) -> Result<PlanProperties> {
+        let eq_properties = input.equivalence_properties().clone();
+
+        Ok(PlanProperties::new(
+            eq_properties,
+            input.output_partitioning().clone(), // Output Partitioning
+            input.execution_mode(),              // Execution Mode
+        ))
     }
 }
 
@@ -146,12 +161,8 @@ impl ExecutionPlan for UnpivotExec {
         self.schema.clone()
     }
 
-    fn output_partitioning(&self) -> Partitioning {
-        self.input.output_partitioning()
-    }
-
-    fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {
-        None
+    fn properties(&self) -> &PlanProperties {
+        &self.cache
     }
 
     fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {

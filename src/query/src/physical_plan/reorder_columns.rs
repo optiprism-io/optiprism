@@ -18,6 +18,8 @@ use datafusion::physical_expr::PhysicalSortExpr;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::ExecutionPlanProperties;
+use datafusion::physical_plan::PlanProperties;
 use datafusion_common::Result as DFResult;
 use futures::Stream;
 use futures::StreamExt;
@@ -31,10 +33,11 @@ pub struct ReorderColumnsExec {
     input: Arc<dyn ExecutionPlan>,
     columns: Vec<String>,
     schema: SchemaRef,
+    cache: PlanProperties,
 }
 
 impl ReorderColumnsExec {
-    pub fn new(input: Arc<dyn ExecutionPlan>, columns: Vec<String>) -> Self {
+    pub fn try_new(input: Arc<dyn ExecutionPlan>, columns: Vec<String>) -> Result<Self> {
         let schema = input.schema();
 
         let mut reordered_cols = vec![];
@@ -48,11 +51,23 @@ impl ReorderColumnsExec {
             }
         }
 
-        Self {
+        let cache = Self::compute_properties(&input)?;
+        Ok(Self {
             input,
             columns,
             schema: Arc::new(Schema::new(reordered_cols)),
-        }
+            cache,
+        })
+    }
+
+    fn compute_properties(input: &Arc<dyn ExecutionPlan>) -> Result<PlanProperties> {
+        let eq_properties = input.equivalence_properties().clone();
+
+        Ok(PlanProperties::new(
+            eq_properties,
+            input.output_partitioning().clone(), // Output Partitioning
+            input.execution_mode(),              // Execution Mode
+        ))
     }
 }
 
@@ -72,12 +87,8 @@ impl ExecutionPlan for ReorderColumnsExec {
         self.schema.clone()
     }
 
-    fn output_partitioning(&self) -> Partitioning {
-        self.input.output_partitioning()
-    }
-
-    fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {
-        None
+    fn properties(&self) -> &PlanProperties {
+        &self.cache
     }
 
     fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
@@ -88,7 +99,7 @@ impl ExecutionPlan for ReorderColumnsExec {
         self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
-        Ok(Arc::new(ReorderColumnsExec::new(
+        Ok(Arc::new(ReorderColumnsExec::try_new(
             children[0].clone(),
             self.columns.clone(),
         )))
