@@ -61,7 +61,6 @@ pub mod context;
 pub mod error;
 pub mod expr;
 pub mod logical_plan;
-pub mod physical_optimizer;
 pub mod physical_plan;
 pub mod provider;
 pub mod queries;
@@ -385,6 +384,7 @@ pub mod test_util {
     use datafusion::prelude::CsvReadOptions;
     use datafusion::prelude::SessionConfig;
     use datafusion::prelude::SessionContext;
+    use datafusion_common::config::TableOptions;
     use datafusion_expr::logical_plan::builder::UNNAMED_TABLE;
     use datafusion_expr::LogicalPlan;
     use datafusion_expr::LogicalPlanBuilder;
@@ -437,7 +437,7 @@ pub mod test_util {
                 .unwrap(),
         )?;
         let session_config = SessionConfig::new();
-        let listing_options = options.to_listing_options(&session_config);
+        let listing_options = options.to_listing_options(&session_config, TableOptions::new());
 
         let config = ListingTableConfig::new(table_path)
             .with_listing_options(listing_options)

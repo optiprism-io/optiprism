@@ -128,7 +128,7 @@ impl ExecutionPlan for DictionaryDecodeExec {
         Ok(Arc::new(DictionaryDecodeExec::try_new(
             children[0].clone(),
             self.decode_cols.clone(),
-        )))
+        )?))
     }
 
     fn execute(
