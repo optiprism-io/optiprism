@@ -72,7 +72,7 @@ pub struct AggregateAndSortColumnsExec {
 }
 
 impl AggregateAndSortColumnsExec {
-    pub fn new(input: Arc<dyn ExecutionPlan>, groups: usize) -> Self {
+    pub fn try_new(input: Arc<dyn ExecutionPlan>, groups: usize) -> Result<Self> {
         let schema = input.schema();
 
         let mut cols = vec![];
@@ -90,12 +90,12 @@ impl AggregateAndSortColumnsExec {
         }
         let cache = Self::compute_properties(&input)?;
 
-        Self {
+        Ok(Self {
             input,
             groups,
             cache,
             schema: Arc::new(Schema::new(cols)),
-        }
+        })
     }
 
     fn compute_properties(input: &Arc<dyn ExecutionPlan>) -> Result<PlanProperties> {
@@ -137,10 +137,10 @@ impl ExecutionPlan for AggregateAndSortColumnsExec {
         self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
-        Ok(Arc::new(AggregateAndSortColumnsExec::new(
-            children[0].clone(),
-            self.groups.clone(),
-        )))
+        Ok(Arc::new(
+            AggregateAndSortColumnsExec::try_new(children[0].clone(), self.groups.clone())
+                .map_err(QueryError::into_datafusion_execution_error)?,
+        ))
     }
 
     fn execute(
@@ -261,7 +261,7 @@ mod tests {
         let schema = res[0].schema();
         let input = MemoryExec::try_new(&[res], schema.clone(), None).unwrap();
 
-        let exec = AggregateAndSortColumnsExec::new(Arc::new(input), 2);
+        let exec = AggregateAndSortColumnsExec::try_new(Arc::new(input), 2);
         let session_ctx = SessionContext::new();
         let task_ctx = session_ctx.task_ctx();
         let stream = exec.execute(0, task_ctx).unwrap();

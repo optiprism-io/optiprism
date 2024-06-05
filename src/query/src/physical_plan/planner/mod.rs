@@ -123,7 +123,8 @@ impl DFExtensionPlanner for ExtensionPlanner {
                 .map_err(|err| DataFusionError::Plan(err.to_string()))?;
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<AddStringColumnNode>() {
-            let exec = AddStringColumnExec::new(physical_inputs[0].clone(), node.col.clone());
+            let exec = AddStringColumnExec::try_new(physical_inputs[0].clone(), node.col.clone())
+                .map_err(|e| DataFusionError::Plan(e.to_string()))?;
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<ReorderColumnsNode>() {
             let exec =
@@ -135,8 +136,11 @@ impl DFExtensionPlanner for ExtensionPlanner {
                 .map_err(|e| DataFusionError::Plan(e.to_string()))?;
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<AggregateAndSortColumnsNode>() {
-            let exec =
-                AggregateAndSortColumnsExec::new(physical_inputs[0].clone(), node.groups.clone());
+            let exec = AggregateAndSortColumnsExec::try_new(
+                physical_inputs[0].clone(),
+                node.groups.clone(),
+            )
+            .map_err(|e| DataFusionError::Plan(e.to_string()))?;
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<LimitGroupsNode>() {
             let exec = LimitGroupsExec::try_new(

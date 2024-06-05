@@ -26,6 +26,9 @@ use datafusion_common::ScalarValue;
 use futures::Stream;
 use futures::StreamExt;
 
+use crate::error::QueryError;
+use crate::error::Result;
+
 #[derive(Debug)]
 pub struct AddStringColumnExec {
     input: Arc<dyn ExecutionPlan>,
@@ -35,7 +38,7 @@ pub struct AddStringColumnExec {
 }
 
 impl AddStringColumnExec {
-    pub fn new(input: Arc<dyn ExecutionPlan>, col: (String, String)) -> Self {
+    pub fn try_new(input: Arc<dyn ExecutionPlan>, col: (String, String)) -> Result<Self> {
         let schema = input.schema();
         let fields = [
             vec![Field::new(col.0.clone(), DataType::Utf8, false)],
@@ -45,12 +48,12 @@ impl AddStringColumnExec {
 
         let schema = Schema::new(fields);
         let cache = Self::compute_properties(&input)?;
-        Self {
+        Ok(Self {
             input,
             schema: Arc::new(schema),
             cache,
             col,
-        }
+        })
     }
 
     fn compute_properties(input: &Arc<dyn ExecutionPlan>) -> crate::Result<PlanProperties> {
@@ -91,10 +94,10 @@ impl ExecutionPlan for AddStringColumnExec {
         self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
-        Ok(Arc::new(AddStringColumnExec::new(
-            children[0].clone(),
-            self.col.clone(),
-        )))
+        Ok(Arc::new(
+            AddStringColumnExec::try_new(children[0].clone(), self.col.clone())
+                .map_err(QueryError::into_datafusion_execution_error)?,
+        ))
     }
 
     fn execute(

@@ -91,11 +91,14 @@ impl ExecutionPlan for RenameColumnRowsExec {
         self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
-        Ok(Arc::new(RenameColumnRowsExec::new(
-            children[0].clone(),
-            self.column.clone(),
-            self.rename.to_vec(),
-        )))
+        Ok(Arc::new(
+            RenameColumnRowsExec::try_new(
+                children[0].clone(),
+                self.column.clone(),
+                self.rename.to_vec(),
+            )
+            .map_err(QueryError::into_datafusion_execution_error)?,
+        ))
     }
 
     fn execute(

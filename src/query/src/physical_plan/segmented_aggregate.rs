@@ -901,7 +901,6 @@ impl Stream for FinalAggregateStream {
             group_by,
             aggs,
             vec![None],
-            vec![None],
             input,
             self.schema.clone(),
         )?);

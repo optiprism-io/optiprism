@@ -99,10 +99,10 @@ impl ExecutionPlan for ReorderColumnsExec {
         self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
-        Ok(Arc::new(ReorderColumnsExec::try_new(
-            children[0].clone(),
-            self.columns.clone(),
-        )))
+        Ok(Arc::new(
+            ReorderColumnsExec::try_new(children[0].clone(), self.columns.clone())
+                .map_err(QueryError::into_datafusion_execution_error)?,
+        ))
     }
 
     fn execute(

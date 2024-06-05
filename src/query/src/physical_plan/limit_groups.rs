@@ -120,12 +120,10 @@ impl ExecutionPlan for LimitGroupsExec {
         self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
-        Ok(Arc::new(LimitGroupsExec::new(
-            children[0].clone(),
-            self.skip_cols,
-            self.groups,
-            self.limit,
-        )))
+        Ok(Arc::new(
+            LimitGroupsExec::try_new(children[0].clone(), self.skip_cols, self.groups, self.limit)
+                .map_err(QueryError::into_datafusion_execution_error)?,
+        ))
     }
 
     fn execute(
