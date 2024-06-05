@@ -36,6 +36,7 @@ use datafusion::physical_plan::PlanProperties;
 use datafusion::physical_plan::RecordBatchStream;
 use datafusion::physical_plan::SendableRecordBatchStream;
 use datafusion::physical_plan::Statistics;
+use datafusion_common::DataFusionError;
 use datafusion_common::Result as DFResult;
 use futures::Stream;
 use futures::StreamExt;
@@ -125,10 +126,10 @@ impl ExecutionPlan for DictionaryDecodeExec {
         self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> DFResult<Arc<dyn ExecutionPlan>> {
-        Ok(Arc::new(DictionaryDecodeExec::try_new(
-            children[0].clone(),
-            self.decode_cols.clone(),
-        )?))
+        Ok(Arc::new(
+            DictionaryDecodeExec::try_new(children[0].clone(), self.decode_cols.clone())
+                .map_err(|e| DataFusionError::Plan(e.to_string()))?,
+        ))
     }
 
     fn execute(

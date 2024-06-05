@@ -78,7 +78,7 @@ fn build_filter(
     execution_props: &ExecutionProps,
 ) -> Result<Option<Arc<dyn PhysicalExpr>>> {
     let ret = filter
-        .map(|e| create_physical_expr(&e, dfschema, schema, execution_props))
+        .map(|e| create_physical_expr(&e, dfschema, execution_props))
         .transpose()?;
 
     Ok(ret)

@@ -57,7 +57,7 @@ pub(crate) fn build_funnel(
         .steps
         .iter()
         .map(|(expr, order)| {
-            let expr = create_physical_expr(&expr, &dfschema, &schema, &execution_props).unwrap();
+            let expr = create_physical_expr(&expr, &dfschema, &execution_props).unwrap();
             let order = match order {
                 logical_plan::funnel::StepOrder::Exact => StepOrder::Exact,
                 logical_plan::funnel::StepOrder::Any(v) => StepOrder::Any(v.to_vec()),
@@ -69,7 +69,7 @@ pub(crate) fn build_funnel(
     let exclude = if let Some(exclude) = f.exclude {
         let mut out = vec![];
         for exclude in exclude {
-            let expr = create_physical_expr(&exclude.expr, &dfschema, &schema, &execution_props)?;
+            let expr = create_physical_expr(&exclude.expr, &dfschema, &execution_props)?;
             let steps = if let Some(steps) = exclude.steps {
                 Some(ExcludeSteps {
                     from: steps.from,
@@ -89,7 +89,7 @@ pub(crate) fn build_funnel(
         Some(
             constants
                 .iter()
-                .map(|expr| create_physical_expr(expr, &dfschema, &schema, &execution_props))
+                .map(|expr| create_physical_expr(expr, &dfschema, &execution_props))
                 .collect::<std::result::Result<Vec<_>, _>>()?,
         )
     } else {
@@ -101,7 +101,7 @@ pub(crate) fn build_funnel(
             groups
                 .iter()
                 .map(|(expr, name, sort_field)| {
-                    let expr = create_physical_expr(&expr, &dfschema, &schema, &execution_props)?;
+                    let expr = create_physical_expr(&expr, &dfschema, &execution_props)?;
                     let sf = SortField::new(sort_field.data_type.clone());
                     Ok((expr, name.clone(), sf))
                 })

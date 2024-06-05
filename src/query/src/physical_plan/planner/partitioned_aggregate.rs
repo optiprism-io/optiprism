@@ -50,7 +50,7 @@ fn build_groups(
         .map(|g| {
             g.iter()
                 .map(|(expr, sf)| {
-                    create_physical_expr(expr, dfschema, schema, execution_props).map(|physexpr| {
+                    create_physical_expr(expr, dfschema, execution_props).map(|physexpr| {
                         let sf = arrow_row::SortField::new(sf.data_type.clone());
                         (
                             physexpr as PhysicalExprRef,
