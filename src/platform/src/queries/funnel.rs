@@ -511,7 +511,11 @@ impl Into<Funnel> for common::query::funnel::Funnel {
     }
 }
 
-pub(crate) fn validate(md: &Arc<MetadataProvider>, project_id: u64, req: &Funnel) -> Result<()> {
+pub(crate) fn validate_request(
+    md: &Arc<MetadataProvider>,
+    project_id: u64,
+    req: &Funnel,
+) -> Result<()> {
     if req.group > GROUPS_COUNT - 1 {
         return Err(PlatformError::BadRequest(
             "group id is out of range".to_string(),
@@ -558,11 +562,6 @@ pub(crate) fn validate(md: &Arc<MetadataProvider>, project_id: u64, req: &Funnel
 
             match &event.filters {
                 Some(filters) => {
-                    if filters.is_empty() {
-                        return Err(PlatformError::BadRequest(format!(
-                            "step #{step_id}, filters must not be empty"
-                        )));
-                    }
                     for (filter_id, filter) in filters.iter().enumerate() {
                         validate_event_filter(
                             md,
@@ -599,11 +598,6 @@ pub(crate) fn validate(md: &Arc<MetadataProvider>, project_id: u64, req: &Funnel
     }
 
     if let Some(exclude) = &req.exclude {
-        if exclude.is_empty() {
-            return Err(PlatformError::BadRequest(
-                "exclude must not be empty".to_string(),
-            ));
-        }
         for (exclude_id, exclude) in exclude.iter().enumerate() {
             validate_event(
                 md,
@@ -635,11 +629,6 @@ pub(crate) fn validate(md: &Arc<MetadataProvider>, project_id: u64, req: &Funnel
     match &req.breakdowns {
         None => {}
         Some(breakdowns) => {
-            if breakdowns.is_empty() {
-                return Err(PlatformError::BadRequest(
-                    "breakdowns must not be empty".to_string(),
-                ));
-            }
             let mut g = HashMap::new();
             for b in breakdowns {
                 g.insert(b.to_owned(), ());
@@ -671,11 +660,6 @@ pub(crate) fn validate(md: &Arc<MetadataProvider>, project_id: u64, req: &Funnel
     }
 
     if let Some(hc) = &req.holding_constants {
-        if hc.is_empty() {
-            return Err(PlatformError::BadRequest(
-                "holding constants field can't be empty".to_string(),
-            ));
-        }
         for (idx, prop) in hc.iter().enumerate() {
             validate_event_property(md, project_id, prop, format!("holding constant {idx}"))?;
         }
@@ -722,4 +706,45 @@ pub(crate) fn validate(md: &Arc<MetadataProvider>, project_id: u64, req: &Funnel
     }
 
     Ok(())
+}
+
+pub(crate) fn fix_request(
+    req: common::query::funnel::Funnel,
+) -> Result<common::query::funnel::Funnel> {
+    let mut out = req.clone();
+
+    for (step_id, step) in req.steps.iter().enumerate() {
+        for (event_id, event) in step.events.iter().enumerate() {
+            if let Some(filters) = &event.filters {
+                if filters.is_empty() {
+                    out.steps[step_id].events[event_id].filters = None;
+                }
+            }
+        }
+    }
+
+    if let Some(exclude) = &req.exclude
+        && exclude.is_empty()
+    {
+        out.exclude = None;
+    }
+
+    if let Some(breakdowns) = &req.breakdowns
+        && breakdowns.is_empty()
+    {
+        out.breakdowns = None;
+    }
+
+    if let Some(holding_constants) = &req.holding_constants
+        && holding_constants.is_empty()
+    {
+        out.holding_constants = None;
+    }
+
+    if let Some(filters) = &req.filters {
+        if filters.is_empty() {
+            out.filters = None;
+        }
+    }
+    Ok(out)
 }

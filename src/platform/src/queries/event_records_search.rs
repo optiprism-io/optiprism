@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use metadata::MetadataProvider;
+use query::queries;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -69,7 +70,7 @@ impl Into<query::queries::event_records_search::EventRecordsSearch> for EventRec
     }
 }
 
-pub(crate) fn validate(
+pub(crate) fn validate_request(
     md: &Arc<MetadataProvider>,
     project_id: u64,
     req: &EventRecordsSearchRequest,
@@ -159,4 +160,29 @@ pub(crate) fn validate(
         }
     }
     Ok(())
+}
+
+pub(crate) fn fix_request(
+    req: queries::event_records_search::EventRecordsSearch,
+) -> Result<queries::event_records_search::EventRecordsSearch> {
+    let mut out = req.clone();
+
+    if let Some(events) = &req.events {
+        if events.is_empty() {
+            out.events = None;
+        }
+    }
+
+    if let Some(filters) = &req.filters {
+        if filters.is_empty() {
+            out.filters = None;
+        }
+    }
+
+    if let Some(properties) = &req.properties {
+        if properties.is_empty() {
+            out.properties = None;
+        }
+    }
+    Ok(out)
 }

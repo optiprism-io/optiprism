@@ -66,7 +66,7 @@ impl Into<ListResponse<Value>> for ArrayRef {
     }
 }
 
-pub(crate) fn validate(
+pub(crate) fn validate_request(
     md: &Arc<MetadataProvider>,
     project_id: u64,
     req: &ListPropertyValuesRequest,
