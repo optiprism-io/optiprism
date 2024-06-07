@@ -640,7 +640,7 @@ impl Into<EventSegmentation> for common::query::event_segmentation::EventSegment
     }
 }
 
-pub(crate) fn validate(
+pub(crate) fn validate_request(
     md: &Arc<MetadataProvider>,
     project_id: u64,
     req: &EventSegmentation,
@@ -694,11 +694,6 @@ pub(crate) fn validate(
     match &req.filters {
         None => {}
         Some(filters) => {
-            if filters.groups.is_empty() {
-                return Err(PlatformError::BadRequest(
-                    "filters field can't be empty".to_string(),
-                ));
-            }
             for filter_group in &filters.groups {
                 if filters.groups.is_empty() {
                     return Err(PlatformError::BadRequest(
@@ -744,7 +739,7 @@ pub(crate) fn validate(
     Ok(())
 }
 
-pub(crate) fn fix_types(
+pub(crate) fn fix_request(
     md: &Arc<MetadataProvider>,
     project_id: u64,
     req: common::query::event_segmentation::EventSegmentation,
@@ -752,80 +747,94 @@ pub(crate) fn fix_types(
     let mut out = req.clone();
     for (event_id, event) in req.events.iter().enumerate() {
         let filters = if let Some(filters) = &event.filters {
-            let mut filters_out = vec![];
-            for (filter_id, filter) in filters.iter().enumerate() {
-                match filter {
-                    common::query::PropValueFilter::Property {
-                        property,
-                        value,
-                        operation,
-                    } => {
-                        let prop = match property {
-                            common::query::PropertyRef::System(name) => {
-                                md.system_properties.get_by_name(project_id, name)?
-                            }
+            if filters.is_empty() {
+                None
+            } else {
+                let mut filters_out = vec![];
+                for (filter_id, filter) in filters.iter().enumerate() {
+                    match filter {
+                        common::query::PropValueFilter::Property {
+                            property,
+                            value,
+                            operation,
+                        } => {
+                            let prop = match property {
+                                common::query::PropertyRef::System(name) => {
+                                    md.system_properties.get_by_name(project_id, name)?
+                                }
 
-                            common::query::PropertyRef::Group(name, group) => {
-                                md.group_properties[*group].get_by_name(project_id, name)?
-                            }
-                            common::query::PropertyRef::Event(name) => {
-                                md.event_properties.get_by_name(project_id, name)?
-                            }
-                            _ => {
-                                return Err(PlatformError::Unimplemented(
-                                    "invalid property type".to_string(),
-                                ));
-                            }
-                        };
+                                common::query::PropertyRef::Group(name, group) => {
+                                    md.group_properties[*group].get_by_name(project_id, name)?
+                                }
+                                common::query::PropertyRef::Event(name) => {
+                                    md.event_properties.get_by_name(project_id, name)?
+                                }
+                                _ => {
+                                    return Err(PlatformError::Unimplemented(
+                                        "invalid property type".to_string(),
+                                    ));
+                                }
+                            };
 
-                        let mut ev = vec![];
-                        if let Some(value) = value {
-                            for value in value {
-                                match (&prop.data_type, value) {
-                                    (&DType::Timestamp, &ScalarValue::Decimal128(_, _, _)) => {
-                                        match out.events[event_id].clone().filters.unwrap()
-                                            [filter_id]
-                                            .clone()
-                                        {
-                                            common::query::PropValueFilter::Property {
-                                                value,
-                                                ..
-                                            } => {
-                                                for value in value.unwrap().iter() {
-                                                    if let ScalarValue::Decimal128(Some(ts), _, _) =
-                                                        value
-                                                    {
-                                                        let sv = ScalarValue::TimestampMillisecond(
-                                                            Some(*ts as i64),
-                                                            None,
-                                                        );
-                                                        ev.push(sv);
-                                                    } else {
-                                                        unreachable!()
+                            let mut ev = vec![];
+                            if let Some(value) = value {
+                                for value in value {
+                                    match (&prop.data_type, value) {
+                                        (&DType::Timestamp, &ScalarValue::Decimal128(_, _, _)) => {
+                                            match out.events[event_id].clone().filters.unwrap()
+                                                [filter_id]
+                                                .clone()
+                                            {
+                                                common::query::PropValueFilter::Property {
+                                                    value,
+                                                    ..
+                                                } => {
+                                                    for value in value.unwrap().iter() {
+                                                        if let ScalarValue::Decimal128(
+                                                            Some(ts),
+                                                            _,
+                                                            _,
+                                                        ) = value
+                                                        {
+                                                            let sv =
+                                                                ScalarValue::TimestampMillisecond(
+                                                                    Some(*ts as i64),
+                                                                    None,
+                                                                );
+                                                            ev.push(sv);
+                                                        } else {
+                                                            unreachable!()
+                                                        }
                                                     }
                                                 }
-                                            }
-                                        };
+                                            };
+                                        }
+                                        _ => ev.push(value.to_owned()),
                                     }
-                                    _ => ev.push(value.to_owned()),
                                 }
                             }
-                        }
 
-                        let filter = common::query::PropValueFilter::Property {
-                            property: property.to_owned(),
-                            operation: operation.to_owned(),
-                            value: Some(ev),
-                        };
-                        filters_out.push(filter);
-                    }
-                };
+                            let filter = common::query::PropValueFilter::Property {
+                                property: property.to_owned(),
+                                operation: operation.to_owned(),
+                                value: Some(ev),
+                            };
+                            filters_out.push(filter);
+                        }
+                    };
+                }
+                Some(filters_out)
             }
-            Some(filters_out)
         } else {
             None
         };
         out.events[event_id].filters = filters;
+
+        if let Some(filters) = &req.filters {
+            if filters.is_empty() {
+                out.filters = None;
+            }
+        }
     }
 
     // TODO make for out.filters

@@ -51,9 +51,9 @@ impl Queries {
             project_id,
             ProjectPermission::ExploreReports,
         )?;
-        event_segmentation::validate(&self.md, project_id, &req)?;
+        event_segmentation::validate_request(&self.md, project_id, &req)?;
         let lreq = req.into();
-        let lreq = event_segmentation::fix_types(&self.md, project_id, lreq)?;
+        let lreq = event_segmentation::fix_request(&self.md, project_id, lreq)?;
         dbg!(&lreq);
 
         let cur_time = match query.timestamp {
@@ -104,7 +104,8 @@ impl Queries {
             project_id,
             ProjectPermission::ExploreReports,
         )?;
-        funnel::validate(&self.md, project_id, &req)?;
+        funnel::validate_request(&self.md, project_id, &req)?;
+        let req = funnel::fix_request(req.into())?;
 
         let lreq = req.into();
         let cur_time = match query.timestamp {
@@ -169,8 +170,8 @@ impl Queries {
             project_id,
             ProjectPermission::ExploreReports,
         )?;
-        event_records_search::validate(&self.md, project_id, &req)?;
-        let lreq = req.into();
+        event_records_search::validate_request(&self.md, project_id, &req)?;
+        let lreq = event_records_search::fix_request(req.into())?;
         let cur_time = match query.timestamp {
             None => Utc::now(),
             Some(ts_sec) => DateTime::from_naive_utc_and_offset(
@@ -219,8 +220,8 @@ impl Queries {
             project_id,
             ProjectPermission::ExploreReports,
         )?;
-        group_records_search::validate(&self.md, project_id, &req)?;
-        let lreq = req.into();
+        group_records_search::validate_request(&self.md, project_id, &req)?;
+        let lreq = group_records_search::fix_request(req.into())?;
         let cur_time = match query.timestamp {
             None => Utc::now(),
             Some(ts_sec) => DateTime::from_naive_utc_and_offset(

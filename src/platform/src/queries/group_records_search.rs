@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use common::GROUPS_COUNT;
 use metadata::MetadataProvider;
+use query::queries;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -82,7 +83,7 @@ impl Into<query::queries::group_records_search::GroupRecordsSearch> for GroupRec
     }
 }
 
-pub(crate) fn validate(
+pub(crate) fn validate_request(
     md: &Arc<MetadataProvider>,
     project_id: u64,
     req: &GroupRecordsSearchRequest,
@@ -170,4 +171,24 @@ pub(crate) fn validate(
     }
 
     Ok(())
+}
+
+pub(crate) fn fix_request(
+    req: queries::group_records_search::GroupRecordsSearch,
+) -> Result<queries::group_records_search::GroupRecordsSearch> {
+    let mut out = req.clone();
+
+    if let Some(filters) = &req.filters
+        && filters.is_empty()
+    {
+        out.filters = None;
+    }
+
+    if let Some(props) = &req.properties
+        && props.is_empty()
+    {
+        out.properties = None;
+    }
+
+    Ok(out)
 }
