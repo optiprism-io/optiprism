@@ -38,8 +38,10 @@ macro_rules! property_col {
     ($ctx:expr,$md:expr,$input:expr,$prop:expr) => {{
         let col_name = $prop.column_name();
         let expr = col(col_name.as_str());
-        let _aggr_schema =
-            DFSchema::new_with_metadata(exprlist_to_fields(vec![&expr], &$input)?, HashMap::new())?;
+        let _aggr_schema = DFSchema::new_with_metadata(
+            exprlist_to_fields(&[expr.clone()], &$input)?,
+            HashMap::new(),
+        )?;
         let agg_fn = Aggregate::try_new(Arc::new($input.clone()), vec![expr], vec![])?;
         let input = LogicalPlan::Aggregate(agg_fn);
 

@@ -435,6 +435,20 @@ impl UserDefinedLogicalNodeCore for PartitionedAggregatePartialNode {
         .map_err(QueryError::into_datafusion_plan_error)
         .unwrap()
     }
+
+    fn with_exprs_and_inputs(
+        &self,
+        exprs: Vec<Expr>,
+        inputs: Vec<LogicalPlan>,
+    ) -> datafusion_common::Result<Self> {
+        Ok(PartitionedAggregatePartialNode::try_new(
+            inputs[0].clone(),
+            self.partition_inputs.clone(),
+            self.partition_col.clone(),
+            self.agg_expr.clone(),
+        )
+        .map_err(QueryError::into_datafusion_plan_error)?)
+    }
 }
 
 #[derive(Hash, Eq, PartialEq)]
@@ -532,6 +546,20 @@ impl UserDefinedLogicalNode
             .unwrap();
 
         Arc::new(node)
+    }
+
+    fn with_exprs_and_inputs(
+        &self,
+        exprs: Vec<Expr>,
+        inputs: Vec<LogicalPlan>,
+    ) -> datafusion_common::Result<Arc<dyn UserDefinedLogicalNode>> {
+        let node =
+            crate::logical_plan::partitioned_aggregate::PartitionedAggregateFinalNode::try_new(
+                inputs[0].clone(),
+                self.agg_expr.clone(),
+            )
+            .map_err(QueryError::into_datafusion_plan_error)?;
+        Ok(Arc::new(node))
     }
 
     fn dyn_hash(&self, state: &mut dyn Hasher) {

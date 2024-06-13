@@ -16,6 +16,7 @@ use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use axum::async_trait;
 use datafusion::execution::context::TaskContext;
+use datafusion::physical_expr::EquivalenceProperties;
 use datafusion::physical_plan::expressions::PhysicalSortExpr;
 use datafusion::physical_plan::metrics::BaselineMetrics;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
@@ -60,24 +61,23 @@ impl MergeExec {
             ]
             .concat();
 
-            Schema::new(fields)
+            Arc::new(Schema::new(fields))
         } else {
-            schema
+            Arc::new(schema)
         };
 
-        let cache = Self::compute_properties(&inputs[0])?;
+        let cache = Self::compute_properties(&inputs[0],schema.clone())?;
         Ok(Self {
             inputs,
             names,
-            schema: Arc::new(schema),
+            schema,
             cache,
             metrics: ExecutionPlanMetricsSet::new(),
         })
     }
 
-    fn compute_properties(input: &Arc<dyn ExecutionPlan>) -> Result<PlanProperties> {
-        let eq_properties = input.equivalence_properties().clone();
-
+    fn compute_properties(input: &Arc<dyn ExecutionPlan>,schema:SchemaRef) -> Result<PlanProperties> {
+        let eq_properties = EquivalenceProperties::new(schema);
         Ok(PlanProperties::new(
             eq_properties,
             input.output_partitioning().clone(), // Output Partitioning
@@ -106,8 +106,8 @@ impl ExecutionPlan for MergeExec {
         &self.cache
     }
 
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
-        self.inputs.clone()
+    fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+        self.inputs.iter().map(|i| i).collect::<Vec<_>>()
     }
 
     fn with_new_children(

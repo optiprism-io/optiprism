@@ -31,7 +31,6 @@ use datafusion_expr::Extension;
 use datafusion_expr::Filter;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::Operator;
-use datafusion_expr::ScalarFunctionDefinition;
 use datafusion_expr::ScalarUDF;
 use datafusion_expr::Sort;
 use metadata::dictionaries::SingleDictionaryProvider;
@@ -600,9 +599,7 @@ impl LogicalPlanBuilder {
 
         let ts_col = Expr::Column(Column::from_qualified_name(COLUMN_CREATED_AT));
         let expr_fn = ScalarFunction {
-            func_def: ScalarFunctionDefinition::UDF(Arc::new(ScalarUDF::new_from_impl(
-                DateTruncFunc::new(),
-            ))),
+            func: Arc::new(ScalarUDF::new_from_impl(DateTruncFunc::new())),
             args: vec![lit(self.es.interval_unit.as_str()), ts_col],
         };
         let time_expr = Expr::ScalarFunction(expr_fn);

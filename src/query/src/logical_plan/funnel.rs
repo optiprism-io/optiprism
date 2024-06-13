@@ -237,6 +237,22 @@ impl UserDefinedLogicalNode for FunnelNode {
         )
     }
 
+    fn with_exprs_and_inputs(
+        &self,
+        exprs: Vec<Expr>,
+        inputs: Vec<LogicalPlan>,
+    ) -> datafusion_common::Result<Arc<dyn UserDefinedLogicalNode>> {
+        Ok(Arc::new(
+            FunnelNode::new(
+                inputs[0].to_owned(),
+                self.partition_inputs.clone(),
+                self.partition_col.clone(),
+                self.funnel.clone(),
+            )
+            .map_err(QueryError::into_datafusion_plan_error)?,
+        ))
+    }
+
     fn dyn_hash(&self, state: &mut dyn Hasher) {
         let mut s = state;
         self.hash(&mut s);

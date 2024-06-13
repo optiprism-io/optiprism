@@ -49,8 +49,7 @@ use datafusion::physical_expr::expressions::col;
 use datafusion::physical_expr::expressions::Avg;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::expressions::Max;
-use datafusion::physical_expr::expressions::Sum;
-use datafusion::physical_expr::AggregateExpr;
+use datafusion::physical_expr::{AggregateExpr, EquivalenceProperties};
 use datafusion::physical_expr::Distribution;
 use datafusion::physical_expr::Partitioning;
 use datafusion::physical_expr::Partitioning::UnknownPartitioning;
@@ -311,22 +310,21 @@ impl FunnelPartialExec {
         let schema = funnel.lock().unwrap().schema();
         let segment_field = Arc::new(Field::new("segment", DataType::Int64, false)) as FieldRef;
         let fields = vec![vec![segment_field], schema.fields().to_vec()].concat();
-        let schema = Schema::new(fields);
-        let cache = Self::compute_properties(&input)?;
+        let schema = Arc::new(Schema::new(fields));
+        let cache = Self::compute_properties(&input,schema.clone())?;
         Ok(Self {
             input,
             segment_inputs: partition_inputs,
             partition_col,
             expr: funnel,
-            schema: Arc::new(schema),
+            schema,
             cache,
             metrics: ExecutionPlanMetricsSet::new(),
         })
     }
 
-    fn compute_properties(input: &Arc<dyn ExecutionPlan>) -> Result<PlanProperties> {
-        let eq_properties = input.equivalence_properties().clone();
-
+    fn compute_properties(input: &Arc<dyn ExecutionPlan>,schema:SchemaRef) -> Result<PlanProperties> {
+        let eq_properties = EquivalenceProperties::new(schema);
         Ok(PlanProperties::new(
             eq_properties,
             UnknownPartitioning(input.output_partitioning().partition_count()),
@@ -387,8 +385,8 @@ impl ExecutionPlan for FunnelPartialExec {
         ])]
     }
 
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
-        vec![self.input.clone()]
+    fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+        vec![&self.input]
     }
 
     fn with_new_children(
@@ -632,8 +630,8 @@ impl ExecutionPlan for FunnelFinalExec {
         vec![Distribution::UnspecifiedDistribution]
     }
 
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
-        vec![self.input.clone()]
+    fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+        vec![&self.input]
     }
 
     fn with_new_children(

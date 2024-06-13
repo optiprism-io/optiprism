@@ -16,6 +16,7 @@ use datafusion_expr::Expr;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::UserDefinedLogicalNode;
 
+use crate::error::QueryError;
 use crate::Result;
 
 #[derive(Hash, Eq, PartialEq)]
@@ -91,6 +92,17 @@ impl UserDefinedLogicalNode for AggregateAndSortColumnsNode {
         inputs: &[LogicalPlan],
     ) -> Arc<dyn UserDefinedLogicalNode> {
         Arc::new(AggregateAndSortColumnsNode::try_new(inputs[0].clone(), self.groups).unwrap())
+    }
+
+    fn with_exprs_and_inputs(
+        &self,
+        exprs: Vec<Expr>,
+        inputs: Vec<LogicalPlan>,
+    ) -> datafusion_common::Result<Arc<dyn UserDefinedLogicalNode>> {
+        Ok(Arc::new(
+            Self::try_new(inputs[0].clone(), self.groups)
+                .map_err(QueryError::into_datafusion_plan_error)?,
+        ))
     }
 
     fn dyn_hash(&self, state: &mut dyn Hasher) {

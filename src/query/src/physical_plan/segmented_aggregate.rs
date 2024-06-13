@@ -30,7 +30,7 @@ use datafusion::execution::context::TaskContext;
 use datafusion::physical_expr::expressions::col;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::expressions::Max;
-use datafusion::physical_expr::Distribution;
+use datafusion::physical_expr::{Distribution, EquivalenceProperties};
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
 use datafusion::physical_expr::PhysicalSortRequirement;
@@ -203,23 +203,22 @@ impl SegmentedAggregatePartialExec {
             .collect::<Vec<_>>();
         let group_fields = [vec![segment_field], group_fields].concat();
         let fields: Vec<FieldRef> = [group_fields.clone(), agg_result_fields].concat();
-        let schema = Schema::new(fields);
-        let cache = Self::compute_properties(&input)?;
+        let schema = Arc::new(Schema::new(fields));
+        let cache = Self::compute_properties(&input,schema.clone())?;
         Ok(Self {
             input,
             segment_inputs: partition_inputs,
             partition_col,
             agg_expr,
-            schema: Arc::new(schema.clone()),
+            schema,
             cache,
             agg_schemas,
             metrics: ExecutionPlanMetricsSet::new(),
         })
     }
 
-    fn compute_properties(input: &Arc<dyn ExecutionPlan>) -> Result<PlanProperties> {
-        let eq_properties = input.equivalence_properties().clone();
-
+    fn compute_properties(input: &Arc<dyn ExecutionPlan>,schema:SchemaRef) -> Result<PlanProperties> {
+        let eq_properties = EquivalenceProperties::new(schema);
         Ok(PlanProperties::new(
             eq_properties,
             UnknownPartitioning(input.output_partitioning().partition_count()), /* Output Partitioning */
@@ -270,8 +269,8 @@ impl ExecutionPlan for SegmentedAggregatePartialExec {
         ])]
     }
 
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
-        vec![self.input.clone()]
+    fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+        vec![&self.input]
     }
 
     fn with_new_children(
@@ -572,8 +571,8 @@ impl ExecutionPlan for SegmentedAggregateFinalExec {
         vec![Distribution::UnspecifiedDistribution]
     }
 
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
-        vec![self.input.clone()]
+    fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+        vec![&self.input]
     }
 
     fn with_new_children(

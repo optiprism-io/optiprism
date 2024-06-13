@@ -11,7 +11,7 @@ debug = true
 [dependencies]
 config = "0.13.4"
 anyhow = "1.0.66"
-arrow = { version = "51.0.0", features = ["prettyprint"] }
+arrow = { version = "52.0.0", features = ["prettyprint"] }
 bytesize = "1.1.0"
 chrono = { version = "0.4.23" }
 clap = { version = "4.5.0", features = ["derive"] }
@@ -19,7 +19,7 @@ common = { path = "../common" }
 crossbeam-channel = "0.5.6"
 scan_dir = "0.3.3"
 csv = "1.1"
-datafusion = "38.0.0"
+datafusion = {  git = "ssh://git@github.com/optiprism-io/datafusion.git" }
 dateparser = "0.2.0"
 enum-iterator = "1.2.0"
 events-gen = { path = "../events-gen" }

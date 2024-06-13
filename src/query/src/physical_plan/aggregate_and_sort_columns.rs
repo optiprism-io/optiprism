@@ -31,7 +31,7 @@ use common::DECIMAL_SCALE;
 use datafusion::execution::RecordBatchStream;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::execution::TaskContext;
-use datafusion::physical_expr::Partitioning;
+use datafusion::physical_expr::{EquivalenceProperties, Partitioning};
 use datafusion::physical_expr::PhysicalSortExpr;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
@@ -88,19 +88,19 @@ impl AggregateAndSortColumnsExec {
                 cols.push(col);
             }
         }
-        let cache = Self::compute_properties(&input)?;
+        let schema = Arc::new(Schema::new(cols));
+        let cache = Self::compute_properties(&input,schema.clone())?;
 
         Ok(Self {
             input,
             groups,
             cache,
-            schema: Arc::new(Schema::new(cols)),
+            schema,
         })
     }
 
-    fn compute_properties(input: &Arc<dyn ExecutionPlan>) -> Result<PlanProperties> {
-        let eq_properties = input.equivalence_properties().clone();
-
+    fn compute_properties(input: &Arc<dyn ExecutionPlan>,schema:SchemaRef) -> Result<PlanProperties> {
+        let eq_properties = EquivalenceProperties::new(schema);
         Ok(PlanProperties::new(
             eq_properties,
             input.output_partitioning().clone(), // Output Partitioning
@@ -129,8 +129,8 @@ impl ExecutionPlan for AggregateAndSortColumnsExec {
         &self.cache
     }
 
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
-        vec![self.input.clone()]
+    fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+        vec![&self.input]
     }
 
     fn with_new_children(

@@ -46,7 +46,7 @@ impl From<DFAggregateFunction> for AggregateFunction {
     fn from(v: DFAggregateFunction) -> AggregateFunction {
         match v {
             DFAggregateFunction::Count => AggregateFunction::Count,
-            DFAggregateFunction::Sum => AggregateFunction::Sum,
+            // DFAggregateFunction::Sum => AggregateFunction::Sum, // todo
             DFAggregateFunction::Min => AggregateFunction::Min,
             DFAggregateFunction::Max => AggregateFunction::Max,
             DFAggregateFunction::Avg => AggregateFunction::Avg,
@@ -59,10 +59,11 @@ impl From<AggregateFunction> for DFAggregateFunction {
     fn from(v: AggregateFunction) -> DFAggregateFunction {
         match v {
             AggregateFunction::Count => DFAggregateFunction::Count,
-            AggregateFunction::Sum => DFAggregateFunction::Sum,
+            // AggregateFunction::Sum => DFAggregateFunction::Sum,
             AggregateFunction::Min => DFAggregateFunction::Min,
             AggregateFunction::Max => DFAggregateFunction::Max,
             AggregateFunction::Avg => DFAggregateFunction::Avg,
+            _=>unimplemented!()
         }
     }
 }

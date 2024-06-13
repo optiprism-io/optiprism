@@ -148,6 +148,20 @@ impl UserDefinedLogicalNode for SegmentNode {
         Arc::new(node)
     }
 
+    fn with_exprs_and_inputs(
+        &self,
+        exprs: Vec<Expr>,
+        inputs: Vec<LogicalPlan>,
+    ) -> datafusion_common::Result<Arc<dyn UserDefinedLogicalNode>> {
+        let node = SegmentNode::try_new(
+            inputs[0].clone(),
+            self.expr.clone(),
+            self.partition_col.clone(),
+        )
+        .map_err(QueryError::into_datafusion_plan_error)?;
+        Ok(Arc::new(node))
+    }
+
     fn dyn_hash(&self, state: &mut dyn Hasher) {
         use std::hash::Hash;
         let mut s = state;

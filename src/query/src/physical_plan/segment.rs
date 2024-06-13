@@ -19,7 +19,7 @@ use axum::async_trait;
 use datafusion::execution::context::TaskContext;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::Partitioning::UnknownPartitioning;
-use datafusion::physical_expr::PhysicalExpr;
+use datafusion::physical_expr::{EquivalenceProperties, PhysicalExpr};
 use datafusion::physical_plan::expressions::PhysicalSortExpr;
 use datafusion::physical_plan::metrics::BaselineMetrics;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
@@ -60,11 +60,11 @@ impl SegmentExec {
         out_buffer_size: usize,
     ) -> Result<Self> {
         let field = Field::new("partition", DataType::Int64, true);
-        let schema = Schema::new(vec![field]);
-        let cache = Self::compute_properties(&input)?;
+        let schema = Arc::new(Schema::new(vec![field]));
+        let cache = Self::compute_properties(&input, schema.clone())?;
         Ok(Self {
             input,
-            schema: Arc::new(schema),
+            schema,
             metrics: ExecutionPlanMetricsSet::new(),
             expr,
             partition_col,
@@ -72,8 +72,8 @@ impl SegmentExec {
             cache,
         })
     }
-    fn compute_properties(input: &Arc<dyn ExecutionPlan>) -> Result<PlanProperties> {
-        let eq_properties = input.equivalence_properties().clone();
+    fn compute_properties(input: &Arc<dyn ExecutionPlan>, schema: SchemaRef) -> Result<PlanProperties> {
+        let eq_properties = EquivalenceProperties::new(schema);
         Ok(PlanProperties::new(
             eq_properties,
             UnknownPartitioning(1),
@@ -102,8 +102,8 @@ impl ExecutionPlan for SegmentExec {
         &self.cache
     }
 
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
-        vec![self.input.clone()]
+    fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+        vec![&self.input]
     }
 
     fn with_new_children(
@@ -117,7 +117,7 @@ impl ExecutionPlan for SegmentExec {
                 self.partition_col.clone(),
                 self.out_buffer_size,
             )
-            .map_err(QueryError::into_datafusion_execution_error)?,
+                .map_err(QueryError::into_datafusion_execution_error)?,
         ))
     }
 

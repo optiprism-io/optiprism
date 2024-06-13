@@ -133,6 +133,17 @@ impl UserDefinedLogicalNode for DictionaryDecodeNode {
         )
     }
 
+    fn with_exprs_and_inputs(
+        &self,
+        exprs: Vec<Expr>,
+        inputs: Vec<LogicalPlan>,
+    ) -> datafusion_common::Result<Arc<dyn UserDefinedLogicalNode>> {
+        Ok(Arc::new(
+            Self::try_new(inputs[0].clone(), self.decode_cols.clone())
+                .map_err(|e| datafusion_common::DataFusionError::Execution(e.to_string()))?,
+        ))
+    }
+
     fn dyn_hash(&self, state: &mut dyn Hasher) {
         let mut s = state;
         self.hash(&mut s);

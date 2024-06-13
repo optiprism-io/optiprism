@@ -82,6 +82,21 @@ impl UserDefinedLogicalNode for RenameColumnRowsNode {
         )
     }
 
+    fn with_exprs_and_inputs(
+        &self,
+        exprs: Vec<Expr>,
+        inputs: Vec<LogicalPlan>,
+    ) -> datafusion_common::Result<Arc<dyn UserDefinedLogicalNode>> {
+        Ok(Arc::new(
+            RenameColumnRowsNode::try_new(
+                inputs[0].to_owned(),
+                self.column.clone(),
+                self.rename.to_vec(),
+            )
+            .map_err(QueryError::into_datafusion_plan_error)?,
+        ))
+    }
+
     fn dyn_hash(&self, state: &mut dyn Hasher) {
         let mut s = state;
         self.hash(&mut s);

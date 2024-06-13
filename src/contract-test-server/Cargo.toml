@@ -5,12 +5,12 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.66"
-arrow = { version = "51.0.0" }
+arrow = { version = "52.0.0" }
 async-trait = "0.1.59"
 chrono = { version = "0.4.23" }
 clap = { version = "4.5.0", features = ["derive"] }
 common = { path = "../common" }
-datafusion = "38.0.0"
+datafusion = {  git = "ssh://git@github.com/optiprism-io/datafusion.git" }
 lazy_static = "1.4.0"
 metadata = { path = "../metadata" }
 platform = { path = "../platform" }
