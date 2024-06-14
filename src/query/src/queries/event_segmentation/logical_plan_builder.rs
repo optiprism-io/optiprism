@@ -18,7 +18,7 @@ use datafusion::functions::datetime::date_trunc::DateTruncFunc;
 use datafusion::functions::math::trunc::TruncFunc;
 use datafusion_common::Column;
 use datafusion_common::ScalarValue;
-use datafusion_expr::binary_expr;
+use datafusion_expr::{binary_expr, Projection};
 use datafusion_expr::col;
 use datafusion_expr::expr;
 use datafusion_expr::expr::Alias;
@@ -438,6 +438,28 @@ impl LogicalPlanBuilder {
             group_id,
             segment_inputs,
         )?;
+
+        let mut exprs: Vec<Expr> = input.schema().iter().map(Expr::from).collect();
+
+        dbg!(input.schema());
+        let ts_col = Expr::Column(Column::from_qualified_name(COLUMN_CREATED_AT));
+        let expr_fn = ScalarFunction {
+            func: Arc::new(ScalarUDF::new_from_impl(DateTruncFunc::new())),
+            args: vec![lit(self.es.interval_unit.as_str()), ts_col],
+        };
+        let time_expr = Expr::ScalarFunction(expr_fn);
+        let time_expr = Expr::Alias(Alias {
+            expr: Box::new(time_expr),
+            relation: None,
+            name: COLUMN_CREATED_AT.to_string(),
+        });
+
+        exprs[1]=time_expr;
+        let projection = Projection::try_new(exprs, Arc::new(input.clone()))?;
+        dbg!(&projection);
+        let mut input = LogicalPlan::Projection(projection);
+
+
         // unpivot aggregate values into value column
         if self.ctx.format != Format::Compact {
             input = {
