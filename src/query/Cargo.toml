@@ -19,9 +19,9 @@ chrono = "0.4.23"
 chronoutil = "0.2.3"
 common = { path = "../common" }
 crossbeam = "0.8.2"
-datafusion = {  git = "ssh://git@github.com/optiprism-io/datafusion.git" }
-datafusion-common = {  git = "ssh://git@github.com/optiprism-io/datafusion.git" }
-datafusion-expr = {  git = "ssh://git@github.com/optiprism-io/datafusion.git" }
+datafusion = {  version = "39.0.0" }
+datafusion-common = {  version = "39.0.0" }
+datafusion-expr = {  version = "39.0.0" }
 display_json = "0.2.1"
 dyn-clone = "1.0.11"
 fnv = "1.0.7"

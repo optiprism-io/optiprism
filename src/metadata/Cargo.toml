@@ -16,8 +16,8 @@ common = { path = "../common" }
 storage = { path = "../storage" }
 convert_case = "0.6.0"
 lru = "0.12.1"
-datafusion = {  git = "ssh://git@github.com/optiprism-io/datafusion.git" }
-datafusion-common = {  git = "ssh://git@github.com/optiprism-io/datafusion.git" }
+datafusion = {  version = "39.0.0" }
+datafusion-common = {  version = "39.0.0" }
 futures = "0.3.25"
 lazy_static = "1.4.0"
 rocksdb = { git = "https://github.com/rust-rocksdb/rust-rocksdb", rev = "1cf906dc4087f06631820f13855e6b27bd21b972" ,features = ["multi-threaded-cf"]}

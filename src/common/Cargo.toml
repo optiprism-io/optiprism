@@ -12,9 +12,9 @@ async-trait = "0.1.59"
 chrono = { version = "0.4.23", features = ["serde"] }
 chronoutil = "0.2.3"
 http-body-util = "0.1.0"
-datafusion = {  git = "ssh://git@github.com/optiprism-io/datafusion.git" }
-datafusion-common = {  git = "ssh://git@github.com/optiprism-io/datafusion.git" }
-datafusion-expr = {  git = "ssh://git@github.com/optiprism-io/datafusion.git" }
+datafusion = {  version = "39.0.0" }
+datafusion-common = {  version = "39.0.0" }
+datafusion-expr = {  version = "39.0.0" }
 jsonwebtoken = "8.2.0"
 lazy_static = "1.4.0"
 rand = "0.8.5"

@@ -10,7 +10,7 @@ async-trait = "0.1.59"
 chrono = { version = "0.4.23" }
 clap = { version = "4.5.0", features = ["derive"] }
 common = { path = "../common" }
-datafusion = {  git = "ssh://git@github.com/optiprism-io/datafusion.git" }
+datafusion = {  version = "39.0.0" }
 lazy_static = "1.4.0"
 metadata = { path = "../metadata" }
 platform = { path = "../platform" }
