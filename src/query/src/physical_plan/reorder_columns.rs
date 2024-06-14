@@ -13,11 +13,13 @@ use async_trait::async_trait;
 use datafusion::execution::RecordBatchStream;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::execution::TaskContext;
-use datafusion::physical_expr::Partitioning;
+use datafusion::physical_expr::{EquivalenceProperties, Partitioning};
 use datafusion::physical_expr::PhysicalSortExpr;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::ExecutionPlanProperties;
+use datafusion::physical_plan::PlanProperties;
 use datafusion_common::Result as DFResult;
 use futures::Stream;
 use futures::StreamExt;
@@ -31,10 +33,11 @@ pub struct ReorderColumnsExec {
     input: Arc<dyn ExecutionPlan>,
     columns: Vec<String>,
     schema: SchemaRef,
+    cache: PlanProperties,
 }
 
 impl ReorderColumnsExec {
-    pub fn new(input: Arc<dyn ExecutionPlan>, columns: Vec<String>) -> Self {
+    pub fn try_new(input: Arc<dyn ExecutionPlan>, columns: Vec<String>) -> Result<Self> {
         let schema = input.schema();
 
         let mut reordered_cols = vec![];
@@ -48,11 +51,23 @@ impl ReorderColumnsExec {
             }
         }
 
-        Self {
+        let schema = Arc::new(Schema::new(reordered_cols));
+        let cache = Self::compute_properties(&input,schema.clone())?;
+        Ok(Self {
             input,
             columns,
-            schema: Arc::new(Schema::new(reordered_cols)),
-        }
+            schema,
+            cache,
+        })
+    }
+
+    fn compute_properties(input: &Arc<dyn ExecutionPlan>,schema:SchemaRef) -> Result<PlanProperties> {
+        let eq_properties = EquivalenceProperties::new(schema);
+        Ok(PlanProperties::new(
+            eq_properties,
+            input.output_partitioning().clone(), // Output Partitioning
+            input.execution_mode(),              // Execution Mode
+        ))
     }
 }
 
@@ -72,26 +87,22 @@ impl ExecutionPlan for ReorderColumnsExec {
         self.schema.clone()
     }
 
-    fn output_partitioning(&self) -> Partitioning {
-        self.input.output_partitioning()
+    fn properties(&self) -> &PlanProperties {
+        &self.cache
     }
 
-    fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {
-        None
-    }
-
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
-        vec![self.input.clone()]
+    fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+        vec![&self.input]
     }
 
     fn with_new_children(
         self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
-        Ok(Arc::new(ReorderColumnsExec::new(
-            children[0].clone(),
-            self.columns.clone(),
-        )))
+        Ok(Arc::new(
+            ReorderColumnsExec::try_new(children[0].clone(), self.columns.clone())
+                .map_err(QueryError::into_datafusion_execution_error)?,
+        ))
     }
 
     fn execute(

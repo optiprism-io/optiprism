@@ -89,6 +89,17 @@ impl UserDefinedLogicalNode for DbParquetNode {
         )
     }
 
+    fn with_exprs_and_inputs(
+        &self,
+        _: Vec<Expr>,
+        inputs: Vec<LogicalPlan>,
+    ) -> datafusion_common::Result<Arc<dyn UserDefinedLogicalNode>> {
+        Ok(Arc::new(
+            Self::try_new(self.db.clone(), self.projection.clone())
+                .map_err(QueryError::into_datafusion_plan_error)?,
+        ))
+    }
+
     fn dyn_hash(&self, state: &mut dyn Hasher) {
         let mut s = state;
         self.hash(&mut s);

@@ -30,7 +30,7 @@ use datafusion::execution::context::TaskContext;
 use datafusion::physical_expr::expressions::col;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::expressions::Max;
-use datafusion::physical_expr::Distribution;
+use datafusion::physical_expr::{Distribution, EquivalenceProperties};
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
 use datafusion::physical_expr::PhysicalSortRequirement;
@@ -46,7 +46,10 @@ use datafusion::physical_plan::AggregateExpr as DFAggregateExpr;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::ExecutionPlanProperties;
 use datafusion::physical_plan::Partitioning;
+use datafusion::physical_plan::Partitioning::UnknownPartitioning;
+use datafusion::physical_plan::PlanProperties;
 use datafusion::physical_plan::RecordBatchStream;
 use datafusion::physical_plan::SendableRecordBatchStream;
 use datafusion::physical_plan::Statistics;
@@ -146,6 +149,7 @@ pub struct SegmentedAggregatePartialExec {
     partition_col: Column,
     agg_expr: Vec<NamedAggExpr>,
     schema: SchemaRef,
+    cache: PlanProperties,
     agg_schemas: Vec<SchemaRef>,
     metrics: ExecutionPlanMetricsSet,
 }
@@ -199,16 +203,27 @@ impl SegmentedAggregatePartialExec {
             .collect::<Vec<_>>();
         let group_fields = [vec![segment_field], group_fields].concat();
         let fields: Vec<FieldRef> = [group_fields.clone(), agg_result_fields].concat();
-        let schema = Schema::new(fields);
+        let schema = Arc::new(Schema::new(fields));
+        let cache = Self::compute_properties(&input,schema.clone())?;
         Ok(Self {
             input,
             segment_inputs: partition_inputs,
             partition_col,
             agg_expr,
-            schema: Arc::new(schema.clone()),
+            schema,
+            cache,
             agg_schemas,
             metrics: ExecutionPlanMetricsSet::new(),
         })
+    }
+
+    fn compute_properties(input: &Arc<dyn ExecutionPlan>,schema:SchemaRef) -> Result<PlanProperties> {
+        let eq_properties = EquivalenceProperties::new(schema);
+        Ok(PlanProperties::new(
+            eq_properties,
+            UnknownPartitioning(input.output_partitioning().partition_count()), /* Output Partitioning */
+            input.execution_mode(),                                             // Execution Mode
+        ))
     }
 }
 
@@ -242,12 +257,8 @@ impl ExecutionPlan for SegmentedAggregatePartialExec {
         vec![Some(sort); self.children().len()]
     }
 
-    fn output_partitioning(&self) -> Partitioning {
-        Partitioning::UnknownPartitioning(self.input.output_partitioning().partition_count())
-    }
-
-    fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {
-        None
+    fn properties(&self) -> &PlanProperties {
+        &self.cache
     }
 
     fn required_input_distribution(&self) -> Vec<Distribution> {
@@ -258,8 +269,8 @@ impl ExecutionPlan for SegmentedAggregatePartialExec {
         ])]
     }
 
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
-        vec![self.input.clone()]
+    fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+        vec![&self.input]
     }
 
     fn with_new_children(
@@ -532,6 +543,7 @@ pub struct SegmentedAggregateFinalExec {
     schema: SchemaRef,
     agg_schemas: Vec<SchemaRef>,
     metrics: ExecutionPlanMetricsSet,
+    cache: PlanProperties,
     group_fields: Vec<FieldRef>,
 }
 
@@ -551,20 +563,16 @@ impl ExecutionPlan for SegmentedAggregateFinalExec {
         self.input.schema()
     }
 
-    fn output_partitioning(&self) -> Partitioning {
-        Partitioning::UnknownPartitioning(1)
-    }
-
-    fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {
-        None
+    fn properties(&self) -> &PlanProperties {
+        &self.cache
     }
 
     fn required_input_distribution(&self) -> Vec<Distribution> {
         vec![Distribution::UnspecifiedDistribution]
     }
 
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
-        vec![self.input.clone()]
+    fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+        vec![&self.input]
     }
 
     fn with_new_children(
@@ -658,14 +666,26 @@ impl crate::physical_plan::segmented_aggregate::SegmentedAggregateFinalExec {
         let group_fields = [vec![segment_field], group_fields].concat();
         let fields: Vec<FieldRef> = [group_fields.clone(), agg_result_fields].concat();
         let schema = Schema::new(fields);
+        let cache = Self::compute_properties(&input)?;
         Ok(Self {
             input,
             agg_expr,
             schema: Arc::new(schema),
             agg_schemas,
             metrics: ExecutionPlanMetricsSet::new(),
+            cache,
             group_fields,
         })
+    }
+
+    fn compute_properties(input: &Arc<dyn ExecutionPlan>) -> Result<PlanProperties> {
+        let eq_properties = input.equivalence_properties().clone();
+
+        Ok(PlanProperties::new(
+            eq_properties,
+            UnknownPartitioning(1),
+            input.execution_mode(),
+        ))
     }
 }
 
@@ -879,7 +899,6 @@ impl Stream for FinalAggregateStream {
             AggregateMode::Final,
             group_by,
             aggs,
-            vec![None],
             vec![None],
             input,
             self.schema.clone(),

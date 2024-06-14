@@ -7,6 +7,9 @@ use std::sync::Arc;
 
 use arrow::datatypes::DataType;
 use arrow::datatypes::DataType::Decimal128;
+use arrow::datatypes::Field;
+use arrow::datatypes::FieldRef;
+use arrow::datatypes::Fields;
 use arrow::datatypes::TimeUnit;
 use chrono::DateTime;
 use chrono::Duration;
@@ -20,7 +23,6 @@ use common::types::RESERVED_COLUMN_COUNT;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 use datafusion_common::Column;
-use datafusion_common::DFField;
 use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;
 use datafusion_expr::Expr;
@@ -250,24 +252,20 @@ impl AggregateExpr {
             } // AggregateExpr::Funnel { .. } => unimplemented!(),
         }
     }
-    pub fn fields(&self, schema: &DFSchema, final_: bool) -> Result<Vec<DFField>> {
+    pub fn fields(&self, schema: &DFSchema, final_: bool) -> Result<Vec<FieldRef>> {
         let fields = match self {
             AggregateExpr::Count { .. } => {
-                vec![DFField::new_unqualified(
-                    RESERVED_COLUMN_COUNT,
-                    DataType::Int64,
-                    true,
-                )]
+                vec![Field::new(RESERVED_COLUMN_COUNT, DataType::Int64, true)]
             }
             AggregateExpr::Aggregate { predicate, agg, .. } => {
                 if final_ {
-                    vec![DFField::new_unqualified(
+                    vec![Field::new(
                         RESERVED_COLUMN_AGG,
                         schema.field_from_column(predicate)?.data_type().to_owned(),
                         true,
                     )]
                 } else {
-                    vec![DFField::new_unqualified(
+                    vec![Field::new(
                         RESERVED_COLUMN_AGG,
                         return_type(
                             schema.field_from_column(predicate)?.data_type().to_owned(),
@@ -286,11 +284,7 @@ impl AggregateExpr {
                     _ => Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
                 };
 
-                vec![DFField::new_unqualified(
-                    RESERVED_COLUMN_AGG_PARTITIONED_COUNT,
-                    dt,
-                    true,
-                )]
+                vec![Field::new(RESERVED_COLUMN_AGG_PARTITIONED_COUNT, dt, true)]
             }
             AggregateExpr::PartitionedAggregate {
                 predicate,
@@ -301,7 +295,7 @@ impl AggregateExpr {
                 let dt = schema.field_from_column(predicate)?.data_type();
                 let rt1 = return_type(dt.to_owned(), inner_fn, schema);
                 if final_ {
-                    vec![DFField::new_unqualified(
+                    vec![Field::new(
                         RESERVED_COLUMN_AGG_PARTITIONED_AGGREGATE,
                         dt.to_owned(),
                         true,
@@ -309,7 +303,7 @@ impl AggregateExpr {
                 } else {
                     let rt2 = return_type(rt1, outer_fn, schema);
 
-                    vec![DFField::new_unqualified(
+                    vec![Field::new(
                         RESERVED_COLUMN_AGG_PARTITIONED_AGGREGATE,
                         rt2,
                         true,
@@ -317,6 +311,11 @@ impl AggregateExpr {
                 }
             }
         };
+
+        let fields = fields
+            .iter()
+            .map(|f| FieldRef::new(f.clone()))
+            .collect::<Vec<_>>();
 
         Ok(fields)
     }
@@ -345,7 +344,7 @@ impl PartitionedAggregatePartialNode {
         agg_expr: Vec<(AggregateExpr, String)>,
     ) -> Result<Self> {
         let mut group_cols: HashMap<String, ()> = Default::default();
-        let mut agg_result_fields: Vec<DFField> = Vec::new();
+        let mut agg_result_fields: Vec<FieldRef> = Vec::new();
         let input_schema = input.schema();
 
         for (agg, name) in agg_expr.iter() {
@@ -354,16 +353,16 @@ impl PartitionedAggregatePartialNode {
             }
 
             for f in agg.fields(input_schema, false)?.iter() {
-                let f = DFField::new_unqualified(
+                let f = Arc::new(Field::new(
                     format!("{}_{}", name, f.name()).as_str(),
                     f.data_type().to_owned(),
                     f.is_nullable(),
-                );
+                ));
                 agg_result_fields.push(f.clone());
             }
         }
 
-        let segment_field = DFField::new_unqualified("segment", DataType::Int64, false);
+        let segment_field = Arc::new(Field::new("segment", DataType::Int64, false));
 
         let group_fields = input_schema
             .fields()
@@ -372,8 +371,9 @@ impl PartitionedAggregatePartialNode {
             .cloned()
             .collect::<Vec<_>>();
         let group_fields = [vec![segment_field], group_fields].concat();
-        let fields: Vec<DFField> = [group_fields, agg_result_fields].concat();
-        let schema = DFSchema::new_with_metadata(fields, Default::default())?;
+        let fields: Vec<FieldRef> = [group_fields, agg_result_fields].concat();
+
+        let schema = DFSchema::from_unqualifed_fields(fields.into(), Default::default())?;
         let ret = Self {
             input,
             partition_inputs,
@@ -435,6 +435,20 @@ impl UserDefinedLogicalNodeCore for PartitionedAggregatePartialNode {
         .map_err(QueryError::into_datafusion_plan_error)
         .unwrap()
     }
+
+    fn with_exprs_and_inputs(
+        &self,
+        exprs: Vec<Expr>,
+        inputs: Vec<LogicalPlan>,
+    ) -> datafusion_common::Result<Self> {
+        Ok(PartitionedAggregatePartialNode::try_new(
+            inputs[0].clone(),
+            self.partition_inputs.clone(),
+            self.partition_col.clone(),
+            self.agg_expr.clone(),
+        )
+        .map_err(QueryError::into_datafusion_plan_error)?)
+    }
 }
 
 #[derive(Hash, Eq, PartialEq)]
@@ -447,7 +461,7 @@ pub struct PartitionedAggregateFinalNode {
 impl crate::logical_plan::partitioned_aggregate::PartitionedAggregateFinalNode {
     pub fn try_new(input: LogicalPlan, agg_expr: Vec<(AggregateExpr, String)>) -> Result<Self> {
         let mut group_cols: HashMap<String, ()> = Default::default();
-        let mut agg_result_fields: Vec<DFField> = Vec::new();
+        let mut agg_result_fields: Vec<FieldRef> = Vec::new();
         let input_schema = input.schema();
         for (agg, name) in agg_expr.iter() {
             for group_expr in agg.group_exprs() {
@@ -455,15 +469,15 @@ impl crate::logical_plan::partitioned_aggregate::PartitionedAggregateFinalNode {
             }
 
             for f in agg.fields(input_schema, true)?.iter() {
-                let f = DFField::new_unqualified(
+                let f = Arc::new(Field::new(
                     format!("{}_{}", name, f.name()).as_str(),
                     f.data_type().to_owned(),
                     f.is_nullable(),
-                );
+                ));
                 agg_result_fields.push(f.clone());
             }
         }
-        let segment_field = DFField::new_unqualified("segment", DataType::Int64, false);
+        let segment_field = Arc::new(Field::new("segment", DataType::Int64, false));
 
         let group_fields = input_schema
             .fields()
@@ -472,8 +486,8 @@ impl crate::logical_plan::partitioned_aggregate::PartitionedAggregateFinalNode {
             .cloned()
             .collect::<Vec<_>>();
         let group_fields = [vec![segment_field], group_fields].concat();
-        let fields: Vec<DFField> = [group_fields, agg_result_fields].concat();
-        let schema = DFSchema::new_with_metadata(fields, Default::default())?;
+        let fields: Vec<FieldRef> = [group_fields, agg_result_fields].concat();
+        let schema = DFSchema::from_unqualifed_fields(Fields::from(fields), Default::default())?;
         let ret = Self {
             input,
             agg_expr,
@@ -532,6 +546,20 @@ impl UserDefinedLogicalNode
             .unwrap();
 
         Arc::new(node)
+    }
+
+    fn with_exprs_and_inputs(
+        &self,
+        exprs: Vec<Expr>,
+        inputs: Vec<LogicalPlan>,
+    ) -> datafusion_common::Result<Arc<dyn UserDefinedLogicalNode>> {
+        let node =
+            crate::logical_plan::partitioned_aggregate::PartitionedAggregateFinalNode::try_new(
+                inputs[0].clone(),
+                self.agg_expr.clone(),
+            )
+            .map_err(QueryError::into_datafusion_plan_error)?;
+        Ok(Arc::new(node))
     }
 
     fn dyn_hash(&self, state: &mut dyn Hasher) {

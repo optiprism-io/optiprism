@@ -14,11 +14,16 @@ use async_trait::async_trait;
 use datafusion::execution::RecordBatchStream;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::execution::TaskContext;
+use datafusion::physical_expr::EquivalenceProperties;
 use datafusion::physical_expr::Partitioning;
+use datafusion::physical_expr::Partitioning::UnknownPartitioning;
 use datafusion::physical_expr::PhysicalSortExpr;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
+use datafusion::physical_plan::ExecutionMode::Bounded;
 use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::ExecutionPlanProperties;
+use datafusion::physical_plan::PlanProperties;
 use datafusion_common::DataFusionError;
 use datafusion_common::Result as DFResult;
 use futures::Stream;
@@ -34,17 +39,27 @@ pub struct DBParquetExec {
     db: Arc<OptiDBImpl>,
     projection: Vec<usize>,
     schema: SchemaRef,
+    cache: PlanProperties,
 }
 
 impl DBParquetExec {
     pub fn try_new(db: Arc<OptiDBImpl>, projection: Vec<usize>) -> Result<Self> {
         let schema = db.schema1("events")?.project(&projection)?;
-
+        let cache = Self::compute_properties(Arc::new(schema.clone()));
         Ok(Self {
             db,
             projection,
             schema: Arc::new(schema),
+            cache,
         })
+    }
+
+    fn compute_properties(schema: SchemaRef) -> PlanProperties {
+        PlanProperties::new(
+            EquivalenceProperties::new(schema),
+            UnknownPartitioning(1),
+            Bounded,
+        )
     }
 }
 
@@ -64,15 +79,11 @@ impl ExecutionPlan for DBParquetExec {
         self.schema.clone()
     }
 
-    fn output_partitioning(&self) -> Partitioning {
-        Partitioning::UnknownPartitioning(1)
+    fn properties(&self) -> &PlanProperties {
+        &self.cache
     }
 
-    fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {
-        None
-    }
-
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
+    fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
         vec![]
     }
 

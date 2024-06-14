@@ -14,6 +14,8 @@ use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_PROJECT_ID;
 use common::types::COLUMN_SEGMENT;
+use datafusion::functions::datetime::date_trunc::DateTruncFunc;
+use datafusion::functions::math::trunc::TruncFunc;
 use datafusion_common::Column;
 use datafusion_common::ScalarValue;
 use datafusion_expr::binary_expr;
@@ -23,14 +25,13 @@ use datafusion_expr::expr::Alias;
 use datafusion_expr::expr::ScalarFunction;
 use datafusion_expr::expr_fn::and;
 use datafusion_expr::lit;
-use datafusion_expr::BuiltinScalarFunction;
 use datafusion_expr::Expr;
 use datafusion_expr::ExprSchemable;
 use datafusion_expr::Extension;
 use datafusion_expr::Filter;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::Operator;
-use datafusion_expr::ScalarFunctionDefinition;
+use datafusion_expr::ScalarUDF;
 use datafusion_expr::Sort;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
@@ -598,7 +599,7 @@ impl LogicalPlanBuilder {
 
         let ts_col = Expr::Column(Column::from_qualified_name(COLUMN_CREATED_AT));
         let expr_fn = ScalarFunction {
-            func_def: ScalarFunctionDefinition::BuiltIn(BuiltinScalarFunction::DateTrunc),
+            func: Arc::new(ScalarUDF::new_from_impl(DateTruncFunc::new())),
             args: vec![lit(self.es.interval_unit.as_str()), ts_col],
         };
         let time_expr = Expr::ScalarFunction(expr_fn);

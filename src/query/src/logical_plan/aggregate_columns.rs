@@ -10,13 +10,13 @@ use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
-use datafusion_common::DFField;
 use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;
 use datafusion_expr::Expr;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::UserDefinedLogicalNode;
 
+use crate::error::QueryError;
 use crate::Result;
 
 #[derive(Hash, Eq, PartialEq)]
@@ -35,19 +35,22 @@ impl AggregateAndSortColumnsNode {
         for (idx, f) in schema.fields().iter().enumerate() {
             cols.push(f.to_owned());
             if idx == groups - 1 {
-                let col = DFField::new_unqualified(
+                let col = Field::new(
                     "Average",
                     DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
                     false,
                 );
-                cols.push(col);
+                cols.push(Arc::new(col));
             }
         }
 
         Ok(Self {
             input,
             groups,
-            schema: Arc::new(DFSchema::new_with_metadata(cols, HashMap::default())?),
+            schema: Arc::new(DFSchema::from_unqualifed_fields(
+                cols.into(),
+                HashMap::default(),
+            )?),
         })
     }
 }
@@ -89,6 +92,17 @@ impl UserDefinedLogicalNode for AggregateAndSortColumnsNode {
         inputs: &[LogicalPlan],
     ) -> Arc<dyn UserDefinedLogicalNode> {
         Arc::new(AggregateAndSortColumnsNode::try_new(inputs[0].clone(), self.groups).unwrap())
+    }
+
+    fn with_exprs_and_inputs(
+        &self,
+        exprs: Vec<Expr>,
+        inputs: Vec<LogicalPlan>,
+    ) -> datafusion_common::Result<Arc<dyn UserDefinedLogicalNode>> {
+        Ok(Arc::new(
+            Self::try_new(inputs[0].clone(), self.groups)
+                .map_err(QueryError::into_datafusion_plan_error)?,
+        ))
     }
 
     fn dyn_hash(&self, state: &mut dyn Hasher) {

@@ -27,7 +27,9 @@ impl ReorderColumnsNode {
         let mut reordered_cols = vec![];
 
         for group_col in columns.iter() {
-            reordered_cols.push(schema.field_with_unqualified_name(group_col)?.to_owned());
+            reordered_cols.push(Arc::new(
+                schema.field_with_unqualified_name(group_col)?.to_owned(),
+            ));
         }
         for field in schema.fields().iter() {
             if !columns.contains(&field.name()) {
@@ -38,8 +40,8 @@ impl ReorderColumnsNode {
         Ok(Self {
             input,
             columns,
-            schema: Arc::new(DFSchema::new_with_metadata(
-                reordered_cols,
+            schema: Arc::new(DFSchema::from_unqualifed_fields(
+                reordered_cols.into(),
                 Default::default(),
             )?),
         })
@@ -83,6 +85,17 @@ impl UserDefinedLogicalNode for ReorderColumnsNode {
                 .map_err(QueryError::into_datafusion_plan_error)
                 .unwrap(),
         )
+    }
+
+    fn with_exprs_and_inputs(
+        &self,
+        exprs: Vec<Expr>,
+        inputs: Vec<LogicalPlan>,
+    ) -> datafusion_common::Result<Arc<dyn UserDefinedLogicalNode>> {
+        Ok(Arc::new(
+            ReorderColumnsNode::try_new(inputs[0].to_owned(), self.columns.clone())
+                .map_err(QueryError::into_datafusion_plan_error)?,
+        ))
     }
 
     fn dyn_hash(&self, state: &mut dyn Hasher) {

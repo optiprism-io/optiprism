@@ -31,11 +31,13 @@ use common::DECIMAL_SCALE;
 use datafusion::execution::RecordBatchStream;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::execution::TaskContext;
-use datafusion::physical_expr::Partitioning;
+use datafusion::physical_expr::{EquivalenceProperties, Partitioning};
 use datafusion::physical_expr::PhysicalSortExpr;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::ExecutionPlanProperties;
+use datafusion::physical_plan::PlanProperties;
 use datafusion_common::DataFusionError;
 use datafusion_common::Result as DFResult;
 use futures::Stream;
@@ -65,11 +67,12 @@ impl Agg {
 pub struct AggregateAndSortColumnsExec {
     input: Arc<dyn ExecutionPlan>,
     groups: usize,
+    cache: PlanProperties,
     schema: SchemaRef,
 }
 
 impl AggregateAndSortColumnsExec {
-    pub fn new(input: Arc<dyn ExecutionPlan>, groups: usize) -> Self {
+    pub fn try_new(input: Arc<dyn ExecutionPlan>, groups: usize) -> Result<Self> {
         let schema = input.schema();
 
         let mut cols = vec![];
@@ -85,12 +88,24 @@ impl AggregateAndSortColumnsExec {
                 cols.push(col);
             }
         }
+        let schema = Arc::new(Schema::new(cols));
+        let cache = Self::compute_properties(&input,schema.clone())?;
 
-        Self {
+        Ok(Self {
             input,
             groups,
-            schema: Arc::new(Schema::new(cols)),
-        }
+            cache,
+            schema,
+        })
+    }
+
+    fn compute_properties(input: &Arc<dyn ExecutionPlan>,schema:SchemaRef) -> Result<PlanProperties> {
+        let eq_properties = EquivalenceProperties::new(schema);
+        Ok(PlanProperties::new(
+            eq_properties,
+            input.output_partitioning().clone(), // Output Partitioning
+            input.execution_mode(),              // Execution Mode
+        ))
     }
 }
 
@@ -110,26 +125,22 @@ impl ExecutionPlan for AggregateAndSortColumnsExec {
         self.schema.clone()
     }
 
-    fn output_partitioning(&self) -> Partitioning {
-        self.input.output_partitioning()
+    fn properties(&self) -> &PlanProperties {
+        &self.cache
     }
 
-    fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {
-        None
-    }
-
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
-        vec![self.input.clone()]
+    fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+        vec![&self.input]
     }
 
     fn with_new_children(
         self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
-        Ok(Arc::new(AggregateAndSortColumnsExec::new(
-            children[0].clone(),
-            self.groups.clone(),
-        )))
+        Ok(Arc::new(
+            AggregateAndSortColumnsExec::try_new(children[0].clone(), self.groups.clone())
+                .map_err(QueryError::into_datafusion_execution_error)?,
+        ))
     }
 
     fn execute(
@@ -250,7 +261,7 @@ mod tests {
         let schema = res[0].schema();
         let input = MemoryExec::try_new(&[res], schema.clone(), None).unwrap();
 
-        let exec = AggregateAndSortColumnsExec::new(Arc::new(input), 2);
+        let exec = AggregateAndSortColumnsExec::try_new(Arc::new(input), 2);
         let session_ctx = SessionContext::new();
         let task_ctx = session_ctx.task_ctx();
         let stream = exec.execute(0, task_ctx).unwrap();

@@ -96,7 +96,7 @@ pub struct SegmentNode {
 impl SegmentNode {
     pub fn try_new(input: LogicalPlan, expr: SegmentExpr, partition_col: Column) -> Result<Self> {
         let field = input.schema().field_from_column(&partition_col)?.to_owned();
-        let schema = DFSchema::new_with_metadata(vec![field], Default::default())?;
+        let schema = DFSchema::from_unqualifed_fields(vec![field].into(), Default::default())?;
         Ok(Self {
             input,
             expr,
@@ -146,6 +146,20 @@ impl UserDefinedLogicalNode for SegmentNode {
         .map_err(QueryError::into_datafusion_plan_error)
         .unwrap();
         Arc::new(node)
+    }
+
+    fn with_exprs_and_inputs(
+        &self,
+        exprs: Vec<Expr>,
+        inputs: Vec<LogicalPlan>,
+    ) -> datafusion_common::Result<Arc<dyn UserDefinedLogicalNode>> {
+        let node = SegmentNode::try_new(
+            inputs[0].clone(),
+            self.expr.clone(),
+            self.partition_col.clone(),
+        )
+        .map_err(QueryError::into_datafusion_plan_error)?;
+        Ok(Arc::new(node))
     }
 
     fn dyn_hash(&self, state: &mut dyn Hasher) {

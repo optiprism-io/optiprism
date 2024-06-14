@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 project-root = "0.2.2"
-arrow = { version = "49.0.0" }
+arrow = { version = "52.0.0" }
 maxminddb = "0.23.0"
 uaparser = "0.6.1"
 metadata = { path = "../metadata" }

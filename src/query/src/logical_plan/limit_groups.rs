@@ -10,13 +10,13 @@ use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
-use datafusion_common::DFField;
 use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;
 use datafusion_expr::Expr;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::UserDefinedLogicalNode;
 
+use crate::error::QueryError;
 use crate::Result;
 
 #[derive(Hash, Eq, PartialEq)]
@@ -82,6 +82,17 @@ impl UserDefinedLogicalNode for LimitGroupsNode {
             LimitGroupsNode::try_new(inputs[0].clone(), self.skip, self.groups, self.limit)
                 .unwrap(),
         )
+    }
+
+    fn with_exprs_and_inputs(
+        &self,
+        exprs: Vec<Expr>,
+        inputs: Vec<LogicalPlan>,
+    ) -> datafusion_common::Result<Arc<dyn UserDefinedLogicalNode>> {
+        Ok(Arc::new(
+            LimitGroupsNode::try_new(inputs[0].clone(), self.skip, self.groups, self.limit)
+                .map_err(QueryError::into_datafusion_plan_error)?,
+        ))
     }
 
     fn dyn_hash(&self, state: &mut dyn Hasher) {

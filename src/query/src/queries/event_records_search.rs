@@ -195,13 +195,13 @@ pub fn build(
             (col, Arc::new(dict))
         })
         .collect::<Vec<_>>();
-    let input = if !decode_cols.is_empty() {
-        LogicalPlan::Extension(Extension {
-            node: Arc::new(DictionaryDecodeNode::try_new(input, decode_cols.clone())?),
-        })
-    } else {
-        input
-    };
+    // let input = if !decode_cols.is_empty() {
+    //     LogicalPlan::Extension(Extension {
+    //         node: Arc::new(DictionaryDecodeNode::try_new(input, decode_cols.clone())?),
+    //     })
+    // } else {
+    //     input
+    // };
 
     let mut rename = vec![];
     for prop in properties {

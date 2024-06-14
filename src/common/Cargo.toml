@@ -6,15 +6,15 @@ authors = ["Optiprism <dev@optiprism.io>"]
 
 [dependencies]
 arrow2 = { git = "ssh://git@github.com/optiprism-io/arrow2.git" }
-arrow = { version = "49.0.0" }
-arrow-schema = { version = "49.0.0", features = ["serde"] }
+arrow = { version = "52.0.0" }
+arrow-schema = { version = "52.0.0", features = ["serde"] }
 async-trait = "0.1.59"
 chrono = { version = "0.4.23", features = ["serde"] }
 chronoutil = "0.2.3"
 http-body-util = "0.1.0"
-datafusion = "34.0.0"
-datafusion-common = "34.0.0"
-datafusion-expr = "34.0.0"
+datafusion = {  version = "39.0.0" }
+datafusion-common = {  version = "39.0.0" }
+datafusion-expr = {  version = "39.0.0" }
 jsonwebtoken = "8.2.0"
 lazy_static = "1.4.0"
 rand = "0.8.5"

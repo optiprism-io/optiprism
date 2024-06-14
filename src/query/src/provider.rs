@@ -209,7 +209,7 @@ impl QueryProvider {
 
         let (session_ctx, state, plan) = self.initial_plan(projection).await?;
         let plan = event_records_search::build(ctx, self.metadata.clone(), plan, req.clone())?;
-
+        println!("{plan:?}");
         let result = self.execute(session_ctx, state, plan).await?;
         let duration = start.elapsed();
         debug!("elapsed: {:?}", duration);

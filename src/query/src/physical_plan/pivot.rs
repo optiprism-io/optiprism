@@ -17,6 +17,7 @@ use arrow::error::Result as ArrowResult;
 use arrow::record_batch::RecordBatch;
 use axum::async_trait;
 use datafusion::execution::context::TaskContext;
+use datafusion::physical_expr::EquivalenceProperties;
 use datafusion::physical_plan::expressions::Column;
 use datafusion::physical_plan::expressions::PhysicalSortExpr;
 use datafusion::physical_plan::hash_utils::create_hashes;
@@ -26,7 +27,9 @@ use datafusion::physical_plan::metrics::MetricsSet;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::ExecutionPlanProperties;
 use datafusion::physical_plan::Partitioning;
+use datafusion::physical_plan::PlanProperties;
 use datafusion::physical_plan::RecordBatchStream;
 use datafusion::physical_plan::SendableRecordBatchStream;
 use datafusion::physical_plan::Statistics;
@@ -51,6 +54,7 @@ pub struct PivotExec {
     value_type: DataType,
     group_cols: Vec<Column>,
     result_cols: Vec<String>,
+    cache: PlanProperties,
     metrics: ExecutionPlanMetricsSet,
 }
 
@@ -90,6 +94,7 @@ impl PivotExec {
             Arc::new(Schema::new([group_fields, result_fields].concat()))
         };
 
+        let cache = Self::compute_properties(&input,schema.clone())?;
         Ok(Self {
             input,
             schema,
@@ -98,8 +103,18 @@ impl PivotExec {
             value_type,
             group_cols,
             result_cols,
+            cache,
             metrics: ExecutionPlanMetricsSet::new(),
         })
+    }
+
+    fn compute_properties(input: &Arc<dyn ExecutionPlan>,schema:SchemaRef) -> Result<PlanProperties> {
+        let eq_properties = EquivalenceProperties::new(schema);
+        Ok(PlanProperties::new(
+            eq_properties,
+            input.output_partitioning().clone(), // Output Partitioning
+            input.execution_mode(),              // Execution Mode
+        ))
     }
 }
 
@@ -119,16 +134,12 @@ impl ExecutionPlan for PivotExec {
         self.schema.clone()
     }
 
-    fn output_partitioning(&self) -> Partitioning {
-        self.input.output_partitioning()
+    fn properties(&self) -> &PlanProperties {
+        &self.cache
     }
 
-    fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {
-        None
-    }
-
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
-        vec![self.input.clone()]
+    fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+        vec![&self.input]
     }
 
     fn with_new_children(

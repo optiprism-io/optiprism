@@ -22,6 +22,7 @@ use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
 use axum::async_trait;
 use datafusion::execution::context::TaskContext;
+use datafusion::physical_expr::EquivalenceProperties;
 use datafusion::physical_plan::expressions::Column;
 use datafusion::physical_plan::expressions::PhysicalSortExpr;
 use datafusion::physical_plan::metrics::BaselineMetrics;
@@ -30,28 +31,33 @@ use datafusion::physical_plan::metrics::MetricsSet;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::ExecutionPlanProperties;
 use datafusion::physical_plan::Partitioning;
+use datafusion::physical_plan::PlanProperties;
 use datafusion::physical_plan::RecordBatchStream;
 use datafusion::physical_plan::SendableRecordBatchStream;
 use datafusion::physical_plan::Statistics;
+use datafusion_common::DataFusionError;
 use datafusion_common::Result as DFResult;
 use futures::Stream;
 use futures::StreamExt;
 use metadata::dictionaries::SingleDictionaryProvider;
 
+use crate::error::Result;
 #[derive(Debug)]
 pub struct DictionaryDecodeExec {
     input: Arc<dyn ExecutionPlan>,
     decode_cols: Vec<(Column, Arc<SingleDictionaryProvider>)>,
     schema: SchemaRef,
+    cache: PlanProperties,
     metrics: ExecutionPlanMetricsSet,
 }
 
 impl DictionaryDecodeExec {
-    pub fn new(
+    pub fn try_new(
         input: Arc<dyn ExecutionPlan>,
         decode_cols: Vec<(Column, Arc<SingleDictionaryProvider>)>,
-    ) -> Self {
+    ) -> Result<Self> {
         let fields = input
             .schema()
             .fields()
@@ -72,12 +78,23 @@ impl DictionaryDecodeExec {
             .collect::<Vec<_>>();
 
         let schema = Arc::new(Schema::new(fields));
-        Self {
+        let cache = Self::compute_properties(&input,schema.clone())?;
+        Ok(Self {
             input,
             decode_cols,
             schema,
+            cache,
             metrics: ExecutionPlanMetricsSet::new(),
-        }
+        })
+    }
+
+    fn compute_properties(input: &Arc<dyn ExecutionPlan>,schema:SchemaRef) -> Result<PlanProperties> {
+        let eq_properties = EquivalenceProperties::new(schema);
+        Ok(PlanProperties::new(
+            eq_properties,
+            input.output_partitioning().clone(), // Output Partitioning
+            input.execution_mode(),              // Execution Mode
+        ))
     }
 }
 
@@ -97,26 +114,22 @@ impl ExecutionPlan for DictionaryDecodeExec {
         self.schema.clone()
     }
 
-    fn output_partitioning(&self) -> Partitioning {
-        self.input.output_partitioning()
+    fn properties(&self) -> &PlanProperties {
+        &self.cache
     }
 
-    fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {
-        self.input.output_ordering()
-    }
-
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
-        vec![self.input.clone()]
+    fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+        vec![&self.input]
     }
 
     fn with_new_children(
         self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> DFResult<Arc<dyn ExecutionPlan>> {
-        Ok(Arc::new(DictionaryDecodeExec::new(
-            children[0].clone(),
-            self.decode_cols.clone(),
-        )))
+        Ok(Arc::new(
+            DictionaryDecodeExec::try_new(children[0].clone(), self.decode_cols.clone())
+                .map_err(|e| DataFusionError::Plan(e.to_string()))?,
+        ))
     }
 
     fn execute(

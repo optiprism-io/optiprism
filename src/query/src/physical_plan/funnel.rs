@@ -49,10 +49,10 @@ use datafusion::physical_expr::expressions::col;
 use datafusion::physical_expr::expressions::Avg;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::expressions::Max;
-use datafusion::physical_expr::expressions::Sum;
-use datafusion::physical_expr::AggregateExpr;
+use datafusion::physical_expr::{AggregateExpr, EquivalenceProperties};
 use datafusion::physical_expr::Distribution;
 use datafusion::physical_expr::Partitioning;
+use datafusion::physical_expr::Partitioning::UnknownPartitioning;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
 use datafusion::physical_expr::PhysicalSortExpr;
@@ -66,6 +66,8 @@ use datafusion::physical_plan::AggregateExpr as DFAggregateExpr;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::ExecutionPlanProperties;
+use datafusion::physical_plan::PlanProperties;
 use datafusion::prelude::SessionContext;
 use datafusion_common::DataFusionError;
 use datafusion_common::Result as DFResult;
@@ -294,6 +296,7 @@ pub struct FunnelPartialExec {
     partition_col: Column,
     expr: Arc<Mutex<Funnel>>,
     schema: SchemaRef,
+    cache: PlanProperties,
     metrics: ExecutionPlanMetricsSet,
 }
 
@@ -307,16 +310,26 @@ impl FunnelPartialExec {
         let schema = funnel.lock().unwrap().schema();
         let segment_field = Arc::new(Field::new("segment", DataType::Int64, false)) as FieldRef;
         let fields = vec![vec![segment_field], schema.fields().to_vec()].concat();
-        let schema = Schema::new(fields);
-
+        let schema = Arc::new(Schema::new(fields));
+        let cache = Self::compute_properties(&input,schema.clone())?;
         Ok(Self {
             input,
             segment_inputs: partition_inputs,
             partition_col,
             expr: funnel,
-            schema: Arc::new(schema),
+            schema,
+            cache,
             metrics: ExecutionPlanMetricsSet::new(),
         })
+    }
+
+    fn compute_properties(input: &Arc<dyn ExecutionPlan>,schema:SchemaRef) -> Result<PlanProperties> {
+        let eq_properties = EquivalenceProperties::new(schema);
+        Ok(PlanProperties::new(
+            eq_properties,
+            UnknownPartitioning(input.output_partitioning().partition_count()),
+            input.execution_mode(), // Execution Mode
+        ))
     }
 }
 
@@ -360,12 +373,8 @@ impl ExecutionPlan for FunnelPartialExec {
         vec![Some(sort); self.children().len()]
     }
 
-    fn output_partitioning(&self) -> Partitioning {
-        Partitioning::UnknownPartitioning(self.input.output_partitioning().partition_count())
-    }
-
-    fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {
-        None
+    fn properties(&self) -> &PlanProperties {
+        &self.cache
     }
 
     fn required_input_distribution(&self) -> Vec<Distribution> {
@@ -376,8 +385,8 @@ impl ExecutionPlan for FunnelPartialExec {
         ])]
     }
 
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
-        vec![self.input.clone()]
+    fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+        vec![&self.input]
     }
 
     fn with_new_children(
@@ -571,17 +580,30 @@ pub struct FunnelFinalExec {
     input: Arc<dyn ExecutionPlan>,
     groups: usize,
     steps: usize,
+    cache: PlanProperties,
     metrics: ExecutionPlanMetricsSet,
 }
 
 impl FunnelFinalExec {
     pub fn try_new(input: Arc<dyn ExecutionPlan>, groups: usize, steps: usize) -> Result<Self> {
+        let cache = Self::compute_properties(&input)?;
         Ok(Self {
             input,
             groups,
             steps,
+            cache,
             metrics: ExecutionPlanMetricsSet::new(),
         })
+    }
+
+    fn compute_properties(input: &Arc<dyn ExecutionPlan>) -> Result<PlanProperties> {
+        let eq_properties = input.equivalence_properties().clone();
+
+        Ok(PlanProperties::new(
+            eq_properties,
+            UnknownPartitioning(1),
+            input.execution_mode(),
+        ))
     }
 }
 impl DisplayAs for FunnelFinalExec {
@@ -600,20 +622,16 @@ impl ExecutionPlan for FunnelFinalExec {
         self.input.schema()
     }
 
-    fn output_partitioning(&self) -> Partitioning {
-        Partitioning::UnknownPartitioning(1)
-    }
-
-    fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {
-        None
+    fn properties(&self) -> &PlanProperties {
+        &self.cache
     }
 
     fn required_input_distribution(&self) -> Vec<Distribution> {
         vec![Distribution::UnspecifiedDistribution]
     }
 
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
-        vec![self.input.clone()]
+    fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+        vec![&self.input]
     }
 
     fn with_new_children(

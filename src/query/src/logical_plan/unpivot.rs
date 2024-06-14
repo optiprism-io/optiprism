@@ -6,9 +6,10 @@ use std::hash::Hasher;
 use std::sync::Arc;
 
 use arrow::datatypes::DataType;
+use arrow::datatypes::Field;
+use arrow::datatypes::FieldRef;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
-use datafusion_common::DFField;
 use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;
 use datafusion_expr::Expr;
@@ -37,22 +38,25 @@ impl UnpivotNode {
         let value_type = DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE);
 
         let schema = {
-            let mut fields: Vec<DFField> = input
+            let mut fields: Vec<_> = input
                 .schema()
                 .fields()
                 .iter()
                 .filter_map(|f| match cols.contains(f.name()) {
                     true => None,
-                    false => Some(f.clone()),
+                    false => Some(f.to_owned()),
                 })
                 .collect();
 
-            let name_field = DFField::new_unqualified(name_col.as_str(), DataType::Utf8, false);
+            let name_field = Arc::new(Field::new(name_col.as_str(), DataType::Utf8, false));
             fields.push(name_field);
-            let value_field = DFField::new_unqualified(value_col.as_str(), value_type, false);
+            let value_field = Arc::new(Field::new(value_col.as_str(), value_type, false));
             fields.push(value_field);
 
-            Arc::new(DFSchema::new_with_metadata(fields, HashMap::new())?)
+            Arc::new(DFSchema::from_unqualifed_fields(
+                fields.into(),
+                HashMap::new(),
+            )?)
         };
 
         Ok(Self {
@@ -107,6 +111,22 @@ impl UserDefinedLogicalNode for UnpivotNode {
             .map_err(QueryError::into_datafusion_plan_error)
             .unwrap(),
         )
+    }
+
+    fn with_exprs_and_inputs(
+        &self,
+        exprs: Vec<Expr>,
+        inputs: Vec<LogicalPlan>,
+    ) -> datafusion_common::Result<Arc<dyn UserDefinedLogicalNode>> {
+        Ok(Arc::new(
+            UnpivotNode::try_new(
+                inputs[0].clone(),
+                self.cols.clone(),
+                self.name_col.clone(),
+                self.value_col.clone(),
+            )
+            .map_err(QueryError::into_datafusion_plan_error)?,
+        ))
     }
 
     fn dyn_hash(&self, state: &mut dyn Hasher) {

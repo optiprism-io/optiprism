@@ -18,7 +18,8 @@ use arrow::record_batch::RecordBatch;
 use axum::async_trait;
 use datafusion::execution::context::TaskContext;
 use datafusion::physical_expr::expressions::Column;
-use datafusion::physical_expr::PhysicalExpr;
+use datafusion::physical_expr::Partitioning::UnknownPartitioning;
+use datafusion::physical_expr::{EquivalenceProperties, PhysicalExpr};
 use datafusion::physical_plan::expressions::PhysicalSortExpr;
 use datafusion::physical_plan::metrics::BaselineMetrics;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
@@ -26,7 +27,9 @@ use datafusion::physical_plan::metrics::MetricsSet;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::ExecutionPlanProperties;
 use datafusion::physical_plan::Partitioning;
+use datafusion::physical_plan::PlanProperties;
 use datafusion::physical_plan::RecordBatchStream;
 use datafusion::physical_plan::SendableRecordBatchStream;
 use datafusion::physical_plan::Statistics;
@@ -46,6 +49,7 @@ pub struct SegmentExec {
     metrics: ExecutionPlanMetricsSet,
     partition_col: Column,
     out_buffer_size: usize,
+    cache: PlanProperties,
 }
 
 impl SegmentExec {
@@ -56,15 +60,25 @@ impl SegmentExec {
         out_buffer_size: usize,
     ) -> Result<Self> {
         let field = Field::new("partition", DataType::Int64, true);
-        let schema = Schema::new(vec![field]);
+        let schema = Arc::new(Schema::new(vec![field]));
+        let cache = Self::compute_properties(&input, schema.clone())?;
         Ok(Self {
             input,
-            schema: Arc::new(schema),
+            schema,
             metrics: ExecutionPlanMetricsSet::new(),
             expr,
             partition_col,
             out_buffer_size,
+            cache,
         })
+    }
+    fn compute_properties(input: &Arc<dyn ExecutionPlan>, schema: SchemaRef) -> Result<PlanProperties> {
+        let eq_properties = EquivalenceProperties::new(schema);
+        Ok(PlanProperties::new(
+            eq_properties,
+            UnknownPartitioning(1),
+            input.execution_mode(),
+        ))
     }
 }
 
@@ -84,16 +98,12 @@ impl ExecutionPlan for SegmentExec {
         self.schema.clone()
     }
 
-    fn output_partitioning(&self) -> Partitioning {
-        Partitioning::UnknownPartitioning(1)
+    fn properties(&self) -> &PlanProperties {
+        &self.cache
     }
 
-    fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {
-        None
-    }
-
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
-        vec![self.input.clone()]
+    fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+        vec![&self.input]
     }
 
     fn with_new_children(
@@ -107,7 +117,7 @@ impl ExecutionPlan for SegmentExec {
                 self.partition_col.clone(),
                 self.out_buffer_size,
             )
-            .map_err(QueryError::into_datafusion_execution_error)?,
+                .map_err(QueryError::into_datafusion_execution_error)?,
         ))
     }
 

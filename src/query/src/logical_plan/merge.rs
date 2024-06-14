@@ -7,7 +7,7 @@ use std::hash::Hasher;
 use std::sync::Arc;
 
 use arrow::datatypes::DataType;
-use datafusion_common::DFField;
+use arrow::datatypes::Field;
 use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;
 use datafusion_expr::Expr;
@@ -32,14 +32,13 @@ impl MergeNode {
         }
 
         schema = if let Some((col_name, _)) = names.clone() {
-            DFSchema::new_with_metadata(
-                [
-                    vec![DFField::new_unqualified(&col_name, DataType::Utf8, false)],
-                    schema.fields().to_vec(),
-                ]
-                .concat(),
-                HashMap::default(),
-            )?
+            let fields = [
+                vec![Arc::new(Field::new(&col_name, DataType::Utf8, false))],
+                schema.fields().to_vec(),
+            ]
+            .concat();
+
+            DFSchema::from_unqualifed_fields(fields.into(), HashMap::default())?
         } else {
             schema
         };
@@ -88,6 +87,17 @@ impl UserDefinedLogicalNode for MergeNode {
                 .map_err(QueryError::into_datafusion_plan_error)
                 .unwrap(),
         )
+    }
+
+    fn with_exprs_and_inputs(
+        &self,
+        exprs: Vec<Expr>,
+        inputs: Vec<LogicalPlan>,
+    ) -> datafusion_common::Result<Arc<dyn UserDefinedLogicalNode>> {
+        Ok(Arc::new(
+            Self::try_new(inputs, self.names.clone())
+                .map_err(QueryError::into_datafusion_plan_error)?,
+        ))
     }
 
     fn dyn_hash(&self, state: &mut dyn Hasher) {

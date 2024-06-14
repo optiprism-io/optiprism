@@ -14,25 +14,31 @@ use arrow::datatypes::SchemaRef;
 use datafusion::execution::RecordBatchStream;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::execution::TaskContext;
-use datafusion::physical_expr::Partitioning;
+use datafusion::physical_expr::{EquivalenceProperties, Partitioning};
 use datafusion::physical_expr::PhysicalSortExpr;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::ExecutionPlanProperties;
+use datafusion::physical_plan::PlanProperties;
 use datafusion_common::Result as DFResult;
 use datafusion_common::ScalarValue;
 use futures::Stream;
 use futures::StreamExt;
 
+use crate::error::QueryError;
+use crate::error::Result;
+
 #[derive(Debug)]
 pub struct AddStringColumnExec {
     input: Arc<dyn ExecutionPlan>,
     schema: SchemaRef,
+    cache: PlanProperties,
     col: (String, String),
 }
 
 impl AddStringColumnExec {
-    pub fn new(input: Arc<dyn ExecutionPlan>, col: (String, String)) -> Self {
+    pub fn try_new(input: Arc<dyn ExecutionPlan>, col: (String, String)) -> Result<Self> {
         let schema = input.schema();
         let fields = [
             vec![Field::new(col.0.clone(), DataType::Utf8, false)],
@@ -40,12 +46,24 @@ impl AddStringColumnExec {
         ]
         .concat();
 
-        let schema = Schema::new(fields);
-        Self {
+        let schema = Arc::new(Schema::new(fields));
+        let cache = Self::compute_properties(&input,schema.clone())?;
+        Ok(Self {
             input,
-            schema: Arc::new(schema),
+            schema,
+            cache,
             col,
-        }
+        })
+    }
+
+    fn compute_properties(input: &Arc<dyn ExecutionPlan>,schema:SchemaRef) -> crate::Result<PlanProperties> {
+        let eq_properties = EquivalenceProperties::new(schema);
+
+        Ok(PlanProperties::new(
+            eq_properties,
+            input.output_partitioning().clone(), // Output Partitioning
+            input.execution_mode(),              // Execution Mode
+        ))
     }
 }
 
@@ -64,26 +82,22 @@ impl ExecutionPlan for AddStringColumnExec {
         self.schema.clone()
     }
 
-    fn output_partitioning(&self) -> Partitioning {
-        self.input.output_partitioning()
+    fn properties(&self) -> &PlanProperties {
+        &self.cache
     }
 
-    fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {
-        None
-    }
-
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
-        vec![self.input.clone()]
+    fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+        vec![&self.input]
     }
 
     fn with_new_children(
         self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
-        Ok(Arc::new(AddStringColumnExec::new(
-            children[0].clone(),
-            self.col.clone(),
-        )))
+        Ok(Arc::new(
+            AddStringColumnExec::try_new(children[0].clone(), self.col.clone())
+                .map_err(QueryError::into_datafusion_execution_error)?,
+        ))
     }
 
     fn execute(

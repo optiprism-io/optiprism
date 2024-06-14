@@ -78,7 +78,7 @@ fn build_filter(
     execution_props: &ExecutionProps,
 ) -> Result<Option<Arc<dyn PhysicalExpr>>> {
     let ret = filter
-        .map(|e| create_physical_expr(&e, dfschema, schema, execution_props))
+        .map(|e| create_physical_expr(&e, dfschema, execution_props))
         .transpose()?;
 
     Ok(ret)
@@ -123,25 +123,33 @@ impl DFExtensionPlanner for ExtensionPlanner {
                 .map_err(|err| DataFusionError::Plan(err.to_string()))?;
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<AddStringColumnNode>() {
-            let exec = AddStringColumnExec::new(physical_inputs[0].clone(), node.col.clone());
+            let exec = AddStringColumnExec::try_new(physical_inputs[0].clone(), node.col.clone())
+                .map_err(|e| DataFusionError::Plan(e.to_string()))?;
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<ReorderColumnsNode>() {
-            let exec = ReorderColumnsExec::new(physical_inputs[0].clone(), node.columns.clone());
+            let exec =
+                ReorderColumnsExec::try_new(physical_inputs[0].clone(), node.columns.clone())
+                    .map_err(|e| DataFusionError::Plan(e.to_string()))?;
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<RenameColumnsNode>() {
-            let exec = RenameColumnsExec::new(physical_inputs[0].clone(), node.columns.clone());
+            let exec = RenameColumnsExec::try_new(physical_inputs[0].clone(), node.columns.clone())
+                .map_err(|e| DataFusionError::Plan(e.to_string()))?;
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<AggregateAndSortColumnsNode>() {
-            let exec =
-                AggregateAndSortColumnsExec::new(physical_inputs[0].clone(), node.groups.clone());
+            let exec = AggregateAndSortColumnsExec::try_new(
+                physical_inputs[0].clone(),
+                node.groups.clone(),
+            )
+            .map_err(|e| DataFusionError::Plan(e.to_string()))?;
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<LimitGroupsNode>() {
-            let exec = LimitGroupsExec::new(
+            let exec = LimitGroupsExec::try_new(
                 physical_inputs[0].clone(),
                 node.skip,
                 node.groups,
                 node.limit,
-            );
+            )
+            .map_err(|e| DataFusionError::Plan(e.to_string()))?;
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<RenameColumnRowsNode>() {
             let col = Column::new(
@@ -149,8 +157,12 @@ impl DFExtensionPlanner for ExtensionPlanner {
                 logical_inputs[0].schema().index_of_column(&node.column)?,
             );
 
-            let exec =
-                RenameColumnRowsExec::new(physical_inputs[0].clone(), col, node.rename.to_vec());
+            let exec = RenameColumnRowsExec::try_new(
+                physical_inputs[0].clone(),
+                col,
+                node.rename.to_vec(),
+            )
+            .map_err(|e| DataFusionError::Plan(e.to_string()))?;
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<DbParquetNode>() {
             let exec = DBParquetExec::try_new(node.db.clone(), node.projection.clone())
@@ -196,7 +208,8 @@ impl DFExtensionPlanner for ExtensionPlanner {
                     )
                 })
                 .collect();
-            let exec = DictionaryDecodeExec::new(physical_inputs[0].clone(), decode_cols);
+            let exec = DictionaryDecodeExec::try_new(physical_inputs[0].clone(), decode_cols)
+                .map_err(|e| DataFusionError::Plan(e.to_string()))?;
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<FunnelNode>() {
             Some(Arc::new(

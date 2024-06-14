@@ -4,7 +4,8 @@ use std::hash::Hash;
 use std::hash::Hasher;
 use std::sync::Arc;
 
-use datafusion_common::DFField;
+use arrow::datatypes::Field;
+use arrow::datatypes::FieldRef;
 use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;
 use datafusion_expr::Expr;
@@ -33,11 +34,11 @@ impl RenameColumnsNode {
             .map(|v| {
                 for col in columns.iter() {
                     if v.name().to_string() == col.0 {
-                        return DFField::new_unqualified(
+                        return FieldRef::new(Field::new(
                             &col.1,
                             v.data_type().clone(),
                             v.is_nullable(),
-                        );
+                        ));
                     }
                 }
                 return v.to_owned();
@@ -47,7 +48,10 @@ impl RenameColumnsNode {
         Ok(Self {
             input,
             columns,
-            schema: Arc::new(DFSchema::new_with_metadata(fields, Default::default())?),
+            schema: Arc::new(DFSchema::from_unqualifed_fields(
+                fields.into(),
+                Default::default(),
+            )?),
         })
     }
 }
@@ -89,6 +93,17 @@ impl UserDefinedLogicalNode for RenameColumnsNode {
                 .map_err(QueryError::into_datafusion_plan_error)
                 .unwrap(),
         )
+    }
+
+    fn with_exprs_and_inputs(
+        &self,
+        exprs: Vec<Expr>,
+        inputs: Vec<LogicalPlan>,
+    ) -> datafusion_common::Result<Arc<dyn UserDefinedLogicalNode>> {
+        Ok(Arc::new(
+            RenameColumnsNode::try_new(inputs[0].to_owned(), self.columns.clone())
+                .map_err(QueryError::into_datafusion_plan_error)?,
+        ))
     }
 
     fn dyn_hash(&self, state: &mut dyn Hasher) {

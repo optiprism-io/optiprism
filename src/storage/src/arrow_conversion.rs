@@ -21,7 +21,7 @@ pub fn arrow2_to_arrow1(
 
     let arr1_ffi = unsafe { mem::transmute(arr2_ffi) }; // todo get rid of transmute?
     let schema1_ffi = unsafe { mem::transmute(schema2_ffi) };
-    let data = from_ffi(arr1_ffi, &schema1_ffi)?;
+    let data = unsafe { from_ffi(arr1_ffi, &schema1_ffi)? };
 
     let arr = make_array(data);
     let f = field2_to_field1(field);
@@ -122,7 +122,7 @@ pub mod arrow2_to_arrow1 {
         let arr1_ffi = unsafe { mem::transmute(arr2_ffi) }; // todo get rid of transmute?
         let schema1_ffi = unsafe { mem::transmute(schema2_ffi) };
 
-        let data = from_ffi(arr1_ffi, &schema1_ffi)?;
+        let data = unsafe { from_ffi(arr1_ffi, &schema1_ffi)? };
         let arr = make_array(data);
         Ok(arr)
     }

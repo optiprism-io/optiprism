@@ -5,7 +5,6 @@ use std::hash::Hasher;
 use std::sync::Arc;
 
 use datafusion_common::Column;
-use datafusion_common::DFField;
 use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;
 use datafusion_expr::Expr;
@@ -81,6 +80,21 @@ impl UserDefinedLogicalNode for RenameColumnRowsNode {
             .map_err(QueryError::into_datafusion_plan_error)
             .unwrap(),
         )
+    }
+
+    fn with_exprs_and_inputs(
+        &self,
+        exprs: Vec<Expr>,
+        inputs: Vec<LogicalPlan>,
+    ) -> datafusion_common::Result<Arc<dyn UserDefinedLogicalNode>> {
+        Ok(Arc::new(
+            RenameColumnRowsNode::try_new(
+                inputs[0].to_owned(),
+                self.column.clone(),
+                self.rename.to_vec(),
+            )
+            .map_err(QueryError::into_datafusion_plan_error)?,
+        ))
     }
 
     fn dyn_hash(&self, state: &mut dyn Hasher) {

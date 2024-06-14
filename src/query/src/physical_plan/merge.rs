@@ -16,6 +16,7 @@ use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use axum::async_trait;
 use datafusion::execution::context::TaskContext;
+use datafusion::physical_expr::EquivalenceProperties;
 use datafusion::physical_plan::expressions::PhysicalSortExpr;
 use datafusion::physical_plan::metrics::BaselineMetrics;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
@@ -23,7 +24,9 @@ use datafusion::physical_plan::metrics::MetricsSet;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::ExecutionPlanProperties;
 use datafusion::physical_plan::Partitioning;
+use datafusion::physical_plan::PlanProperties;
 use datafusion::physical_plan::RecordBatchStream;
 use datafusion::physical_plan::SendableRecordBatchStream;
 use datafusion::physical_plan::Statistics;
@@ -40,6 +43,7 @@ pub struct MergeExec {
     inputs: Vec<Arc<dyn ExecutionPlan>>,
     names: Option<(String, Vec<String>)>,
     schema: SchemaRef,
+    cache: PlanProperties,
     metrics: ExecutionPlanMetricsSet,
 }
 
@@ -57,17 +61,28 @@ impl MergeExec {
             ]
             .concat();
 
-            Schema::new(fields)
+            Arc::new(Schema::new(fields))
         } else {
-            schema
+            Arc::new(schema)
         };
 
+        let cache = Self::compute_properties(&inputs[0],schema.clone())?;
         Ok(Self {
             inputs,
             names,
-            schema: Arc::new(schema),
+            schema,
+            cache,
             metrics: ExecutionPlanMetricsSet::new(),
         })
+    }
+
+    fn compute_properties(input: &Arc<dyn ExecutionPlan>,schema:SchemaRef) -> Result<PlanProperties> {
+        let eq_properties = EquivalenceProperties::new(schema);
+        Ok(PlanProperties::new(
+            eq_properties,
+            input.output_partitioning().clone(), // Output Partitioning
+            input.execution_mode(),              // Execution Mode
+        ))
     }
 }
 
@@ -87,16 +102,12 @@ impl ExecutionPlan for MergeExec {
         self.schema.clone()
     }
 
-    fn output_partitioning(&self) -> Partitioning {
-        self.inputs[0].output_partitioning()
+    fn properties(&self) -> &PlanProperties {
+        &self.cache
     }
 
-    fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {
-        None
-    }
-
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
-        self.inputs.clone()
+    fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+        self.inputs.iter().map(|i| i).collect::<Vec<_>>()
     }
 
     fn with_new_children(

@@ -7,8 +7,9 @@ use std::hash::Hasher;
 use std::sync::Arc;
 
 use arrow::datatypes::DataType;
+use arrow::datatypes::Field;
+use arrow::datatypes::Fields;
 use datafusion_common::Column;
-use datafusion_common::DFField;
 use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;
 use datafusion_expr::logical_plan::LogicalPlan;
@@ -38,18 +39,20 @@ impl DictionaryDecodeNode {
                     .iter()
                     .find(|(col, _)| *field.name() == col.name)
                 {
-                    Some(_) => DFField::new(
-                        field.qualifier().cloned(),
+                    Some(_) => Arc::new(Field::new(
                         field.name().as_str(),
                         DataType::Utf8,
                         field.is_nullable(),
-                    ),
+                    )),
                     None => field.to_owned(),
                 }
             })
             .collect::<Vec<_>>();
 
-        let schema = Arc::new(DFSchema::new_with_metadata(fields, HashMap::new())?);
+        let schema = Arc::new(DFSchema::from_unqualifed_fields(
+            Fields::from(fields),
+            HashMap::new(),
+        )?);
 
         Ok(Self {
             input,
@@ -128,6 +131,17 @@ impl UserDefinedLogicalNode for DictionaryDecodeNode {
         Arc::new(
             DictionaryDecodeNode::try_new(inputs[0].clone(), self.decode_cols.clone()).unwrap(),
         )
+    }
+
+    fn with_exprs_and_inputs(
+        &self,
+        exprs: Vec<Expr>,
+        inputs: Vec<LogicalPlan>,
+    ) -> datafusion_common::Result<Arc<dyn UserDefinedLogicalNode>> {
+        Ok(Arc::new(
+            Self::try_new(inputs[0].clone(), self.decode_cols.clone())
+                .map_err(|e| datafusion_common::DataFusionError::Execution(e.to_string()))?,
+        ))
     }
 
     fn dyn_hash(&self, state: &mut dyn Hasher) {
