@@ -25,7 +25,7 @@ use common::query::Breakdown;
 use common::query::EventRef;
 use common::query::PropValueFilter;
 use common::query::PropertyRef;
-use common::types::COLUMN_CREATED_AT;
+use common::types::{COLUMN_CREATED_AT, ROUND_DIGITS};
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_EVENT_ID;
 use common::types::COLUMN_PROJECT_ID;
@@ -44,6 +44,7 @@ use datafusion::prelude::SessionConfig;
 use datafusion::prelude::SessionContext;
 use datafusion_expr::Extension;
 use datafusion_expr::LogicalPlan;
+use num_traits::ToPrimitive;
 use metadata::MetadataProvider;
 use rust_decimal::Decimal;
 use storage::db::OptiDBImpl;
@@ -332,11 +333,31 @@ impl QueryProvider {
                         }
                     }
                 };
-                let col = cast(result.column(idx + 1), &DataType::Utf8)?
-                    .as_any()
-                    .downcast_ref::<StringArray>()
-                    .unwrap()
-                    .to_owned();
+                let col = match result.column(idx + 1).data_type() {
+                    DataType::Decimal128(_, _) => {
+                        let arr = result.column(idx + 1).as_any().downcast_ref::<Decimal128Array>().unwrap();
+                        let mut builder = StringBuilder::new();
+                        for i in 0..arr.len() {
+                            let v = arr.value(i);
+                            let vv = Decimal::from_i128_with_scale(
+                                v,
+                                DECIMAL_SCALE as u32,
+                            ).round_dp(ROUND_DIGITS.into());
+                            if vv.is_integer() {
+                                builder.append_value(vv.to_i64().unwrap().to_string());
+                            } else {
+                                builder.append_value(vv.to_string());
+                            }
+                        }
+                        builder.finish().as_any().downcast_ref::<StringArray>().unwrap().clone()
+                    }
+                    _ => cast(result.column(idx + 1), &DataType::Utf8)?
+                        .as_any()
+                        .downcast_ref::<StringArray>()
+                        .unwrap()
+                        .to_owned()
+                };
+
                 group_cols.push(col);
                 groups.push(prop.name());
             }
@@ -393,16 +414,16 @@ impl QueryProvider {
                     conversion_ratio: Decimal::from_i128_with_scale(
                         dec_val_cols[step_id * 3].value(idx) as i128,
                         DECIMAL_SCALE as u32,
-                    ),
+                    ).round_dp(ROUND_DIGITS.into()),
                     avg_time_to_convert: Decimal::from_i128_with_scale(
                         dec_val_cols[step_id * 3 + 1].value(idx) as i128,
                         DECIMAL_SCALE as u32,
-                    ),
+                    ).round_dp(ROUND_DIGITS.into()),
                     dropped_off: int_val_cols[step_id * 4 + 1].value(idx) as i64,
                     drop_off_ratio: Decimal::from_i128_with_scale(
                         dec_val_cols[step_id * 3 + 2].value(idx) as i128,
                         DECIMAL_SCALE as u32,
-                    ),
+                    ).round_dp(ROUND_DIGITS.into()),
                     time_to_convert: int_val_cols[step_id * 4 + 2].value(idx) as i64,
                     time_to_convert_from_start: int_val_cols[step_id * 4 + 3].value(idx) as i64,
                 };
