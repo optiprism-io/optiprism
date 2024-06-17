@@ -682,20 +682,10 @@ pub(crate) fn validate_request(
     match &req.filters {
         None => {}
         Some(filters) => {
-            if filters.groups.is_empty() {
-                return Err(PlatformError::BadRequest(
-                    "groups field can't be empty".to_string(),
-                ));
-            }
             for filter_group in &filters.groups {
                 if filters.groups.is_empty() {
                     return Err(PlatformError::BadRequest(
                         "filter_group field can't be empty".to_string(),
-                    ));
-                }
-                if filter_group.filters.is_empty() {
-                    return Err(PlatformError::BadRequest(
-                        "filters field can't be empty".to_string(),
                     ));
                 }
                 for (filter_id, filter) in filter_group.filters.iter().enumerate() {

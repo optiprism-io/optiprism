@@ -66,6 +66,7 @@ use crate::Column;
 use crate::ColumnType;
 use crate::Context;
 use crate::DataTable;
+use crate::error::QueryError;
 use crate::Result;
 
 pub struct QueryProvider {
@@ -89,7 +90,7 @@ impl QueryProvider {
             SessionConfig::new().with_collect_statistics(true),
             runtime,
         )
-        .with_query_planner(Arc::new(QueryPlanner {}));
+            .with_query_planner(Arc::new(QueryPlanner {}));
 
         // if let Some(projection) = projection {
         // state = state
@@ -317,18 +318,29 @@ impl QueryProvider {
             .unwrap()
             .to_owned();
         group_cols.push(col);
+        let mut groups = vec!["Segment".to_string()];
         if let Some(breakdowns) = &req.breakdowns {
-            for idx in 0..breakdowns.len() {
-                let col = result
-                    .column(idx + 1)
+            for (idx, breakdown) in breakdowns.iter().enumerate() {
+                let prop = match breakdown {
+                    Breakdown::Property(prop) => {
+                        match prop {
+                            PropertyRef::System(name) => self.metadata.system_properties.get_by_name(ctx.project_id, name.as_ref())?,
+                            PropertyRef::SystemGroup(name) => self.metadata.system_group_properties.get_by_name(ctx.project_id, name.as_ref())?,
+                            PropertyRef::Group(name, gid) => self.metadata.group_properties[*gid].get_by_name(ctx.project_id, name.as_ref())?,
+                            PropertyRef::Event(name) => self.metadata.event_properties.get_by_name(ctx.project_id, name.as_ref())?,
+                            PropertyRef::Custom(_) => return Err(QueryError::Unimplemented("custom properties are not implemented for breakdowns".to_string()))
+                        }
+                    }
+                };
+                let col = cast(result.column(idx + 1), &DataType::Utf8)?
                     .as_any()
                     .downcast_ref::<StringArray>()
                     .unwrap()
                     .to_owned();
                 group_cols.push(col);
+                groups.push(prop.name());
             }
         }
-        group_cols.dedup();
 
         let mut int_val_cols = vec![];
         let mut dec_val_cols = vec![];
@@ -399,7 +411,7 @@ impl QueryProvider {
             steps.push(step);
         }
 
-        Ok(funnel::Response { steps })
+        Ok(funnel::Response { groups, steps })
     }
 }
 

@@ -618,6 +618,7 @@ pub struct FunnelStep {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct FunnelResponse {
+    pub groups:Vec<String>,
     pub steps: Vec<FunnelStep>,
 }
 

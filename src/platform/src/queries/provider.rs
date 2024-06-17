@@ -9,6 +9,7 @@ use query::context::Format;
 use query::queries::funnel::StepData;
 use query::QueryProvider;
 use serde_json::Value;
+use metadata::properties::Type;
 
 use crate::queries::event_records_search;
 use crate::queries::event_records_search::EventRecordsSearchRequest;
@@ -21,7 +22,7 @@ use crate::queries::group_records_search::GroupRecordsSearchRequest;
 use crate::queries::property_values::ListPropertyValuesRequest;
 use crate::queries::QueryParams;
 use crate::queries::QueryResponseFormat;
-use crate::Context;
+use crate::{Context, PropertyRef};
 use crate::FunnelResponse;
 use crate::FunnelStep;
 use crate::FunnelStepData;
@@ -129,6 +130,9 @@ impl Queries {
 
         let mut qdata = self.query.funnel(ctx, lreq).await?;
 
+        let groups = qdata
+            .groups;
+
         let steps = qdata
             .steps
             .iter()
@@ -154,7 +158,7 @@ impl Queries {
                 }
             })
             .collect::<Vec<_>>();
-        let resp = FunnelResponse { steps };
+        let resp = FunnelResponse { groups, steps };
         Ok(resp)
     }
 

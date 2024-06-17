@@ -738,7 +738,6 @@ impl Stream for FinalFunnelStream {
         let agg_arrs = aggregate(&final_batch, groups, aggs)
             .map_err(QueryError::into_datafusion_execution_error)?;
         let result = RecordBatch::try_new(self.schema.clone(), agg_arrs)?;
-
         self.finished = true;
         Poll::Ready(Some(Ok(result)))
     }
