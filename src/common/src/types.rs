@@ -76,6 +76,7 @@ pub const RESERVED_COLUMN_FUNNEL_TOTAL: &str = "total";
 pub const RESERVED_COLUMN_FUNNEL_COMPLETED: &str = "completed";
 pub const RESERVED_COLUMN_FUNNEL_CONVERSION_RATIO: &str = "conversion_ratio";
 pub const RESERVED_COLUMN_FUNNEL_AVG_TIME_TO_CONVERT: &str = "avg_time_to_convert";
+pub const RESERVED_COLUMN_FUNNEL_AVG_TIME_TO_CONVERT_FROM_START: &str = "avg_time_to_convert_from_start";
 pub const RESERVED_COLUMN_FUNNEL_DROPPED_OFF: &str = "dropped_off";
 pub const RESERVED_COLUMN_FUNNEL_DROP_OFF_RATIO: &str = "drop_off_ratio";
 pub const RESERVED_COLUMN_AGG_PARTITIONED_AGGREGATE: &str = "partitioned_agg";

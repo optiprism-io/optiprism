@@ -140,16 +140,19 @@ impl Queries {
                 let data = step
                     .data
                     .iter()
-                    .map(|data| FunnelStepData {
-                        groups: data.groups.clone(),
-                        ts: data.ts.clone(),
-                        total: data.total.clone(),
-                        conversion_ratio: data.conversion_ratio.clone(),
-                        avg_time_to_convert: data.avg_time_to_convert.clone(),
-                        dropped_off: data.dropped_off.clone(),
-                        drop_off_ratio: data.drop_off_ratio.clone(),
-                        time_to_convert: data.time_to_convert.clone(),
-                        time_to_convert_from_start: data.time_to_convert_from_start.clone(),
+                    .map(|data| {
+                        FunnelStepData {
+                            groups: data.groups.clone(),
+                            ts: data.ts.clone(),
+                            total: data.total.clone(),
+                            conversion_ratio: data.conversion_ratio.clone(),
+                            avg_time_to_convert: data.avg_time_to_convert.clone(),
+                            avg_time_to_convert_from_start: data.avg_time_to_convert_from_start.clone(),
+                            dropped_off: data.dropped_off.clone(),
+                            drop_off_ratio: data.drop_off_ratio.clone(),
+                            time_to_convert: data.time_to_convert.clone(),
+                            time_to_convert_from_start: data.time_to_convert_from_start.clone(),
+                        }
                     })
                     .collect::<Vec<_>>();
                 FunnelStep {

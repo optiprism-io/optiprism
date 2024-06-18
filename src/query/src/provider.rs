@@ -412,16 +412,20 @@ impl QueryProvider {
                     ts: ts_col.value(idx),
                     total: int_val_cols[step_id * 4].value(idx) as i64,
                     conversion_ratio: Decimal::from_i128_with_scale(
-                        dec_val_cols[step_id * 3].value(idx) as i128,
+                        dec_val_cols[step_id * 4].value(idx) as i128,
                         DECIMAL_SCALE as u32,
                     ).round_dp(ROUND_DIGITS.into()),
                     avg_time_to_convert: Decimal::from_i128_with_scale(
-                        dec_val_cols[step_id * 3 + 1].value(idx) as i128,
+                        dec_val_cols[step_id * 4 + 1].value(idx) as i128,
+                        DECIMAL_SCALE as u32,
+                    ).round_dp(ROUND_DIGITS.into()),
+                    avg_time_to_convert_from_start: Decimal::from_i128_with_scale(
+                        dec_val_cols[step_id * 4 + 2].value(idx) as i128,
                         DECIMAL_SCALE as u32,
                     ).round_dp(ROUND_DIGITS.into()),
                     dropped_off: int_val_cols[step_id * 4 + 1].value(idx) as i64,
                     drop_off_ratio: Decimal::from_i128_with_scale(
-                        dec_val_cols[step_id * 3 + 2].value(idx) as i128,
+                        dec_val_cols[step_id * 4 + 3].value(idx) as i128,
                         DECIMAL_SCALE as u32,
                     ).round_dp(ROUND_DIGITS.into()),
                     time_to_convert: int_val_cols[step_id * 4 + 2].value(idx) as i64,

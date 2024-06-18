@@ -85,6 +85,11 @@ impl Funnel {
                         true,
                     ),
                     Field::new(
+                        format!("step{}_avg_time_to_convert_from_start", step_id).as_str(),
+                        DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                        true,
+                    ),
+                    Field::new(
                         format!("step{}_dropped_off", step_id).as_str(),
                         DataType::Int64,
                         true,

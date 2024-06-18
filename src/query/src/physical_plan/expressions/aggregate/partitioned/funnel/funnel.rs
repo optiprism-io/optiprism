@@ -433,6 +433,11 @@ impl Funnel {
                         DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
                         false,
                     ),
+                    Field::new(
+                        format!("step{}_avg_time_to_convert_from_start", step_id),
+                        DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                        false,
+                    ),
                     Field::new(format!("step{step_id}_dropped_off"), DataType::Int64, false),
                     Field::new(
                         format!("step{step_id}_drop_off_ratio"),
@@ -744,6 +749,9 @@ impl Funnel {
             let mut step_avg_time_to_convert = (0..steps)
                 .map(|_| Decimal128Builder::with_capacity(arr_len))
                 .collect::<Vec<_>>();
+            let mut step_avg_time_to_convert_from_start = (0..steps)
+                .map(|_| Decimal128Builder::with_capacity(arr_len))
+                .collect::<Vec<_>>();
             let mut step_dropped_off = (0..steps)
                 .map(|_| Int64Builder::with_capacity(arr_len))
                 .collect::<Vec<_>>();
@@ -798,6 +806,20 @@ impl Funnel {
                     };
                     v.rescale(DECIMAL_SCALE as u32);
                     step_avg_time_to_convert[step_id].append_value(v.mantissa());
+
+                    let mut v = if step_id == 0 {
+                        Decimal::from_f64(0.).unwrap()
+                    } else {
+                        Decimal::from_f64(if step.total > 0 {
+                            step.total_time_to_convert_from_start as f64 / step.total as f64 * 100.
+                        } else {
+                            0.
+                        })
+                            .unwrap()
+                    };
+                    v.rescale(DECIMAL_SCALE as u32);
+                    step_avg_time_to_convert_from_start[step_id].append_value(v.mantissa());
+
                     step_time_to_convert[step_id].append_value(step.total_time_to_convert);
                     step_time_to_convert_from_start[step_id]
                         .append_value(step.total_time_to_convert_from_start);
@@ -830,6 +852,12 @@ impl Funnel {
                         ) as ArrayRef,
                         Arc::new(
                             step_avg_time_to_convert[idx]
+                                .finish()
+                                .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)
+                                .unwrap(),
+                        ) as ArrayRef,
+                        Arc::new(
+                            step_avg_time_to_convert_from_start[idx]
                                 .finish()
                                 .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)
                                 .unwrap(),

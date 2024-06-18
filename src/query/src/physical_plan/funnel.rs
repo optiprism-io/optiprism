@@ -89,10 +89,7 @@ impl Agg {
     pub fn result(&self) -> i128 {
         match self {
             Agg::Sum(sum) => *sum,
-            Agg::Avg(sum, count) => {
-                let v = *sum / *count;
-                *sum / *count
-            }
+            Agg::Avg(sum, count) => *sum / *count,
         }
     }
 }
@@ -715,6 +712,9 @@ impl Stream for FinalFunnelStream {
             aggs.push((col(&cname, &self.schema).unwrap(), Agg::Avg(0, 0)));
 
             let cname = format!("step{}_avg_time_to_convert", i);
+            aggs.push((col(&cname, &self.schema).unwrap(), Agg::Avg(0, 0)));
+
+            let cname = format!("step{}_avg_time_to_convert_from_start", i);
             aggs.push((col(&cname, &self.schema).unwrap(), Agg::Avg(0, 0)));
 
             let cname = format!("step{}_dropped_off", i);
