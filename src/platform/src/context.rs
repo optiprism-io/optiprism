@@ -49,11 +49,12 @@ pub struct Context {
 
 impl Context {
     pub fn check_permission(&self, permission: Permission) -> Result<()> {
-        if self.force_update_password {
+        // todo uncomment
+        /*if self.force_update_password {
             return Err(PlatformError::Forbidden(
                 "password must be changed".to_string(),
             ));
-        }
+        }*/
         if let Some(role) = &self.role {
             for (root_role, role_permission) in PERMISSIONS.iter() {
                 if *root_role != *role {

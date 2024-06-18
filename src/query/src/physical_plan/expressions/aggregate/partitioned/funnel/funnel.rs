@@ -4,13 +4,13 @@ use std::result;
 use std::sync::Arc;
 
 use ahash::RandomState;
-use arrow::array::ArrayBuilder;
+use arrow::array::{ArrayBuilder, TimestampMillisecondBuilder};
 use arrow::array::ArrayRef;
 use arrow::array::Decimal128Builder;
 use arrow::array::Int64Array;
 use arrow::array::Int64Builder;
 use arrow::array::TimestampMillisecondArray;
-use arrow::compute::concat;
+use arrow::compute::{concat, take};
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
 use arrow::datatypes::Schema;
@@ -760,35 +760,44 @@ impl Funnel {
             // iterate over buckets and fill values to builders
             for (ts, bucket) in buckets {
                 for (step_id, step) in bucket.steps.iter().enumerate() {
-                    let completed = step.total - step.dropped_off;
                     step_total[step_id].append_value(step.total);
-                    let mut v = Decimal::from_f64(if completed > 0 {
-                        completed as f64 / step.total as f64 * 100.
+                    let mut v = if step_id == 0 {
+                        Decimal::from_f64(100.).unwrap()
                     } else {
-                        if step_id == 0 { 100. } else { 0. }
-                    })
-                    .unwrap();
+                        Decimal::from_f64(if step.total > 0 {
+                            step.total as f64 / bucket.steps[step_id - 1].total as f64 * 100.
+                        } else {
+                            100.
+                        })
+                            .unwrap()
+                    };
                     v.rescale(DECIMAL_SCALE as u32);
                     step_conversion_ratio[step_id].append_value(v.mantissa());
-
-                    let v = if completed > 0 {
-                        step.total_time_to_convert as f64 / completed as f64
-                    } else {
-                        0.
-                    };
-
-                    let mut a = Decimal::from_f64(v).unwrap();
-                    a.rescale(DECIMAL_SCALE as u32);
-                    step_avg_time_to_convert[step_id].append_value(a.mantissa());
                     step_dropped_off[step_id].append_value(step.dropped_off);
-                    let mut v = Decimal::from_f64(if step.total > 0 && step.dropped_off > 0 {
-                        step.dropped_off as f64 / step.total as f64 * 100.
+                    let mut v = if step_id == 0 {
+                        Decimal::from_f64(0.).unwrap()
                     } else {
-                        0.
-                    })
-                    .unwrap();
+                        Decimal::from_f64(if step.total > 0 {
+                            step.dropped_off as f64 / step.total as f64 * 100.
+                        } else {
+                            0.
+                        })
+                            .unwrap()
+                    };
                     v.rescale(DECIMAL_SCALE as u32);
                     step_drop_off_ratio[step_id].append_value(v.mantissa());
+                    let mut v = if step_id == 0 {
+                        Decimal::from_f64(0.).unwrap()
+                    } else {
+                        Decimal::from_f64(if step.total > 0 {
+                            step.total_time_to_convert as f64 / step.total as f64 * 100.
+                        } else {
+                            0.
+                        })
+                            .unwrap()
+                    };
+                    v.rescale(DECIMAL_SCALE as u32);
+                    step_avg_time_to_convert[step_id].append_value(v.mantissa());
                     step_time_to_convert[step_id].append_value(step.total_time_to_convert);
                     step_time_to_convert_from_start[step_id]
                         .append_value(step.total_time_to_convert_from_start);
@@ -803,7 +812,7 @@ impl Funnel {
                     .map(|arr| {
                         // make scalar value from group and stretch it to array size of buckets len
                         ScalarValue::try_from_array(arr.as_ref(), group_id)
-                            .map(|v| v.to_array_of_size(buckets.len()).unwrap())
+                            .map(|v| v.to_array_of_size(arr_len).unwrap())
                     })
                     .collect::<Result<Vec<_>, _>>()?;
                 arrs = [garr, arrs].concat();
@@ -851,6 +860,23 @@ impl Funnel {
             })
             .collect::<Vec<_>>();
 
+        let groups_len = if let Some(g) = &self.groups {
+            g.exprs.len()
+        } else {
+            0
+        };
+
+        let step0_total = res[groups_len + 1].as_any().downcast_ref::<Int64Array>().unwrap();
+        let mut idx_arr = Int64Builder::new();
+        for (idx, v) in step0_total.iter().enumerate() {
+            if v.unwrap() != 0 {
+                idx_arr.append_value(idx as i64);
+            }
+        }
+        let a = Arc::new(idx_arr.finish()) as ArrayRef;
+        let res = res
+            .iter()
+            .map(|c| take(&c, &a, None).unwrap()).collect::<Vec<_>>();
         Ok(res)
     }
 }
@@ -935,14 +961,14 @@ mod tests {
                         "1976-01-01 12:00:00 +0000",
                         "%Y-%m-%d %H:%M:%S %z",
                     )
-                    .unwrap()
-                    .with_timezone(&Utc),
+                        .unwrap()
+                        .with_timezone(&Utc),
                     to: DateTime::parse_from_str(
                         "1976-02-01 12:00:00 +0000",
                         "%Y-%m-%d %H:%M:%S %z",
                     )
-                    .unwrap()
-                    .with_timezone(&Utc),
+                        .unwrap()
+                        .with_timezone(&Utc),
                     schema: schema.clone(),
                     groups: None,
                     ts_col: Arc::new(Column::new("ts", 1)),
@@ -986,14 +1012,14 @@ asd
                         "1976-01-01 12:00:00 +0000",
                         "%Y-%m-%d %H:%M:%S %z",
                     )
-                    .unwrap()
-                    .with_timezone(&Utc),
+                        .unwrap()
+                        .with_timezone(&Utc),
                     to: DateTime::parse_from_str(
                         "1976-02-01 12:00:00 +0000",
                         "%Y-%m-%d %H:%M:%S %z",
                     )
-                    .unwrap()
-                    .with_timezone(&Utc),
+                        .unwrap()
+                        .with_timezone(&Utc),
                     schema: schema.clone(),
                     groups: None,
                     ts_col: Arc::new(Column::new("ts", 1)),
@@ -1038,14 +1064,14 @@ asd
                         "1976-01-01 12:00:00 +0000",
                         "%Y-%m-%d %H:%M:%S %z",
                     )
-                    .unwrap()
-                    .with_timezone(&Utc),
+                        .unwrap()
+                        .with_timezone(&Utc),
                     to: DateTime::parse_from_str(
                         "1976-02-01 12:00:00 +0000",
                         "%Y-%m-%d %H:%M:%S %z",
                     )
-                    .unwrap()
-                    .with_timezone(&Utc),
+                        .unwrap()
+                        .with_timezone(&Utc),
                     schema: schema.clone(),
                     groups: None,
                     ts_col: Arc::new(Column::new("ts", 1)),
