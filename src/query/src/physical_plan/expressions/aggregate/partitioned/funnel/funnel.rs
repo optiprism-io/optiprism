@@ -34,7 +34,7 @@ use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
 use datafusion::sql::sqlparser::keywords::Keyword::DESC;
 use datafusion_common::ScalarValue;
-use num_traits::FromPrimitive;
+use num_traits::{FromPrimitive, ToPrimitive};
 use rust_decimal::Decimal;
 
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::evaluate_batch;
@@ -769,18 +769,18 @@ impl Funnel {
             for (ts, bucket) in buckets {
                 for (step_id, step) in bucket.steps.iter().enumerate() {
                     step_total[step_id].append_value(step.total);
-                    let mut v = if step_id == 0 {
+                    let mut scr = if step_id == 0 {
                         Decimal::from_f64(100.).unwrap()
                     } else {
                         Decimal::from_f64(if step.total > 0 {
                             step.total as f64 / bucket.steps[step_id - 1].total as f64 * 100.
                         } else {
-                            100.
+                            0.
                         })
                             .unwrap()
                     };
-                    v.rescale(DECIMAL_SCALE as u32);
-                    step_conversion_ratio[step_id].append_value(v.mantissa());
+                    scr.rescale(DECIMAL_SCALE as u32);
+                    step_conversion_ratio[step_id].append_value(scr.mantissa());
                     step_dropped_off[step_id].append_value(step.dropped_off);
                     let mut v = if step_id == 0 {
                         Decimal::from_f64(0.).unwrap()
@@ -793,7 +793,9 @@ impl Funnel {
                             .unwrap()
                     };
                     v.rescale(DECIMAL_SCALE as u32);
-                    step_drop_off_ratio[step_id].append_value(v.mantissa());
+                    let mut dor = Decimal::from_f64(100.-scr.to_f64().unwrap()).unwrap();
+                    dor.rescale(DECIMAL_SCALE as u32);
+                    step_drop_off_ratio[step_id].append_value(dor.mantissa());
                     let mut v = if step_id == 0 {
                         Decimal::from_f64(0.).unwrap()
                     } else {
