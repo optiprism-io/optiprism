@@ -10,8 +10,6 @@ use query::QueryProvider;
 use serde_json::Value;
 use metadata::properties::Type;
 
-use crate::queries::funnel;
-use crate::queries::funnel::FunnelRequest;
 use crate::queries::group_records_search;
 use crate::queries::group_records_search::GroupRecordsSearchRequest;
 use crate::{Context, PropertyRef, QueryParams, QueryResponseFormat};

@@ -9,8 +9,8 @@ use serde::Deserialize;
 use serde::Serialize;
 use common::event_segmentation::EventSegmentation;
 
-use crate::queries::funnel::FunnelRequest;
 use crate::Context;
+use crate::funnel::FunnelRequest;
 use crate::ListResponse;
 use crate::Result;
 
