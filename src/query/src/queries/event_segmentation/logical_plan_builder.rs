@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use common::group_col;
-use common::query::event_segmentation::Event;
-use common::query::event_segmentation::EventSegmentation;
-use common::query::event_segmentation::Query;
+use common::event_segmentation::Event;
+use common::event_segmentation::EventSegmentation;
+use common::event_segmentation::Query;
 use common::query::time_columns;
 use common::query::Breakdown;
 use common::query::DidEventAggregate;

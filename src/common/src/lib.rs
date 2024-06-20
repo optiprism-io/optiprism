@@ -2,10 +2,12 @@ pub mod arrow;
 pub mod config;
 pub mod error;
 pub mod http;
-pub mod query;
 pub mod rbac;
 pub mod scalar;
 pub mod types;
+pub mod query;
+pub mod event_segmentation;
+pub mod funnel;
 
 pub use types::DECIMAL_MULTIPLIER;
 pub use types::DECIMAL_PRECISION;

@@ -1,63 +1,260 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use axum::async_trait;
+use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
+use common::rbac::ProjectPermission;
+use metadata::MetadataProvider;
+use query::context::Format;
+use query::{event_records, queries};
+use query::event_records::{EventRecordsSearch, Provider};
 
-use crate::queries::QueryTime;
-use crate::Context;
+use crate::{Context, PlatformError, PropertyRef, QueryParams, QueryResponse, QueryResponseFormat, QueryTime, validate_event, validate_event_filter};
 use crate::EventGroupedFilters;
 use crate::EventRef;
 use crate::ListResponse;
 use crate::PropValueFilter;
 use crate::Result;
 
-#[async_trait]
-pub trait Provider: Sync + Send {
-    async fn list(
-        &self,
-        ctx: Context,
-
-        project_id: u64,
-        request: ListEventRecordsRequest,
-    ) -> Result<ListResponse<EventRecord>>;
-
-    async fn get_by_id(&self, ctx: Context, project_id: u64, id: u64) -> Result<EventRecord>;
+pub struct EventRecords {
+    md: Arc<MetadataProvider>,
+    prov: Arc<Provider>,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct Event {
-    #[serde(flatten)]
-    pub event: EventRef,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub filters: Option<Vec<PropValueFilter>>,
-}
+impl EventRecords {
+    pub fn new(md: Arc<MetadataProvider>, prov: Arc<Provider>) -> Self {
+        Self { md, prov }
+    }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct ListEventRecordsRequest {
-    time: QueryTime,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    search_in_event_properties: Option<Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    search_in_user_properties: Option<Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    events: Option<Vec<Event>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    filters: Option<EventGroupedFilters>,
+    pub async fn get_by_id(&self, ctx: Context, project_id: u64, id: u64) -> Result<EventRecord> {
+        Err(PlatformError::Unimplemented("not implemented".to_string()))
+        /**/
+    }
+
+    pub async fn search(&self, ctx: Context, project_id: u64, req: EventRecordsSearchRequest, query: QueryParams) -> Result<QueryResponse> {
+        ctx.check_project_permission(
+            ctx.organization_id,
+            project_id,
+            ProjectPermission::ExploreReports,
+        )?;
+        validate_search_request(&self.md, project_id, &req)?;
+        let lreq = fix_search_request(req.into())?;
+        let cur_time = match query.timestamp {
+            None => Utc::now(),
+            Some(ts_sec) => DateTime::from_naive_utc_and_offset(
+                chrono::NaiveDateTime::from_timestamp_millis(ts_sec * 1000).unwrap(),
+                Utc,
+            ),
+        };
+        let ctx = query::Context {
+            project_id,
+            format: match &query.format {
+                None => Format::Regular,
+                Some(format) => match format {
+                    QueryResponseFormat::Json => Format::Regular,
+                    QueryResponseFormat::JsonCompact => Format::Compact,
+                },
+            },
+            cur_time,
+        };
+
+        let mut data = self.prov.search(ctx, lreq).await?;
+
+        // do empty response so it will be [] instead of [[],[],[],...]
+        if !data.columns.is_empty() && data.columns[0].data.is_empty() {
+            data.columns = vec![];
+        }
+        let resp = match query.format {
+            None => QueryResponse::columns_to_json(data.columns),
+            Some(QueryResponseFormat::Json) => QueryResponse::columns_to_json(data.columns),
+            Some(QueryResponseFormat::JsonCompact) => {
+                QueryResponse::columns_to_json_compact(data.columns)
+            }
+        }?;
+
+        Ok(resp)
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct EventRecord {
-    pub id: u64,
-    pub name: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub event_properties: Option<HashMap<String, Value>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub user_properties: Option<HashMap<String, Value>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub matched_custom_events: Option<Vec<u64>>,
+    pub properties: Vec<PropertyRef>,
+}
+
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Event {
+    #[serde(flatten)]
+    pub event: EventRef,
+    pub filters: Option<Vec<PropValueFilter>>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EventRecordsSearchRequest {
+    pub time: QueryTime,
+    pub events: Option<Vec<Event>>,
+    pub filters: Option<Vec<PropValueFilter>>,
+    pub properties: Option<Vec<PropertyRef>>,
+}
+
+impl Into<event_records::Event> for Event {
+    fn into(self) -> event_records::Event {
+        event_records::Event {
+            event: self.event.into(),
+            filters: self.filters.map(|filters| {
+                filters
+                    .iter()
+                    .map(|filter| filter.to_owned().into())
+                    .collect::<Vec<_>>()
+            }),
+        }
+    }
+}
+
+impl Into<event_records::EventRecordsSearch> for EventRecordsSearchRequest {
+    fn into(self) -> event_records::EventRecordsSearch {
+        event_records::EventRecordsSearch {
+            time: self.time.into(),
+            events: self.events.map(|events| {
+                events
+                    .into_iter()
+                    .map(|event| event.into())
+                    .collect::<Vec<_>>()
+            }),
+            filters: self.filters.map(|filters| {
+                filters
+                    .iter()
+                    .map(|filter| filter.to_owned().into())
+                    .collect::<Vec<_>>()
+            }),
+            properties: self.properties.map(|props| {
+                props
+                    .iter()
+                    .map(|prop| prop.to_owned().into())
+                    .collect::<Vec<_>>()
+            }),
+        }
+    }
+}
+
+pub(crate) fn validate_search_request(
+    md: &Arc<MetadataProvider>,
+    project_id: u64,
+    req: &EventRecordsSearchRequest,
+) -> Result<()> {
+    match req.time {
+        QueryTime::Between { from, to } => {
+            if from > to {
+                return Err(PlatformError::BadRequest(
+                    "from time must be less than to time".to_string(),
+                ));
+            }
+        }
+        _ => {}
+    }
+
+    if let Some(events) = &req.events {
+        if events.is_empty() {
+            return Err(PlatformError::BadRequest(
+                "events field can't be empty".to_string(),
+            ));
+        }
+        for (event_id, event) in events.iter().enumerate() {
+            validate_event(md, project_id, &event.event, event_id, "".to_string())?;
+
+            match &event.filters {
+                Some(filters) => {
+                    for (filter_id, filter) in filters.iter().enumerate() {
+                        validate_event_filter(
+                            md,
+                            project_id,
+                            filter,
+                            filter_id,
+                            format!("event #{event_id}, "),
+                        )?;
+                    }
+                }
+                None => {}
+            }
+        }
+    }
+    match &req.filters {
+        None => {}
+        Some(filters) => {
+            for (filter_id, filter) in filters.iter().enumerate() {
+                validate_event_filter(md, project_id, filter, filter_id, "".to_string())?;
+            }
+        }
+    }
+
+    match &req.properties {
+        None => {}
+        Some(props) => {
+            if props.is_empty() {
+                return Err(PlatformError::BadRequest(
+                    "props field can't be empty".to_string(),
+                ));
+            }
+            for (idx, prop) in props.iter().enumerate() {
+                match prop {
+                    PropertyRef::Group {
+                        property_name,
+                        group,
+                    } => md.group_properties[*group]
+                        .get_by_name(project_id, &property_name)
+                        .map_err(|err| {
+                            PlatformError::BadRequest(format!("property {idx}: {err}"))
+                        })?,
+                    PropertyRef::Event { property_name } => md
+                        .event_properties
+                        .get_by_name(project_id, &property_name)
+                        .map_err(|err| {
+                            PlatformError::BadRequest(format!("property {idx}: {err}"))
+                        })?,
+                    PropertyRef::System { property_name } => md
+                        .system_properties
+                        .get_by_name(project_id, &property_name)
+                        .map_err(|err| {
+                            PlatformError::BadRequest(format!("property {idx}: {err}"))
+                        })?,
+                    _ => {
+                        return Err(PlatformError::Unimplemented(
+                            "invalid property type".to_string(),
+                        ));
+                    }
+                };
+            }
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn fix_search_request(
+    req: EventRecordsSearch,
+) -> Result<EventRecordsSearch> {
+    let mut out = req.clone();
+
+    if let Some(events) = &req.events {
+        if events.is_empty() {
+            out.events = None;
+        }
+    }
+
+    if let Some(filters) = &req.filters {
+        if filters.is_empty() {
+            out.filters = None;
+        }
+    }
+
+    if let Some(properties) = &req.properties {
+        if properties.is_empty() {
+            out.properties = None;
+        }
+    }
+    Ok(out)
 }

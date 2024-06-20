@@ -24,7 +24,6 @@ impl Events {
     pub async fn create(
         &self,
         ctx: Context,
-
         project_id: u64,
         request: CreateEventRequest,
     ) -> Result<Event> {

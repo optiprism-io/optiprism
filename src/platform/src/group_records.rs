@@ -6,8 +6,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::queries::QueryTime;
-use crate::Context;
+use crate::{Context, QueryTime};
 use crate::EventGroupedFilters;
 use crate::ListResponse;
 use crate::Result;

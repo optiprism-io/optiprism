@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Instant;
 
 use common::query::EventRef;
 use common::query::PropValueFilter;
 use common::query::PropertyRef;
 use common::query::QueryTime;
-use common::types::COLUMN_CREATED_AT;
+use common::types::{COLUMN_CREATED_AT, COLUMN_EVENT, TABLE_EVENTS};
 use common::types::COLUMN_EVENT_ID;
 use common::types::COLUMN_PROJECT_ID;
 use common::GROUPS_COUNT;
@@ -24,8 +25,10 @@ use datafusion_expr::LogicalPlan;
 use datafusion_expr::Operator;
 use datafusion_expr::Projection;
 use datafusion_expr::Sort;
+use tracing::debug;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
+use storage::db::OptiDBImpl;
 
 use crate::error::QueryError;
 use crate::error::Result;
@@ -36,10 +39,10 @@ use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::logical_plan::expr::multi_and;
 use crate::logical_plan::expr::multi_or;
 use crate::logical_plan::rename_columns::RenameColumnsNode;
-use crate::queries::decode_filter_single_dictionary;
-use crate::Context;
+use crate::queries::{decode_filter_single_dictionary};
+use crate::{col_name, ColumnType, Context, DataTable, execute, initial_plan, QueryProvider};
 
-pub fn build(
+pub fn build_plan(
     ctx: Context,
     metadata: Arc<MetadataProvider>,
     input: LogicalPlan,
@@ -267,6 +270,88 @@ fn decode_filter_dictionaries(
     Ok(LogicalPlan::Extension(Extension {
         node: Arc::new(DictionaryDecodeNode::try_new(input, decode_cols.clone())?),
     }))
+}
+
+
+fn event_records_search_projection(
+    ctx: &Context,
+    req: &EventRecordsSearch,
+    md: &Arc<MetadataProvider>,
+) -> Result<Vec<String>> {
+    let mut fields = vec![
+        COLUMN_PROJECT_ID.to_string(),
+        COLUMN_CREATED_AT.to_string(),
+        COLUMN_EVENT.to_string(),
+        COLUMN_EVENT_ID.to_string(),
+    ];
+    if let Some(filters) = &req.filters {
+        for filter in filters {
+            match filter {
+                PropValueFilter::Property { property, .. } => {
+                    fields.push(col_name(ctx, property, md)?)
+                }
+            }
+        }
+    }
+
+    for prop in req.properties.clone().unwrap() {
+        fields.push(col_name(ctx, &prop, md)?);
+    }
+
+    Ok(fields)
+}
+
+pub struct Provider {
+    metadata: Arc<MetadataProvider>,
+    db: Arc<OptiDBImpl>,
+}
+
+impl Provider {
+    pub fn new(metadata: Arc<MetadataProvider>, db: Arc<OptiDBImpl>) -> Self {
+        Self { metadata, db }
+    }
+
+    pub async fn search(
+        &self,
+        ctx: Context,
+        req: EventRecordsSearch,
+    ) -> Result<DataTable> {
+        let start = Instant::now();
+        let schema = self.db.schema1(TABLE_EVENTS)?;
+        let projection = if req.properties.is_some() {
+            let projection = event_records_search_projection(&ctx, &req, &self.metadata)?;
+            projection
+                .iter()
+                .map(|x| schema.index_of(x).unwrap())
+                .collect()
+        } else {
+            (0..schema.fields.len()).collect::<Vec<_>>()
+        };
+
+        let (session_ctx, state, plan) = initial_plan(&self.db, projection).await?;
+        let plan = build_plan(ctx, self.metadata.clone(), plan, req.clone())?;
+        println!("{plan:?}");
+        let result = execute(session_ctx, state, plan).await?;
+        let duration = start.elapsed();
+        debug!("elapsed: {:?}", duration);
+
+        let cols = result
+            .schema()
+            .fields()
+            .iter()
+            .enumerate()
+            .map(|(idx, field)| crate::Column {
+                name: field.name().to_owned(),
+                typ: ColumnType::Dimension,
+                is_nullable: field.is_nullable(),
+                data_type: field.data_type().to_owned(),
+                hidden: false,
+                data: result.column(idx).to_owned(),
+            })
+            .collect();
+
+        Ok(DataTable::new(result.schema(), cols))
+    }
 }
 
 #[derive(Clone, Debug)]

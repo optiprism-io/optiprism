@@ -7,7 +7,7 @@ extern crate core;
 pub use std::cmp::Ordering;
 use std::sync::Arc;
 
-use arrow::array::Array;
+use arrow::array::{Array, RecordBatch};
 use arrow::array::ArrayRef;
 use arrow::array::BinaryArray;
 use arrow::array::BooleanArray;
@@ -45,17 +45,28 @@ use arrow::array::UInt16Array;
 use arrow::array::UInt32Array;
 use arrow::array::UInt64Array;
 use arrow::array::UInt8Array;
-use arrow::datatypes::DataType;
+use arrow::datatypes::{DataType, Schema};
 use arrow::datatypes::IntervalUnit;
 use arrow::datatypes::SchemaRef;
 use arrow::datatypes::TimeUnit;
 use arrow2::array::Int128Array;
+use datafusion::execution::context::SessionState;
+use datafusion::execution::runtime_env::RuntimeEnv;
+use datafusion::physical_plan::coalesce_batches::concat_batches;
+use datafusion::physical_plan::collect;
+use datafusion::physical_plan::display::DisplayableExecutionPlan;
+use datafusion::prelude::{SessionConfig, SessionContext};
+use datafusion_expr::{Extension, LogicalPlan};
 use common::query::PropertyRef;
 pub use context::Context;
 pub use error::Result;
 use indexmap::IndexMap;
+use tracing::debug;
 use metadata::MetadataProvider;
 pub use provider::QueryProvider;
+use storage::db::OptiDBImpl;
+use crate::logical_plan::db_parquet::DbParquetNode;
+use crate::physical_plan::planner::QueryPlanner;
 
 pub mod context;
 pub mod error;
@@ -64,6 +75,7 @@ pub mod logical_plan;
 pub mod physical_plan;
 pub mod provider;
 pub mod queries;
+pub mod event_records;
 
 pub const DEFAULT_BATCH_SIZE: usize = 4096;
 
@@ -351,6 +363,41 @@ impl DataTable {
     pub fn new(schema: SchemaRef, columns: Vec<Column>) -> Self {
         Self { schema, columns }
     }
+}
+
+pub async fn initial_plan(
+    db: &Arc<OptiDBImpl>,
+    projection: Vec<usize>,
+) -> Result<(SessionContext, SessionState, LogicalPlan)> {
+    let runtime = Arc::new(RuntimeEnv::default());
+    let state = SessionState::new_with_config_rt(
+        SessionConfig::new().with_collect_statistics(true),
+        runtime,
+    )
+        .with_query_planner(Arc::new(QueryPlanner {}));
+
+    let exec_ctx = SessionContext::new_with_state(state.clone());
+    let plan = LogicalPlan::Extension(Extension {
+        node: Arc::new(DbParquetNode::try_new(db.clone(), projection.clone())?),
+    });
+
+    Ok((exec_ctx, state, plan))
+}
+
+pub async fn execute(
+    ctx: SessionContext,
+    state: SessionState,
+    plan: LogicalPlan,
+) -> Result<RecordBatch> {
+    let physical_plan = state.create_physical_plan(&plan).await?;
+    let displayable_plan = DisplayableExecutionPlan::with_full_metrics(physical_plan.as_ref());
+    debug!("physical plan: {}", displayable_plan.indent(true));
+    let batches = collect(physical_plan, ctx.task_ctx()).await?;
+    let schema: Arc<Schema> = Arc::new(plan.schema().as_ref().into());
+    let rows_count = batches.iter().fold(0, |acc, x| acc + x.num_rows());
+    let res = concat_batches(&schema, &batches, rows_count)?;
+
+    Ok(res)
 }
 
 pub mod test_util {

@@ -5,8 +5,7 @@ use std::hash::Hasher;
 use std::sync::Arc;
 
 use common::query;
-use common::query::event_segmentation::QueryAggregate;
-use common::query::PropValueOperation;
+use common::query::{PropValueOperation, QueryAggregate};
 use common::query::SegmentTime;
 use datafusion_common::Column;
 use datafusion_common::DFSchema;

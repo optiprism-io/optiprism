@@ -1,6 +1,5 @@
 use std::fmt;
 use std::fmt::Display;
-
 use chrono::prelude::*;
 use chrono::DateTime;
 use chrono::Duration;
@@ -15,11 +14,40 @@ use serde::Serialize;
 
 use crate::error::CommonError;
 use crate::error::Result;
-use crate::query::event_segmentation::QueryAggregate;
 use crate::scalar::ScalarValueRef;
 
-pub mod event_segmentation;
-pub mod funnel;
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub enum QueryAggregate {
+    Min,
+    Max,
+    Sum,
+    Avg,
+    Median,
+    DistinctCount,
+    Percentile25th,
+    Percentile75th,
+    Percentile90th,
+    Percentile99th,
+}
+
+impl QueryAggregate {
+    pub fn aggregate_function(&self) -> AggregateFunction {
+        match self {
+            QueryAggregate::Min => AggregateFunction::Min,
+            QueryAggregate::Max => AggregateFunction::Max,
+            QueryAggregate::Sum => AggregateFunction::Sum,
+            QueryAggregate::Avg => AggregateFunction::Avg,
+            QueryAggregate::Median => unimplemented!(),
+            QueryAggregate::DistinctCount => unimplemented!(),
+            QueryAggregate::Percentile25th => unimplemented!(),
+            QueryAggregate::Percentile75th => unimplemented!(),
+            QueryAggregate::Percentile90th => unimplemented!(),
+            QueryAggregate::Percentile99th => unimplemented!(),
+        }
+    }
+}
+
 
 /// Enum of all built-in aggregate functions
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]

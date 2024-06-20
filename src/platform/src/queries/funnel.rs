@@ -8,15 +8,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::error::Result;
-use crate::queries::event_records_search::EventRecordsSearchRequest;
-use crate::queries::validation::validate_event;
-use crate::queries::validation::validate_event_filter;
-use crate::queries::validation::validate_event_property;
-use crate::queries::Breakdown;
-use crate::queries::QueryTime;
-use crate::queries::Segment;
-use crate::queries::TimeIntervalUnit;
-use crate::EventGroupedFilterGroup;
+use crate::{Breakdown, EventGroupedFilterGroup, QueryTime, Segment, TimeIntervalUnit, validate_event, validate_event_filter, validate_event_property};
 use crate::EventGroupedFilters;
 use crate::EventRef;
 use crate::PlatformError;
@@ -47,9 +39,9 @@ pub struct Step {
     pub order: StepOrder,
 }
 
-impl Into<common::query::funnel::Step> for Step {
-    fn into(self) -> common::query::funnel::Step {
-        common::query::funnel::Step {
+impl Into<common::funnel::Step> for Step {
+    fn into(self) -> common::funnel::Step {
+        common::funnel::Step {
             events: self
                 .events
                 .iter()
@@ -60,7 +52,7 @@ impl Into<common::query::funnel::Step> for Step {
     }
 }
 
-impl Into<Step> for common::query::funnel::Step {
+impl Into<Step> for common::funnel::Step {
     fn into(self) -> Step {
         Step {
             events: self
@@ -79,20 +71,20 @@ pub enum Order {
     Exact,
 }
 
-impl Into<common::query::funnel::Order> for Order {
-    fn into(self) -> common::query::funnel::Order {
+impl Into<common::funnel::Order> for Order {
+    fn into(self) -> common::funnel::Order {
         match self {
-            Order::Any => common::query::funnel::Order::Any,
-            Order::Exact => common::query::funnel::Order::Exact,
+            Order::Any => common::funnel::Order::Any,
+            Order::Exact => common::funnel::Order::Exact,
         }
     }
 }
 
-impl Into<Order> for common::query::funnel::Order {
+impl Into<Order> for common::funnel::Order {
     fn into(self) -> Order {
         match self {
-            common::query::funnel::Order::Any => Order::Any,
-            common::query::funnel::Order::Exact => Order::Exact,
+            common::funnel::Order::Any => Order::Any,
+            common::funnel::Order::Exact => Order::Exact,
         }
     }
 }
@@ -104,9 +96,9 @@ pub struct Event {
     pub filters: Option<Vec<PropValueFilter>>,
 }
 
-impl Into<common::query::funnel::Event> for Event {
-    fn into(self) -> common::query::funnel::Event {
-        common::query::funnel::Event {
+impl Into<common::funnel::Event> for Event {
+    fn into(self) -> common::funnel::Event {
+        common::funnel::Event {
             event: self.event.into(),
             filters: self
                 .filters
@@ -115,7 +107,7 @@ impl Into<common::query::funnel::Event> for Event {
     }
 }
 
-impl Into<Event> for common::query::funnel::Event {
+impl Into<Event> for common::funnel::Event {
     fn into(self) -> Event {
         Event {
             event: self.event.into(),
@@ -132,16 +124,16 @@ pub struct TimeWindow {
     pub unit: TimeIntervalUnitSession,
 }
 
-impl Into<common::query::funnel::TimeWindow> for TimeWindow {
-    fn into(self) -> common::query::funnel::TimeWindow {
-        common::query::funnel::TimeWindow {
+impl Into<common::funnel::TimeWindow> for TimeWindow {
+    fn into(self) -> common::funnel::TimeWindow {
+        common::funnel::TimeWindow {
             n: self.n,
             unit: self.unit.into(),
         }
     }
 }
 
-impl Into<TimeWindow> for common::query::funnel::TimeWindow {
+impl Into<TimeWindow> for common::funnel::TimeWindow {
     fn into(self) -> TimeWindow {
         TimeWindow {
             n: self.n,
@@ -160,30 +152,30 @@ pub enum TimeIntervalUnitSession {
     Session,
 }
 
-impl Into<common::query::funnel::TimeIntervalUnitSession> for TimeIntervalUnitSession {
-    fn into(self) -> common::query::funnel::TimeIntervalUnitSession {
+impl Into<common::funnel::TimeIntervalUnitSession> for TimeIntervalUnitSession {
+    fn into(self) -> common::funnel::TimeIntervalUnitSession {
         match self {
-            TimeIntervalUnitSession::Hour => common::query::funnel::TimeIntervalUnitSession::Hour,
-            TimeIntervalUnitSession::Day => common::query::funnel::TimeIntervalUnitSession::Day,
-            TimeIntervalUnitSession::Week => common::query::funnel::TimeIntervalUnitSession::Week,
-            TimeIntervalUnitSession::Month => common::query::funnel::TimeIntervalUnitSession::Month,
-            TimeIntervalUnitSession::Year => common::query::funnel::TimeIntervalUnitSession::Year,
+            TimeIntervalUnitSession::Hour => common::funnel::TimeIntervalUnitSession::Hour,
+            TimeIntervalUnitSession::Day => common::funnel::TimeIntervalUnitSession::Day,
+            TimeIntervalUnitSession::Week => common::funnel::TimeIntervalUnitSession::Week,
+            TimeIntervalUnitSession::Month => common::funnel::TimeIntervalUnitSession::Month,
+            TimeIntervalUnitSession::Year => common::funnel::TimeIntervalUnitSession::Year,
             TimeIntervalUnitSession::Session => {
-                common::query::funnel::TimeIntervalUnitSession::Session
+                common::funnel::TimeIntervalUnitSession::Session
             }
         }
     }
 }
 
-impl Into<TimeIntervalUnitSession> for common::query::funnel::TimeIntervalUnitSession {
+impl Into<TimeIntervalUnitSession> for common::funnel::TimeIntervalUnitSession {
     fn into(self) -> TimeIntervalUnitSession {
         match self {
-            common::query::funnel::TimeIntervalUnitSession::Hour => TimeIntervalUnitSession::Hour,
-            common::query::funnel::TimeIntervalUnitSession::Day => TimeIntervalUnitSession::Day,
-            common::query::funnel::TimeIntervalUnitSession::Week => TimeIntervalUnitSession::Week,
-            common::query::funnel::TimeIntervalUnitSession::Month => TimeIntervalUnitSession::Month,
-            common::query::funnel::TimeIntervalUnitSession::Year => TimeIntervalUnitSession::Year,
-            common::query::funnel::TimeIntervalUnitSession::Session => {
+            common::funnel::TimeIntervalUnitSession::Hour => TimeIntervalUnitSession::Hour,
+            common::funnel::TimeIntervalUnitSession::Day => TimeIntervalUnitSession::Day,
+            common::funnel::TimeIntervalUnitSession::Week => TimeIntervalUnitSession::Week,
+            common::funnel::TimeIntervalUnitSession::Month => TimeIntervalUnitSession::Month,
+            common::funnel::TimeIntervalUnitSession::Year => TimeIntervalUnitSession::Year,
+            common::funnel::TimeIntervalUnitSession::Session => {
                 TimeIntervalUnitSession::Session
             }
         }
@@ -196,20 +188,20 @@ pub enum StepOrder {
     Any { steps: Vec<(usize, usize)> }, // any of the steps
 }
 
-impl Into<common::query::funnel::StepOrder> for StepOrder {
-    fn into(self) -> common::query::funnel::StepOrder {
+impl Into<common::funnel::StepOrder> for StepOrder {
+    fn into(self) -> common::funnel::StepOrder {
         match self {
-            StepOrder::Exact => common::query::funnel::StepOrder::Exact,
-            StepOrder::Any { steps } => common::query::funnel::StepOrder::Any(steps),
+            StepOrder::Exact => common::funnel::StepOrder::Exact,
+            StepOrder::Any { steps } => common::funnel::StepOrder::Any(steps),
         }
     }
 }
 
-impl Into<StepOrder> for common::query::funnel::StepOrder {
+impl Into<StepOrder> for common::funnel::StepOrder {
     fn into(self) -> StepOrder {
         match self {
-            common::query::funnel::StepOrder::Exact => StepOrder::Exact,
-            common::query::funnel::StepOrder::Any(steps) => StepOrder::Any { steps },
+            common::funnel::StepOrder::Exact => StepOrder::Exact,
+            common::funnel::StepOrder::Any(steps) => StepOrder::Any { steps },
         }
     }
 }
@@ -220,22 +212,22 @@ pub enum ExcludeSteps {
     Between { from: usize, to: usize },
 }
 
-impl Into<common::query::funnel::ExcludeSteps> for ExcludeSteps {
-    fn into(self) -> common::query::funnel::ExcludeSteps {
+impl Into<common::funnel::ExcludeSteps> for ExcludeSteps {
+    fn into(self) -> common::funnel::ExcludeSteps {
         match self {
-            ExcludeSteps::All => common::query::funnel::ExcludeSteps::All,
+            ExcludeSteps::All => common::funnel::ExcludeSteps::All,
             ExcludeSteps::Between { from, to } => {
-                common::query::funnel::ExcludeSteps::Between(from, to)
+                common::funnel::ExcludeSteps::Between(from, to)
             }
         }
     }
 }
 
-impl Into<ExcludeSteps> for common::query::funnel::ExcludeSteps {
+impl Into<ExcludeSteps> for common::funnel::ExcludeSteps {
     fn into(self) -> ExcludeSteps {
         match self {
-            common::query::funnel::ExcludeSteps::All => ExcludeSteps::All,
-            common::query::funnel::ExcludeSteps::Between(from, to) => {
+            common::funnel::ExcludeSteps::All => ExcludeSteps::All,
+            common::funnel::ExcludeSteps::Between(from, to) => {
                 ExcludeSteps::Between { from, to }
             }
         }
@@ -250,22 +242,22 @@ pub enum Count {
     Session,
 }
 
-impl Into<common::query::funnel::Count> for Count {
-    fn into(self) -> common::query::funnel::Count {
+impl Into<common::funnel::Count> for Count {
+    fn into(self) -> common::funnel::Count {
         match self {
-            Count::Unique => common::query::funnel::Count::Unique,
-            Count::NonUnique => common::query::funnel::Count::NonUnique,
-            Count::Session => common::query::funnel::Count::Session,
+            Count::Unique => common::funnel::Count::Unique,
+            Count::NonUnique => common::funnel::Count::NonUnique,
+            Count::Session => common::funnel::Count::Session,
         }
     }
 }
 
-impl Into<Count> for common::query::funnel::Count {
+impl Into<Count> for common::funnel::Count {
     fn into(self) -> Count {
         match self {
-            common::query::funnel::Count::Unique => Count::Unique,
-            common::query::funnel::Count::NonUnique => Count::NonUnique,
-            common::query::funnel::Count::Session => Count::Session,
+            common::funnel::Count::Unique => Count::Unique,
+            common::funnel::Count::NonUnique => Count::NonUnique,
+            common::funnel::Count::Session => Count::Session,
         }
     }
 }
@@ -276,16 +268,16 @@ pub struct Exclude {
     pub steps: Option<ExcludeSteps>,
 }
 
-impl Into<common::query::funnel::Exclude> for Exclude {
-    fn into(self) -> common::query::funnel::Exclude {
-        common::query::funnel::Exclude {
+impl Into<common::funnel::Exclude> for Exclude {
+    fn into(self) -> common::funnel::Exclude {
+        common::funnel::Exclude {
             event: self.event.into(),
             steps: self.steps.map(|s| s.into()),
         }
     }
 }
 
-impl Into<Exclude> for common::query::funnel::Exclude {
+impl Into<Exclude> for common::funnel::Exclude {
     fn into(self) -> Exclude {
         Exclude {
             event: self.event.into(),
@@ -304,24 +296,24 @@ pub enum Filter {
     TimeToConvert { from: i64, to: i64 }, // conversion should be within certain window
 }
 
-impl Into<common::query::funnel::Filter> for Filter {
-    fn into(self) -> common::query::funnel::Filter {
+impl Into<common::funnel::Filter> for Filter {
+    fn into(self) -> common::funnel::Filter {
         match self {
-            Filter::DropOffOnAnyStep => common::query::funnel::Filter::DropOffOnAnyStep,
-            Filter::DropOffOnStep { step } => common::query::funnel::Filter::DropOffOnStep(step),
+            Filter::DropOffOnAnyStep => common::funnel::Filter::DropOffOnAnyStep,
+            Filter::DropOffOnStep { step } => common::funnel::Filter::DropOffOnStep(step),
             Filter::TimeToConvert { from, to } => {
-                common::query::funnel::Filter::TimeToConvert(from, to)
+                common::funnel::Filter::TimeToConvert(from, to)
             }
         }
     }
 }
 
-impl Into<Filter> for common::query::funnel::Filter {
+impl Into<Filter> for common::funnel::Filter {
     fn into(self) -> Filter {
         match self {
-            common::query::funnel::Filter::DropOffOnAnyStep => Filter::DropOffOnAnyStep,
-            common::query::funnel::Filter::DropOffOnStep(step) => Filter::DropOffOnStep { step },
-            common::query::funnel::Filter::TimeToConvert(from, to) => {
+            common::funnel::Filter::DropOffOnAnyStep => Filter::DropOffOnAnyStep,
+            common::funnel::Filter::DropOffOnStep(step) => Filter::DropOffOnStep { step },
+            common::funnel::Filter::TimeToConvert(from, to) => {
                 Filter::TimeToConvert { from, to }
             }
         }
@@ -336,22 +328,22 @@ pub enum Touch {
     Step { step: usize },
 }
 
-impl Into<common::query::funnel::Touch> for Touch {
-    fn into(self) -> common::query::funnel::Touch {
+impl Into<common::funnel::Touch> for Touch {
+    fn into(self) -> common::funnel::Touch {
         match self {
-            Touch::First => common::query::funnel::Touch::First,
-            Touch::Last => common::query::funnel::Touch::Last,
-            Touch::Step { step } => common::query::funnel::Touch::Step { step },
+            Touch::First => common::funnel::Touch::First,
+            Touch::Last => common::funnel::Touch::Last,
+            Touch::Step { step } => common::funnel::Touch::Step { step },
         }
     }
 }
 
-impl Into<Touch> for common::query::funnel::Touch {
+impl Into<Touch> for common::funnel::Touch {
     fn into(self) -> Touch {
         match self {
-            common::query::funnel::Touch::First => Touch::First,
-            common::query::funnel::Touch::Last => Touch::Last,
-            common::query::funnel::Touch::Step { step } => Touch::Step { step },
+            common::funnel::Touch::First => Touch::First,
+            common::funnel::Touch::Last => Touch::Last,
+            common::funnel::Touch::Step { step } => Touch::Step { step },
         }
     }
 }
@@ -383,12 +375,12 @@ impl ChartType {
         }
     }
 }
-impl Into<common::query::funnel::ChartType> for ChartType {
-    fn into(self) -> common::query::funnel::ChartType {
+impl Into<common::funnel::ChartType> for ChartType {
+    fn into(self) -> common::funnel::ChartType {
         match self {
-            ChartType::Steps => common::query::funnel::ChartType::Steps,
+            ChartType::Steps => common::funnel::ChartType::Steps,
             ChartType::ConversionOverTime { interval_unit } => {
-                common::query::funnel::ChartType::ConversionOverTime {
+                common::funnel::ChartType::ConversionOverTime {
                     interval_unit: interval_unit.into(),
                 }
             }
@@ -396,26 +388,26 @@ impl Into<common::query::funnel::ChartType> for ChartType {
                 interval_unit,
                 min_interval,
                 max_interval,
-            } => common::query::funnel::ChartType::TimeToConvert {
+            } => common::funnel::ChartType::TimeToConvert {
                 interval_unit: interval_unit.into(),
                 min_interval,
                 max_interval,
             },
-            ChartType::Frequency => common::query::funnel::ChartType::Frequency,
+            ChartType::Frequency => common::funnel::ChartType::Frequency,
         }
     }
 }
 
-impl Into<ChartType> for common::query::funnel::ChartType {
+impl Into<ChartType> for common::funnel::ChartType {
     fn into(self) -> ChartType {
         match self {
-            common::query::funnel::ChartType::Steps => ChartType::Steps,
-            common::query::funnel::ChartType::ConversionOverTime { interval_unit } => {
+            common::funnel::ChartType::Steps => ChartType::Steps,
+            common::funnel::ChartType::ConversionOverTime { interval_unit } => {
                 ChartType::ConversionOverTime {
                     interval_unit: interval_unit.into(),
                 }
             }
-            common::query::funnel::ChartType::TimeToConvert {
+            common::funnel::ChartType::TimeToConvert {
                 interval_unit,
                 min_interval,
                 max_interval,
@@ -424,14 +416,14 @@ impl Into<ChartType> for common::query::funnel::ChartType {
                 min_interval,
                 max_interval,
             },
-            common::query::funnel::ChartType::Frequency => ChartType::Frequency,
+            common::funnel::ChartType::Frequency => ChartType::Frequency,
         }
     }
 }
 
-impl Into<common::query::funnel::Funnel> for Funnel {
-    fn into(self) -> common::query::funnel::Funnel {
-        common::query::funnel::Funnel {
+impl Into<common::funnel::Funnel> for Funnel {
+    fn into(self) -> common::funnel::Funnel {
+        common::funnel::Funnel {
             time: self.time.into(),
             group_id: self.group,
             steps: self
@@ -468,7 +460,7 @@ impl Into<common::query::funnel::Funnel> for Funnel {
     }
 }
 
-impl Into<Funnel> for common::query::funnel::Funnel {
+impl Into<Funnel> for common::funnel::Funnel {
     fn into(self) -> Funnel {
         Funnel {
             time: self.time.into(),
@@ -699,8 +691,8 @@ pub(crate) fn validate_request(
 }
 
 pub(crate) fn fix_request(
-    req: common::query::funnel::Funnel,
-) -> Result<common::query::funnel::Funnel> {
+    req: common::funnel::Funnel,
+) -> Result<common::funnel::Funnel> {
     let mut out = req.clone();
 
     for (step_id, step) in req.steps.iter().enumerate() {

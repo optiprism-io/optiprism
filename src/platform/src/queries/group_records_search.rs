@@ -6,10 +6,7 @@ use query::queries;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::queries::validation::validate_event;
-use crate::queries::validation::validate_event_filter;
-use crate::queries::QueryTime;
-use crate::EventRef;
+use crate::{EventRef, QueryTime, validate_event_filter};
 use crate::PlatformError;
 use crate::PropValueFilter;
 use crate::PropertyRef;
