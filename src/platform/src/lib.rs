@@ -18,6 +18,7 @@ pub mod projects;
 pub mod properties;
 pub mod reports;
 pub mod queries;
+pub mod event_segmentation;
 // pub mod stub;
 
 use std::fmt::Debug;
@@ -68,12 +69,12 @@ use crate::accounts::Accounts;
 use crate::auth::Auth;
 use crate::custom_events::CustomEvents;
 use crate::dashboards::Dashboards;
+use crate::event_segmentation::{EventSegmentation};
 use crate::events::Events;
 use crate::groups::Groups;
 use crate::organizations::Organizations;
 use crate::projects::Projects;
 use crate::properties::Properties;
-use crate::queries::event_segmentation::QueryAggregate;
 use crate::queries::provider::Queries;
 use crate::reports::Reports;
 
@@ -88,6 +89,7 @@ pub struct PlatformProvider {
     pub accounts: Arc<Accounts>,
     pub auth: Arc<Auth>,
     pub query: Arc<Queries>,
+    pub event_segmentation:Arc<EventSegmentation>,
     pub dashboards: Arc<Dashboards>,
     pub reports: Arc<Reports>,
     pub projects: Arc<Projects>,
@@ -100,6 +102,7 @@ impl PlatformProvider {
     pub fn new(
         md: Arc<MetadataProvider>,
         query_prov: Arc<query::QueryProvider>,
+        es_prov:Arc<query::event_segmentation::EventSegmentationProvider>,
         cfg: Config,
     ) -> Self {
         let group_properties = (0..GROUPS_COUNT)
@@ -117,7 +120,8 @@ impl PlatformProvider {
             )),
             accounts: Arc::new(Accounts::new(md.accounts.clone())),
             auth: Arc::new(Auth::new(md.accounts.clone(), cfg.clone())),
-            query: Arc::new(Queries::new(query_prov, md.clone())),
+            query: Arc::new(Queries::new(query_prov.clone(), md.clone())),
+            event_segmentation: Arc::new(EventSegmentation::new(md.clone(),es_prov)),
             dashboards: Arc::new(Dashboards::new(md.dashboards.clone())),
             reports: Arc::new(Reports::new(md.reports.clone())),
             // event_records: Arc::new(stub::EventRecords {}),
@@ -1292,6 +1296,76 @@ impl Into<PartitionedAggregateFunction> for common::query::PartitionedAggregateF
     }
 }
 
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum QueryAggregate {
+    Min,
+    Max,
+    Sum,
+    Avg,
+    Median,
+    DistinctCount,
+    Percentile25,
+    Percentile75,
+    Percentile90,
+    Percentile99,
+}
+
+impl Into<common::query::QueryAggregate> for QueryAggregate {
+    fn into(self) -> common::query::QueryAggregate {
+        match self {
+            QueryAggregate::Min => common::query::QueryAggregate::Min,
+            QueryAggregate::Max => common::query::QueryAggregate::Max,
+            QueryAggregate::Sum => common::query::QueryAggregate::Sum,
+            QueryAggregate::Avg => common::query::QueryAggregate::Avg,
+            QueryAggregate::Median => common::query::QueryAggregate::Median,
+            QueryAggregate::DistinctCount => {
+                common::query::QueryAggregate::DistinctCount
+            }
+            QueryAggregate::Percentile25 => {
+                common::query::QueryAggregate::Percentile25th
+            }
+            QueryAggregate::Percentile75 => {
+                common::query::QueryAggregate::Percentile75th
+            }
+            QueryAggregate::Percentile90 => {
+                common::query::QueryAggregate::Percentile90th
+            }
+            QueryAggregate::Percentile99 => {
+                common::query::QueryAggregate::Percentile99th
+            }
+        }
+    }
+}
+
+impl Into<QueryAggregate> for common::query::QueryAggregate {
+    fn into(self) -> QueryAggregate {
+        match self {
+            common::query::QueryAggregate::Min => QueryAggregate::Min,
+            common::query::QueryAggregate::Max => QueryAggregate::Max,
+            common::query::QueryAggregate::Sum => QueryAggregate::Sum,
+            common::query::QueryAggregate::Avg => QueryAggregate::Avg,
+            common::query::QueryAggregate::Median => QueryAggregate::Median,
+            common::query::QueryAggregate::DistinctCount => {
+                QueryAggregate::DistinctCount
+            }
+            common::query::QueryAggregate::Percentile25th => {
+                QueryAggregate::Percentile25
+            }
+            common::query::QueryAggregate::Percentile75th => {
+                QueryAggregate::Percentile75
+            }
+            common::query::QueryAggregate::Percentile90th => {
+                QueryAggregate::Percentile90
+            }
+            common::query::QueryAggregate::Percentile99th => {
+                QueryAggregate::Percentile99
+            }
+        }
+    }
+}
+
+
 pub fn validate_event_property(
     md: &Arc<MetadataProvider>,
     project_id: u64,
@@ -1325,6 +1399,7 @@ pub fn validate_event_property(
     }
     Ok(())
 }
+
 pub fn validate_event_filter_property(
     md: &Arc<MetadataProvider>,
     project_id: u64,

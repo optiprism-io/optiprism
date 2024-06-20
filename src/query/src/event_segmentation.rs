@@ -1,16 +1,17 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Instant;
 
 use common::group_col;
 use common::event_segmentation::Event;
 use common::event_segmentation::EventSegmentation;
 use common::event_segmentation::Query;
-use common::query::time_columns;
+use common::query::{PropValueFilter, time_columns};
 use common::query::Breakdown;
 use common::query::DidEventAggregate;
 use common::query::PropertyRef;
 use common::query::SegmentCondition;
-use common::types::COLUMN_CREATED_AT;
+use common::types::{COLUMN_CREATED_AT, TABLE_EVENTS};
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_PROJECT_ID;
 use common::types::COLUMN_SEGMENT;
@@ -33,10 +34,12 @@ use datafusion_expr::LogicalPlan;
 use datafusion_expr::Operator;
 use datafusion_expr::ScalarUDF;
 use datafusion_expr::Sort;
+use tracing::debug;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
+use storage::db::OptiDBImpl;
 
-use crate::breakdowns_to_dicts;
+use crate::{breakdowns_to_dicts, col_name, ColumnType, DataTable, execute, initial_plan};
 use crate::context::Format;
 use crate::error::QueryError;
 use crate::error::Result;
@@ -69,6 +72,142 @@ use crate::Context;
 
 pub const COL_AGG_NAME: &str = "agg_name";
 const COL_VALUE: &str = "value";
+
+pub struct EventSegmentationProvider {
+    metadata: Arc<MetadataProvider>,
+    db: Arc<OptiDBImpl>,
+}
+
+impl EventSegmentationProvider {
+    pub fn new(metadata: Arc<MetadataProvider>, db: Arc<OptiDBImpl>) -> Self {
+        Self { metadata, db }
+    }
+    pub async fn event_segmentation(
+        &self,
+        ctx: Context,
+        req: EventSegmentation,
+    ) -> Result<DataTable> {
+        let start = Instant::now();
+        let schema = self.db.schema1(TABLE_EVENTS)?;
+        let projection = projection(&ctx, &req, &self.metadata)?;
+        let projection = projection
+            .iter()
+            .map(|x| schema.index_of(x).unwrap())
+            .collect();
+        let (session_ctx, state, plan) = initial_plan(&self.db, projection).await?;
+        let plan = LogicalPlanBuilder::build(
+            ctx.clone(),
+            self.metadata.clone(),
+            plan,
+            req.clone(),
+        )?;
+
+        println!("{plan:?}");
+        let result = execute(session_ctx, state, plan).await?;
+        let duration = start.elapsed();
+        debug!("elapsed: {:?}", duration);
+
+        let metric_cols = req.time_columns(ctx.cur_time);
+        let cols = result
+            .schema()
+            .fields()
+            .iter()
+            .enumerate()
+            .map(|(idx, field)| {
+                let typ = match metric_cols.contains(field.name()) {
+                    true => ColumnType::Metric,
+                    false => ColumnType::Dimension,
+                };
+
+                let arr = result.column(idx).to_owned();
+
+                crate::Column {
+                    name: field.name().to_owned(),
+                    typ,
+                    is_nullable: field.is_nullable(),
+                    data_type: field.data_type().to_owned(),
+                    hidden: false,
+                    data: arr,
+                }
+            })
+            .collect();
+
+        Ok(DataTable::new(result.schema(), cols))
+    }
+    }
+
+fn projection(
+    ctx: &Context,
+    req: &EventSegmentation,
+    md: &Arc<MetadataProvider>,
+) -> Result<Vec<String>> {
+    let mut fields = vec![
+        COLUMN_PROJECT_ID.to_string(),
+        group_col(req.group_id),
+        COLUMN_CREATED_AT.to_string(),
+        COLUMN_EVENT.to_string(),
+    ];
+
+    for event in &req.events {
+        if let Some(filters) = &event.filters {
+            for filter in filters {
+                match filter {
+                    PropValueFilter::Property { property, .. } => {
+                        fields.push(col_name(ctx, property, md)?)
+                    }
+                }
+            }
+        }
+
+        for query in &event.queries {
+            match &query.agg {
+                Query::CountEvents => {}
+                Query::CountUniqueGroups => {}
+                Query::DailyActiveGroups => {}
+                Query::WeeklyActiveGroups => {}
+                Query::MonthlyActiveGroups => {}
+                Query::CountPerGroup { .. } => {}
+                Query::AggregatePropertyPerGroup { property, .. } => {
+                    fields.push(col_name(ctx, property, md)?)
+                }
+                Query::AggregateProperty { property, .. } => {
+                    fields.push(col_name(ctx, property, md)?)
+                }
+                Query::QueryFormula { .. } => {}
+            }
+        }
+
+        if let Some(breakdowns) = &event.breakdowns {
+            for breakdown in breakdowns {
+                match breakdown {
+                    Breakdown::Property(property) => fields.push(col_name(ctx, property, md)?),
+                }
+            }
+        }
+    }
+
+    if let Some(filters) = &req.filters {
+        for filter in filters {
+            match filter {
+                PropValueFilter::Property { property, .. } => {
+                    fields.push(col_name(ctx, property, md)?)
+                }
+            }
+        }
+    }
+
+    if let Some(breakdowns) = &req.breakdowns {
+        for breakdown in breakdowns {
+            match breakdown {
+                Breakdown::Property(property) => fields.push(col_name(ctx, property, md)?),
+            }
+        }
+    }
+
+    fields.dedup();
+
+    Ok(fields)
+}
 
 pub struct LogicalPlanBuilder {
     ctx: Context,

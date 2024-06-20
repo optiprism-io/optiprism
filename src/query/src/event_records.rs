@@ -42,6 +42,59 @@ use crate::logical_plan::rename_columns::RenameColumnsNode;
 use crate::queries::{decode_filter_single_dictionary};
 use crate::{col_name, ColumnType, Context, DataTable, execute, initial_plan, QueryProvider};
 
+pub struct Provider {
+    metadata: Arc<MetadataProvider>,
+    db: Arc<OptiDBImpl>,
+}
+
+impl Provider {
+    pub fn new(metadata: Arc<MetadataProvider>, db: Arc<OptiDBImpl>) -> Self {
+        Self { metadata, db }
+    }
+
+    pub async fn search(
+        &self,
+        ctx: Context,
+        req: EventRecordsSearch,
+    ) -> Result<DataTable> {
+        let start = Instant::now();
+        let schema = self.db.schema1(TABLE_EVENTS)?;
+        let projection = if req.properties.is_some() {
+            let projection = projection(&ctx, &req, &self.metadata)?;
+            projection
+                .iter()
+                .map(|x| schema.index_of(x).unwrap())
+                .collect()
+        } else {
+            (0..schema.fields.len()).collect::<Vec<_>>()
+        };
+
+        let (session_ctx, state, plan) = initial_plan(&self.db, projection).await?;
+        let plan = build_plan(ctx, self.metadata.clone(), plan, req.clone())?;
+        println!("{plan:?}");
+        let result = execute(session_ctx, state, plan).await?;
+        let duration = start.elapsed();
+        debug!("elapsed: {:?}", duration);
+
+        let cols = result
+            .schema()
+            .fields()
+            .iter()
+            .enumerate()
+            .map(|(idx, field)| crate::Column {
+                name: field.name().to_owned(),
+                typ: ColumnType::Dimension,
+                is_nullable: field.is_nullable(),
+                data_type: field.data_type().to_owned(),
+                hidden: false,
+                data: result.column(idx).to_owned(),
+            })
+            .collect();
+
+        Ok(DataTable::new(result.schema(), cols))
+    }
+}
+
 pub fn build_plan(
     ctx: Context,
     metadata: Arc<MetadataProvider>,
@@ -273,7 +326,7 @@ fn decode_filter_dictionaries(
 }
 
 
-fn event_records_search_projection(
+fn projection(
     ctx: &Context,
     req: &EventRecordsSearch,
     md: &Arc<MetadataProvider>,
@@ -299,59 +352,6 @@ fn event_records_search_projection(
     }
 
     Ok(fields)
-}
-
-pub struct Provider {
-    metadata: Arc<MetadataProvider>,
-    db: Arc<OptiDBImpl>,
-}
-
-impl Provider {
-    pub fn new(metadata: Arc<MetadataProvider>, db: Arc<OptiDBImpl>) -> Self {
-        Self { metadata, db }
-    }
-
-    pub async fn search(
-        &self,
-        ctx: Context,
-        req: EventRecordsSearch,
-    ) -> Result<DataTable> {
-        let start = Instant::now();
-        let schema = self.db.schema1(TABLE_EVENTS)?;
-        let projection = if req.properties.is_some() {
-            let projection = event_records_search_projection(&ctx, &req, &self.metadata)?;
-            projection
-                .iter()
-                .map(|x| schema.index_of(x).unwrap())
-                .collect()
-        } else {
-            (0..schema.fields.len()).collect::<Vec<_>>()
-        };
-
-        let (session_ctx, state, plan) = initial_plan(&self.db, projection).await?;
-        let plan = build_plan(ctx, self.metadata.clone(), plan, req.clone())?;
-        println!("{plan:?}");
-        let result = execute(session_ctx, state, plan).await?;
-        let duration = start.elapsed();
-        debug!("elapsed: {:?}", duration);
-
-        let cols = result
-            .schema()
-            .fields()
-            .iter()
-            .enumerate()
-            .map(|(idx, field)| crate::Column {
-                name: field.name().to_owned(),
-                typ: ColumnType::Dimension,
-                is_nullable: field.is_nullable(),
-                data_type: field.data_type().to_owned(),
-                hidden: false,
-                data: result.column(idx).to_owned(),
-            })
-            .collect();
-
-        Ok(DataTable::new(result.schema(), cols))
-    }
 }
 
 #[derive(Clone, Debug)]

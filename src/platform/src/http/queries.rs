@@ -8,29 +8,16 @@ use axum::Router;
 use common::http::Json;
 use serde_json::Value;
 
-use crate::queries::event_segmentation::EventSegmentation;
 use crate::queries::funnel::Funnel;
 use crate::queries::group_records_search::GroupRecordsSearchRequest;
 use crate::queries::property_values::ListPropertyValuesRequest;
 use crate::{Context, QueryParams};
+use crate::event_segmentation::EventSegmentation;
 use crate::FunnelResponse;
 use crate::ListResponse;
 use crate::queries::provider::Queries;
 use crate::QueryResponse;
 use crate::Result;
-async fn event_segmentation(
-    ctx: Context,
-    Extension(provider): Extension<Arc<Queries>>,
-    Path(project_id): Path<u64>,
-    Query(query): Query<QueryParams>,
-    Json(request): Json<EventSegmentation>,
-) -> Result<Json<QueryResponse>> {
-    Ok(Json(
-        provider
-            .event_segmentation(ctx, project_id, request, query)
-            .await?,
-    ))
-}
 
 async fn funnel(
     ctx: Context,
@@ -73,10 +60,6 @@ pub fn attach_routes(router: Router) -> Router {
     router.nest(
         "/api/v1/projects/:project_id",
         Router::new()
-            .route(
-                "/queries/event-segmentation",
-                routing::post(event_segmentation),
-            )
             .route("/property-values", routing::post(property_values))
             .route("/queries/funnel", routing::post(funnel)),
     )
