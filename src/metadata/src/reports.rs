@@ -9,7 +9,7 @@ use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
-use common::event_segmentation::EventSegmentation;
+use common::event_segmentation::EventSegmentationRequest;
 use common::funnel::Funnel;
 
 use crate::error::MetadataError;
@@ -145,7 +145,7 @@ pub enum Type {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum Query {
-    EventSegmentation(EventSegmentation),
+    EventSegmentation(EventSegmentationRequest),
     Funnel(Funnel),
 }
 

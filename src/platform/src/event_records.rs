@@ -3,14 +3,14 @@ use std::sync::Arc;
 
 use axum::async_trait;
 use chrono::{DateTime, Utc};
+use datafusion_common::ScalarValue;
 use serde::Deserialize;
 use serde::Serialize;
-use serde_json::Value;
+use serde_json::{json, Value};
 use common::rbac::ProjectPermission;
 use metadata::MetadataProvider;
 use query::context::Format;
 use query::{event_records, queries};
-use query::event_records::{EventRecordsSearch, Provider};
 
 use crate::{Context, PlatformError, PropertyRef, QueryParams, QueryResponse, QueryResponseFormat, QueryTime, validate_event, validate_event_filter};
 use crate::EventGroupedFilters;
@@ -21,17 +21,29 @@ use crate::Result;
 
 pub struct EventRecords {
     md: Arc<MetadataProvider>,
-    prov: Arc<Provider>,
+    prov: Arc<event_records::EventRecordsProvider>,
 }
 
 impl EventRecords {
-    pub fn new(md: Arc<MetadataProvider>, prov: Arc<Provider>) -> Self {
+    pub fn new(md: Arc<MetadataProvider>, prov: Arc<event_records::EventRecordsProvider>) -> Self {
         Self { md, prov }
     }
 
     pub async fn get_by_id(&self, ctx: Context, project_id: u64, id: u64) -> Result<EventRecord> {
-        Err(PlatformError::Unimplemented("not implemented".to_string()))
-        /**/
+        ctx.check_project_permission(
+            ctx.organization_id,
+            project_id,
+            ProjectPermission::ExploreReports,
+        )?;
+        let ctx = query::Context {
+            project_id,
+            format: Format::Regular,
+            cur_time: Utc::now(),
+        };
+
+        let mut data = self.prov.get_by_id(ctx, id).await?;
+
+        Ok(data.into())
     }
 
     pub async fn search(&self, ctx: Context, project_id: u64, req: EventRecordsSearchRequest, query: QueryParams) -> Result<QueryResponse> {
@@ -61,7 +73,7 @@ impl EventRecords {
             cur_time,
         };
 
-        let mut data = self.prov.search(ctx, lreq).await?;
+        let mut data = self.prov.search(ctx, lreq.into()).await?;
 
         // do empty response so it will be [] instead of [[],[],[],...]
         if !data.columns.is_empty() && data.columns[0].data.is_empty() {
@@ -82,9 +94,40 @@ impl EventRecords {
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct EventRecord {
-    pub properties: Vec<PropertyRef>,
+    pub properties: Vec<PropertyAndValue>,
 }
 
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PropertyAndValue {
+    property: PropertyRef,
+    value: Value,
+}
+
+impl Into<EventRecord> for query::event_records::EventRecord {
+    fn into(self) -> EventRecord {
+        EventRecord { properties: self.properties.iter().map(|p| p.to_owned().into()).collect::<Vec<_>>() }
+    }
+}
+
+impl Into<PropertyAndValue> for query::event_records::PropertyAndValue {
+    fn into(self) -> PropertyAndValue {
+        let value = match self.value {
+            ScalarValue::Boolean(Some(v)) => json!(v),
+            ScalarValue::Decimal128(Some(v), _, _) => json!(v),
+            ScalarValue::Int8(Some(v)) => json!(v),
+            ScalarValue::Int16(Some(v)) => json!(v),
+            ScalarValue::Int32(Some(v)) => json!(v),
+            ScalarValue::Int64(Some(v)) => json!(v),
+            ScalarValue::Utf8(Some(v)) => json!(v),
+            ScalarValue::TimestampMillisecond(Some(v),_ ) => json!(v),
+            _ => unimplemented!()
+        };
+
+
+        PropertyAndValue { property: self.property.into(), value }
+    }
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Event {
@@ -116,9 +159,9 @@ impl Into<event_records::Event> for Event {
     }
 }
 
-impl Into<event_records::EventRecordsSearch> for EventRecordsSearchRequest {
-    fn into(self) -> event_records::EventRecordsSearch {
-        event_records::EventRecordsSearch {
+impl Into<event_records::EventRecordsSearchRequest> for EventRecordsSearchRequest {
+    fn into(self) -> event_records::EventRecordsSearchRequest {
+        event_records::EventRecordsSearchRequest {
             time: self.time.into(),
             events: self.events.map(|events| {
                 events
@@ -235,8 +278,8 @@ pub(crate) fn validate_search_request(
 }
 
 pub(crate) fn fix_search_request(
-    req: EventRecordsSearch,
-) -> Result<EventRecordsSearch> {
+    req: EventRecordsSearchRequest,
+) -> Result<EventRecordsSearchRequest> {
     let mut out = req.clone();
 
     if let Some(events) = &req.events {

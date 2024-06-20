@@ -4,7 +4,7 @@ use std::time::Instant;
 
 use common::group_col;
 use common::event_segmentation::Event;
-use common::event_segmentation::EventSegmentation;
+use common::event_segmentation::EventSegmentationRequest;
 use common::event_segmentation::Query;
 use common::query::{PropValueFilter, time_columns};
 use common::query::Breakdown;
@@ -85,7 +85,7 @@ impl EventSegmentationProvider {
     pub async fn event_segmentation(
         &self,
         ctx: Context,
-        req: EventSegmentation,
+        req: EventSegmentationRequest,
     ) -> Result<DataTable> {
         let start = Instant::now();
         let schema = self.db.schema1(TABLE_EVENTS)?;
@@ -138,7 +138,7 @@ impl EventSegmentationProvider {
 
 fn projection(
     ctx: &Context,
-    req: &EventSegmentation,
+    req: &EventSegmentationRequest,
     md: &Arc<MetadataProvider>,
 ) -> Result<Vec<String>> {
     let mut fields = vec![
@@ -212,7 +212,7 @@ fn projection(
 pub struct LogicalPlanBuilder {
     ctx: Context,
     metadata: Arc<MetadataProvider>,
-    es: EventSegmentation,
+    es: EventSegmentationRequest,
 }
 
 impl LogicalPlanBuilder {
@@ -221,7 +221,7 @@ impl LogicalPlanBuilder {
         ctx: Context,
         metadata: Arc<MetadataProvider>,
         input: LogicalPlan,
-        es: EventSegmentation,
+        es: EventSegmentationRequest,
     ) -> Result<LogicalPlan> {
         let events = es.events.clone();
         let builder = LogicalPlanBuilder {

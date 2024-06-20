@@ -65,12 +65,14 @@ use serde::Serialize;
 use serde_json::json;
 use serde_json::Number;
 use serde_json::Value;
+use query::event_records::EventRecordsProvider;
 use query::properties::PropertiesProvider;
 
 use crate::accounts::Accounts;
 use crate::auth::Auth;
 use crate::custom_events::CustomEvents;
 use crate::dashboards::Dashboards;
+use crate::event_records::EventRecords;
 use crate::event_segmentation::{EventSegmentation};
 use crate::events::Events;
 use crate::funnel::Funnel;
@@ -89,7 +91,7 @@ pub struct PlatformProvider {
     pub group_properties: Vec<Arc<Properties>>,
     pub system_properties: Arc<Properties>,
     pub system_group_properties: Arc<Properties>,
-    pub properties:Arc<Properties>,
+    pub properties: Arc<Properties>,
     pub accounts: Arc<Accounts>,
     pub auth: Arc<Auth>,
     pub query: Arc<Queries>,
@@ -99,7 +101,7 @@ pub struct PlatformProvider {
     pub reports: Arc<Reports>,
     pub projects: Arc<Projects>,
     pub organizations: Arc<Organizations>,
-    // pub event_records: Arc<dyn event_records::Provider>,
+    pub event_records: Arc<EventRecords>,
     // pub group_records: Arc<dyn group_records::Provider>,
 }
 
@@ -109,24 +111,25 @@ impl PlatformProvider {
         query_prov: Arc<query::QueryProvider>,
         es_prov: Arc<query::event_segmentation::EventSegmentationProvider>,
         funnel_prov: Arc<query::funnel::FunnelProvider>,
-        prop_prov:Arc<PropertiesProvider>,
+        prop_prov: Arc<PropertiesProvider>,
+        event_records_prov: Arc<EventRecordsProvider>,
         cfg: Config,
     ) -> Self {
         let group_properties = (0..GROUPS_COUNT)
-            .map(|gid| Arc::new(Properties::new_group(md.group_properties[gid].clone(),prop_prov.clone())))
+            .map(|gid| Arc::new(Properties::new_group(md.group_properties[gid].clone(), prop_prov.clone())))
             .collect::<Vec<_>>();
         Self {
             events: Arc::new(Events::new(md.events.clone())),
             custom_events: Arc::new(CustomEvents::new(md.custom_events.clone())),
             groups: Arc::new(Groups::new(md.groups.clone())),
-            event_properties: Arc::new(Properties::new_event(md.event_properties.clone(),prop_prov.clone())),
+            event_properties: Arc::new(Properties::new_event(md.event_properties.clone(), prop_prov.clone())),
             group_properties,
-            system_properties: Arc::new(Properties::new_system(md.system_properties.clone(),prop_prov.clone())),
+            system_properties: Arc::new(Properties::new_system(md.system_properties.clone(), prop_prov.clone())),
             system_group_properties: Arc::new(Properties::new_system_group(
-                md.system_group_properties.clone(),prop_prov.clone()
+                md.system_group_properties.clone(), prop_prov.clone(),
             )),
             properties: Arc::new(Properties::new(
-                md.system_group_properties.clone(),prop_prov.clone()
+                md.system_group_properties.clone(), prop_prov.clone(),
             )),
             accounts: Arc::new(Accounts::new(md.accounts.clone())),
             auth: Arc::new(Auth::new(md.accounts.clone(), cfg.clone())),
@@ -135,7 +138,7 @@ impl PlatformProvider {
             funnel: Arc::new(Funnel::new(md.clone(), funnel_prov)),
             dashboards: Arc::new(Dashboards::new(md.dashboards.clone())),
             reports: Arc::new(Reports::new(md.reports.clone())),
-            // event_records: Arc::new(stub::EventRecords {}),
+            event_records: Arc::new(EventRecords::new(md.clone(), event_records_prov)),
             // group_records: Arc::new(stub::GroupRecords {}),
             projects: Arc::new(Projects::new(md.clone(), cfg.clone())),
             organizations: Arc::new(Organizations::new(md.clone(), cfg.clone())),

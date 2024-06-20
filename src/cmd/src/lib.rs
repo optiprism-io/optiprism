@@ -93,6 +93,7 @@ use rand::distributions::DistString;
 use rand::thread_rng;
 use tracing::info;
 use uaparser::UserAgentParser;
+use query::event_records::EventRecordsProvider;
 use query::event_segmentation::EventSegmentationProvider;
 use query::funnel::FunnelProvider;
 use query::properties::PropertiesProvider;
@@ -210,7 +211,7 @@ pub fn init_system(
             display_name: Some(format!("Group {g}")),
             typ: Type::System,
             data_type: DType::String,
-            nullable: false,
+            nullable: true,
             hidden: false,
             dict: Some(DictionaryType::Int64),
         })?;
@@ -271,7 +272,7 @@ pub fn init_system(
         display_name: Some("Ip".to_string()),
         typ: Type::System,
         data_type: DType::String,
-        nullable: false,
+        nullable: true,
         dict: None,
         hidden: true,
     })?;
@@ -329,12 +330,14 @@ fn init_platform(
     let es_provider = Arc::new(EventSegmentationProvider::new(md.clone(), db.clone()));
     let funnel_provider = Arc::new(FunnelProvider::new(md.clone(), db.clone()));
     let prop_provider = Arc::new(PropertiesProvider::new(md.clone(), db.clone()));
+    let er_provider = Arc::new(EventRecordsProvider::new(md.clone(), db.clone()));
     let platform_provider = Arc::new(PlatformProvider::new(
         md.clone(),
         query_provider,
         es_provider,
         funnel_provider,
         prop_provider,
+        er_provider,
         cfg.clone(),
     ));
 

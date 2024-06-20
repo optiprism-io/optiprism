@@ -7,7 +7,7 @@ use common::types::OptionalProperty;
 use metadata::reports::Reports as MDReports;
 use serde::Deserialize;
 use serde::Serialize;
-use common::event_segmentation::EventSegmentation;
+use common::event_segmentation::EventSegmentationRequest;
 
 use crate::Context;
 use crate::funnel::FunnelRequest;
@@ -139,7 +139,7 @@ impl From<Type> for metadata::reports::Type {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum Query {
-    EventSegmentation(EventSegmentation),
+    EventSegmentation(EventSegmentationRequest),
     Funnel(FunnelRequest),
 }
 

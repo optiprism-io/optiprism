@@ -68,7 +68,7 @@ impl Destination<Track> for Local {
 
             for g in 1..GROUPS_COUNT {
                 if !found.contains_key(&g) {
-                    groups.push(NamedValue::new(group_col(g), Value::Int64(Some(0))))
+                    groups.push(NamedValue::new(group_col(g), Value::Int64(None)))
                 }
             }
             groups
@@ -76,7 +76,7 @@ impl Destination<Track> for Local {
             // skip user group, i.e. skip 0
             (1..GROUPS_COUNT)
                 .into_iter()
-                .map(|v| NamedValue::new(group_col(v), Value::Int64(Some(0)))) // don't use null as primary key, only zero
+                .map(|v| NamedValue::new(group_col(v), Value::Int64(None))) // don't use null as primary key, only zero
                 .collect::<Vec<_>>()
         };
 
