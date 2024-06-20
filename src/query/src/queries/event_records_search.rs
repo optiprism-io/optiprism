@@ -204,10 +204,23 @@ pub fn build(
     // };
 
     let mut rename = vec![];
+    let mut rename_found: Vec<String> = vec![];
     for prop in properties {
+        let mut found = 0;
+        for f in rename_found.iter() {
+            if f == &prop.name() {
+                found += 1;
+            }
+        }
         let col_name = prop.column_name();
-        let new_name = prop.name();
+
+        let new_name = if found == 0 {
+            prop.name()
+        } else {
+            format!("{} {}", prop.name(), found + 1)
+        };
         rename.push((col_name, new_name));
+        rename_found.push(prop.name());
     }
     let input = LogicalPlan::Extension(Extension {
         node: Arc::new(RenameColumnsNode::try_new(input, rename)?),
