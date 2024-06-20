@@ -165,6 +165,13 @@ impl Scenario {
                     DECIMAL_SCALE as u32,
                 )),
             );
+            props.insert(
+                "Age".to_string(),
+                PropValue::Number(Decimal::new(
+                    profile.company.age as i64 * 10i64.pow(16),
+                    DECIMAL_SCALE as u32,
+                )),
+            );
             let identify = Identify {
                 timestamp: DateTime::from_timestamp_millis(state.cur_timestamp * 10i64.pow(3))
                     .unwrap(),

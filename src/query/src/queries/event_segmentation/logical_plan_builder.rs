@@ -189,6 +189,8 @@ impl LogicalPlanBuilder {
             vec![COLUMN_SEGMENT.to_string()]
         };
 
+        let mut display_group_cols: Vec<String> = vec![];
+
         let mut rename_groups = if ctx.format != Format::Compact {
             vec![
                 (COLUMN_EVENT.to_string(), "Event".to_string()),
@@ -197,34 +199,6 @@ impl LogicalPlanBuilder {
         } else {
             vec![(COLUMN_SEGMENT.to_string(), "Segment".to_string())]
         };
-
-        if let Some(breakdowns) = &es.breakdowns {
-            for breakdown in breakdowns.iter() {
-                let prop = match breakdown {
-                    Breakdown::Property(p) => match p {
-                        PropertyRef::System(p) => {
-                            metadata.system_properties.get_by_name(ctx.project_id, p)?
-                        }
-                        PropertyRef::Group(p, group) => {
-                            metadata.group_properties[*group].get_by_name(ctx.project_id, p)?
-                        }
-                        PropertyRef::Event(p) => {
-                            metadata.event_properties.get_by_name(ctx.project_id, p)?
-                        }
-                        _ => {
-                            return Err(QueryError::Unimplemented(
-                                "invalid property type".to_string(),
-                            ));
-                        }
-                    },
-                };
-                let cn = prop.column_name();
-                if !group_cols.contains(&cn) {
-                    group_cols.push(cn.clone());
-                    rename_groups.push((cn, prop.name()));
-                }
-            }
-        }
 
         for event in &es.events {
             if let Some(breakdowns) = &event.breakdowns {
@@ -250,11 +224,63 @@ impl LogicalPlanBuilder {
                     let cn = prop.column_name();
                     if !group_cols.contains(&cn) {
                         group_cols.push(cn.clone());
-                        rename_groups.push((cn, prop.name()));
+                        let mut found = 0;
+                        for v in display_group_cols.iter() {
+                            if *v == prop.name() {
+                                found += 1;
+                            }
+                        }
+                        display_group_cols.push(prop.name());
+                        if found == 0 {
+                            rename_groups.push((cn, prop.name()));
+                        } else {
+                            rename_groups.push((cn, format!("{} {}", prop.name(), found + 1)));
+                        }
                     }
                 }
             }
         }
+
+        if let Some(breakdowns) = &es.breakdowns {
+            for breakdown in breakdowns.iter() {
+                let prop = match breakdown {
+                    Breakdown::Property(p) => match p {
+                        PropertyRef::System(p) => {
+                            metadata.system_properties.get_by_name(ctx.project_id, p)?
+                        }
+                        PropertyRef::Group(p, group) => {
+                            metadata.group_properties[*group].get_by_name(ctx.project_id, p)?
+                        }
+                        PropertyRef::Event(p) => {
+                            metadata.event_properties.get_by_name(ctx.project_id, p)?
+                        }
+                        _ => {
+                            return Err(QueryError::Unimplemented(
+                                "invalid property type".to_string(),
+                            ));
+                        }
+                    },
+                };
+                let cn = prop.column_name();
+                if !group_cols.contains(&cn) {
+                    group_cols.push(cn.clone());
+                    let mut found = 0;
+                    for v in display_group_cols.iter() {
+                        if *v == prop.name() {
+                            found += 1;
+                        }
+                    }
+                    display_group_cols.push(prop.name());
+                    if found == 0 {
+                        rename_groups.push((cn, prop.name()));
+                    } else {
+                        rename_groups.push((cn, format!("{} {}", prop.name(), found + 1)));
+                    }
+                }
+            }
+        }
+
+        dbg!(&group_cols,&rename_groups);
         group_cols.push(COL_AGG_NAME.to_string());
         rename_groups.push((COL_AGG_NAME.to_string(), "Formula".to_string()));
 
