@@ -16,8 +16,8 @@ pub mod http;
 pub mod organizations;
 pub mod projects;
 pub mod properties;
-pub mod queries;
 pub mod reports;
+pub mod queries;
 // pub mod stub;
 
 use std::fmt::Debug;
@@ -40,6 +40,7 @@ use arrow::array::UInt32Array;
 use arrow::array::UInt64Array;
 use arrow::array::UInt8Array;
 use arrow::datatypes::TimeUnit;
+use chrono::{DateTime, Utc};
 use common::config::Config;
 use common::types::DType;
 use common::types::SortDirection;
@@ -72,7 +73,8 @@ use crate::groups::Groups;
 use crate::organizations::Organizations;
 use crate::projects::Projects;
 use crate::properties::Properties;
-use crate::queries::Queries;
+use crate::queries::event_segmentation::QueryAggregate;
+use crate::queries::provider::Queries;
 use crate::reports::Reports;
 
 pub struct PlatformProvider {
@@ -653,4 +655,868 @@ pub struct EventGroupedFilters {
     #[serde(default)]
     pub groups_condition: Option<EventGroupedFiltersGroupsCondition>,
     pub groups: Vec<EventGroupedFilterGroup>,
+}
+
+
+// queries
+
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum QueryResponseFormat {
+    Json,
+    JsonCompact,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct QueryParams {
+    pub format: Option<QueryResponseFormat>,
+    pub timestamp: Option<i64>,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum QueryTime {
+    Between {
+        from: DateTime<Utc>,
+        to: DateTime<Utc>,
+    },
+    From {
+        from: DateTime<Utc>,
+    },
+    Last {
+        last: i64,
+        unit: TimeIntervalUnit,
+    },
+}
+
+impl Into<common::query::QueryTime> for QueryTime {
+    fn into(self) -> common::query::QueryTime {
+        match self {
+            QueryTime::Between { from, to } => common::query::QueryTime::Between { from, to },
+            QueryTime::From { from } => common::query::QueryTime::From(from),
+            QueryTime::Last { last, unit } => common::query::QueryTime::Last {
+                last,
+                unit: unit.into(),
+            },
+        }
+    }
+}
+
+impl Into<QueryTime> for common::query::QueryTime {
+    fn into(self) -> QueryTime {
+        match self {
+            common::query::QueryTime::Between { from, to } => QueryTime::Between { from, to },
+            common::query::QueryTime::From(from) => QueryTime::From { from },
+            common::query::QueryTime::Last { last, unit } => QueryTime::Last {
+                last,
+                unit: unit.into(),
+            },
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum TimeIntervalUnit {
+    Hour,
+    Day,
+    Week,
+    Month,
+    Year,
+}
+
+impl Into<common::query::TimeIntervalUnit> for TimeIntervalUnit {
+    fn into(self) -> common::query::TimeIntervalUnit {
+        match self {
+            TimeIntervalUnit::Hour => common::query::TimeIntervalUnit::Hour,
+            TimeIntervalUnit::Day => common::query::TimeIntervalUnit::Day,
+            TimeIntervalUnit::Week => common::query::TimeIntervalUnit::Week,
+            TimeIntervalUnit::Month => common::query::TimeIntervalUnit::Month,
+            TimeIntervalUnit::Year => common::query::TimeIntervalUnit::Year,
+        }
+    }
+}
+
+impl Into<TimeIntervalUnit> for common::query::TimeIntervalUnit {
+    fn into(self) -> TimeIntervalUnit {
+        match self {
+            common::query::TimeIntervalUnit::Hour => TimeIntervalUnit::Hour,
+            common::query::TimeIntervalUnit::Day => TimeIntervalUnit::Day,
+            common::query::TimeIntervalUnit::Week => TimeIntervalUnit::Week,
+            common::query::TimeIntervalUnit::Month => TimeIntervalUnit::Month,
+            common::query::TimeIntervalUnit::Year => TimeIntervalUnit::Year,
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum Breakdown {
+    Property {
+        #[serde(flatten)]
+        property: PropertyRef,
+    },
+}
+
+impl Into<common::query::Breakdown> for Breakdown {
+    fn into(self) -> common::query::Breakdown {
+        match self {
+            Breakdown::Property { property } => {
+                common::query::Breakdown::Property(property.to_owned().into())
+            }
+        }
+    }
+}
+
+impl Into<Breakdown> for common::query::Breakdown {
+    fn into(self) -> Breakdown {
+        match self {
+            common::query::Breakdown::Property(property) => Breakdown::Property {
+                property: property.to_owned().into(),
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum AggregateFunction {
+    /// count
+    Count,
+    /// sum
+    Sum,
+    /// min
+    Min,
+    /// max
+    Max,
+    /// avg
+    Avg,
+    /// Approximate aggregate function
+    ApproxDistinct,
+    /// array_agg
+    ArrayAgg,
+    /// Variance (Sample)
+    Variance,
+    /// Variance (Population)
+    VariancePop,
+    /// Standard Deviation (Sample)
+    Stddev,
+    /// Standard Deviation (Population)
+    StddevPop,
+    /// Covariance (Sample)
+    Covariance,
+    /// Covariance (Population)
+    CovariancePop,
+    /// Correlation
+    Correlation,
+    /// Approximate continuous percentile function
+    ApproxPercentileCont,
+    /// ApproxMedian
+    ApproxMedian,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum DidEventAggregate {
+    Count {
+        operation: PropValueOperation,
+        value: i64,
+        time: SegmentTime,
+    },
+    RelativeCount {
+        #[serde(flatten)]
+        event: EventRef,
+        operation: PropValueOperation,
+        filters: Option<Vec<PropValueFilter>>,
+        time: SegmentTime,
+    },
+    AggregateProperty {
+        #[serde(flatten)]
+        property: PropertyRef,
+        aggregate: QueryAggregate,
+        operation: PropValueOperation,
+        value: Option<Value>,
+        time: SegmentTime,
+    },
+    HistoricalCount {
+        operation: PropValueOperation,
+        value: u64,
+        time: SegmentTime,
+    },
+}
+
+impl Into<common::query::DidEventAggregate> for DidEventAggregate {
+    fn into(self) -> common::query::DidEventAggregate {
+        match self {
+            DidEventAggregate::Count {
+                operation,
+                value,
+                time,
+            } => common::query::DidEventAggregate::Count {
+                operation: operation.into(),
+                value,
+                time: time.into(),
+            },
+            DidEventAggregate::RelativeCount {
+                event,
+                operation,
+                filters,
+                time,
+            } => common::query::DidEventAggregate::RelativeCount {
+                event: event.into(),
+                operation: operation.into(),
+                filters: filters.map_or_else(
+                    || None,
+                    |v| {
+                        if v.is_empty() {
+                            None
+                        } else {
+                            Some(v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>())
+                        }
+                    },
+                ),
+                time: time.into(),
+            },
+            DidEventAggregate::AggregateProperty {
+                property,
+                aggregate,
+                operation,
+                value,
+                time,
+            } => common::query::DidEventAggregate::AggregateProperty {
+                property: property.into(),
+                aggregate: aggregate.into(),
+                operation: operation.into(),
+                value: value.map(|v| json_value_to_scalar(&v)),
+                time: time.into(),
+            },
+            DidEventAggregate::HistoricalCount {
+                operation,
+                value,
+                time,
+            } => common::query::DidEventAggregate::HistoricalCount {
+                operation: operation.into(),
+                value,
+                time: time.into(),
+            },
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum SegmentTime {
+    Between {
+        from: DateTime<Utc>,
+        to: DateTime<Utc>,
+    },
+    From(DateTime<Utc>),
+    Last {
+        last: i64,
+        unit: TimeIntervalUnit,
+    },
+    AfterFirstUse {
+        within: i64,
+        unit: TimeIntervalUnit,
+    },
+    WindowEach {
+        unit: TimeIntervalUnit,
+        n: i64,
+    },
+}
+
+impl Into<common::query::SegmentTime> for SegmentTime {
+    fn into(self) -> common::query::SegmentTime {
+        match self {
+            SegmentTime::Between { from, to } => common::query::SegmentTime::Between { from, to },
+            SegmentTime::From(v) => common::query::SegmentTime::From(v),
+            SegmentTime::Last { last: n, unit } => common::query::SegmentTime::Last {
+                n,
+                unit: unit.into(),
+            },
+            SegmentTime::AfterFirstUse { within, unit } => {
+                common::query::SegmentTime::AfterFirstUse {
+                    within,
+                    unit: unit.into(),
+                }
+            }
+            SegmentTime::WindowEach { unit, n } => common::query::SegmentTime::Each {
+                n,
+                unit: unit.into(),
+            },
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum SegmentCondition {
+    #[serde(rename_all = "camelCase")]
+    HasPropertyValue {
+        property_name: String,
+        operation: PropValueOperation,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<Vec<Value>>,
+    },
+    #[serde(rename_all = "camelCase")]
+    HadPropertyValue {
+        property_name: String,
+        operation: PropValueOperation,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<Vec<Value>>,
+        time: SegmentTime,
+    },
+    #[serde(rename_all = "camelCase")]
+    DidEvent {
+        #[serde(flatten)]
+        event: EventRef,
+        filters: Option<Vec<PropValueFilter>>,
+        aggregate: DidEventAggregate,
+    },
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct Segment {
+    name: String,
+    conditions: Vec<Vec<SegmentCondition>>,
+}
+
+impl Into<common::query::SegmentCondition> for SegmentCondition {
+    fn into(self) -> common::query::SegmentCondition {
+        match self {
+            SegmentCondition::HasPropertyValue {
+                property_name,
+                operation,
+                value,
+            } => common::query::SegmentCondition::HasPropertyValue {
+                property_name,
+                operation: operation.into(),
+                value: match value {
+                    Some(v) if !v.is_empty() => {
+                        Some(v.iter().map(json_value_to_scalar).collect::<Vec<_>>())
+                    }
+                    _ => None,
+                },
+                // value
+                // .map(|v| {
+                // if v.is_empty() {
+                // None
+                // } else {
+                // v.iter()
+                // .map(|v| json_value_to_scalar(v))
+                // .collect::<Result<_>>()
+                // }
+                // })
+                // .transpose()?,
+            },
+            SegmentCondition::HadPropertyValue {
+                property_name,
+                operation,
+                value,
+                time,
+            } => common::query::SegmentCondition::HadPropertyValue {
+                property_name,
+                operation: operation.into(),
+                value: match value {
+                    Some(v) if !v.is_empty() => {
+                        Some(v.iter().map(json_value_to_scalar).collect::<Vec<_>>())
+                    }
+                    _ => None,
+                },
+                time: time.into(),
+            },
+            SegmentCondition::DidEvent {
+                event,
+                filters,
+                aggregate,
+            } => common::query::SegmentCondition::DidEvent {
+                event: event.into(),
+                filters: filters.map_or_else(
+                    || None,
+                    |v| {
+                        if v.is_empty() {
+                            None
+                        } else {
+                            Some(v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>())
+                        }
+                    },
+                ),
+                aggregate: aggregate.into(),
+            },
+        }
+    }
+}
+
+impl Into<SegmentTime> for common::query::SegmentTime {
+    fn into(self) -> SegmentTime {
+        match self {
+            common::query::SegmentTime::Between { from, to } => {
+                SegmentTime::Between { from, to }
+            }
+            common::query::SegmentTime::From(from) => SegmentTime::From(from),
+            common::query::SegmentTime::Last { n, unit } => SegmentTime::Last {
+                last: n,
+                unit: unit.into(),
+            },
+            common::query::SegmentTime::AfterFirstUse { within, unit } => {
+                SegmentTime::AfterFirstUse {
+                    within,
+                    unit: unit.into(),
+                }
+            }
+            common::query::SegmentTime::Each { n, unit } => {
+                SegmentTime::WindowEach {
+                    unit: unit.into(),
+                    n,
+                }
+            }
+        }
+    }
+}
+
+impl Into<DidEventAggregate> for common::query::DidEventAggregate {
+    fn into(self) -> DidEventAggregate {
+        match self {
+            common::query::DidEventAggregate::Count {
+                operation,
+                value,
+                time,
+            } => DidEventAggregate::Count {
+                operation: operation.into(),
+                value,
+                time: time.into(),
+            },
+            common::query::DidEventAggregate::RelativeCount {
+                event,
+                operation,
+                filters,
+                time,
+            } => DidEventAggregate::RelativeCount {
+                event: event.into(),
+                operation: operation.into(),
+                filters: filters.map_or_else(
+                    || None,
+                    |v| {
+                        if v.is_empty() {
+                            None
+                        } else {
+                            Some(v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>())
+                        }
+                    },
+                ),
+                time: time.into(),
+            },
+            common::query::DidEventAggregate::AggregateProperty {
+                property,
+                aggregate,
+                operation,
+                value,
+                time,
+            } => DidEventAggregate::AggregateProperty {
+                property: property.into(),
+                aggregate: aggregate.into(),
+                operation: operation.into(),
+                value: value.map(|v| scalar_to_json_value(&v)),
+                time: time.into(),
+            },
+            common::query::DidEventAggregate::HistoricalCount {
+                operation,
+                value,
+                time,
+            } => DidEventAggregate::HistoricalCount {
+                operation: operation.into(),
+                value,
+                time: time.into(),
+            },
+        }
+    }
+}
+
+impl Into<SegmentCondition> for common::query::SegmentCondition {
+    fn into(self) -> SegmentCondition {
+        match self {
+            common::query::SegmentCondition::HasPropertyValue {
+                property_name,
+                operation,
+                value,
+            } => SegmentCondition::HasPropertyValue {
+                property_name,
+                operation: operation.into(),
+                value: value.map_or_else(
+                    || None,
+                    |v| {
+                        if v.is_empty() {
+                            None
+                        } else {
+                            Some(v.iter().map(scalar_to_json_value).collect::<Vec<_>>())
+                        }
+                    },
+                ),
+            },
+            common::query::SegmentCondition::HadPropertyValue {
+                property_name,
+                operation,
+                value,
+                time,
+            } => SegmentCondition::HadPropertyValue {
+                property_name,
+                operation: operation.into(),
+                value: value.map_or_else(
+                    || None,
+                    |v| {
+                        if v.is_empty() {
+                            None
+                        } else {
+                            Some(v.iter().map(scalar_to_json_value).collect::<Vec<_>>())
+                        }
+                    },
+                ),
+                time: time.into(),
+            },
+            common::query::SegmentCondition::DidEvent {
+                event,
+                filters,
+                aggregate,
+            } => SegmentCondition::DidEvent {
+                event: event.into(),
+                filters: filters.map_or_else(
+                    || None,
+                    |v| {
+                        if v.is_empty() {
+                            None
+                        } else {
+                            Some(v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>())
+                        }
+                    },
+                ),
+                aggregate: aggregate.into(),
+            },
+        }
+    }
+}
+
+impl Into<common::query::Segment> for Segment {
+    fn into(self) -> common::query::Segment {
+        common::query::Segment {
+            name: self.name.clone(),
+            conditions: self
+                .conditions
+                .iter()
+                .map(|v| v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>())
+                .collect::<Vec<_>>(),
+        }
+    }
+}
+
+impl Into<Segment> for common::query::Segment {
+    fn into(self) -> Segment {
+        Segment {
+            name: self.name.clone(),
+            conditions: self
+                .conditions
+                .iter()
+                .map(|v| v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>())
+                .collect::<Vec<_>>(),
+        }
+    }
+}
+
+impl Into<common::query::AggregateFunction> for &AggregateFunction {
+    fn into(self) -> common::query::AggregateFunction {
+        match self {
+            AggregateFunction::Count => common::query::AggregateFunction::Count,
+            AggregateFunction::Sum => common::query::AggregateFunction::Sum,
+            AggregateFunction::Min => common::query::AggregateFunction::Min,
+            AggregateFunction::Max => common::query::AggregateFunction::Max,
+            AggregateFunction::Avg => common::query::AggregateFunction::Avg,
+            _ => unimplemented!("unimplemented"),
+        }
+    }
+}
+
+impl Into<AggregateFunction> for common::query::AggregateFunction {
+    fn into(self) -> AggregateFunction {
+        match self {
+            common::query::AggregateFunction::Count => AggregateFunction::Count,
+            common::query::AggregateFunction::Sum => AggregateFunction::Sum,
+            common::query::AggregateFunction::Min => AggregateFunction::Min,
+            common::query::AggregateFunction::Max => AggregateFunction::Max,
+            common::query::AggregateFunction::Avg => AggregateFunction::Avg,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PartitionedAggregateFunction {
+    Sum,
+    Avg,
+    // Median,
+    Count,
+    Min,
+    Max,
+    // DistinctCount,
+    // Percentile25,
+    // Percentile75,
+    // Percentile90,
+    // Percentile99,
+}
+
+impl Into<common::query::PartitionedAggregateFunction> for &PartitionedAggregateFunction {
+    fn into(self) -> common::query::PartitionedAggregateFunction {
+        match self {
+            PartitionedAggregateFunction::Count => {
+                common::query::PartitionedAggregateFunction::Count
+            }
+            PartitionedAggregateFunction::Sum => common::query::PartitionedAggregateFunction::Sum,
+            PartitionedAggregateFunction::Avg => common::query::PartitionedAggregateFunction::Avg,
+            PartitionedAggregateFunction::Min => common::query::PartitionedAggregateFunction::Min,
+            PartitionedAggregateFunction::Max => common::query::PartitionedAggregateFunction::Max,
+        }
+    }
+}
+
+impl Into<PartitionedAggregateFunction> for common::query::PartitionedAggregateFunction {
+    fn into(self) -> PartitionedAggregateFunction {
+        match self {
+            common::query::PartitionedAggregateFunction::Count => {
+                PartitionedAggregateFunction::Count
+            }
+            common::query::PartitionedAggregateFunction::Sum => PartitionedAggregateFunction::Sum,
+            common::query::PartitionedAggregateFunction::Avg => PartitionedAggregateFunction::Avg,
+            common::query::PartitionedAggregateFunction::Min => PartitionedAggregateFunction::Min,
+            common::query::PartitionedAggregateFunction::Max => PartitionedAggregateFunction::Max,
+        }
+    }
+}
+
+pub fn validate_event_property(
+    md: &Arc<MetadataProvider>,
+    project_id: u64,
+    property: &PropertyRef,
+    err_prefix: String,
+) -> crate::Result<()> {
+    match property {
+        PropertyRef::Group {
+            property_name,
+            group,
+        } => {
+            md.group_properties[*group]
+                .get_by_name(project_id, &property_name)
+                .map_err(|err| PlatformError::BadRequest(format!("{err_prefix}: {err}")))?;
+        }
+        PropertyRef::Event { property_name } => {
+            md.event_properties
+                .get_by_name(project_id, &property_name)
+                .map_err(|err| PlatformError::BadRequest(format!("{err_prefix}: {err}")))?;
+        }
+        PropertyRef::System { property_name } => {
+            md.system_properties
+                .get_by_name(project_id, &property_name)
+                .map_err(|err| PlatformError::BadRequest(format!("{err_prefix}: {err}")))?;
+        }
+        _ => {
+            return Err(PlatformError::Unimplemented(
+                "invalid property type".to_string(),
+            ));
+        }
+    }
+    Ok(())
+}
+pub fn validate_event_filter_property(
+    md: &Arc<MetadataProvider>,
+    project_id: u64,
+    property: &PropertyRef,
+    operation: &PropValueOperation,
+    value: &Option<Vec<Value>>,
+    err_prefix: String,
+) -> crate::Result<()> {
+    let prop = match property {
+        PropertyRef::Group {
+            property_name,
+            group,
+        } => md.group_properties[*group]
+            .get_by_name(project_id, &property_name)
+            .map_err(|err| PlatformError::BadRequest(format!("{err_prefix}: {err}")))?,
+        PropertyRef::Event { property_name } => md
+            .event_properties
+            .get_by_name(project_id, &property_name)
+            .map_err(|err| PlatformError::BadRequest(format!("{err_prefix}: {err}")))?,
+        PropertyRef::System { property_name } => md
+            .system_properties
+            .get_by_name(project_id, &property_name)
+            .map_err(|err| PlatformError::BadRequest(format!("{err_prefix}: {err}")))?,
+        _ => {
+            return Err(PlatformError::Unimplemented(
+                "invalid custom type".to_string(),
+            ));
+        }
+    };
+    let mut allow_empty_values = false;
+    match operation {
+        PropValueOperation::Gt
+        | PropValueOperation::Gte
+        | PropValueOperation::Lt
+        | PropValueOperation::Lte => match prop.data_type {
+            DType::Int8 | DType::Int16 | DType::Int64 | DType::Decimal | DType::Timestamp => {}
+            _ => {
+                return Err(PlatformError::BadRequest(format!(
+                    "{err_prefix}property \"{}\" is not numeric, but operation is \"{:?}\"",
+                    prop.name, operation
+                )));
+            }
+        },
+        PropValueOperation::True | PropValueOperation::False => {
+            if prop.data_type != DType::Boolean {
+                return Err(PlatformError::BadRequest(format!(
+                    "{err_prefix}\"{}\" is not boolean, but operation is \"{:?}\"",
+                    prop.name, operation
+                )));
+            }
+            allow_empty_values = true;
+        }
+        PropValueOperation::Exists | PropValueOperation::Empty => {
+            if !prop.nullable {
+                return Err(PlatformError::BadRequest(format!(
+                    "{err_prefix}property \"{}\" is not nullable, but operation is \"{:?}\"",
+                    prop.name, operation
+                )));
+            }
+            allow_empty_values = true;
+        }
+        PropValueOperation::Regex
+        | PropValueOperation::Like
+        | PropValueOperation::NotLike
+        | PropValueOperation::NotRegex => {
+            if prop.data_type != DType::String {
+                return Err(PlatformError::BadRequest(format!(
+                    "{err_prefix}property \"{}\" is not string, but operation is \"{:?}\"",
+                    prop.name, operation
+                )));
+            }
+        }
+        _ => {}
+    }
+    match value {
+        None => {
+            if !prop.nullable {
+                return Err(PlatformError::BadRequest(format!(
+                    "{err_prefix}property \"{}\" is not nullable",
+                    prop.name
+                )));
+            }
+        }
+        Some(values) => {
+            if !allow_empty_values && values.is_empty() {
+                return Err(PlatformError::BadRequest(format!(
+                    "{err_prefix} values cannot be empty"
+                )));
+            }
+            for (vid, value) in values.iter().enumerate() {
+                match value {
+                    Value::Null => {
+                        if !prop.nullable {
+                            return Err(PlatformError::BadRequest(format!(
+                                "{err_prefix}property \"{}\" is not nullable, but value {vid} is \"{value:?}\"",
+                                prop.name
+                            )));
+                        }
+                    }
+                    Value::Bool(_) => {
+                        if prop.data_type != DType::Boolean {
+                            return Err(PlatformError::BadRequest(format!(
+                                "{err_prefix}property \"{}\" is not boolean, but value {vid} is \"{value:?}\"",
+                                prop.name
+                            )));
+                        }
+                    }
+                    Value::Number(_) => match prop.data_type {
+                        DType::Int8
+                        | DType::Int16
+                        | DType::Int32
+                        | DType::Int64
+                        | DType::Decimal
+                        | DType::Timestamp => {}
+                        _ => {
+                            return Err(PlatformError::BadRequest(format!(
+                                "{err_prefix}property \"{}\" is not numeric, but value {vid} is \"{value:?}\"",
+                                prop.name
+                            )));
+                        }
+                    },
+                    Value::String(_) => {
+                        if prop.data_type != DType::String {
+                            return Err(PlatformError::BadRequest(format!(
+                                "{err_prefix}property \"{}\" is not string, but value {vid} is \"{value:?}\"",
+                                prop.name
+                            )));
+                        }
+                    }
+                    Value::Array(_) => {
+                        return Err(PlatformError::Unimplemented(
+                            "array value is unimplemented".to_string(),
+                        ));
+                    }
+                    Value::Object(_) => {
+                        return Err(PlatformError::Unimplemented(
+                            "object value is unimplemented".to_string(),
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_event(
+    md: &Arc<MetadataProvider>,
+    project_id: u64,
+    event: &EventRef,
+    event_id: usize,
+    err_prefix: String,
+) -> crate::Result<()> {
+    match event {
+        EventRef::Regular { event_name } => {
+            md.events
+                .get_by_name(project_id, &event_name)
+                .map_err(|err| PlatformError::BadRequest(format!("event {event_id}: {err}")))?;
+        }
+        EventRef::Custom { event_id } => {
+            md.custom_events
+                .get_by_id(project_id, *event_id)
+                .map_err(|err| PlatformError::BadRequest(format!("event {event_id}: {err}")))?;
+        }
+    }
+
+    Ok(())
+}
+
+pub(crate) fn validate_event_filter(
+    md: &Arc<MetadataProvider>,
+    project_id: u64,
+    filter: &PropValueFilter,
+    filter_id: usize,
+    err_prefix: String,
+) -> crate::Result<()> {
+    match filter {
+        PropValueFilter::Property {
+            property,
+            operation,
+            value,
+        } => {
+            validate_event_filter_property(
+                md,
+                project_id,
+                property,
+                operation,
+                value,
+                format!("{err_prefix}filter #{filter_id}"),
+            )?;
+        }
+    }
+
+    Ok(())
 }

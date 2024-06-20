@@ -4,13 +4,13 @@ use bincode::deserialize;
 use bincode::serialize;
 use chrono::DateTime;
 use chrono::Utc;
-use common::query::event_segmentation::EventSegmentation;
-use common::query::funnel::Funnel;
 use common::types::OptionalProperty;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
+use common::event_segmentation::EventSegmentation;
+use common::funnel::Funnel;
 
 use crate::error::MetadataError;
 use crate::index::next_seq;

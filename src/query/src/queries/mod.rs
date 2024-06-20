@@ -10,7 +10,6 @@ use metadata::MetadataProvider;
 
 use crate::Context;
 
-pub mod event_records_search;
 pub mod event_segmentation;
 pub mod funnel;
 pub mod group_records_search;

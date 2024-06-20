@@ -18,9 +18,9 @@ use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
 use arrow::util::pretty::print_batches;
 use common::group_col;
-use common::query::event_segmentation::EventSegmentation;
-use common::query::event_segmentation::Query;
-use common::query::funnel::Funnel;
+use common::event_segmentation::EventSegmentation;
+use common::event_segmentation::Query;
+use common::funnel::Funnel;
 use common::query::Breakdown;
 use common::query::EventRef;
 use common::query::PropValueFilter;
@@ -50,11 +50,9 @@ use rust_decimal::Decimal;
 use storage::db::OptiDBImpl;
 use tracing::debug;
 
-use crate::col_name;
+use crate::{col_name, execute, initial_plan};
 use crate::logical_plan::db_parquet::DbParquetNode;
 use crate::physical_plan::planner::QueryPlanner;
-use crate::queries::event_records_search;
-use crate::queries::event_records_search::EventRecordsSearch;
 use crate::queries::event_segmentation;
 use crate::queries::event_segmentation::logical_plan_builder::COL_AGG_NAME;
 use crate::queries::funnel;
@@ -82,51 +80,6 @@ impl QueryProvider {
 }
 
 impl QueryProvider {
-    pub async fn initial_plan(
-        &self,
-        projection: Vec<usize>,
-    ) -> Result<(SessionContext, SessionState, LogicalPlan)> {
-        let runtime = Arc::new(RuntimeEnv::default());
-        let state = SessionState::new_with_config_rt(
-            SessionConfig::new().with_collect_statistics(true),
-            runtime,
-        )
-            .with_query_planner(Arc::new(QueryPlanner {}));
-
-        // if let Some(projection) = projection {
-        // state = state
-        // .add_physical_optimizer_rule(Arc::new(ApplyParquetProjection::new(projection)));
-        // }
-        // .with_optimizer_rules(vec![
-        // Arc::new(OptimizeProjections::new()),
-        // Arc::new(PushDownFilter::new()),
-        // ])
-        // .with_physical_optimizer_rules(vec![Arc::new(ProjectionPushdown::new())])
-        let exec_ctx = SessionContext::new_with_state(state.clone());
-        let plan = LogicalPlan::Extension(Extension {
-            node: Arc::new(DbParquetNode::try_new(self.db.clone(), projection.clone())?),
-        });
-
-        Ok((exec_ctx, state, plan))
-    }
-
-    pub async fn execute(
-        &self,
-        ctx: SessionContext,
-        state: SessionState,
-        plan: LogicalPlan,
-    ) -> Result<RecordBatch> {
-        let physical_plan = state.create_physical_plan(&plan).await?;
-        let displayable_plan = DisplayableExecutionPlan::with_full_metrics(physical_plan.as_ref());
-        debug!("physical plan: {}", displayable_plan.indent(true));
-        let batches = collect(physical_plan, ctx.task_ctx()).await?;
-        let schema: Arc<Schema> = Arc::new(plan.schema().as_ref().into());
-        let rows_count = batches.iter().fold(0, |acc, x| acc + x.num_rows());
-        let res = concat_batches(&schema, &batches, rows_count)?;
-
-        Ok(res)
-    }
-
     pub async fn property_values(&self, ctx: Context, req: PropertyValues) -> Result<ArrayRef> {
         let start = Instant::now();
         let schema = self.db.schema1(TABLE_EVENTS)?;
@@ -135,7 +88,7 @@ impl QueryProvider {
             .iter()
             .map(|x| schema.index_of(x).unwrap())
             .collect();
-        let (session_ctx, state, plan) = self.initial_plan(projection).await?;
+        let (session_ctx, state, plan) = initial_plan(&self.db, projection).await?;
         let plan = property_values::LogicalPlanBuilder::build(
             ctx,
             self.metadata.clone(),
@@ -143,7 +96,7 @@ impl QueryProvider {
             req.clone(),
         )?;
 
-        let res = self.execute(session_ctx, state, plan).await?;
+        let res = execute(session_ctx, state, plan).await?;
         let duration = start.elapsed();
         debug!("elapsed: {:?}", duration);
 
@@ -167,52 +120,10 @@ impl QueryProvider {
             (0..schema.fields.len()).collect::<Vec<_>>()
         };
 
-        let (session_ctx, state, plan) = self.initial_plan(projection).await?;
+        let (session_ctx, state, plan) = initial_plan(&self.db, projection).await?;
         let plan = group_records_search::build(ctx, self.metadata.clone(), plan, req.clone())?;
 
-        let result = self.execute(session_ctx, state, plan).await?;
-        let duration = start.elapsed();
-        debug!("elapsed: {:?}", duration);
-
-        let cols = result
-            .schema()
-            .fields()
-            .iter()
-            .enumerate()
-            .map(|(idx, field)| Column {
-                name: field.name().to_owned(),
-                typ: ColumnType::Dimension,
-                is_nullable: field.is_nullable(),
-                data_type: field.data_type().to_owned(),
-                hidden: false,
-                data: result.column(idx).to_owned(),
-            })
-            .collect();
-
-        Ok(DataTable::new(result.schema(), cols))
-    }
-
-    pub async fn event_records_search(
-        &self,
-        ctx: Context,
-        req: EventRecordsSearch,
-    ) -> Result<DataTable> {
-        let start = Instant::now();
-        let schema = self.db.schema1(TABLE_EVENTS)?;
-        let projection = if req.properties.is_some() {
-            let projection = event_records_search_projection(&ctx, &req, &self.metadata)?;
-            projection
-                .iter()
-                .map(|x| schema.index_of(x).unwrap())
-                .collect()
-        } else {
-            (0..schema.fields.len()).collect::<Vec<_>>()
-        };
-
-        let (session_ctx, state, plan) = self.initial_plan(projection).await?;
-        let plan = event_records_search::build(ctx, self.metadata.clone(), plan, req.clone())?;
-        println!("{plan:?}");
-        let result = self.execute(session_ctx, state, plan).await?;
+        let result = execute(session_ctx, state, plan).await?;
         let duration = start.elapsed();
         debug!("elapsed: {:?}", duration);
 
@@ -246,7 +157,7 @@ impl QueryProvider {
             .iter()
             .map(|x| schema.index_of(x).unwrap())
             .collect();
-        let (session_ctx, state, plan) = self.initial_plan(projection).await?;
+        let (session_ctx, state, plan) = initial_plan(&self.db, projection).await?;
         let plan = event_segmentation::logical_plan_builder::LogicalPlanBuilder::build(
             ctx.clone(),
             self.metadata.clone(),
@@ -255,7 +166,7 @@ impl QueryProvider {
         )?;
 
         println!("{plan:?}");
-        let result = self.execute(session_ctx, state, plan).await?;
+        let result = execute(session_ctx, state, plan).await?;
         let duration = start.elapsed();
         debug!("elapsed: {:?}", duration);
 
@@ -296,10 +207,10 @@ impl QueryProvider {
             .map(|x| schema.index_of(x).unwrap())
             .collect();
 
-        let (session_ctx, state, plan) = self.initial_plan(projection).await?;
+        let (session_ctx, state, plan) = initial_plan(&self.db, projection).await?;
         let plan = funnel::build(ctx.clone(), self.metadata.clone(), plan, req.clone())?;
 
-        let result = self.execute(session_ctx, state, plan).await?;
+        let result = execute(session_ctx, state, plan).await?;
         let duration = start.elapsed();
         debug!("elapsed: {:?}", duration);
         let mut group_cols: Vec<StringArray> = vec![];
@@ -478,34 +389,6 @@ fn group_records_search_projection(
     if let Some((prop, ..)) = &req.sort {
         fields.push(col_name(ctx, &prop, md)?);
     }
-    Ok(fields)
-}
-
-fn event_records_search_projection(
-    ctx: &Context,
-    req: &EventRecordsSearch,
-    md: &Arc<MetadataProvider>,
-) -> Result<Vec<String>> {
-    let mut fields = vec![
-        COLUMN_PROJECT_ID.to_string(),
-        COLUMN_CREATED_AT.to_string(),
-        COLUMN_EVENT.to_string(),
-        COLUMN_EVENT_ID.to_string(),
-    ];
-    if let Some(filters) = &req.filters {
-        for filter in filters {
-            match filter {
-                PropValueFilter::Property { property, .. } => {
-                    fields.push(col_name(ctx, property, md)?)
-                }
-            }
-        }
-    }
-
-    for prop in req.properties.clone().unwrap() {
-        fields.push(col_name(ctx, &prop, md)?);
-    }
-
     Ok(fields)
 }
 

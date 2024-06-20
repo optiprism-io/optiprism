@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use chrono::DateTime;
 use chrono::Utc;
-use common::query::event_segmentation::NamedQuery;
+use common::event_segmentation::NamedQuery;
 use common::types::DType;
 use common::GROUPS_COUNT;
 use datafusion_common::ScalarValue;
@@ -12,16 +12,13 @@ use serde::Serialize;
 use serde_json::Value;
 
 use crate::error::Result;
-use crate::json_value_to_scalar;
-use crate::queries::validation::validate_event;
-use crate::queries::validation::validate_event_filter;
-use crate::queries::validation::validate_event_property;
-use crate::queries::AggregateFunction;
-use crate::queries::Breakdown;
-use crate::queries::PartitionedAggregateFunction;
-use crate::queries::QueryTime;
-use crate::queries::Segment;
-use crate::queries::TimeIntervalUnit;
+use crate::{json_value_to_scalar, validate_event, validate_event_filter, validate_event_property};
+use crate::AggregateFunction;
+use crate::Breakdown;
+use crate::PartitionedAggregateFunction;
+use crate::QueryTime;
+use crate::Segment;
+use crate::TimeIntervalUnit;
 use crate::scalar_to_json_value;
 use crate::Context;
 use crate::EventGroupedFilterGroup;
@@ -40,22 +37,22 @@ pub enum ChartType {
     Pie,
 }
 
-impl Into<common::query::event_segmentation::ChartType> for ChartType {
-    fn into(self) -> common::query::event_segmentation::ChartType {
+impl Into<common::event_segmentation::ChartType> for ChartType {
+    fn into(self) -> common::event_segmentation::ChartType {
         match self {
-            ChartType::Line => common::query::event_segmentation::ChartType::Line,
-            ChartType::Column => common::query::event_segmentation::ChartType::Column,
-            ChartType::Pie => common::query::event_segmentation::ChartType::Pie,
+            ChartType::Line => common::event_segmentation::ChartType::Line,
+            ChartType::Column => common::event_segmentation::ChartType::Column,
+            ChartType::Pie => common::event_segmentation::ChartType::Pie,
         }
     }
 }
 
-impl Into<ChartType> for common::query::event_segmentation::ChartType {
+impl Into<ChartType> for common::event_segmentation::ChartType {
     fn into(self) -> ChartType {
         match self {
-            common::query::event_segmentation::ChartType::Line => ChartType::Line,
-            common::query::event_segmentation::ChartType::Column => ChartType::Column,
-            common::query::event_segmentation::ChartType::Pie => ChartType::Pie,
+            common::event_segmentation::ChartType::Line => ChartType::Line,
+            common::event_segmentation::ChartType::Column => ChartType::Column,
+            common::event_segmentation::ChartType::Pie => ChartType::Pie,
         }
     }
 }
@@ -72,34 +69,34 @@ pub enum Analysis {
     Cumulative,
 }
 
-impl Into<common::query::event_segmentation::Analysis> for Analysis {
-    fn into(self) -> common::query::event_segmentation::Analysis {
+impl Into<common::event_segmentation::Analysis> for Analysis {
+    fn into(self) -> common::event_segmentation::Analysis {
         match self {
-            Analysis::Linear => common::query::event_segmentation::Analysis::Linear,
+            Analysis::Linear => common::event_segmentation::Analysis::Linear,
             Analysis::RollingAverage { window, unit } => {
-                common::query::event_segmentation::Analysis::RollingAverage {
+                common::event_segmentation::Analysis::RollingAverage {
                     window,
                     unit: unit.into(),
                 }
             }
-            Analysis::Logarithmic => common::query::event_segmentation::Analysis::Logarithmic,
-            Analysis::Cumulative => common::query::event_segmentation::Analysis::Cumulative,
+            Analysis::Logarithmic => common::event_segmentation::Analysis::Logarithmic,
+            Analysis::Cumulative => common::event_segmentation::Analysis::Cumulative,
         }
     }
 }
 
-impl Into<Analysis> for common::query::event_segmentation::Analysis {
+impl Into<Analysis> for common::event_segmentation::Analysis {
     fn into(self) -> Analysis {
         match self {
-            common::query::event_segmentation::Analysis::Linear => Analysis::Linear,
-            common::query::event_segmentation::Analysis::RollingAverage { window, unit } => {
+            common::event_segmentation::Analysis::Linear => Analysis::Linear,
+            common::event_segmentation::Analysis::RollingAverage { window, unit } => {
                 Analysis::RollingAverage {
                     window,
                     unit: unit.into(),
                 }
             }
-            common::query::event_segmentation::Analysis::Logarithmic => Analysis::Logarithmic,
-            common::query::event_segmentation::Analysis::Cumulative => Analysis::Cumulative,
+            common::event_segmentation::Analysis::Logarithmic => Analysis::Logarithmic,
+            common::event_segmentation::Analysis::Cumulative => Analysis::Cumulative,
         }
     }
 }
@@ -111,16 +108,16 @@ pub struct Compare {
     pub unit: TimeIntervalUnit,
 }
 
-impl Into<common::query::event_segmentation::Compare> for Compare {
-    fn into(self) -> common::query::event_segmentation::Compare {
-        common::query::event_segmentation::Compare {
+impl Into<common::event_segmentation::Compare> for Compare {
+    fn into(self) -> common::event_segmentation::Compare {
+        common::event_segmentation::Compare {
             offset: self.offset,
             unit: self.unit.into(),
         }
     }
 }
 
-impl Into<Compare> for common::query::event_segmentation::Compare {
+impl Into<Compare> for common::event_segmentation::Compare {
     fn into(self) -> Compare {
         Compare {
             offset: self.offset,
@@ -144,54 +141,54 @@ pub enum QueryAggregate {
     Percentile99,
 }
 
-impl Into<common::query::event_segmentation::QueryAggregate> for QueryAggregate {
-    fn into(self) -> common::query::event_segmentation::QueryAggregate {
+impl Into<common::query::QueryAggregate> for QueryAggregate {
+    fn into(self) -> common::query::QueryAggregate {
         match self {
-            QueryAggregate::Min => common::query::event_segmentation::QueryAggregate::Min,
-            QueryAggregate::Max => common::query::event_segmentation::QueryAggregate::Max,
-            QueryAggregate::Sum => common::query::event_segmentation::QueryAggregate::Sum,
-            QueryAggregate::Avg => common::query::event_segmentation::QueryAggregate::Avg,
-            QueryAggregate::Median => common::query::event_segmentation::QueryAggregate::Median,
+            QueryAggregate::Min => common::query::QueryAggregate::Min,
+            QueryAggregate::Max => common::query::QueryAggregate::Max,
+            QueryAggregate::Sum => common::query::QueryAggregate::Sum,
+            QueryAggregate::Avg => common::query::QueryAggregate::Avg,
+            QueryAggregate::Median => common::query::QueryAggregate::Median,
             QueryAggregate::DistinctCount => {
-                common::query::event_segmentation::QueryAggregate::DistinctCount
+                common::query::QueryAggregate::DistinctCount
             }
             QueryAggregate::Percentile25 => {
-                common::query::event_segmentation::QueryAggregate::Percentile25th
+                common::query::QueryAggregate::Percentile25th
             }
             QueryAggregate::Percentile75 => {
-                common::query::event_segmentation::QueryAggregate::Percentile75th
+                common::query::QueryAggregate::Percentile75th
             }
             QueryAggregate::Percentile90 => {
-                common::query::event_segmentation::QueryAggregate::Percentile90th
+                common::query::QueryAggregate::Percentile90th
             }
             QueryAggregate::Percentile99 => {
-                common::query::event_segmentation::QueryAggregate::Percentile99th
+                common::query::QueryAggregate::Percentile99th
             }
         }
     }
 }
 
-impl Into<QueryAggregate> for common::query::event_segmentation::QueryAggregate {
+impl Into<QueryAggregate> for common::query::QueryAggregate {
     fn into(self) -> QueryAggregate {
         match self {
-            common::query::event_segmentation::QueryAggregate::Min => QueryAggregate::Min,
-            common::query::event_segmentation::QueryAggregate::Max => QueryAggregate::Max,
-            common::query::event_segmentation::QueryAggregate::Sum => QueryAggregate::Sum,
-            common::query::event_segmentation::QueryAggregate::Avg => QueryAggregate::Avg,
-            common::query::event_segmentation::QueryAggregate::Median => QueryAggregate::Median,
-            common::query::event_segmentation::QueryAggregate::DistinctCount => {
+            common::query::QueryAggregate::Min => QueryAggregate::Min,
+            common::query::QueryAggregate::Max => QueryAggregate::Max,
+            common::query::QueryAggregate::Sum => QueryAggregate::Sum,
+            common::query::QueryAggregate::Avg => QueryAggregate::Avg,
+            common::query::QueryAggregate::Median => QueryAggregate::Median,
+            common::query::QueryAggregate::DistinctCount => {
                 QueryAggregate::DistinctCount
             }
-            common::query::event_segmentation::QueryAggregate::Percentile25th => {
+            common::query::QueryAggregate::Percentile25th => {
                 QueryAggregate::Percentile25
             }
-            common::query::event_segmentation::QueryAggregate::Percentile75th => {
+            common::query::QueryAggregate::Percentile75th => {
                 QueryAggregate::Percentile75
             }
-            common::query::event_segmentation::QueryAggregate::Percentile90th => {
+            common::query::QueryAggregate::Percentile90th => {
                 QueryAggregate::Percentile90
             }
-            common::query::event_segmentation::QueryAggregate::Percentile99th => {
+            common::query::QueryAggregate::Percentile99th => {
                 QueryAggregate::Percentile99
             }
         }
@@ -209,26 +206,26 @@ pub enum QueryAggregatePerGroup {
     DistinctCount,
 }
 
-impl Into<common::query::event_segmentation::QueryAggregatePerGroup> for QueryAggregatePerGroup {
-    fn into(self) -> common::query::event_segmentation::QueryAggregatePerGroup {
+impl Into<common::event_segmentation::QueryAggregatePerGroup> for QueryAggregatePerGroup {
+    fn into(self) -> common::event_segmentation::QueryAggregatePerGroup {
         match self {
             QueryAggregatePerGroup::Min => {
-                common::query::event_segmentation::QueryAggregatePerGroup::Min
+                common::event_segmentation::QueryAggregatePerGroup::Min
             }
             QueryAggregatePerGroup::Max => {
-                common::query::event_segmentation::QueryAggregatePerGroup::Max
+                common::event_segmentation::QueryAggregatePerGroup::Max
             }
             QueryAggregatePerGroup::Sum => {
-                common::query::event_segmentation::QueryAggregatePerGroup::Sum
+                common::event_segmentation::QueryAggregatePerGroup::Sum
             }
             QueryAggregatePerGroup::Avg => {
-                common::query::event_segmentation::QueryAggregatePerGroup::Avg
+                common::event_segmentation::QueryAggregatePerGroup::Avg
             }
             QueryAggregatePerGroup::Median => {
-                common::query::event_segmentation::QueryAggregatePerGroup::Median
+                common::event_segmentation::QueryAggregatePerGroup::Median
             }
             QueryAggregatePerGroup::DistinctCount => {
-                common::query::event_segmentation::QueryAggregatePerGroup::DistinctCount
+                common::event_segmentation::QueryAggregatePerGroup::DistinctCount
             }
         }
     }
@@ -240,11 +237,11 @@ pub enum QueryPerGroup {
     CountEvents,
 }
 
-impl Into<common::query::event_segmentation::QueryPerGroup> for QueryPerGroup {
-    fn into(self) -> common::query::event_segmentation::QueryPerGroup {
+impl Into<common::event_segmentation::QueryPerGroup> for QueryPerGroup {
+    fn into(self) -> common::event_segmentation::QueryPerGroup {
         match self {
             QueryPerGroup::CountEvents => {
-                common::query::event_segmentation::QueryPerGroup::CountEvents
+                common::event_segmentation::QueryPerGroup::CountEvents
             }
         }
     }
@@ -279,20 +276,20 @@ pub enum Query {
     },
 }
 
-impl Into<common::query::event_segmentation::Query> for &Query {
-    fn into(self) -> common::query::event_segmentation::Query {
+impl Into<common::event_segmentation::Query> for &Query {
+    fn into(self) -> common::event_segmentation::Query {
         match self {
-            Query::CountEvents => common::query::event_segmentation::Query::CountEvents,
-            Query::CountUniqueGroups => common::query::event_segmentation::Query::CountUniqueGroups,
-            Query::DailyActiveGroups => common::query::event_segmentation::Query::DailyActiveGroups,
+            Query::CountEvents => common::event_segmentation::Query::CountEvents,
+            Query::CountUniqueGroups => common::event_segmentation::Query::CountUniqueGroups,
+            Query::DailyActiveGroups => common::event_segmentation::Query::DailyActiveGroups,
             Query::WeeklyActiveGroups => {
-                common::query::event_segmentation::Query::WeeklyActiveGroups
+                common::event_segmentation::Query::WeeklyActiveGroups
             }
             Query::MonthlyActiveGroups => {
-                common::query::event_segmentation::Query::MonthlyActiveGroups
+                common::event_segmentation::Query::MonthlyActiveGroups
             }
             Query::CountPerGroup { aggregate } => {
-                common::query::event_segmentation::Query::CountPerGroup {
+                common::event_segmentation::Query::CountPerGroup {
                     aggregate: aggregate.into(),
                 }
             }
@@ -300,7 +297,7 @@ impl Into<common::query::event_segmentation::Query> for &Query {
                 property,
                 aggregate_per_group,
                 aggregate,
-            } => common::query::event_segmentation::Query::AggregatePropertyPerGroup {
+            } => common::event_segmentation::Query::AggregatePropertyPerGroup {
                 property: property.to_owned().into(),
                 aggregate_per_group: aggregate_per_group.into(),
                 aggregate: aggregate.into(),
@@ -308,35 +305,35 @@ impl Into<common::query::event_segmentation::Query> for &Query {
             Query::AggregateProperty {
                 property,
                 aggregate,
-            } => common::query::event_segmentation::Query::AggregateProperty {
+            } => common::event_segmentation::Query::AggregateProperty {
                 property: property.to_owned().into(),
                 aggregate: aggregate.into(),
             },
-            Query::Formula { formula } => common::query::event_segmentation::Query::QueryFormula {
+            Query::Formula { formula } => common::event_segmentation::Query::QueryFormula {
                 formula: formula.clone(),
             },
         }
     }
 }
 
-impl Into<Query> for common::query::event_segmentation::Query {
+impl Into<Query> for common::event_segmentation::Query {
     fn into(self) -> Query {
         match self {
-            common::query::event_segmentation::Query::CountEvents => Query::CountEvents,
-            common::query::event_segmentation::Query::CountUniqueGroups => Query::CountUniqueGroups,
-            common::query::event_segmentation::Query::DailyActiveGroups => Query::DailyActiveGroups,
-            common::query::event_segmentation::Query::WeeklyActiveGroups => {
+            common::event_segmentation::Query::CountEvents => Query::CountEvents,
+            common::event_segmentation::Query::CountUniqueGroups => Query::CountUniqueGroups,
+            common::event_segmentation::Query::DailyActiveGroups => Query::DailyActiveGroups,
+            common::event_segmentation::Query::WeeklyActiveGroups => {
                 Query::WeeklyActiveGroups
             }
-            common::query::event_segmentation::Query::MonthlyActiveGroups => {
+            common::event_segmentation::Query::MonthlyActiveGroups => {
                 Query::MonthlyActiveGroups
             }
-            common::query::event_segmentation::Query::CountPerGroup { aggregate } => {
+            common::event_segmentation::Query::CountPerGroup { aggregate } => {
                 Query::CountPerGroup {
                     aggregate: aggregate.into(),
                 }
             }
-            common::query::event_segmentation::Query::AggregatePropertyPerGroup {
+            common::event_segmentation::Query::AggregatePropertyPerGroup {
                 property,
                 aggregate_per_group,
                 aggregate,
@@ -345,14 +342,14 @@ impl Into<Query> for common::query::event_segmentation::Query {
                 aggregate_per_group: aggregate_per_group.into(),
                 aggregate: aggregate.into(),
             },
-            common::query::event_segmentation::Query::AggregateProperty {
+            common::event_segmentation::Query::AggregateProperty {
                 property,
                 aggregate,
             } => Query::AggregateProperty {
                 property: property.into(),
                 aggregate: aggregate.into(),
             },
-            common::query::event_segmentation::Query::QueryFormula { formula } => {
+            common::event_segmentation::Query::QueryFormula { formula } => {
                 Query::Formula { formula }
             }
         }
@@ -378,9 +375,9 @@ pub struct Event {
     pub queries: Vec<Query>,
 }
 
-impl Into<common::query::event_segmentation::Event> for &Event {
-    fn into(self) -> common::query::event_segmentation::Event {
-        common::query::event_segmentation::Event {
+impl Into<common::event_segmentation::Event> for &Event {
+    fn into(self) -> common::event_segmentation::Event {
+        common::event_segmentation::Event {
             event: self.event.to_owned().into(),
             filters: self.filters.as_ref().map_or_else(
                 || None,
@@ -406,7 +403,7 @@ impl Into<common::query::event_segmentation::Event> for &Event {
                 .queries
                 .iter()
                 .map(|v| v.into())
-                .collect::<Vec<common::query::event_segmentation::Query>>()
+                .collect::<Vec<common::event_segmentation::Query>>()
                 .iter()
                 .enumerate()
                 .map(|(idx, v)| NamedQuery::new(v.clone(), Some(self.event.name(idx))))
@@ -415,7 +412,7 @@ impl Into<common::query::event_segmentation::Event> for &Event {
     }
 }
 
-impl Into<Event> for &common::query::event_segmentation::Event {
+impl Into<Event> for &common::event_segmentation::Event {
     fn into(self) -> Event {
         Event {
             event: self.event.to_owned().into(),
@@ -467,16 +464,16 @@ pub struct EventSegmentation {
     pub segments: Option<Vec<Segment>>,
 }
 
-// impl TryInto<common::query::event_segmentation::SegmentCondition> for SegmentCondition {
+// impl TryInto<common::event_segmentation::SegmentCondition> for SegmentCondition {
 // type Error = PlatformError;
 //
-// fn try_into(self) -> Result<common::query::event_segmentation::SegmentCondition, Self::Error> {
+// fn try_into(self) -> Result<common::event_segmentation::SegmentCondition, Self::Error> {
 // match self {
 // SegmentCondition::HasPropertyValue {
 // property_name,
 // operation,
 // value,
-// } => common::query::event_segmentation::SegmentCondition::HasPropertyValue {
+// } => common::event_segmentation::SegmentCondition::HasPropertyValue {
 // property_name,
 // operation: operation.try_into()?,
 // value: value
@@ -489,7 +486,7 @@ pub struct EventSegmentation {
 // operation,
 // value,
 // time,
-// } => common::query::event_segmentation::SegmentCondition::HadPropertyValue {
+// } => common::event_segmentation::SegmentCondition::HadPropertyValue {
 // property_name,
 // operation: operation.try_into()?,
 // value: value
@@ -502,7 +499,7 @@ pub struct EventSegmentation {
 // event,
 // filters,
 // aggregate,
-// } => common::query::event_segmentation::SegmentCondition::DidEvent {
+// } => common::event_segmentation::SegmentCondition::DidEvent {
 // event: event.try_into()?,
 // filters: filters
 // .map(|v| v.iter().map(|v| v.try_into()))
@@ -514,12 +511,12 @@ pub struct EventSegmentation {
 // }
 // }
 //
-// impl TryInto<SegmentCondition> for common::query::event_segmentation::SegmentCondition {
+// impl TryInto<SegmentCondition> for common::event_segmentation::SegmentCondition {
 // type Error = PlatformError;
 //
 // fn try_into(self) -> Result<SegmentCondition, Self::Error> {
 // match self {
-// common::query::event_segmentation::SegmentCondition::HasPropertyValue {
+// common::event_segmentation::SegmentCondition::HasPropertyValue {
 // property_name,
 // operation,
 // value,
@@ -531,7 +528,7 @@ pub struct EventSegmentation {
 // .collect::<std::result::Result<_, _>>()
 // .transpose()?,
 // },
-// common::query::event_segmentation::SegmentCondition::HadPropertyValue {
+// common::event_segmentation::SegmentCondition::HadPropertyValue {
 // property_name,
 // operation,
 // value,
@@ -549,7 +546,7 @@ pub struct EventSegmentation {
 // event,
 // filters,
 // aggregate,
-// } => common::query::event_segmentation::SegmentCondition::DidEvent {
+// } => common::event_segmentation::SegmentCondition::DidEvent {
 // event: event.try_into()?,
 // filters: filters
 // .map(|v| v.iter().map(|v| scalar_to_json_value(v)))
@@ -561,9 +558,9 @@ pub struct EventSegmentation {
 // }
 // }
 
-impl Into<common::query::event_segmentation::EventSegmentation> for EventSegmentation {
-    fn into(self) -> common::query::event_segmentation::EventSegmentation {
-        common::query::event_segmentation::EventSegmentation {
+impl Into<common::event_segmentation::EventSegmentation> for EventSegmentation {
+    fn into(self) -> common::event_segmentation::EventSegmentation {
+        common::event_segmentation::EventSegmentation {
             time: self.time.into(),
             group_id: self.group,
             interval_unit: self.interval_unit.into(),
@@ -602,7 +599,7 @@ impl Into<common::query::event_segmentation::EventSegmentation> for EventSegment
     }
 }
 
-impl Into<EventSegmentation> for common::query::event_segmentation::EventSegmentation {
+impl Into<EventSegmentation> for common::event_segmentation::EventSegmentation {
     fn into(self) -> EventSegmentation {
         EventSegmentation {
             time: self.time.into(),
@@ -742,8 +739,8 @@ pub(crate) fn validate_request(
 pub(crate) fn fix_request(
     md: &Arc<MetadataProvider>,
     project_id: u64,
-    req: common::query::event_segmentation::EventSegmentation,
-) -> Result<common::query::event_segmentation::EventSegmentation> {
+    req: common::event_segmentation::EventSegmentation,
+) -> Result<common::event_segmentation::EventSegmentation> {
     let mut out = req.clone();
     for (event_id, event) in req.events.iter().enumerate() {
         let filters = if let Some(filters) = &event.filters {
@@ -964,7 +961,7 @@ mod tests {
             segments: None,
         };
 
-        let _qes: common::query::event_segmentation::EventSegmentation = es.clone().into();
+        let _qes: common::event_segmentation::EventSegmentation = es.clone().into();
         let j = serde_json::to_string_pretty(&es).unwrap();
         print!("1 {}", j);
 

@@ -6,16 +6,6 @@ use chrono::Duration;
 use chrono::Utc;
 use common::group_col;
 // use std::time::Duration;
-use common::query::funnel::ChartType;
-use common::query::funnel::Count;
-use common::query::funnel::ExcludeSteps;
-use common::query::funnel::Filter;
-use common::query::funnel::Funnel;
-use common::query::funnel::Order;
-use common::query::funnel::StepOrder;
-use common::query::funnel::TimeIntervalUnitSession;
-use common::query::funnel::TimeWindow;
-use common::query::funnel::Touch;
 use common::query::Breakdown;
 use common::query::EventRef;
 use common::query::PropValueFilter;
@@ -41,6 +31,7 @@ use datafusion_expr::Sort;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
 use rust_decimal::Decimal;
+use common::funnel::{Count, ExcludeSteps, Filter, Funnel, StepOrder, TimeWindow, Touch};
 use metadata::properties::Property;
 
 use crate::breakdowns_to_dicts;
@@ -57,7 +48,6 @@ use crate::logical_plan::funnel::FunnelNode;
 use crate::logical_plan::rename_columns::RenameColumnsNode;
 use crate::logical_plan::SortField;
 use crate::queries::decode_filter_single_dictionary;
-use crate::queries::event_records_search::Event;
 use crate::Context;
 
 pub fn build(

@@ -43,36 +43,6 @@ pub struct Compare {
     pub unit: TimeIntervalUnit,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub enum QueryAggregate {
-    Min,
-    Max,
-    Sum,
-    Avg,
-    Median,
-    DistinctCount,
-    Percentile25th,
-    Percentile75th,
-    Percentile90th,
-    Percentile99th,
-}
-
-impl QueryAggregate {
-    pub fn aggregate_function(&self) -> AggregateFunction {
-        match self {
-            QueryAggregate::Min => AggregateFunction::Min,
-            QueryAggregate::Max => AggregateFunction::Max,
-            QueryAggregate::Sum => AggregateFunction::Sum,
-            QueryAggregate::Avg => AggregateFunction::Avg,
-            QueryAggregate::Median => unimplemented!(),
-            QueryAggregate::DistinctCount => unimplemented!(),
-            QueryAggregate::Percentile25th => unimplemented!(),
-            QueryAggregate::Percentile75th => unimplemented!(),
-            QueryAggregate::Percentile90th => unimplemented!(),
-            QueryAggregate::Percentile99th => unimplemented!(),
-        }
-    }
-}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum QueryAggregatePerGroup {

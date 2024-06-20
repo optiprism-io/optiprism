@@ -6,11 +6,8 @@ use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::array_ref_to_json_values;
+use crate::{array_ref_to_json_values, validate_event_filter_property};
 use crate::json_value_to_scalar;
-use crate::queries::event_records_search::EventRecordsSearchRequest;
-use crate::queries::validation::validate_event_filter;
-use crate::queries::validation::validate_event_filter_property;
 use crate::EventRef;
 use crate::ListResponse;
 use crate::PlatformError;
