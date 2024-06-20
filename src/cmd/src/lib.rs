@@ -95,6 +95,7 @@ use tracing::info;
 use uaparser::UserAgentParser;
 use query::event_segmentation::EventSegmentationProvider;
 use query::funnel::FunnelProvider;
+use query::properties::PropertiesProvider;
 
 use crate::error::Error;
 
@@ -327,11 +328,13 @@ fn init_platform(
     let query_provider = Arc::new(QueryProvider::new(md.clone(), db.clone()));
     let es_provider = Arc::new(EventSegmentationProvider::new(md.clone(), db.clone()));
     let funnel_provider = Arc::new(FunnelProvider::new(md.clone(), db.clone()));
+    let prop_provider = Arc::new(PropertiesProvider::new(md.clone(), db.clone()));
     let platform_provider = Arc::new(PlatformProvider::new(
         md.clone(),
         query_provider,
         es_provider,
         funnel_provider,
+        prop_provider,
         cfg.clone(),
     ));
 

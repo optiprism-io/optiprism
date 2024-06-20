@@ -65,6 +65,7 @@ use serde::Serialize;
 use serde_json::json;
 use serde_json::Number;
 use serde_json::Value;
+use query::properties::PropertiesProvider;
 
 use crate::accounts::Accounts;
 use crate::auth::Auth;
@@ -88,6 +89,7 @@ pub struct PlatformProvider {
     pub group_properties: Vec<Arc<Properties>>,
     pub system_properties: Arc<Properties>,
     pub system_group_properties: Arc<Properties>,
+    pub properties:Arc<Properties>,
     pub accounts: Arc<Accounts>,
     pub auth: Arc<Auth>,
     pub query: Arc<Queries>,
@@ -107,20 +109,24 @@ impl PlatformProvider {
         query_prov: Arc<query::QueryProvider>,
         es_prov: Arc<query::event_segmentation::EventSegmentationProvider>,
         funnel_prov: Arc<query::funnel::FunnelProvider>,
+        prop_prov:Arc<PropertiesProvider>,
         cfg: Config,
     ) -> Self {
         let group_properties = (0..GROUPS_COUNT)
-            .map(|gid| Arc::new(Properties::new_group(md.group_properties[gid].clone())))
+            .map(|gid| Arc::new(Properties::new_group(md.group_properties[gid].clone(),prop_prov.clone())))
             .collect::<Vec<_>>();
         Self {
             events: Arc::new(Events::new(md.events.clone())),
             custom_events: Arc::new(CustomEvents::new(md.custom_events.clone())),
             groups: Arc::new(Groups::new(md.groups.clone())),
-            event_properties: Arc::new(Properties::new_event(md.event_properties.clone())),
+            event_properties: Arc::new(Properties::new_event(md.event_properties.clone(),prop_prov.clone())),
             group_properties,
-            system_properties: Arc::new(Properties::new_system(md.system_properties.clone())),
+            system_properties: Arc::new(Properties::new_system(md.system_properties.clone(),prop_prov.clone())),
             system_group_properties: Arc::new(Properties::new_system_group(
-                md.system_group_properties.clone(),
+                md.system_group_properties.clone(),prop_prov.clone()
+            )),
+            properties: Arc::new(Properties::new(
+                md.system_group_properties.clone(),prop_prov.clone()
             )),
             accounts: Arc::new(Accounts::new(md.accounts.clone())),
             auth: Arc::new(Auth::new(md.accounts.clone(), cfg.clone())),

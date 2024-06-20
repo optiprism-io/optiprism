@@ -14,7 +14,6 @@ use crate::queries::funnel;
 use crate::queries::funnel::FunnelRequest;
 use crate::queries::group_records_search;
 use crate::queries::group_records_search::GroupRecordsSearchRequest;
-use crate::queries::property_values::ListPropertyValuesRequest;
 use crate::{Context, PropertyRef, QueryParams, QueryResponseFormat};
 use crate::FunnelResponse;
 use crate::FunnelStep;
@@ -82,24 +81,5 @@ impl Queries {
         Ok(resp)
     }
 
-    pub async fn property_values(
-        &self,
-        ctx: Context,
-        project_id: u64,
-        req: ListPropertyValuesRequest,
-    ) -> Result<ListResponse<Value>> {
-        ctx.check_project_permission(
-            ctx.organization_id,
-            project_id,
-            ProjectPermission::ExploreReports,
-        )?;
 
-        let lreq = req.into();
-        let result = self
-            .query
-            .property_values(query::Context::new(project_id), lreq)
-            .await?;
-
-        Ok(result.into())
-    }
 }
