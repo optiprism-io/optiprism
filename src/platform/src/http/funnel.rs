@@ -13,33 +13,34 @@ use crate::queries::group_records_search::GroupRecordsSearchRequest;
 use crate::queries::property_values::ListPropertyValuesRequest;
 use crate::{Context, QueryParams};
 use crate::event_segmentation::{EventSegmentation, EventSegmentationRequest};
+use crate::funnel::Funnel;
 use crate::FunnelResponse;
 use crate::ListResponse;
 use crate::queries::provider::Queries;
 use crate::QueryResponse;
 use crate::Result;
 
-async fn event_segmentation(
+
+async fn funnel(
     ctx: Context,
-    Extension(provider): Extension<Arc<EventSegmentation>>,
+    Extension(provider): Extension<Arc<Funnel>>,
     Path(project_id): Path<u64>,
     Query(query): Query<QueryParams>,
-    Json(request): Json<EventSegmentationRequest>,
-) -> Result<Json<QueryResponse>> {
+    Json(request): Json<FunnelRequest>,
+) -> Result<Json<FunnelResponse>> {
     Ok(Json(
-        provider
-            .event_segmentation(ctx, project_id, request, query)
-            .await?,
+        provider.funnel(ctx, project_id, request, query).await?,
     ))
 }
+
 
 pub fn attach_routes(router: Router) -> Router {
     router.nest(
         "/api/v1/projects/:project_id",
         Router::new()
             .route(
-                "/queries/event-segmentation",
-                routing::post(event_segmentation),
+                "/queries/funnel",
+                routing::post(funnel),
             )
     )
 }

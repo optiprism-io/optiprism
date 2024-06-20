@@ -12,6 +12,7 @@ pub mod properties;
 pub mod queries;
 pub mod reports;
 mod event_segmentation;
+pub mod funnel;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -66,6 +67,7 @@ pub fn attach_routes(
     router = reports::attach_routes(router);
     router = event_records::attach_routes(router);
     router = event_segmentation::attach_routes(router);
+    router = funnel::attach_routes(router);
     router = group_records::attach_routes(router);
     if let Some(ui_path) = &cfg.ui_path {
         let serve_dir = ServeDir::new(ui_path.to_owned())
@@ -93,6 +95,7 @@ pub fn attach_routes(
         .layer(Extension(cfg))
         .layer(Extension(platform.query.clone()))
         .layer(Extension(platform.event_segmentation.clone()))
+        .layer(Extension(platform.funnel.clone()))
         .layer(Extension(platform.dashboards.clone()))
         .layer(Extension(platform.reports.clone()));
     // .layer(Extension(platform.event_records.clone()))

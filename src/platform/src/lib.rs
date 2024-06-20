@@ -19,6 +19,7 @@ pub mod properties;
 pub mod reports;
 pub mod queries;
 pub mod event_segmentation;
+mod funnel;
 // pub mod stub;
 
 use std::fmt::Debug;
@@ -71,6 +72,7 @@ use crate::custom_events::CustomEvents;
 use crate::dashboards::Dashboards;
 use crate::event_segmentation::{EventSegmentation};
 use crate::events::Events;
+use crate::funnel::Funnel;
 use crate::groups::Groups;
 use crate::organizations::Organizations;
 use crate::projects::Projects;
@@ -89,7 +91,8 @@ pub struct PlatformProvider {
     pub accounts: Arc<Accounts>,
     pub auth: Arc<Auth>,
     pub query: Arc<Queries>,
-    pub event_segmentation:Arc<EventSegmentation>,
+    pub event_segmentation: Arc<EventSegmentation>,
+    pub funnel: Arc<Funnel>,
     pub dashboards: Arc<Dashboards>,
     pub reports: Arc<Reports>,
     pub projects: Arc<Projects>,
@@ -102,7 +105,8 @@ impl PlatformProvider {
     pub fn new(
         md: Arc<MetadataProvider>,
         query_prov: Arc<query::QueryProvider>,
-        es_prov:Arc<query::event_segmentation::EventSegmentationProvider>,
+        es_prov: Arc<query::event_segmentation::EventSegmentationProvider>,
+        funnel_prov: Arc<query::funnel::FunnelProvider>,
         cfg: Config,
     ) -> Self {
         let group_properties = (0..GROUPS_COUNT)
@@ -121,7 +125,8 @@ impl PlatformProvider {
             accounts: Arc::new(Accounts::new(md.accounts.clone())),
             auth: Arc::new(Auth::new(md.accounts.clone(), cfg.clone())),
             query: Arc::new(Queries::new(query_prov.clone(), md.clone())),
-            event_segmentation: Arc::new(EventSegmentation::new(md.clone(),es_prov)),
+            event_segmentation: Arc::new(EventSegmentation::new(md.clone(), es_prov)),
+            funnel: Arc::new(Funnel::new(md.clone(), funnel_prov)),
             dashboards: Arc::new(Dashboards::new(md.dashboards.clone())),
             reports: Arc::new(Reports::new(md.reports.clone())),
             // event_records: Arc::new(stub::EventRecords {}),
@@ -229,7 +234,8 @@ impl From<metadata::metadata::ResponseMetadata> for ResponseMetadata {
 #[derive(Serialize, Deserialize, Default, Debug, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ListResponse<T>
-where T: Debug
+where
+    T: Debug,
 {
     pub data: Vec<T>,
     pub meta: ResponseMetadata,
@@ -601,6 +607,7 @@ impl QueryResponse {
         Ok(Self::JSONCompact(JSONCompactQueryResponse(data)))
     }
 }
+
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct FunnelStepData {
@@ -615,6 +622,7 @@ pub struct FunnelStepData {
     pub time_to_convert: i64,
     pub time_to_convert_from_start: i64,
 }
+
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct FunnelStep {
@@ -625,7 +633,7 @@ pub struct FunnelStep {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct FunnelResponse {
-    pub groups:Vec<String>,
+    pub groups: Vec<String>,
     pub steps: Vec<FunnelStep>,
 }
 

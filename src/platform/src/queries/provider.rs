@@ -6,13 +6,12 @@ use chrono::Utc;
 use common::rbac::ProjectPermission;
 use metadata::MetadataProvider;
 use query::context::Format;
-use query::queries::funnel::StepData;
 use query::QueryProvider;
 use serde_json::Value;
 use metadata::properties::Type;
 
 use crate::queries::funnel;
-use crate::queries::funnel::Funnel;
+use crate::queries::funnel::FunnelRequest;
 use crate::queries::group_records_search;
 use crate::queries::group_records_search::GroupRecordsSearchRequest;
 use crate::queries::property_values::ListPropertyValuesRequest;
@@ -33,78 +32,6 @@ impl Queries {
     pub fn new(query: Arc<QueryProvider>, md: Arc<MetadataProvider>) -> Self {
         Self { query, md }
     }
-    pub async fn funnel(
-        &self,
-        ctx: Context,
-        project_id: u64,
-        req: Funnel,
-        query: QueryParams,
-    ) -> Result<FunnelResponse> {
-        ctx.check_project_permission(
-            ctx.organization_id,
-            project_id,
-            ProjectPermission::ExploreReports,
-        )?;
-        funnel::validate_request(&self.md, project_id, &req)?;
-        let req = funnel::fix_request(req.into())?;
-
-        let lreq = req.into();
-        let cur_time = match query.timestamp {
-            None => Utc::now(),
-            Some(ts_sec) => DateTime::from_naive_utc_and_offset(
-                chrono::NaiveDateTime::from_timestamp_millis(ts_sec * 1000).unwrap(),
-                Utc,
-            ),
-        };
-        let ctx = query::Context {
-            project_id,
-            format: match &query.format {
-                None => Format::Regular,
-                Some(format) => match format {
-                    QueryResponseFormat::Json => Format::Regular,
-                    QueryResponseFormat::JsonCompact => Format::Compact,
-                },
-            },
-            cur_time,
-        };
-
-        let mut qdata = self.query.funnel(ctx, lreq).await?;
-
-        let groups = qdata
-            .groups;
-
-        let steps = qdata
-            .steps
-            .iter()
-            .map(|step| {
-                let data = step
-                    .data
-                    .iter()
-                    .map(|data| {
-                        FunnelStepData {
-                            groups: data.groups.clone(),
-                            ts: data.ts.clone(),
-                            total: data.total.clone(),
-                            conversion_ratio: data.conversion_ratio.clone(),
-                            avg_time_to_convert: data.avg_time_to_convert.clone(),
-                            avg_time_to_convert_from_start: data.avg_time_to_convert_from_start.clone(),
-                            dropped_off: data.dropped_off.clone(),
-                            drop_off_ratio: data.drop_off_ratio.clone(),
-                            time_to_convert: data.time_to_convert.clone(),
-                            time_to_convert_from_start: data.time_to_convert_from_start.clone(),
-                        }
-                    })
-                    .collect::<Vec<_>>();
-                FunnelStep {
-                    step: step.step.clone(),
-                    data,
-                }
-            })
-            .collect::<Vec<_>>();
-        let resp = FunnelResponse { groups, steps };
-        Ok(resp)
-    }
-
     pub async fn group_record_search(
         &self,
         ctx: Context,
