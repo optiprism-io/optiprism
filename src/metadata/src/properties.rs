@@ -20,6 +20,7 @@ use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
+use common::query::PropertyRef;
 use storage::db::OptiDBImpl;
 use storage::error::StoreError;
 
@@ -41,6 +42,7 @@ use crate::project_ns;
 use crate::Result;
 
 const IDX_NAME: &[u8] = b"name";
+const IDX_COLUMN_NAME: &[u8] = b"column_name";
 const IDX_DISPLAY_NAME: &[u8] = b"display_name";
 
 fn index_keys(
@@ -53,7 +55,7 @@ fn index_keys(
         index_name_key(project_id, typ, name),
         index_display_name_key(project_id, typ, display_name),
     ]
-    .to_vec()
+        .to_vec()
 }
 
 fn index_name_key(project_id: u64, typ: &Type, name: &str) -> Option<Vec<u8>> {
@@ -63,7 +65,18 @@ fn index_name_key(project_id: u64, typ: &Type, name: &str) -> Option<Vec<u8>> {
             IDX_NAME,
             name,
         )
-        .to_vec(),
+            .to_vec(),
+    )
+}
+
+fn index_column_name_key(project_id: u64, typ: &Type, name: &str) -> Option<Vec<u8>> {
+    Some(
+        make_index_key(
+            project_ns(project_id, "global".as_bytes()).as_slice(),
+            IDX_COLUMN_NAME,
+            name,
+        )
+            .to_vec(),
     )
 }
 
@@ -78,7 +91,7 @@ fn index_display_name_key(
             IDX_DISPLAY_NAME,
             v.as_str(),
         )
-        .to_vec()
+            .to_vec()
     })
 }
 
@@ -91,6 +104,21 @@ pub struct Properties {
 }
 
 impl Properties {
+    pub fn new(db: Arc<TransactionDB>, opti_db: Arc<OptiDBImpl>) -> Self {
+        let id_cache = RwLock::new(LruCache::new(
+            NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
+        ));
+        let name_cache = RwLock::new(LruCache::new(
+            NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
+        ));
+        Properties {
+            db,
+            id_cache,
+            name_cache,
+            opti_db,
+            typ: Type::Event,
+        }
+    }
     pub fn new_group(db: Arc<TransactionDB>, opti_db: Arc<OptiDBImpl>) -> Vec<Arc<Self>> {
         let props = (0..GROUPS_COUNT)
             .into_iter()
@@ -161,6 +189,23 @@ impl Properties {
             typ: Type::SystemGroup,
         }
     }
+    pub fn get_by_column_name_global(&self,
+                          project_id: u64,
+                          name: &str) -> Result<Property> {
+        let tx = self.db.transaction();
+        let idx_key = make_index_key(
+            project_ns(project_id, self.typ.path().as_bytes()).as_slice(),
+            IDX_NAME,
+            name,
+        );
+        let id = get_index(
+            &tx,
+            idx_key,
+            format!("property with col name \"{}\" not found", name).as_str(),
+        )?;
+
+        self.get_by_id_(&tx, project_id, id)
+    }
 
     fn get_by_name_(
         &self,
@@ -206,6 +251,8 @@ impl Properties {
             id,
         );
 
+        // todo писать в кеш
+
         match tx.get(key)? {
             None => Err(MetadataError::NotFound(
                 format!("property {id} not found").to_string(),
@@ -225,9 +272,15 @@ impl Properties {
         } else {
             project_id
         };
-        let idx_keys = index_keys(project_id, &self.typ, &req.name, req.display_name.clone());
+        let mut idx_keys = index_keys(project_id, &self.typ, &req.name, req.display_name.clone());
 
-        check_insert_constraints(tx, idx_keys.as_ref())?;
+        for key in idx_keys.iter().flatten() {
+            if tx.get(key)?.is_some() {
+                return Err(MetadataError::AlreadyExists(String::from_utf8(
+                    key.to_owned(),
+                )?));
+            }
+        }
 
         let id = next_seq(
             tx,
@@ -241,7 +294,7 @@ impl Properties {
                     project_id,
                     format!("{}/{}", self.typ.order_path(), req.data_type.short_name()).as_bytes(),
                 )
-                .as_slice(),
+                    .as_slice(),
             ),
         )?;
         let created_at = Utc::now();
@@ -277,13 +330,25 @@ impl Properties {
             .write()
             .unwrap()
             .put((project_id, prop.name.to_string()), prop.clone());
+
         self.id_cache
             .write()
             .unwrap()
             .put((project_id, id), prop.clone());
 
+        dbg!(prop.column_name());
         let data = serialize(&prop)?;
         tx.put(idx_key, &data)?;
+
+        idx_keys.push(Some(
+            make_index_key(
+                project_ns(project_id, "global".as_bytes()).as_slice(),
+                IDX_COLUMN_NAME,
+                prop.column_name().as_str()
+            )
+                .to_vec(),
+        ));
+
 
         insert_index(tx, idx_keys.as_ref(), prop.id)?;
 
@@ -674,6 +739,15 @@ impl Property {
             dt.to_owned().into()
         } else {
             self.data_type.to_owned().into()
+        }
+    }
+
+    pub fn reference(&self) -> PropertyRef {
+        match self.typ {
+            Type::System => PropertyRef::System(self.name.to_owned()),
+            Type::SystemGroup => PropertyRef::SystemGroup(self.name.to_owned()),
+            Type::Event => PropertyRef::Event(self.name.to_owned()),
+            Type::Group(v) => PropertyRef::Group(self.name.to_owned(), v),
         }
     }
 }

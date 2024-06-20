@@ -37,6 +37,7 @@ use tokio::net::TcpListener;
 use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tracing::info;
+use query::event_records::EventRecordsProvider;
 use query::event_segmentation::EventSegmentationProvider;
 use query::funnel::FunnelProvider;
 use query::properties::PropertiesProvider;
@@ -283,6 +284,7 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
     let es_prov = Arc::new(EventSegmentationProvider::new(md.clone(), db.clone()));
     let funnel_prov = Arc::new(FunnelProvider::new(md.clone(), db.clone()));
     let prop_prov = Arc::new(PropertiesProvider::new(md.clone(), db.clone()));
+    let er_prov = Arc::new(EventRecordsProvider::new(md.clone(), db.clone()));
 
     let query_provider = Arc::new(QueryProvider::new(md.clone(), db.clone()));
     let platform_provider = Arc::new(platform::PlatformProvider::new(
@@ -291,6 +293,7 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
         es_prov,
         funnel_prov,
         prop_prov,
+        er_prov,
         cfg.clone(),
     ));
 

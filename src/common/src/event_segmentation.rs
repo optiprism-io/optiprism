@@ -170,7 +170,7 @@ impl Event {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct EventSegmentation {
+pub struct EventSegmentationRequest {
     pub time: QueryTime,
     pub group_id: usize,
     pub interval_unit: TimeIntervalUnit,
@@ -183,7 +183,7 @@ pub struct EventSegmentation {
     pub segments: Option<Vec<Segment>>,
 }
 
-impl EventSegmentation {
+impl EventSegmentationRequest {
     pub fn time_columns(&self, cur_time: DateTime<Utc>) -> Vec<String> {
         let (from, to) = self.time.range(cur_time);
         time_columns(from, to, &self.interval_unit)

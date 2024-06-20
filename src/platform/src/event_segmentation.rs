@@ -557,9 +557,9 @@ pub struct EventSegmentationRequest {
 // }
 // }
 
-impl Into<common::event_segmentation::EventSegmentation> for EventSegmentationRequest {
-    fn into(self) -> common::event_segmentation::EventSegmentation {
-        common::event_segmentation::EventSegmentation {
+impl Into<common::event_segmentation::EventSegmentationRequest> for EventSegmentationRequest {
+    fn into(self) -> common::event_segmentation::EventSegmentationRequest {
+        common::event_segmentation::EventSegmentationRequest {
             time: self.time.into(),
             group_id: self.group,
             interval_unit: self.interval_unit.into(),
@@ -598,7 +598,7 @@ impl Into<common::event_segmentation::EventSegmentation> for EventSegmentationRe
     }
 }
 
-impl Into<EventSegmentationRequest> for common::event_segmentation::EventSegmentation {
+impl Into<EventSegmentationRequest> for common::event_segmentation::EventSegmentationRequest {
     fn into(self) -> EventSegmentationRequest {
         EventSegmentationRequest {
             time: self.time.into(),
@@ -738,8 +738,8 @@ pub(crate) fn validate_request(
 pub(crate) fn fix_request(
     md: &Arc<MetadataProvider>,
     project_id: u64,
-    req: common::event_segmentation::EventSegmentation,
-) -> Result<common::event_segmentation::EventSegmentation> {
+    req: common::event_segmentation::EventSegmentationRequest,
+) -> Result<common::event_segmentation::EventSegmentationRequest> {
     let mut out = req.clone();
     for (event_id, event) in req.events.iter().enumerate() {
         let filters = if let Some(filters) = &event.filters {
@@ -960,7 +960,7 @@ mod tests {
             segments: None,
         };
 
-        let _qes: common::event_segmentation::EventSegmentation = es.clone().into();
+        let _qes: common::event_segmentation::EventSegmentationRequest = es.clone().into();
         let j = serde_json::to_string_pretty(&es).unwrap();
         print!("1 {}", j);
 

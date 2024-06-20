@@ -100,8 +100,8 @@ pub fn attach_routes(
         .layer(Extension(platform.event_segmentation.clone()))
         .layer(Extension(platform.funnel.clone()))
         .layer(Extension(platform.dashboards.clone()))
-        .layer(Extension(platform.reports.clone()));
-    // .layer(Extension(platform.event_records.clone()))
+        .layer(Extension(platform.reports.clone()))
+        .layer(Extension(platform.event_records.clone()));
     // .layer(Extension(platform.group_records.clone()));
 
     let cors = CorsLayer::new()

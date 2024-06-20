@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
+use arrow::array::{Array, BooleanArray, Decimal128Array, Int16Array, Int32Array, Int64Array, Int8Array, StringArray, TimestampMillisecondArray, TimestampMillisecondBuilder};
+use arrow::datatypes::DataType;
 
 use common::query::EventRef;
 use common::query::PropValueFilter;
@@ -9,7 +11,7 @@ use common::query::QueryTime;
 use common::types::{COLUMN_CREATED_AT, COLUMN_EVENT, TABLE_EVENTS};
 use common::types::COLUMN_EVENT_ID;
 use common::types::COLUMN_PROJECT_ID;
-use common::GROUPS_COUNT;
+use common::{DECIMAL_PRECISION, DECIMAL_SCALE, GROUPS_COUNT};
 use datafusion_common::Column;
 use datafusion_common::ScalarValue;
 use datafusion_expr::and;
@@ -42,20 +44,115 @@ use crate::logical_plan::rename_columns::RenameColumnsNode;
 use crate::queries::{decode_filter_single_dictionary};
 use crate::{col_name, ColumnType, Context, DataTable, execute, initial_plan, QueryProvider};
 
-pub struct Provider {
+pub struct EventRecordsProvider {
     metadata: Arc<MetadataProvider>,
     db: Arc<OptiDBImpl>,
 }
 
-impl Provider {
+impl EventRecordsProvider {
     pub fn new(metadata: Arc<MetadataProvider>, db: Arc<OptiDBImpl>) -> Self {
         Self { metadata, db }
+    }
+
+    pub async fn get_by_id(
+        &self,
+        ctx: Context,
+        id: u64,
+    ) -> Result<EventRecord> {
+        let start = Instant::now();
+        let schema = self.db.schema1(TABLE_EVENTS)?;
+        let projection =
+            (0..schema.fields.len()).collect::<Vec<_>>();
+
+        let (session_ctx, state, plan) = initial_plan(&self.db, projection).await?;
+        let plan = build_get_by_id_plan(&ctx, self.metadata.clone(), plan, id)?;
+        println!("{plan:?}");
+        let result = execute(session_ctx, state, plan).await?;
+        let duration = start.elapsed();
+        debug!("elapsed: {:?}", duration);
+
+        let mut properties = vec![];
+
+        for (field, col) in result.schema().fields().iter().zip(result.columns().iter()) {
+            let mut property = None;
+            for p in self.metadata.event_properties.list(ctx.project_id)?.data {
+                if p.column_name() == *field.name() {
+                    property = Some(p);
+                    break;
+                }
+            };
+
+            if property.is_none() {
+                for p in self.metadata.system_properties.list(ctx.project_id)?.data {
+                    if p.column_name() == *field.name() {
+                        property = Some(p);
+                        break;
+                    }
+                };
+            }
+
+            if property.is_none() {
+                for g in 0..GROUPS_COUNT {
+                    for p in self.metadata.group_properties[g].list(ctx.project_id)?.data {
+                        if p.column_name() == *field.name() {
+                            property = Some(p);
+                            break;
+                        }
+                    };
+                }
+            }
+
+            if let Some(prop) = property {
+                let value = match field.data_type() {
+                    DataType::Boolean => {
+                        let a = col.as_any().downcast_ref::<BooleanArray>().unwrap();
+                        ScalarValue::Boolean(Some(a.value(0)))
+                    }
+                    DataType::Int8 => {
+                        let a = col.as_any().downcast_ref::<Int8Array>().unwrap();
+                        ScalarValue::Int8(Some(a.value(0)))
+                    }
+                    DataType::Int16 => {
+                        let a = col.as_any().downcast_ref::<Int16Array>().unwrap();
+                        ScalarValue::Int16(Some(a.value(0).to_owned()))
+                    }
+                    DataType::Int32 => {
+                        let a = col.as_any().downcast_ref::<Int32Array>().unwrap();
+                        ScalarValue::Int32(Some(a.value(0).to_owned()))
+                    }
+                    DataType::Int64 => {
+                        let a = col.as_any().downcast_ref::<Int64Array>().unwrap();
+                        ScalarValue::Int64(Some(a.value(0).to_owned()))
+                    }
+                    DataType::Utf8 => {
+                        {
+                            let a = col.as_any().downcast_ref::<StringArray>().unwrap();
+                            ScalarValue::Utf8(Some(a.value(0).to_owned()))
+                        }
+                    }
+                    DataType::Decimal128(_, _) => {
+                        let a = col.as_any().downcast_ref::<Decimal128Array>().unwrap();
+                        ScalarValue::Decimal128(Some(a.value(0)), DECIMAL_PRECISION, DECIMAL_SCALE)
+                    }
+                    DataType::Timestamp(tu, v) => {
+                        let a = col.as_any().downcast_ref::<TimestampMillisecondArray>().unwrap();
+                        ScalarValue::TimestampMillisecond(Some(a.value(0)), None).to_owned()
+                    }
+                    _ => unimplemented!("unimplemented {}", field.data_type().to_string())
+                };
+
+                properties.push(PropertyAndValue { property: prop.reference(), value })
+            }
+        }
+        let rec = EventRecord { properties };
+
+        Ok(rec)
     }
 
     pub async fn search(
         &self,
         ctx: Context,
-        req: EventRecordsSearch,
+        req: EventRecordsSearchRequest,
     ) -> Result<DataTable> {
         let start = Instant::now();
         let schema = self.db.schema1(TABLE_EVENTS)?;
@@ -70,7 +167,7 @@ impl Provider {
         };
 
         let (session_ctx, state, plan) = initial_plan(&self.db, projection).await?;
-        let plan = build_plan(ctx, self.metadata.clone(), plan, req.clone())?;
+        let plan = build_search_plan(ctx, self.metadata.clone(), plan, req.clone())?;
         println!("{plan:?}");
         let result = execute(session_ctx, state, plan).await?;
         let duration = start.elapsed();
@@ -95,11 +192,11 @@ impl Provider {
     }
 }
 
-pub fn build_plan(
+pub fn build_search_plan(
     ctx: Context,
     metadata: Arc<MetadataProvider>,
     input: LogicalPlan,
-    req: EventRecordsSearch,
+    req: EventRecordsSearchRequest,
 ) -> Result<LogicalPlan> {
     let mut properties = vec![];
     let input = if let Some(props) = &req.properties {
@@ -251,13 +348,13 @@ pub fn build_plan(
             (col, Arc::new(dict))
         })
         .collect::<Vec<_>>();
-    // let input = if !decode_cols.is_empty() {
-    //     LogicalPlan::Extension(Extension {
-    //         node: Arc::new(DictionaryDecodeNode::try_new(input, decode_cols.clone())?),
-    //     })
-    // } else {
-    //     input
-    // };
+    let input = if !decode_cols.is_empty() {
+        LogicalPlan::Extension(Extension {
+            node: Arc::new(DictionaryDecodeNode::try_new(input, decode_cols.clone())?),
+        })
+    } else {
+        input
+    };
 
     let mut rename = vec![];
     let mut rename_found: Vec<String> = vec![];
@@ -281,6 +378,72 @@ pub fn build_plan(
     let input = LogicalPlan::Extension(Extension {
         node: Arc::new(RenameColumnsNode::try_new(input, rename)?),
     });
+
+    Ok(input)
+}
+
+pub fn build_get_by_id_plan(
+    ctx: &Context,
+    metadata: Arc<MetadataProvider>,
+    input: LogicalPlan,
+    id: u64,
+) -> Result<LogicalPlan> {
+    let mut filter_exprs = vec![
+        binary_expr(
+            col(COLUMN_PROJECT_ID),
+            Operator::Eq,
+            lit(ScalarValue::from(ctx.project_id as i64)),
+        ),
+        binary_expr(
+            col(COLUMN_EVENT_ID),
+            Operator::Eq,
+            lit(ScalarValue::from(id as i64)),
+        ),
+    ];
+
+    let input = LogicalPlan::Filter(PlanFilter::try_new(
+        multi_and(filter_exprs),
+        Arc::new(input),
+    )?);
+
+    let mut properties = vec![];
+    let mut l = metadata.system_properties.list(ctx.project_id)?.data;
+    properties.append(&mut (l));
+    let mut l = metadata.event_properties.list(ctx.project_id)?.data;
+    properties.append(&mut (l));
+    for g in 0..GROUPS_COUNT {
+        let mut l = metadata.group_properties[g].list(ctx.project_id)?.data;
+        properties.append(&mut (l));
+    }
+
+    let mut cols_hash: HashMap<String, ()> = HashMap::new();
+    let dict_props = properties
+        .iter()
+        .filter(|prop| prop.is_dictionary && !cols_hash.contains_key(&prop.column_name()))
+        .collect::<Vec<_>>();
+    let decode_cols = dict_props
+        .iter()
+        .map(|prop| {
+            let col_name = prop.column_name();
+            let dict = SingleDictionaryProvider::new(
+                ctx.project_id,
+                col_name.clone(),
+                metadata.dictionaries.clone(),
+            );
+            let col = Column::from_name(col_name);
+            cols_hash.insert(prop.column_name(), ());
+
+            (col, Arc::new(dict))
+        })
+        .collect::<Vec<_>>();
+
+    let input = if !decode_cols.is_empty() {
+        LogicalPlan::Extension(Extension {
+            node: Arc::new(DictionaryDecodeNode::try_new(input, decode_cols.clone())?),
+        })
+    } else {
+        input
+    };
 
     Ok(input)
 }
@@ -328,7 +491,7 @@ fn decode_filter_dictionaries(
 
 fn projection(
     ctx: &Context,
-    req: &EventRecordsSearch,
+    req: &EventRecordsSearchRequest,
     md: &Arc<MetadataProvider>,
 ) -> Result<Vec<String>> {
     let mut fields = vec![
@@ -361,7 +524,18 @@ pub struct Event {
 }
 
 #[derive(Clone, Debug)]
-pub struct EventRecordsSearch {
+pub struct EventRecord {
+    pub properties: Vec<PropertyAndValue>,
+}
+
+#[derive(Clone, Debug)]
+pub struct PropertyAndValue {
+    pub property: PropertyRef,
+    pub value: ScalarValue,
+}
+
+#[derive(Clone, Debug)]
+pub struct EventRecordsSearchRequest {
     pub time: QueryTime,
     pub events: Option<Vec<Event>>,
     pub filters: Option<Vec<PropValueFilter>>,

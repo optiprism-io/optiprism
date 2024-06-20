@@ -34,6 +34,7 @@ pub struct MetadataProvider {
     pub reports: Arc<Reports>,
     pub events: Arc<Events>,
     pub custom_events: Arc<CustomEvents>,
+    pub properties: Arc<Properties>,
     pub event_properties: Arc<Properties>,
     pub group_properties: Vec<Arc<Properties>>,
     pub system_properties: Arc<Properties>,
@@ -55,6 +56,10 @@ impl MetadataProvider {
             reports: Arc::new(reports::Reports::new(db.clone())),
             events: events.clone(),
             custom_events: Arc::new(custom_events::CustomEvents::new(db.clone(), events)),
+            properties: Arc::new(properties::Properties::new(
+                db.clone(),
+                opti_db.clone(),
+            )),
             event_properties: Arc::new(properties::Properties::new_event(
                 db.clone(),
                 opti_db.clone(),

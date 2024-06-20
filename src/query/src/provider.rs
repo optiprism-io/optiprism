@@ -18,7 +18,7 @@ use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
 use arrow::util::pretty::print_batches;
 use common::group_col;
-use common::event_segmentation::EventSegmentation;
+use common::event_segmentation::EventSegmentationRequest;
 use common::event_segmentation::Query;
 use common::funnel::Funnel;
 use common::query::Breakdown;
