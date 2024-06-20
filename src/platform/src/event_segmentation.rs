@@ -10,9 +10,13 @@ use metadata::MetadataProvider;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
+use common::rbac::ProjectPermission;
+use query::context::Format;
+use query::event_segmentation::EventSegmentationProvider;
+use query::QueryProvider;
 
 use crate::error::Result;
-use crate::{json_value_to_scalar, validate_event, validate_event_filter, validate_event_property};
+use crate::{json_value_to_scalar, QueryParams, QueryResponse, QueryResponseFormat, validate_event, validate_event_filter, validate_event_property};
 use crate::AggregateFunction;
 use crate::Breakdown;
 use crate::PartitionedAggregateFunction;
@@ -28,6 +32,69 @@ use crate::PlatformError;
 use crate::PropValueFilter;
 use crate::PropValueOperation;
 use crate::PropertyRef;
+
+pub struct EventSegmentation {
+    md: Arc<MetadataProvider>,
+    prov: Arc<EventSegmentationProvider>,
+}
+
+impl EventSegmentation {
+    pub fn new(md: Arc<MetadataProvider>, prov: Arc<EventSegmentationProvider>) -> Self {
+        Self { md, prov }
+    }
+    pub async fn event_segmentation(
+        &self,
+        ctx: Context,
+        project_id: u64,
+        req: EventSegmentationRequest,
+        query: QueryParams,
+    ) -> Result<QueryResponse> {
+        ctx.check_project_permission(
+            ctx.organization_id,
+            project_id,
+            ProjectPermission::ExploreReports,
+        )?;
+        validate_request(&self.md, project_id, &req)?;
+        let lreq = req.into();
+        let lreq = fix_request(&self.md, project_id, lreq)?;
+        dbg!(&lreq);
+
+        let cur_time = match query.timestamp {
+            None => Utc::now(),
+            Some(ts_sec) => DateTime::from_naive_utc_and_offset(
+                chrono::NaiveDateTime::from_timestamp_millis(ts_sec * 1000).unwrap(),
+                Utc,
+            ),
+        };
+        let ctx = query::Context {
+            project_id,
+            format: match &query.format {
+                None => Format::Regular,
+                Some(format) => match format {
+                    QueryResponseFormat::Json => Format::Regular,
+                    QueryResponseFormat::JsonCompact => Format::Compact,
+                },
+            },
+            cur_time,
+        };
+
+        let mut data = self.prov.event_segmentation(ctx, lreq).await?;
+
+        // do empty response so it will be [] instead of [[],[],[],...]
+        if !data.columns.is_empty() && data.columns[0].data.is_empty() {
+            data.columns = vec![];
+        }
+        let resp = match query.format {
+            None => QueryResponse::columns_to_json(data.columns),
+            Some(QueryResponseFormat::Json) => QueryResponse::columns_to_json(data.columns),
+            Some(QueryResponseFormat::JsonCompact) => {
+                QueryResponse::columns_to_json_compact(data.columns)
+            }
+        }?;
+
+        Ok(resp)
+    }
+}
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -126,74 +193,6 @@ impl Into<Compare> for common::event_segmentation::Compare {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub enum QueryAggregate {
-    Min,
-    Max,
-    Sum,
-    Avg,
-    Median,
-    DistinctCount,
-    Percentile25,
-    Percentile75,
-    Percentile90,
-    Percentile99,
-}
-
-impl Into<common::query::QueryAggregate> for QueryAggregate {
-    fn into(self) -> common::query::QueryAggregate {
-        match self {
-            QueryAggregate::Min => common::query::QueryAggregate::Min,
-            QueryAggregate::Max => common::query::QueryAggregate::Max,
-            QueryAggregate::Sum => common::query::QueryAggregate::Sum,
-            QueryAggregate::Avg => common::query::QueryAggregate::Avg,
-            QueryAggregate::Median => common::query::QueryAggregate::Median,
-            QueryAggregate::DistinctCount => {
-                common::query::QueryAggregate::DistinctCount
-            }
-            QueryAggregate::Percentile25 => {
-                common::query::QueryAggregate::Percentile25th
-            }
-            QueryAggregate::Percentile75 => {
-                common::query::QueryAggregate::Percentile75th
-            }
-            QueryAggregate::Percentile90 => {
-                common::query::QueryAggregate::Percentile90th
-            }
-            QueryAggregate::Percentile99 => {
-                common::query::QueryAggregate::Percentile99th
-            }
-        }
-    }
-}
-
-impl Into<QueryAggregate> for common::query::QueryAggregate {
-    fn into(self) -> QueryAggregate {
-        match self {
-            common::query::QueryAggregate::Min => QueryAggregate::Min,
-            common::query::QueryAggregate::Max => QueryAggregate::Max,
-            common::query::QueryAggregate::Sum => QueryAggregate::Sum,
-            common::query::QueryAggregate::Avg => QueryAggregate::Avg,
-            common::query::QueryAggregate::Median => QueryAggregate::Median,
-            common::query::QueryAggregate::DistinctCount => {
-                QueryAggregate::DistinctCount
-            }
-            common::query::QueryAggregate::Percentile25th => {
-                QueryAggregate::Percentile25
-            }
-            common::query::QueryAggregate::Percentile75th => {
-                QueryAggregate::Percentile75
-            }
-            common::query::QueryAggregate::Percentile90th => {
-                QueryAggregate::Percentile90
-            }
-            common::query::QueryAggregate::Percentile99th => {
-                QueryAggregate::Percentile99
-            }
-        }
-    }
-}
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -447,7 +446,7 @@ impl Into<Event> for &common::event_segmentation::Event {
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct EventSegmentation {
+pub struct EventSegmentationRequest {
     pub time: QueryTime,
     pub group: usize,
     pub interval_unit: TimeIntervalUnit,
@@ -558,7 +557,7 @@ pub struct EventSegmentation {
 // }
 // }
 
-impl Into<common::event_segmentation::EventSegmentation> for EventSegmentation {
+impl Into<common::event_segmentation::EventSegmentation> for EventSegmentationRequest {
     fn into(self) -> common::event_segmentation::EventSegmentation {
         common::event_segmentation::EventSegmentation {
             time: self.time.into(),
@@ -599,9 +598,9 @@ impl Into<common::event_segmentation::EventSegmentation> for EventSegmentation {
     }
 }
 
-impl Into<EventSegmentation> for common::event_segmentation::EventSegmentation {
-    fn into(self) -> EventSegmentation {
-        EventSegmentation {
+impl Into<EventSegmentationRequest> for common::event_segmentation::EventSegmentation {
+    fn into(self) -> EventSegmentationRequest {
+        EventSegmentationRequest {
             time: self.time.into(),
             group: self.group_id,
             interval_unit: self.interval_unit.into(),
@@ -640,7 +639,7 @@ impl Into<EventSegmentation> for common::event_segmentation::EventSegmentation {
 pub(crate) fn validate_request(
     md: &Arc<MetadataProvider>,
     project_id: u64,
-    req: &EventSegmentation,
+    req: &EventSegmentationRequest,
 ) -> Result<()> {
     if req.group > GROUPS_COUNT - 1 {
         return Err(PlatformError::BadRequest(
@@ -847,18 +846,18 @@ mod tests {
     use serde_json::json;
 
     use crate::error::Result;
-    use crate::queries::event_segmentation::AggregateFunction;
-    use crate::queries::event_segmentation::Analysis;
-    use crate::queries::event_segmentation::Breakdown;
-    use crate::queries::event_segmentation::ChartType;
-    use crate::queries::event_segmentation::Compare;
-    use crate::queries::event_segmentation::Event;
-    use crate::queries::event_segmentation::EventSegmentation;
-    use crate::queries::event_segmentation::PartitionedAggregateFunction;
-    use crate::queries::event_segmentation::PropValueFilter;
-    use crate::queries::event_segmentation::Query;
-    use crate::queries::event_segmentation::QueryTime;
-    use crate::queries::event_segmentation::TimeIntervalUnit;
+    use crate::event_segmentation::{AggregateFunction, EventSegmentationRequest};
+    use crate::event_segmentation::Analysis;
+    use crate::event_segmentation::Breakdown;
+    use crate::event_segmentation::ChartType;
+    use crate::event_segmentation::Compare;
+    use crate::event_segmentation::Event;
+    use crate::event_segmentation::EventSegmentation;
+    use crate::event_segmentation::PartitionedAggregateFunction;
+    use crate::event_segmentation::PropValueFilter;
+    use crate::event_segmentation::Query;
+    use crate::event_segmentation::QueryTime;
+    use crate::event_segmentation::TimeIntervalUnit;
     use crate::EventGroupedFilters;
     use crate::EventRef;
     use crate::PropValueOperation;
@@ -872,7 +871,7 @@ mod tests {
         let to = DateTime::parse_from_rfc3339("2021-09-08T13:48:00.000000+00:00")
             .unwrap()
             .with_timezone(&Utc);
-        let es = EventSegmentation {
+        let es = EventSegmentationRequest {
             time: QueryTime::Between { from, to },
             group: GROUP_USER_ID,
             interval_unit: TimeIntervalUnit::Hour,

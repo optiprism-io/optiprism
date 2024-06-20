@@ -7,8 +7,8 @@ use common::types::OptionalProperty;
 use metadata::reports::Reports as MDReports;
 use serde::Deserialize;
 use serde::Serialize;
+use common::event_segmentation::EventSegmentation;
 
-use crate::queries::event_segmentation::EventSegmentation;
 use crate::queries::funnel::Funnel;
 use crate::Context;
 use crate::ListResponse;

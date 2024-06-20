@@ -93,6 +93,7 @@ use rand::distributions::DistString;
 use rand::thread_rng;
 use tracing::info;
 use uaparser::UserAgentParser;
+use query::event_segmentation::EventSegmentationProvider;
 
 use crate::error::Error;
 
@@ -323,10 +324,11 @@ fn init_platform(
     cfg: Config,
 ) -> crate::error::Result<Router> {
     let query_provider = Arc::new(QueryProvider::new(md.clone(), db.clone()));
-
+    let es_provider = Arc::new(EventSegmentationProvider::new(md.clone(), db.clone()));
     let platform_provider = Arc::new(PlatformProvider::new(
         md.clone(),
         query_provider,
+        es_provider,
         cfg.clone(),
     ));
 
@@ -446,7 +448,7 @@ fn init_session_cleaner(
                                 ),
                             ],
                         ]
-                        .concat();
+                            .concat();
 
                         db.insert("events", values).unwrap();
 

@@ -25,7 +25,7 @@ mod tests {
     use common::query::QueryTime;
     use datafusion_common::ScalarValue;
     use metadata::util::init_db;
-    use query::queries::event_segmentation::logical_plan_builder::LogicalPlanBuilder;
+    use query::queries::event_segmentation::event_segmentation::LogicalPlanBuilder;
     use query::queries::funnel;
     use query::test_util::create_entities;
     use query::test_util::events_provider;

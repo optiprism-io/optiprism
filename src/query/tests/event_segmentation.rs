@@ -29,7 +29,7 @@ mod tests {
     use metadata::custom_events::CreateCustomEventRequest;
     use metadata::util::init_db;
     use query::error::Result;
-    use query::queries::event_segmentation::logical_plan_builder::LogicalPlanBuilder;
+    use query::queries::event_segmentation::event_segmentation::LogicalPlanBuilder;
     use query::test_util::create_entities;
     use query::test_util::events_provider;
     use query::test_util::run_plan;

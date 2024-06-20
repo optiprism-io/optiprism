@@ -37,6 +37,7 @@ use tokio::net::TcpListener;
 use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tracing::info;
+use query::event_segmentation::EventSegmentationProvider;
 
 use crate::init_metrics;
 use crate::init_system;
@@ -277,11 +278,13 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
     }
 
     let cfg = Config::default();
-    let query_provider = Arc::new(QueryProvider::new(md.clone(), db.clone()));
+    let prov = Arc::new(EventSegmentationProvider::new(md.clone(), db.clone()));
 
+    let query_provider = Arc::new(QueryProvider::new(md.clone(), db.clone()));
     let platform_provider = Arc::new(platform::PlatformProvider::new(
         md.clone(),
         query_provider,
+        prov,
         cfg.clone(),
     ));
 

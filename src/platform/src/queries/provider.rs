@@ -11,8 +11,6 @@ use query::QueryProvider;
 use serde_json::Value;
 use metadata::properties::Type;
 
-use crate::queries::event_segmentation;
-use crate::queries::event_segmentation::EventSegmentation;
 use crate::queries::funnel;
 use crate::queries::funnel::Funnel;
 use crate::queries::group_records_search;
@@ -35,60 +33,6 @@ impl Queries {
     pub fn new(query: Arc<QueryProvider>, md: Arc<MetadataProvider>) -> Self {
         Self { query, md }
     }
-
-    pub async fn event_segmentation(
-        &self,
-        ctx: Context,
-        project_id: u64,
-        req: EventSegmentation,
-        query: QueryParams,
-    ) -> Result<QueryResponse> {
-        ctx.check_project_permission(
-            ctx.organization_id,
-            project_id,
-            ProjectPermission::ExploreReports,
-        )?;
-        event_segmentation::validate_request(&self.md, project_id, &req)?;
-        let lreq = req.into();
-        let lreq = event_segmentation::fix_request(&self.md, project_id, lreq)?;
-        dbg!(&lreq);
-
-        let cur_time = match query.timestamp {
-            None => Utc::now(),
-            Some(ts_sec) => DateTime::from_naive_utc_and_offset(
-                chrono::NaiveDateTime::from_timestamp_millis(ts_sec * 1000).unwrap(),
-                Utc,
-            ),
-        };
-        let ctx = query::Context {
-            project_id,
-            format: match &query.format {
-                None => Format::Regular,
-                Some(format) => match format {
-                    QueryResponseFormat::Json => Format::Regular,
-                    QueryResponseFormat::JsonCompact => Format::Compact,
-                },
-            },
-            cur_time,
-        };
-
-        let mut data = self.query.event_segmentation(ctx, lreq).await?;
-
-        // do empty response so it will be [] instead of [[],[],[],...]
-        if !data.columns.is_empty() && data.columns[0].data.is_empty() {
-            data.columns = vec![];
-        }
-        let resp = match query.format {
-            None => QueryResponse::columns_to_json(data.columns),
-            Some(QueryResponseFormat::Json) => QueryResponse::columns_to_json(data.columns),
-            Some(QueryResponseFormat::JsonCompact) => {
-                QueryResponse::columns_to_json_compact(data.columns)
-            }
-        }?;
-
-        Ok(resp)
-    }
-
     pub async fn funnel(
         &self,
         ctx: Context,
