@@ -10,7 +10,6 @@ use serde_json::Value;
 
 use crate::queries::funnel::FunnelRequest;
 use crate::queries::group_records_search::GroupRecordsSearchRequest;
-use crate::queries::property_values::ListPropertyValuesRequest;
 use crate::{Context, QueryParams};
 use crate::event_segmentation::{EventSegmentation, EventSegmentationRequest};
 use crate::funnel::Funnel;

@@ -78,6 +78,7 @@ pub mod queries;
 pub mod event_records;
 pub mod event_segmentation;
 pub mod funnel;
+pub mod properties;
 
 pub const DEFAULT_BATCH_SIZE: usize = 4096;
 

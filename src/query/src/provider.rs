@@ -76,28 +76,6 @@ impl QueryProvider {
 }
 
 impl QueryProvider {
-    pub async fn property_values(&self, ctx: Context, req: PropertyValues) -> Result<ArrayRef> {
-        let start = Instant::now();
-        let schema = self.db.schema1(TABLE_EVENTS)?;
-        let projection = property_values_projection(&ctx, &req, &self.metadata)?;
-        let projection = projection
-            .iter()
-            .map(|x| schema.index_of(x).unwrap())
-            .collect();
-        let (session_ctx, state, plan) = initial_plan(&self.db, projection).await?;
-        let plan = property_values::LogicalPlanBuilder::build(
-            ctx,
-            self.metadata.clone(),
-            plan,
-            req.clone(),
-        )?;
-
-        let res = execute(session_ctx, state, plan).await?;
-        let duration = start.elapsed();
-        debug!("elapsed: {:?}", duration);
-
-        Ok(res.column(0).to_owned())
-    }
 
     pub async fn group_records_search(
         &self,
@@ -142,17 +120,6 @@ impl QueryProvider {
     }
 
 
-}
-
-fn property_values_projection(
-    ctx: &Context,
-    req: &PropertyValues,
-    md: &Arc<MetadataProvider>,
-) -> Result<Vec<String>> {
-    let mut fields = vec![COLUMN_PROJECT_ID.to_string(), COLUMN_EVENT.to_string()];
-    fields.push(col_name(ctx, &req.property, md)?);
-    fields.dedup();
-    Ok(fields)
 }
 
 fn group_records_search_projection(

@@ -43,6 +43,7 @@ pub struct PropertiesLayer {
     groups: Vec<Arc<Properties>>,
     system: Arc<Properties>,
     system_groups: Arc<Properties>,
+    props: Arc<Properties>,
 }
 
 pub fn attach_routes(
@@ -58,6 +59,7 @@ pub fn attach_routes(
     router = events::attach_routes(router);
     router = custom_events::attach_routes(router);
     router = groups::attach_routes(router);
+    router = properties::attach_routes(router);
     router = properties::attach_event_routes(router);
     router = properties::attach_group_routes(router);
     router = properties::attach_system_routes(router);
@@ -91,6 +93,7 @@ pub fn attach_routes(
             groups: platform.group_properties.clone(),
             system: platform.system_properties.clone(),
             system_groups: platform.system_group_properties.clone(),
+            props: platform.properties.clone(),
         }))
         .layer(Extension(cfg))
         .layer(Extension(platform.query.clone()))
