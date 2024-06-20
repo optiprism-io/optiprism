@@ -17,7 +17,7 @@ use crate::PropertyRef;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct Funnel {
+pub struct FunnelRequest {
     pub time: QueryTime,
     pub group: usize,
     pub steps: Vec<Step>,
@@ -421,7 +421,7 @@ impl Into<ChartType> for common::funnel::ChartType {
     }
 }
 
-impl Into<common::funnel::Funnel> for Funnel {
+impl Into<common::funnel::Funnel> for FunnelRequest {
     fn into(self) -> common::funnel::Funnel {
         common::funnel::Funnel {
             time: self.time.into(),
@@ -460,9 +460,9 @@ impl Into<common::funnel::Funnel> for Funnel {
     }
 }
 
-impl Into<Funnel> for common::funnel::Funnel {
-    fn into(self) -> Funnel {
-        Funnel {
+impl Into<FunnelRequest> for common::funnel::Funnel {
+    fn into(self) -> FunnelRequest {
+        FunnelRequest {
             time: self.time.into(),
             group: self.group_id,
             steps: self
@@ -503,230 +503,4 @@ impl Into<Funnel> for common::funnel::Funnel {
     }
 }
 
-pub(crate) fn validate_request(
-    md: &Arc<MetadataProvider>,
-    project_id: u64,
-    req: &Funnel,
-) -> Result<()> {
-    if req.group > GROUPS_COUNT - 1 {
-        return Err(PlatformError::BadRequest(
-            "group id is out of range".to_string(),
-        ));
-    }
 
-    match req.time {
-        QueryTime::Between { from, to } => {
-            if from > to {
-                return Err(PlatformError::BadRequest(
-                    "from time must be less than to time".to_string(),
-                ));
-            }
-        }
-        _ => {}
-    }
-
-    if req.steps.is_empty() {
-        return Err(PlatformError::BadRequest(
-            "steps must not be empty".to_string(),
-        ));
-    }
-
-    if req.steps.len() > 5 {
-        return Err(PlatformError::BadRequest(
-            "steps must not be more than 5".to_string(),
-        ));
-    }
-    for (step_id, step) in req.steps.iter().enumerate() {
-        if step.events.is_empty() {
-            return Err(PlatformError::BadRequest(format!(
-                "step #{step_id}, events must not be empty"
-            )));
-        }
-
-        for (event_id, event) in step.events.iter().enumerate() {
-            validate_event(
-                md,
-                project_id,
-                &event.event,
-                event_id,
-                format!("step #{step_id}, "),
-            )?;
-
-            match &event.filters {
-                Some(filters) => {
-                    for (filter_id, filter) in filters.iter().enumerate() {
-                        validate_event_filter(
-                            md,
-                            project_id,
-                            filter,
-                            filter_id,
-                            format!("event #{event_id}, "),
-                        )?;
-                    }
-                }
-                None => {}
-            }
-        }
-
-        match &step.order {
-            StepOrder::Exact => {}
-            StepOrder::Any { steps } => steps
-                .iter()
-                .map(|(from, to)| {
-                    if *from >= req.steps.len() {
-                        return Err(PlatformError::BadRequest(
-                            "step_order: from step index out of range".to_string(),
-                        ));
-                    }
-                    if *to >= req.steps.len() {
-                        return Err(PlatformError::BadRequest(
-                            "step_order: to step index out of range".to_string(),
-                        ));
-                    }
-                    Ok(())
-                })
-                .collect::<Result<_>>()?,
-        }
-    }
-
-    if let Some(exclude) = &req.exclude {
-        for (exclude_id, exclude) in exclude.iter().enumerate() {
-            validate_event(
-                md,
-                project_id,
-                &exclude.event.event,
-                exclude_id,
-                format!("exclude #{exclude_id}, "),
-            )?;
-            match &exclude.steps {
-                Some(steps) => match steps {
-                    ExcludeSteps::Between { from, to } => {
-                        if *from >= req.steps.len() {
-                            return Err(PlatformError::BadRequest(
-                                "exclude: from step index out of range".to_string(),
-                            ));
-                        }
-                        if *to >= req.steps.len() {
-                            return Err(PlatformError::BadRequest(
-                                "exclude: to step index out of range".to_string(),
-                            ));
-                        }
-                    }
-                    ExcludeSteps::All => {}
-                },
-                None => {}
-            }
-        }
-    }
-    match &req.breakdowns {
-        None => {}
-        Some(breakdowns) => {
-            let mut g = HashMap::new();
-            for b in breakdowns {
-                g.insert(b.to_owned(), ());
-            }
-            if g.len() != breakdowns.len() {
-                return Err(PlatformError::BadRequest(
-                    "use only unique breakdowns".to_string(),
-                ));
-            }
-            for (idx, breakdown) in breakdowns.iter().enumerate() {
-                match breakdown {
-                    Breakdown::Property { property } => {
-                        validate_event_property(
-                            md,
-                            project_id,
-                            property,
-                            format!("breakdown {idx}"),
-                        )?;
-                    }
-                }
-            }
-        }
-    }
-
-    if req.segments.is_some() {
-        return Err(PlatformError::Unimplemented(
-            "segments are unimplemented yet".to_string(),
-        ));
-    }
-
-    if let Some(hc) = &req.holding_constants {
-        for (idx, prop) in hc.iter().enumerate() {
-            validate_event_property(md, project_id, prop, format!("holding constant {idx}"))?;
-        }
-    }
-
-    if let Some(filter) = &req.filter {
-        match filter {
-            Filter::DropOffOnAnyStep => {}
-            Filter::DropOffOnStep { .. } => {}
-            Filter::TimeToConvert { from, to } => {
-                if from > to {
-                    return Err(PlatformError::BadRequest(
-                        "from time must be less than to time".to_string(),
-                    ));
-                }
-            }
-        }
-    }
-
-    match &req.filters {
-        None => {}
-        Some(filters) => {
-            for filter_group in &filters.groups {
-                if filters.groups.is_empty() {
-                    return Err(PlatformError::BadRequest(
-                        "filter_group field can't be empty".to_string(),
-                    ));
-                }
-                for (filter_id, filter) in filter_group.filters.iter().enumerate() {
-                    validate_event_filter(md, project_id, filter, filter_id, "".to_string())?;
-                }
-            }
-        }
-    }
-
-    Ok(())
-}
-
-pub(crate) fn fix_request(
-    req: common::funnel::Funnel,
-) -> Result<common::funnel::Funnel> {
-    let mut out = req.clone();
-
-    for (step_id, step) in req.steps.iter().enumerate() {
-        for (event_id, event) in step.events.iter().enumerate() {
-            if let Some(filters) = &event.filters {
-                if filters.is_empty() {
-                    out.steps[step_id].events[event_id].filters = None;
-                }
-            }
-        }
-    }
-
-    if let Some(exclude) = &req.exclude
-        && exclude.is_empty()
-    {
-        out.exclude = None;
-    }
-
-    if let Some(breakdowns) = &req.breakdowns
-        && breakdowns.is_empty()
-    {
-        out.breakdowns = None;
-    }
-
-    if let Some(holding_constants) = &req.holding_constants
-        && holding_constants.is_empty()
-    {
-        out.holding_constants = None;
-    }
-
-    if let Some(filters) = &req.filters {
-        if filters.is_empty() {
-            out.filters = None;
-        }
-    }
-    Ok(out)
-}

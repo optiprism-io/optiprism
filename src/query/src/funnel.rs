@@ -1,17 +1,21 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Instant;
+use arrow::array::{Array, Decimal128Array, Int64Array, StringArray, StringBuilder, TimestampMillisecondArray};
+use arrow::compute::cast;
+use arrow::datatypes::DataType;
 
 use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
-use common::group_col;
+use common::{DECIMAL_SCALE, group_col};
 // use std::time::Duration;
 use common::query::Breakdown;
 use common::query::EventRef;
 use common::query::PropValueFilter;
 use common::query::PropertyRef;
 use common::query::QueryTime;
-use common::types::COLUMN_CREATED_AT;
+use common::types::{COLUMN_CREATED_AT, COLUMN_EVENT, ROUND_DIGITS, TABLE_EVENTS};
 use common::types::COLUMN_PROJECT_ID;
 use datafusion_common::Column;
 use datafusion_common::ScalarValue;
@@ -28,13 +32,16 @@ use datafusion_expr::LogicalPlan;
 use datafusion_expr::Operator;
 use datafusion_expr::Projection;
 use datafusion_expr::Sort;
+use num_traits::ToPrimitive;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
 use rust_decimal::Decimal;
+use tracing::debug;
 use common::funnel::{Count, ExcludeSteps, Filter, Funnel, StepOrder, TimeWindow, Touch};
 use metadata::properties::Property;
+use storage::db::OptiDBImpl;
 
-use crate::breakdowns_to_dicts;
+use crate::{breakdowns_to_dicts, col_name, execute, initial_plan};
 use crate::error::QueryError;
 use crate::error::Result;
 use crate::expr::event_expression;
@@ -50,6 +57,169 @@ use crate::logical_plan::SortField;
 use crate::queries::decode_filter_single_dictionary;
 use crate::Context;
 
+
+pub struct FunnelProvider {
+    metadata: Arc<MetadataProvider>,
+    db: Arc<OptiDBImpl>,
+}
+
+impl FunnelProvider {
+    pub fn new(metadata: Arc<MetadataProvider>, db: Arc<OptiDBImpl>) -> Self {
+        Self { metadata, db }
+    }
+
+    pub async fn funnel(&self, ctx: Context, req: Funnel) -> Result<Response> {
+        let start = Instant::now();
+        let schema = self.db.schema1(TABLE_EVENTS)?;
+        let projection = projection(&ctx, &req, &self.metadata)?;
+        let projection = projection
+            .iter()
+            .map(|x| schema.index_of(x).unwrap())
+            .collect();
+
+        let (session_ctx, state, plan) = initial_plan(&self.db, projection).await?;
+        let plan = build(ctx.clone(), self.metadata.clone(), plan, req.clone())?;
+
+        let result = execute(session_ctx, state, plan).await?;
+        let duration = start.elapsed();
+        debug!("elapsed: {:?}", duration);
+        let mut group_cols: Vec<StringArray> = vec![];
+        let mut ts_col = {
+            let idx = result.schema().index_of("ts").unwrap();
+            result
+                .column(idx)
+                .as_any()
+                .downcast_ref::<TimestampMillisecondArray>()
+                .unwrap()
+        };
+
+        // segment
+        let col = cast(&result.column(0), &DataType::Utf8)?
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap()
+            .to_owned();
+        group_cols.push(col);
+        let mut groups = vec!["Segment".to_string()];
+        if let Some(breakdowns) = &req.breakdowns {
+            for (idx, breakdown) in breakdowns.iter().enumerate() {
+                let prop = match breakdown {
+                    Breakdown::Property(prop) => {
+                        match prop {
+                            PropertyRef::System(name) => self.metadata.system_properties.get_by_name(ctx.project_id, name.as_ref())?,
+                            PropertyRef::SystemGroup(name) => self.metadata.system_group_properties.get_by_name(ctx.project_id, name.as_ref())?,
+                            PropertyRef::Group(name, gid) => self.metadata.group_properties[*gid].get_by_name(ctx.project_id, name.as_ref())?,
+                            PropertyRef::Event(name) => self.metadata.event_properties.get_by_name(ctx.project_id, name.as_ref())?,
+                            PropertyRef::Custom(_) => return Err(QueryError::Unimplemented("custom properties are not implemented for breakdowns".to_string()))
+                        }
+                    }
+                };
+                let col = match result.column(idx + 1).data_type() {
+                    DataType::Decimal128(_, _) => {
+                        let arr = result.column(idx + 1).as_any().downcast_ref::<Decimal128Array>().unwrap();
+                        let mut builder = StringBuilder::new();
+                        for i in 0..arr.len() {
+                            let v = arr.value(i);
+                            let vv = Decimal::from_i128_with_scale(
+                                v,
+                                DECIMAL_SCALE as u32,
+                            ).round_dp(ROUND_DIGITS.into());
+                            if vv.is_integer() {
+                                builder.append_value(vv.to_i64().unwrap().to_string());
+                            } else {
+                                builder.append_value(vv.to_string());
+                            }
+                        }
+                        builder.finish().as_any().downcast_ref::<StringArray>().unwrap().clone()
+                    }
+                    _ => cast(result.column(idx + 1), &DataType::Utf8)?
+                        .as_any()
+                        .downcast_ref::<StringArray>()
+                        .unwrap()
+                        .to_owned()
+                };
+
+                group_cols.push(col);
+                groups.push(prop.name());
+            }
+        }
+
+        let mut int_val_cols = vec![];
+        let mut dec_val_cols = vec![];
+
+        for idx in 0..(result.schema().fields().len() - group_cols.len() - 1) {
+            let arr = result.column(group_cols.len() + 1 + idx).to_owned();
+            match arr.data_type() {
+                DataType::Int64 => int_val_cols.push(
+                    arr.as_any()
+                        .downcast_ref::<Int64Array>()
+                        .unwrap()
+                        .to_owned(),
+                ),
+                DataType::Decimal128(_, _) => dec_val_cols.push(
+                    arr.as_any()
+                        .downcast_ref::<Decimal128Array>()
+                        .unwrap()
+                        .to_owned(),
+                ),
+                _ => panic!("unexpected data type"),
+            }
+        }
+
+        let mut steps = vec![];
+        for (step_id, step) in req.steps.iter().enumerate() {
+            let name = match &step.events[0].event {
+                EventRef::RegularName(n) => n.clone(),
+                EventRef::Regular(id) => self.metadata.events.get_by_id(ctx.project_id, *id)?.name,
+                EventRef::Custom(_) => unimplemented!(),
+            };
+            let mut step = Step {
+                step: name.clone(),
+                data: vec![],
+            };
+            for idx in 0..result.num_rows() {
+                let groups = if group_cols.is_empty() {
+                    None
+                } else {
+                    Some(
+                        group_cols
+                            .iter()
+                            .map(|col| col.value(idx).to_string())
+                            .collect::<Vec<_>>(),
+                    )
+                };
+                let step_data = StepData {
+                    groups,
+                    ts: ts_col.value(idx),
+                    total: int_val_cols[step_id * 4].value(idx) as i64,
+                    conversion_ratio: Decimal::from_i128_with_scale(
+                        dec_val_cols[step_id * 4].value(idx) as i128,
+                        DECIMAL_SCALE as u32,
+                    ).round_dp(ROUND_DIGITS.into()),
+                    avg_time_to_convert: Decimal::from_i128_with_scale(
+                        dec_val_cols[step_id * 4 + 1].value(idx) as i128,
+                        DECIMAL_SCALE as u32,
+                    ).round_dp(ROUND_DIGITS.into()),
+                    avg_time_to_convert_from_start: Decimal::from_i128_with_scale(
+                        dec_val_cols[step_id * 4 + 2].value(idx) as i128,
+                        DECIMAL_SCALE as u32,
+                    ).round_dp(ROUND_DIGITS.into()),
+                    dropped_off: int_val_cols[step_id * 4 + 1].value(idx) as i64,
+                    drop_off_ratio: Decimal::from_i128_with_scale(
+                        dec_val_cols[step_id * 4 + 3].value(idx) as i128,
+                        DECIMAL_SCALE as u32,
+                    ).round_dp(ROUND_DIGITS.into()),
+                    time_to_convert: int_val_cols[step_id * 4 + 2].value(idx) as i64,
+                    time_to_convert_from_start: int_val_cols[step_id * 4 + 3].value(idx) as i64,
+                };
+                step.data.push(step_data);
+            }
+            steps.push(step);
+        }
+
+        Ok(Response { groups, steps })
+    }
+}
 pub fn build(
     ctx: Context,
     metadata: Arc<MetadataProvider>,
@@ -298,4 +468,72 @@ pub struct Step {
 pub struct Response {
     pub groups: Vec<String>,
     pub steps: Vec<Step>,
+}
+
+fn projection(
+    ctx: &Context,
+    req: &Funnel,
+    md: &Arc<MetadataProvider>,
+) -> Result<Vec<String>> {
+    let mut fields = vec![
+        COLUMN_PROJECT_ID.to_string(),
+        group_col(req.group_id),
+        COLUMN_CREATED_AT.to_string(),
+        COLUMN_EVENT.to_string(),
+    ];
+
+    for step in &req.steps {
+        for event in &step.events {
+            if let Some(filters) = &event.filters {
+                for filter in filters {
+                    match filter {
+                        PropValueFilter::Property { property, .. } => {
+                            fields.push(col_name(ctx, property, md)?)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(c) = &req.holding_constants {
+        for constant in c {
+            fields.push(col_name(ctx, constant, md)?);
+        }
+    }
+
+    if let Some(exclude) = &req.exclude {
+        for e in exclude {
+            if let Some(filters) = &e.event.filters {
+                for filter in filters {
+                    match filter {
+                        PropValueFilter::Property { property, .. } => {
+                            fields.push(col_name(ctx, property, md)?)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(filters) = &req.filters {
+        for filter in filters {
+            match filter {
+                PropValueFilter::Property { property, .. } => {
+                    fields.push(col_name(ctx, property, md)?)
+                }
+            }
+        }
+    }
+
+    if let Some(breakdowns) = &req.breakdowns {
+        for breakdown in breakdowns {
+            match breakdown {
+                Breakdown::Property(property) => fields.push(col_name(ctx, property, md)?),
+            }
+        }
+    }
+
+    fields.dedup();
+    Ok(fields)
 }

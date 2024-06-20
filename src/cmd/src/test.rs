@@ -38,6 +38,7 @@ use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tracing::info;
 use query::event_segmentation::EventSegmentationProvider;
+use query::funnel::FunnelProvider;
 
 use crate::init_metrics;
 use crate::init_system;
@@ -278,13 +279,15 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
     }
 
     let cfg = Config::default();
-    let prov = Arc::new(EventSegmentationProvider::new(md.clone(), db.clone()));
+    let es_prov = Arc::new(EventSegmentationProvider::new(md.clone(), db.clone()));
+    let funnel_prov = Arc::new(FunnelProvider::new(md.clone(), db.clone()));
 
     let query_provider = Arc::new(QueryProvider::new(md.clone(), db.clone()));
     let platform_provider = Arc::new(platform::PlatformProvider::new(
         md.clone(),
         query_provider,
-        prov,
+        es_prov,
+        funnel_prov,
         cfg.clone(),
     ));
 
