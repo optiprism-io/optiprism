@@ -25,7 +25,7 @@ use common::query::Breakdown;
 use common::query::EventRef;
 use common::query::PropValueFilter;
 use common::query::PropertyRef;
-use common::types::COLUMN_CREATED_AT;
+use common::types::{COLUMN_CREATED_AT, ROUND_DIGITS};
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_EVENT_ID;
 use common::types::COLUMN_PROJECT_ID;
@@ -44,6 +44,7 @@ use datafusion::prelude::SessionConfig;
 use datafusion::prelude::SessionContext;
 use datafusion_expr::Extension;
 use datafusion_expr::LogicalPlan;
+use num_traits::ToPrimitive;
 use metadata::MetadataProvider;
 use rust_decimal::Decimal;
 use storage::db::OptiDBImpl;
@@ -66,6 +67,7 @@ use crate::Column;
 use crate::ColumnType;
 use crate::Context;
 use crate::DataTable;
+use crate::error::QueryError;
 use crate::Result;
 
 pub struct QueryProvider {
@@ -89,7 +91,7 @@ impl QueryProvider {
             SessionConfig::new().with_collect_statistics(true),
             runtime,
         )
-        .with_query_planner(Arc::new(QueryPlanner {}));
+            .with_query_planner(Arc::new(QueryPlanner {}));
 
         // if let Some(projection) = projection {
         // state = state
@@ -317,18 +319,49 @@ impl QueryProvider {
             .unwrap()
             .to_owned();
         group_cols.push(col);
+        let mut groups = vec!["Segment".to_string()];
         if let Some(breakdowns) = &req.breakdowns {
-            for idx in 0..breakdowns.len() {
-                let col = result
-                    .column(idx + 1)
-                    .as_any()
-                    .downcast_ref::<StringArray>()
-                    .unwrap()
-                    .to_owned();
+            for (idx, breakdown) in breakdowns.iter().enumerate() {
+                let prop = match breakdown {
+                    Breakdown::Property(prop) => {
+                        match prop {
+                            PropertyRef::System(name) => self.metadata.system_properties.get_by_name(ctx.project_id, name.as_ref())?,
+                            PropertyRef::SystemGroup(name) => self.metadata.system_group_properties.get_by_name(ctx.project_id, name.as_ref())?,
+                            PropertyRef::Group(name, gid) => self.metadata.group_properties[*gid].get_by_name(ctx.project_id, name.as_ref())?,
+                            PropertyRef::Event(name) => self.metadata.event_properties.get_by_name(ctx.project_id, name.as_ref())?,
+                            PropertyRef::Custom(_) => return Err(QueryError::Unimplemented("custom properties are not implemented for breakdowns".to_string()))
+                        }
+                    }
+                };
+                let col = match result.column(idx + 1).data_type() {
+                    DataType::Decimal128(_, _) => {
+                        let arr = result.column(idx + 1).as_any().downcast_ref::<Decimal128Array>().unwrap();
+                        let mut builder = StringBuilder::new();
+                        for i in 0..arr.len() {
+                            let v = arr.value(i);
+                            let vv = Decimal::from_i128_with_scale(
+                                v,
+                                DECIMAL_SCALE as u32,
+                            ).round_dp(ROUND_DIGITS.into());
+                            if vv.is_integer() {
+                                builder.append_value(vv.to_i64().unwrap().to_string());
+                            } else {
+                                builder.append_value(vv.to_string());
+                            }
+                        }
+                        builder.finish().as_any().downcast_ref::<StringArray>().unwrap().clone()
+                    }
+                    _ => cast(result.column(idx + 1), &DataType::Utf8)?
+                        .as_any()
+                        .downcast_ref::<StringArray>()
+                        .unwrap()
+                        .to_owned()
+                };
+
                 group_cols.push(col);
+                groups.push(prop.name());
             }
         }
-        group_cols.dedup();
 
         let mut int_val_cols = vec![];
         let mut dec_val_cols = vec![];
@@ -379,18 +412,22 @@ impl QueryProvider {
                     ts: ts_col.value(idx),
                     total: int_val_cols[step_id * 4].value(idx) as i64,
                     conversion_ratio: Decimal::from_i128_with_scale(
-                        dec_val_cols[step_id * 3].value(idx) as i128,
+                        dec_val_cols[step_id * 4].value(idx) as i128,
                         DECIMAL_SCALE as u32,
-                    ),
+                    ).round_dp(ROUND_DIGITS.into()),
                     avg_time_to_convert: Decimal::from_i128_with_scale(
-                        dec_val_cols[step_id * 3 + 1].value(idx) as i128,
+                        dec_val_cols[step_id * 4 + 1].value(idx) as i128,
                         DECIMAL_SCALE as u32,
-                    ),
+                    ).round_dp(ROUND_DIGITS.into()),
+                    avg_time_to_convert_from_start: Decimal::from_i128_with_scale(
+                        dec_val_cols[step_id * 4 + 2].value(idx) as i128,
+                        DECIMAL_SCALE as u32,
+                    ).round_dp(ROUND_DIGITS.into()),
                     dropped_off: int_val_cols[step_id * 4 + 1].value(idx) as i64,
                     drop_off_ratio: Decimal::from_i128_with_scale(
-                        dec_val_cols[step_id * 3 + 2].value(idx) as i128,
+                        dec_val_cols[step_id * 4 + 3].value(idx) as i128,
                         DECIMAL_SCALE as u32,
-                    ),
+                    ).round_dp(ROUND_DIGITS.into()),
                     time_to_convert: int_val_cols[step_id * 4 + 2].value(idx) as i64,
                     time_to_convert_from_start: int_val_cols[step_id * 4 + 3].value(idx) as i64,
                 };
@@ -399,7 +436,7 @@ impl QueryProvider {
             steps.push(step);
         }
 
-        Ok(funnel::Response { steps })
+        Ok(funnel::Response { groups, steps })
     }
 }
 

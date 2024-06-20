@@ -93,6 +93,7 @@ impl Agg {
         }
     }
 }
+
 struct Group {
     aggs: Vec<Agg>,
 }
@@ -106,6 +107,7 @@ enum StaticArrayBuilder {
     Int64(Int64Builder),
     Decimal(Decimal128Builder),
 }
+
 fn aggregate(
     batch: &RecordBatch,
     mut groups: Vec<(PhysicalExprRef, SortField)>,
@@ -283,6 +285,7 @@ fn aggregate(
 
     Ok(cols)
 }
+
 #[derive(Eq, PartialEq, Clone, Debug)]
 enum Stage {
     CollectSegments,
@@ -311,7 +314,7 @@ impl FunnelPartialExec {
         let segment_field = Arc::new(Field::new("segment", DataType::Int64, false)) as FieldRef;
         let fields = vec![vec![segment_field], schema.fields().to_vec()].concat();
         let schema = Arc::new(Schema::new(fields));
-        let cache = Self::compute_properties(&input,schema.clone())?;
+        let cache = Self::compute_properties(&input, schema.clone())?;
         Ok(Self {
             input,
             segment_inputs: partition_inputs,
@@ -323,7 +326,7 @@ impl FunnelPartialExec {
         })
     }
 
-    fn compute_properties(input: &Arc<dyn ExecutionPlan>,schema:SchemaRef) -> Result<PlanProperties> {
+    fn compute_properties(input: &Arc<dyn ExecutionPlan>, schema: SchemaRef) -> Result<PlanProperties> {
         let eq_properties = EquivalenceProperties::new(schema);
         Ok(PlanProperties::new(
             eq_properties,
@@ -400,7 +403,7 @@ impl ExecutionPlan for FunnelPartialExec {
                 self.partition_col.clone(),
                 self.expr.clone(),
             )
-            .map_err(QueryError::into_datafusion_execution_error)?,
+                .map_err(QueryError::into_datafusion_execution_error)?,
         ))
     }
 
@@ -525,7 +528,7 @@ impl Stream for PartialFunnelStream {
                                     &batch,
                                     Some(&self.segment_partitions.borrow()[segment]),
                                 )
-                                .map_err(QueryError::into_datafusion_execution_error)?;
+                                    .map_err(QueryError::into_datafusion_execution_error)?;
                             } else {
                                 agg.evaluate(&batch, None)
                                     .map_err(QueryError::into_datafusion_execution_error)?;
@@ -606,6 +609,7 @@ impl FunnelFinalExec {
         ))
     }
 }
+
 impl DisplayAs for FunnelFinalExec {
     fn fmt_as(&self, t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "FunnelFinalExec")
@@ -710,6 +714,9 @@ impl Stream for FinalFunnelStream {
             let cname = format!("step{}_avg_time_to_convert", i);
             aggs.push((col(&cname, &self.schema).unwrap(), Agg::Avg(0, 0)));
 
+            let cname = format!("step{}_avg_time_to_convert_from_start", i);
+            aggs.push((col(&cname, &self.schema).unwrap(), Agg::Avg(0, 0)));
+
             let cname = format!("step{}_dropped_off", i);
             aggs.push((col(&cname, &self.schema).unwrap(), Agg::Sum(0)));
 
@@ -738,7 +745,6 @@ impl Stream for FinalFunnelStream {
         let agg_arrs = aggregate(&final_batch, groups, aggs)
             .map_err(QueryError::into_datafusion_execution_error)?;
         let result = RecordBatch::try_new(self.schema.clone(), agg_arrs)?;
-
         self.finished = true;
         Poll::Ready(Some(Ok(result)))
     }
@@ -871,7 +877,7 @@ mod tests {
             Column::new_with_schema("u", &schema).unwrap(),
             Arc::new(Mutex::new(f)),
         )
-        .unwrap();
+            .unwrap();
         let session_ctx = SessionContext::new();
         let task_ctx = session_ctx.task_ctx();
         let stream = exec.execute(0, task_ctx).unwrap();

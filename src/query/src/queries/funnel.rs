@@ -41,6 +41,7 @@ use datafusion_expr::Sort;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
 use rust_decimal::Decimal;
+use metadata::properties::Property;
 
 use crate::breakdowns_to_dicts;
 use crate::error::QueryError;
@@ -242,10 +243,6 @@ pub fn build(
         input
     };
 
-    let input = LogicalPlan::Extension(Extension {
-        node: Arc::new(RenameColumnsNode::try_new(input, rename_groups)?),
-    });
-
     Ok(input)
 }
 
@@ -286,6 +283,7 @@ fn decode_filter_dictionaries(
         node: Arc::new(DictionaryDecodeNode::try_new(input, decode_cols.clone())?),
     }))
 }
+
 #[derive(Clone, Debug)]
 pub struct StepData {
     pub groups: Option<Vec<String>>,
@@ -293,17 +291,21 @@ pub struct StepData {
     pub total: i64,
     pub conversion_ratio: Decimal,
     pub avg_time_to_convert: Decimal,
+    pub avg_time_to_convert_from_start: Decimal,
     pub dropped_off: i64,
     pub drop_off_ratio: Decimal,
     pub time_to_convert: i64,
     pub time_to_convert_from_start: i64,
 }
+
 #[derive(Clone, Debug)]
 pub struct Step {
     pub step: String,
     pub data: Vec<StepData>,
 }
+
 #[derive(Clone, Debug)]
 pub struct Response {
+    pub groups: Vec<String>,
     pub steps: Vec<Step>,
 }

@@ -603,6 +603,7 @@ pub struct FunnelStepData {
     pub total: i64,
     pub conversion_ratio: Decimal,
     pub avg_time_to_convert: Decimal,
+    pub avg_time_to_convert_from_start: Decimal,
     pub dropped_off: i64,
     pub drop_off_ratio: Decimal,
     pub time_to_convert: i64,
@@ -618,6 +619,7 @@ pub struct FunnelStep {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct FunnelResponse {
+    pub groups:Vec<String>,
     pub steps: Vec<FunnelStep>,
 }
 
