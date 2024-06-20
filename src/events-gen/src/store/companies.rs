@@ -20,6 +20,7 @@ use crate::probability;
 struct CSVCompany {
     pub name: String,
     pub staff: usize,
+    pub age:usize,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -27,6 +28,7 @@ struct CSVCompany {
 pub struct Company {
     pub name: String,
     pub staff: usize,
+    pub age: usize,
 }
 
 pub struct CompanyProvider {
@@ -43,6 +45,7 @@ impl CompanyProvider {
             let company = Company {
                 name: rec.name,
                 staff: rec.staff,
+                age: rec.age,
             };
             companies.push(company);
         }
