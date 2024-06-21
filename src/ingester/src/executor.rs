@@ -129,9 +129,10 @@ impl Executor<Track> {
                     user_id,
                     vec![],
                 )?;
-                self.md.dictionaries.get_key_or_create(
+                self.md.dictionaries.create_key(
                     ctx.project_id.unwrap(),
                     group_col(GROUP_USER_ID).as_str(),
+                    group.id,
                     user_id.as_str(),
                 )?;
 
@@ -141,6 +142,13 @@ impl Executor<Track> {
                 let id = self.md.groups.get_or_create_anonymous_id(
                     ctx.project_id.unwrap(),
                     GROUP_USER_ID as u64,
+                    user_id.as_str(),
+                )?;
+
+                self.md.dictionaries.create_key(
+                    ctx.project_id.unwrap(),
+                    group_col(GROUP_USER_ID).as_str(),
+                    id,
                     user_id.as_str(),
                 )?;
 
@@ -232,6 +240,7 @@ impl Executor<Track> {
         Ok(())
     }
 }
+
 #[allow(clippy::too_many_arguments)]
 impl Executor<Identify> {
     pub fn new(
@@ -309,6 +318,7 @@ impl Executor<Identify> {
             vec![]
         };
 
+
         let resolved_group_values = self.md.groups.create_or_update(
             ctx.project_id.unwrap(),
             group.id,
@@ -326,6 +336,9 @@ impl Executor<Identify> {
             group_vals_id,
             req.id.as_str(),
         )?;
+        // if req.group_id == 0 {
+        //     print!("{group_vals_id} - {} ", req.id);
+        // }
 
         for transformer in &self.transformers {
             req = transformer.process(&ctx, req)?;
