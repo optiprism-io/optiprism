@@ -11,7 +11,6 @@ use metadata::MetadataProvider;
 use crate::Context;
 
 pub mod group_records_search;
-pub mod property_values;
 
 pub fn decode_filter_single_dictionary(
     ctx: &Context,

@@ -35,7 +35,6 @@ use crate::expr::event_expression;
 use crate::expr::property_expression;
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::{col_name, Context, execute, initial_plan};
-use crate::queries::property_values;
 
 pub struct PropertiesProvider {
     metadata: Arc<MetadataProvider>,
@@ -47,7 +46,7 @@ impl PropertiesProvider {
         Self { metadata, db }
     }
 
-    pub async fn values(&self, ctx: Context, req: crate::queries::property_values::PropertyValues) -> Result<ArrayRef> {
+    pub async fn values(&self, ctx: Context, req: PropertyValues) -> Result<ArrayRef> {
         let start = Instant::now();
         let schema = self.db.schema1(TABLE_EVENTS)?;
         let projection = projection(&ctx, &req, &self.metadata)?;
@@ -56,7 +55,7 @@ impl PropertiesProvider {
             .map(|x| schema.index_of(x).unwrap())
             .collect();
         let (session_ctx, state, plan) = initial_plan(&self.db, projection).await?;
-        let plan = property_values::LogicalPlanBuilder::build(
+        let plan = LogicalPlanBuilder::build(
             ctx,
             self.metadata.clone(),
             plan,
@@ -199,7 +198,7 @@ pub struct PropertyValues {
 
 fn projection(
     ctx: &Context,
-    req: &crate::queries::property_values::PropertyValues,
+    req: &PropertyValues,
     md: &Arc<MetadataProvider>,
 ) -> Result<Vec<String>> {
     let mut fields = vec![COLUMN_PROJECT_ID.to_string(), COLUMN_EVENT.to_string()];

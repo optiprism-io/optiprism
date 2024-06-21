@@ -10,7 +10,7 @@ use metadata::{MetadataProvider, properties};
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
-use query::properties::PropertiesProvider;
+use query::properties::{PropertiesProvider, PropertyValues};
 
 use crate::{array_ref_to_json_values, Context, EventRef, json_value_to_scalar, PropertyRef, PropValueOperation, ResponseMetadata, validate_event_filter_property};
 use crate::ListResponse;
@@ -390,9 +390,9 @@ pub struct ListPropertyValuesRequest {
     pub filter: Option<Filter>,
 }
 
-impl Into<query::queries::property_values::PropertyValues> for ListPropertyValuesRequest {
-    fn into(self) -> query::queries::property_values::PropertyValues {
-        query::queries::property_values::PropertyValues {
+impl Into<query::properties::PropertyValues> for ListPropertyValuesRequest {
+    fn into(self) -> PropertyValues {
+        query::properties::PropertyValues {
             property: self.property.into(),
             event: self.event.map(|event| event.into()),
             filter: self.filter.map(|filter| filter.into()),
@@ -400,9 +400,9 @@ impl Into<query::queries::property_values::PropertyValues> for ListPropertyValue
     }
 }
 
-impl Into<query::queries::property_values::Filter> for Filter {
-    fn into(self) -> query::queries::property_values::Filter {
-        query::queries::property_values::Filter {
+impl Into<query::properties::Filter> for Filter {
+    fn into(self) -> query::properties::Filter {
+        query::properties::Filter {
             operation: self.operation.into(),
             value: self
                 .value
