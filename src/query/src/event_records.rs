@@ -298,19 +298,19 @@ pub fn build_search_plan(
         Arc::new(input),
     )?);
 
-    // let input = {
-    //     let s = Expr::Sort(expr::Sort {
-    //         expr: Box::new(col(COLUMN_EVENT_ID)),
-    //         asc: false,
-    //         nulls_first: false,
-    //     });
-    //
-    //     LogicalPlan::Sort(Sort {
-    //         expr: vec![s],
-    //         input: Arc::new(input),
-    //         fetch: None,
-    //     })
-    // };
+    let input = {
+        let s = Expr::Sort(expr::Sort {
+            expr: Box::new(col(COLUMN_EVENT_ID)),
+            asc: false,
+            nulls_first: false,
+        });
+
+        LogicalPlan::Sort(Sort {
+            expr: vec![s],
+            input: Arc::new(input),
+            fetch: None,
+        })
+    };
 
     let input = LogicalPlan::Limit(Limit {
         skip: 0,
