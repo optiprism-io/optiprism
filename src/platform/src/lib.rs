@@ -167,6 +167,39 @@ macro_rules! int_arr_to_json_values {
     }};
 }
 
+
+pub fn scalar_to_json(v:&ScalarValue)->Value {
+    if v.is_null() {
+        return Value::Null;
+    }
+    match v {
+        ScalarValue::Boolean(Some(v)) => Value::Bool(*v),
+        ScalarValue::Decimal128(Some(v), _, _) => {
+            let d = Decimal::from_i128_with_scale(*v, DECIMAL_SCALE as u32)
+                .round_dp(ROUND_DIGITS.into());
+            let d_f = match d.to_f64() {
+                None => {
+                    panic!("can't convert decimal to f64");
+                }
+                Some(v) => v,
+            };
+            let n = match Number::from_f64(d_f) {
+                None => {
+                    panic!("can't make json number from f64");
+                }
+                Some(v) => v,
+            };
+            Value::Number(n)
+        }
+        ScalarValue::Int8(Some(v)) => Value::Number(Number::from(*v)),
+        ScalarValue::Int16(Some(v)) => Value::Number(Number::from(*v)),
+        ScalarValue::Int32(Some(v)) => Value::Number(Number::from(*v)),
+        ScalarValue::Int64(Some(v)) => Value::Number(Number::from(*v)),
+        ScalarValue::Utf8(Some(v)) => Value::String(v.to_owned()),
+        ScalarValue::TimestampMillisecond(Some(v), _) => Value::Number(Number::from(*v)),
+        _=>unimplemented!()
+    }
+}
 pub fn array_ref_to_json_values(arr: &ArrayRef) -> Vec<Value> {
     match arr.data_type() {
         arrow::datatypes::DataType::Int8 => int_arr_to_json_values!(arr, Int8Array),
