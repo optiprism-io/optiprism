@@ -125,7 +125,6 @@ impl Groups {
                     &tx,
                     make_id_seq_key(project_ns(project_id, group_key.as_bytes()).as_slice()),
                 )?;
-
                 let group = GroupValues { id, values };
                 tx.put(key.as_bytes(), serialize(&group)?)?;
 
@@ -167,7 +166,6 @@ impl Groups {
                     &tx,
                     make_id_seq_key(project_ns(project_id, group_key.as_bytes()).as_slice()),
                 )?;
-
                 let group = GroupValues { id, values };
                 tx.put(key.as_bytes(), serialize(&group)?)?;
                 group
