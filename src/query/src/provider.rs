@@ -55,8 +55,6 @@ use crate::logical_plan::db_parquet::DbParquetNode;
 use crate::physical_plan::planner::QueryPlanner;
 use crate::queries::group_records_search;
 use crate::queries::group_records_search::GroupRecordsSearch;
-use crate::queries::property_values;
-use crate::queries::property_values::PropertyValues;
 use crate::Column;
 use crate::ColumnType;
 use crate::Context;
