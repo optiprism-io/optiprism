@@ -12,7 +12,7 @@ use metadata::MetadataProvider;
 use query::context::Format;
 use query::{event_records, queries};
 
-use crate::{Context, PlatformError, PropertyRef, QueryParams, QueryResponse, QueryResponseFormat, QueryTime, validate_event, validate_event_filter};
+use crate::{Context, PlatformError, PropertyRef, QueryParams, QueryResponse, QueryResponseFormat, QueryTime, scalar_to_json, validate_event, validate_event_filter};
 use crate::EventGroupedFilters;
 use crate::EventRef;
 use crate::ListResponse;
@@ -100,6 +100,7 @@ pub struct EventRecord {
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct PropertyAndValue {
+    #[serde(flatten)]
     property: PropertyRef,
     value: Value,
 }
@@ -112,18 +113,7 @@ impl Into<EventRecord> for query::event_records::EventRecord {
 
 impl Into<PropertyAndValue> for query::event_records::PropertyAndValue {
     fn into(self) -> PropertyAndValue {
-        let value = match self.value {
-            ScalarValue::Boolean(Some(v)) => json!(v),
-            ScalarValue::Decimal128(Some(v), _, _) => json!(v),
-            ScalarValue::Int8(Some(v)) => json!(v),
-            ScalarValue::Int16(Some(v)) => json!(v),
-            ScalarValue::Int32(Some(v)) => json!(v),
-            ScalarValue::Int64(Some(v)) => json!(v),
-            ScalarValue::Utf8(Some(v)) => json!(v),
-            ScalarValue::TimestampMillisecond(Some(v),_ ) => json!(v),
-            _ => unimplemented!()
-        };
-
+        let value = scalar_to_json(&self.value);
 
         PropertyAndValue { property: self.property.into(), value }
     }

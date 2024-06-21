@@ -336,7 +336,6 @@ impl Properties {
             .unwrap()
             .put((project_id, id), prop.clone());
 
-        dbg!(prop.column_name());
         let data = serialize(&prop)?;
         tx.put(idx_key, &data)?;
 
