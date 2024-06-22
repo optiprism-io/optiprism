@@ -8,13 +8,11 @@ use axum::Router;
 use common::http::Json;
 use serde_json::Value;
 
-use crate::queries::group_records_search::GroupRecordsSearchRequest;
 use crate::{Context, QueryParams};
 use crate::event_segmentation::{EventSegmentation, EventSegmentationRequest};
 use crate::funnel::{Funnel, FunnelRequest};
 use crate::FunnelResponse;
 use crate::ListResponse;
-use crate::queries::provider::Queries;
 use crate::QueryResponse;
 use crate::Result;
 

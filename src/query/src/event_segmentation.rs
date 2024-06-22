@@ -39,7 +39,7 @@ use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
 use storage::db::OptiDBImpl;
 
-use crate::{breakdowns_to_dicts, col_name, ColumnType, DataTable, execute, initial_plan};
+use crate::{breakdowns_to_dicts, col_name, ColumnType, DataTable, decode_filter_single_dictionary, execute, initial_plan};
 use crate::context::Format;
 use crate::error::QueryError;
 use crate::error::Result;
@@ -67,7 +67,6 @@ use crate::logical_plan::segment::SegmentExpr;
 use crate::logical_plan::segment::SegmentNode;
 use crate::logical_plan::unpivot::UnpivotNode;
 use crate::logical_plan::SortField;
-use crate::queries::decode_filter_single_dictionary;
 use crate::Context;
 
 pub const COL_AGG_NAME: &str = "agg_name";

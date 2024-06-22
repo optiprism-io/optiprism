@@ -8,7 +8,7 @@ use common::query::EventRef;
 use common::query::PropValueFilter;
 use common::query::PropertyRef;
 use common::query::QueryTime;
-use common::types::{COLUMN_CREATED_AT, COLUMN_EVENT, TABLE_EVENTS};
+use common::types::{COLUMN_CREATED_AT, COLUMN_EVENT, GROUP_COLUMN_CREATED_AT, GROUP_COLUMN_ID, GROUP_COLUMN_PROJECT_ID, GROUP_COLUMN_VERSION, SortDirection, TABLE_EVENTS};
 use common::types::COLUMN_EVENT_ID;
 use common::types::COLUMN_PROJECT_ID;
 use common::{DECIMAL_PRECISION, DECIMAL_SCALE, GROUPS_COUNT};
@@ -34,7 +34,7 @@ use storage::db::OptiDBImpl;
 
 use crate::error::QueryError;
 use crate::error::Result;
-use crate::expr::event_expression;
+use crate::expr::{event_expression, property_col};
 use crate::expr::event_filters_expression;
 use crate::expr::time_expression;
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
@@ -43,12 +43,12 @@ use crate::logical_plan::expr::multi_or;
 use crate::logical_plan::rename_columns::RenameColumnsNode;
 use crate::{col_name, ColumnType, Context, DataTable, decode_filter_single_dictionary, execute, initial_plan, PropertyAndValue};
 
-pub struct EventRecordsProvider {
+pub struct GroupRecordsProvider {
     metadata: Arc<MetadataProvider>,
     db: Arc<OptiDBImpl>,
 }
 
-impl EventRecordsProvider {
+impl GroupRecordsProvider {
     pub fn new(metadata: Arc<MetadataProvider>, db: Arc<OptiDBImpl>) -> Self {
         Self { metadata, db }
     }
@@ -56,15 +56,16 @@ impl EventRecordsProvider {
     pub async fn get_by_id(
         &self,
         ctx: Context,
+        group_id: usize,
         id: u64,
-    ) -> Result<EventRecord> {
+    ) -> Result<GroupRecord> {
         let start = Instant::now();
         let schema = self.db.schema1(TABLE_EVENTS)?;
         let projection =
             (0..schema.fields.len()).collect::<Vec<_>>();
 
         let (session_ctx, state, plan) = initial_plan(&self.db, projection).await?;
-        let plan = build_get_by_id_plan(&ctx, self.metadata.clone(), plan, id)?;
+        let plan = build_get_by_id_plan(&ctx, self.metadata.clone(), plan, group_id, id)?;
         println!("{plan:?}");
         let result = execute(session_ctx, state, plan).await?;
         let duration = start.elapsed();
@@ -74,7 +75,7 @@ impl EventRecordsProvider {
 
         for (field, col) in result.schema().fields().iter().zip(result.columns().iter()) {
             let mut property = None;
-            for p in self.metadata.event_properties.list(ctx.project_id)?.data {
+            for p in self.metadata.group_properties[group_id].list(ctx.project_id)?.data {
                 if p.column_name() == *field.name() {
                     property = Some(p);
                     break;
@@ -82,23 +83,12 @@ impl EventRecordsProvider {
             };
 
             if property.is_none() {
-                for p in self.metadata.system_properties.list(ctx.project_id)?.data {
+                for p in self.metadata.system_group_properties.list(ctx.project_id)?.data {
                     if p.column_name() == *field.name() {
                         property = Some(p);
                         break;
                     }
                 };
-            }
-
-            if property.is_none() {
-                for g in 0..GROUPS_COUNT {
-                    for p in self.metadata.group_properties[g].list(ctx.project_id)?.data {
-                        if p.column_name() == *field.name() {
-                            property = Some(p);
-                            break;
-                        }
-                    };
-                }
             }
 
             if let Some(prop) = property {
@@ -143,7 +133,7 @@ impl EventRecordsProvider {
                 properties.push(PropertyAndValue { property: prop.reference(), value })
             }
         }
-        let rec = EventRecord { properties };
+        let rec = GroupRecord { properties };
 
         Ok(rec)
     }
@@ -151,7 +141,7 @@ impl EventRecordsProvider {
     pub async fn search(
         &self,
         ctx: Context,
-        req: EventRecordsSearchRequest,
+        req: GroupRecordsSearchRequest,
     ) -> Result<DataTable> {
         let start = Instant::now();
         let schema = self.db.schema1(TABLE_EVENTS)?;
@@ -195,7 +185,7 @@ pub fn build_search_plan(
     ctx: Context,
     metadata: Arc<MetadataProvider>,
     input: LogicalPlan,
-    req: EventRecordsSearchRequest,
+    req: GroupRecordsSearchRequest,
 ) -> Result<LogicalPlan> {
     let mut properties = vec![];
     let input = if let Some(props) = &req.properties {
@@ -203,26 +193,33 @@ pub fn build_search_plan(
         let mut exprs = vec![
             col(Column {
                 relation: None,
-                name: COLUMN_PROJECT_ID.to_string(),
+                name: GROUP_COLUMN_PROJECT_ID.to_string(),
             }),
             col(Column {
                 relation: None,
-                name: COLUMN_EVENT_ID.to_string(),
+                name: GROUP_COLUMN_ID.to_string(),
+            }),
+            col(Column {
+                relation: None,
+                name: GROUP_COLUMN_VERSION.to_string(),
+            }),
+            col(Column {
+                relation: None,
+                name: GROUP_COLUMN_CREATED_AT.to_string(),
             }),
         ];
-        prop_names.push(COLUMN_PROJECT_ID.to_string());
-        prop_names.push(COLUMN_EVENT_ID.to_string());
+        prop_names.push(GROUP_COLUMN_PROJECT_ID.to_string());
+        prop_names.push(GROUP_COLUMN_ID.to_string());
+        prop_names.push(GROUP_COLUMN_VERSION.to_string());
+        prop_names.push(GROUP_COLUMN_CREATED_AT.to_string());
 
         for prop in props {
             let p = match prop {
-                PropertyRef::System(n) => metadata
-                    .system_properties
-                    .get_by_name(ctx.project_id, n.as_ref())?,
                 PropertyRef::Group(n, group_id) => {
                     metadata.group_properties[*group_id].get_by_name(ctx.project_id, n.as_ref())?
                 }
-                PropertyRef::Event(n) => metadata
-                    .event_properties
+                PropertyRef::SystemGroup(n) => metadata
+                    .system_group_properties
                     .get_by_name(ctx.project_id, n.as_ref())?,
                 _ => {
                     return Err(QueryError::Unimplemented(
@@ -247,44 +244,18 @@ pub fn build_search_plan(
     };
 
     let mut cols_hash: HashMap<String, ()> = HashMap::new();
-    let input = decode_filter_dictionaries(
-        &ctx,
-        &metadata,
-        req.events.as_ref(),
-        req.filters.as_ref(),
-        input,
-        &mut cols_hash,
-    )?;
+    let input =
+        decode_filter_dictionaries(&ctx, &metadata, req.filters.as_ref(), input, &mut cols_hash)?;
 
-    let mut filter_exprs = vec![
-        binary_expr(
-            col(COLUMN_PROJECT_ID),
-            Operator::Eq,
-            lit(ScalarValue::from(ctx.project_id as i64)),
-        ),
-        time_expression(COLUMN_CREATED_AT, input.schema(), &req.time, ctx.cur_time)?,
-    ];
+    let mut filter_exprs = vec![binary_expr(
+        col(GROUP_COLUMN_PROJECT_ID),
+        Operator::Eq,
+        lit(ScalarValue::from(ctx.project_id as i64)),
+    )];
 
-    if let Some(events) = &req.events
-        && !events.is_empty()
-    {
-        let mut exprs = vec![];
-        for event in events {
-            // event expression
-            let mut expr = event_expression(&ctx, &metadata, &event.event)?;
-            // apply event filters
-            if let Some(filters) = &event.filters
-                && !filters.is_empty()
-            {
-                expr = and(
-                    expr.clone(),
-                    event_filters_expression(&ctx, &metadata, filters)?,
-                )
-            }
-
-            exprs.push(expr);
-        }
-        filter_exprs.push(multi_or(exprs))
+    if let Some(time)=&req.time {
+        let expr = time_expression(GROUP_COLUMN_CREATED_AT, input.schema(), time, ctx.cur_time)?;
+        filter_exprs.push(expr);
     }
 
     if let Some(filters) = &req.filters {
@@ -297,10 +268,14 @@ pub fn build_search_plan(
         Arc::new(input),
     )?);
 
-    let input = {
+    let input = if let Some((prop, sort)) = &req.sort {
         let s = Expr::Sort(expr::Sort {
-            expr: Box::new(col(COLUMN_EVENT_ID)),
-            asc: false,
+            expr: Box::new(property_col(&ctx, &metadata, prop)?),
+            asc: if *sort == SortDirection::Asc {
+                true
+            } else {
+                false
+            },
             nulls_first: false,
         });
 
@@ -309,23 +284,23 @@ pub fn build_search_plan(
             input: Arc::new(input),
             fetch: None,
         })
+    } else {
+        input
     };
 
     let input = LogicalPlan::Limit(Limit {
         skip: 0,
-        fetch: Some(100),
+        fetch: Some(1000),
         input: Arc::new(input),
     });
 
     if properties.is_empty() {
-        let mut l = metadata.system_properties.list(ctx.project_id)?.data;
+        let mut l = metadata.system_group_properties.list(ctx.project_id)?.data;
         properties.append(&mut (l));
-        let mut l = metadata.event_properties.list(ctx.project_id)?.data;
+        let mut l = metadata.group_properties[req.group_id]
+            .list(ctx.project_id)?
+            .data;
         properties.append(&mut (l));
-        for g in 0..GROUPS_COUNT {
-            let mut l = metadata.group_properties[g].list(ctx.project_id)?.data;
-            properties.append(&mut (l));
-        }
     }
 
     let dict_props = properties
@@ -385,16 +360,17 @@ pub fn build_get_by_id_plan(
     ctx: &Context,
     metadata: Arc<MetadataProvider>,
     input: LogicalPlan,
+    group_id: usize,
     id: u64,
 ) -> Result<LogicalPlan> {
     let mut filter_exprs = vec![
         binary_expr(
-            col(COLUMN_PROJECT_ID),
+            col(GROUP_COLUMN_PROJECT_ID),
             Operator::Eq,
             lit(ScalarValue::from(ctx.project_id as i64)),
         ),
         binary_expr(
-            col(COLUMN_EVENT_ID),
+            col(GROUP_COLUMN_ID),
             Operator::Eq,
             lit(ScalarValue::from(id as i64)),
         ),
@@ -406,14 +382,10 @@ pub fn build_get_by_id_plan(
     )?);
 
     let mut properties = vec![];
-    let mut l = metadata.system_properties.list(ctx.project_id)?.data;
+    let mut l = metadata.system_group_properties.list(ctx.project_id)?.data;
     properties.append(&mut (l));
-    let mut l = metadata.event_properties.list(ctx.project_id)?.data;
+    let mut l = metadata.group_properties[group_id].list(ctx.project_id)?.data;
     properties.append(&mut (l));
-    for g in 0..GROUPS_COUNT {
-        let mut l = metadata.group_properties[g].list(ctx.project_id)?.data;
-        properties.append(&mut (l));
-    }
 
     let mut cols_hash: HashMap<String, ()> = HashMap::new();
     let dict_props = properties
@@ -450,28 +422,11 @@ pub fn build_get_by_id_plan(
 fn decode_filter_dictionaries(
     ctx: &Context,
     metadata: &Arc<MetadataProvider>,
-    events: Option<&Vec<Event>>,
     filters: Option<&Vec<PropValueFilter>>,
     input: LogicalPlan,
     cols_hash: &mut HashMap<String, ()>,
 ) -> Result<LogicalPlan> {
     let mut decode_cols: Vec<(Column, Arc<SingleDictionaryProvider>)> = Vec::new();
-
-    if let Some(events) = events {
-        for event in events {
-            if let Some(filters) = &event.filters {
-                for filter in filters {
-                    decode_filter_single_dictionary(
-                        ctx,
-                        metadata,
-                        cols_hash,
-                        &mut decode_cols,
-                        filter,
-                    )?;
-                }
-            }
-        }
-    }
 
     if let Some(filters) = filters {
         for filter in filters {
@@ -490,14 +445,14 @@ fn decode_filter_dictionaries(
 
 fn projection(
     ctx: &Context,
-    req: &EventRecordsSearchRequest,
+    req: &GroupRecordsSearchRequest,
     md: &Arc<MetadataProvider>,
 ) -> Result<Vec<String>> {
     let mut fields = vec![
-        COLUMN_PROJECT_ID.to_string(),
-        COLUMN_CREATED_AT.to_string(),
-        COLUMN_EVENT.to_string(),
-        COLUMN_EVENT_ID.to_string(),
+        GROUP_COLUMN_PROJECT_ID.to_string(),
+        GROUP_COLUMN_ID.to_string(),
+        GROUP_COLUMN_VERSION.to_string(),
+        GROUP_COLUMN_CREATED_AT.to_string(),
     ];
     if let Some(filters) = &req.filters {
         for filter in filters {
@@ -517,21 +472,15 @@ fn projection(
 }
 
 #[derive(Clone, Debug)]
-pub struct Event {
-    pub event: EventRef,
-    pub filters: Option<Vec<PropValueFilter>>,
-}
-
-#[derive(Clone, Debug)]
-pub struct EventRecord {
+pub struct GroupRecord {
     pub properties: Vec<PropertyAndValue>,
 }
 
-
 #[derive(Clone, Debug)]
-pub struct EventRecordsSearchRequest {
-    pub time: QueryTime,
-    pub events: Option<Vec<Event>>,
+pub struct GroupRecordsSearchRequest {
+    pub time: Option<QueryTime>,
+    pub group_id: usize,
     pub filters: Option<Vec<PropValueFilter>>,
     pub properties: Option<Vec<PropertyRef>>,
+    pub sort: Option<(PropertyRef, SortDirection)>,
 }

@@ -17,7 +17,6 @@ pub mod organizations;
 pub mod projects;
 pub mod properties;
 pub mod reports;
-pub mod queries;
 pub mod event_segmentation;
 mod funnel;
 // pub mod stub;
@@ -66,6 +65,7 @@ use serde_json::json;
 use serde_json::Number;
 use serde_json::Value;
 use query::event_records::EventRecordsProvider;
+use query::group_records::GroupRecordsProvider;
 use query::properties::PropertiesProvider;
 
 use crate::accounts::Accounts;
@@ -76,11 +76,11 @@ use crate::event_records::EventRecords;
 use crate::event_segmentation::{EventSegmentation};
 use crate::events::Events;
 use crate::funnel::Funnel;
+use crate::group_records::GroupRecords;
 use crate::groups::Groups;
 use crate::organizations::Organizations;
 use crate::projects::Projects;
 use crate::properties::Properties;
-use crate::queries::provider::Queries;
 use crate::reports::Reports;
 
 pub struct PlatformProvider {
@@ -94,7 +94,6 @@ pub struct PlatformProvider {
     pub properties: Arc<Properties>,
     pub accounts: Arc<Accounts>,
     pub auth: Arc<Auth>,
-    pub query: Arc<Queries>,
     pub event_segmentation: Arc<EventSegmentation>,
     pub funnel: Arc<Funnel>,
     pub dashboards: Arc<Dashboards>,
@@ -102,17 +101,17 @@ pub struct PlatformProvider {
     pub projects: Arc<Projects>,
     pub organizations: Arc<Organizations>,
     pub event_records: Arc<EventRecords>,
-    // pub group_records: Arc<dyn group_records::Provider>,
+    pub group_records: Arc<GroupRecords>,
 }
 
 impl PlatformProvider {
     pub fn new(
         md: Arc<MetadataProvider>,
-        query_prov: Arc<query::QueryProvider>,
         es_prov: Arc<query::event_segmentation::EventSegmentationProvider>,
         funnel_prov: Arc<query::funnel::FunnelProvider>,
         prop_prov: Arc<PropertiesProvider>,
         event_records_prov: Arc<EventRecordsProvider>,
+        group_records_prov: Arc<GroupRecordsProvider>,
         cfg: Config,
     ) -> Self {
         let group_properties = (0..GROUPS_COUNT)
@@ -133,13 +132,12 @@ impl PlatformProvider {
             )),
             accounts: Arc::new(Accounts::new(md.accounts.clone())),
             auth: Arc::new(Auth::new(md.accounts.clone(), cfg.clone())),
-            query: Arc::new(Queries::new(query_prov.clone(), md.clone())),
             event_segmentation: Arc::new(EventSegmentation::new(md.clone(), es_prov)),
             funnel: Arc::new(Funnel::new(md.clone(), funnel_prov)),
             dashboards: Arc::new(Dashboards::new(md.dashboards.clone())),
             reports: Arc::new(Reports::new(md.reports.clone())),
             event_records: Arc::new(EventRecords::new(md.clone(), event_records_prov)),
-            // group_records: Arc::new(stub::GroupRecords {}),
+            group_records: Arc::new(GroupRecords::new(md.clone(), group_records_prov)),
             projects: Arc::new(Projects::new(md.clone(), cfg.clone())),
             organizations: Arc::new(Organizations::new(md.clone(), cfg.clone())),
         }
@@ -1415,6 +1413,15 @@ impl Into<QueryAggregate> for common::query::QueryAggregate {
     }
 }
 
+
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PropertyAndValue {
+    #[serde(flatten)]
+    property: PropertyRef,
+    value: Value,
+}
 
 pub fn validate_event_property(
     md: &Arc<MetadataProvider>,
