@@ -87,7 +87,6 @@ use metrics_exporter_prometheus::PrometheusBuilder;
 use platform::auth;
 use platform::auth::password::make_password_hash;
 use platform::PlatformProvider;
-use query::QueryProvider;
 use rand::distributions::Alphanumeric;
 use rand::distributions::DistString;
 use rand::thread_rng;
@@ -96,6 +95,7 @@ use uaparser::UserAgentParser;
 use query::event_records::EventRecordsProvider;
 use query::event_segmentation::EventSegmentationProvider;
 use query::funnel::FunnelProvider;
+use query::group_records::GroupRecordsProvider;
 use query::properties::PropertiesProvider;
 
 use crate::error::Error;
@@ -326,18 +326,18 @@ fn init_platform(
     router: Router,
     cfg: Config,
 ) -> crate::error::Result<Router> {
-    let query_provider = Arc::new(QueryProvider::new(md.clone(), db.clone()));
     let es_provider = Arc::new(EventSegmentationProvider::new(md.clone(), db.clone()));
     let funnel_provider = Arc::new(FunnelProvider::new(md.clone(), db.clone()));
     let prop_provider = Arc::new(PropertiesProvider::new(md.clone(), db.clone()));
     let er_provider = Arc::new(EventRecordsProvider::new(md.clone(), db.clone()));
+    let gr_provider = Arc::new(GroupRecordsProvider::new(md.clone(), db.clone()));
     let platform_provider = Arc::new(PlatformProvider::new(
         md.clone(),
-        query_provider,
         es_provider,
         funnel_provider,
         prop_provider,
         er_provider,
+        gr_provider,
         cfg.clone(),
     ));
 

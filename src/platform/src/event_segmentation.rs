@@ -13,7 +13,6 @@ use serde_json::Value;
 use common::rbac::ProjectPermission;
 use query::context::Format;
 use query::event_segmentation::EventSegmentationProvider;
-use query::QueryProvider;
 
 use crate::error::Result;
 use crate::{json_value_to_scalar, QueryParams, QueryResponse, QueryResponseFormat, validate_event, validate_event_filter, validate_event_property};

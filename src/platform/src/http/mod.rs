@@ -9,7 +9,6 @@ mod groups;
 pub mod organizations;
 pub mod projects;
 pub mod properties;
-pub mod queries;
 pub mod reports;
 mod event_segmentation;
 pub mod funnel;
@@ -64,7 +63,6 @@ pub fn attach_routes(
     router = properties::attach_group_routes(router);
     router = properties::attach_system_routes(router);
     router = properties::attach_system_group_routes(router);
-    router = queries::attach_routes(router);
     router = dashboards::attach_routes(router);
     router = reports::attach_routes(router);
     router = event_records::attach_routes(router);
@@ -96,13 +94,12 @@ pub fn attach_routes(
             props: platform.properties.clone(),
         }))
         .layer(Extension(cfg))
-        .layer(Extension(platform.query.clone()))
         .layer(Extension(platform.event_segmentation.clone()))
         .layer(Extension(platform.funnel.clone()))
         .layer(Extension(platform.dashboards.clone()))
         .layer(Extension(platform.reports.clone()))
-        .layer(Extension(platform.event_records.clone()));
-    // .layer(Extension(platform.group_records.clone()));
+        .layer(Extension(platform.event_records.clone()))
+        .layer(Extension(platform.group_records.clone()));
 
     let cors = CorsLayer::new()
         .allow_methods(Any)

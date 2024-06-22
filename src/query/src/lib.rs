@@ -5,6 +5,7 @@
 extern crate core;
 
 pub use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use arrow::array::{Array, RecordBatch};
@@ -56,14 +57,15 @@ use datafusion::physical_plan::coalesce_batches::concat_batches;
 use datafusion::physical_plan::collect;
 use datafusion::physical_plan::display::DisplayableExecutionPlan;
 use datafusion::prelude::{SessionConfig, SessionContext};
+use datafusion_common::ScalarValue;
 use datafusion_expr::{Extension, LogicalPlan};
-use common::query::PropertyRef;
+use common::query::{PropertyRef, PropValueFilter, PropValueOperation};
 pub use context::Context;
 pub use error::Result;
 use indexmap::IndexMap;
 use tracing::debug;
+use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
-pub use provider::QueryProvider;
 use storage::db::OptiDBImpl;
 use crate::logical_plan::db_parquet::DbParquetNode;
 use crate::physical_plan::planner::QueryPlanner;
@@ -73,12 +75,11 @@ pub mod error;
 pub mod expr;
 pub mod logical_plan;
 pub mod physical_plan;
-pub mod provider;
-pub mod queries;
 pub mod event_records;
 pub mod event_segmentation;
 pub mod funnel;
 pub mod properties;
+pub mod group_records;
 
 pub const DEFAULT_BATCH_SIZE: usize = 4096;
 
@@ -368,6 +369,12 @@ impl DataTable {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct PropertyAndValue {
+    pub property: PropertyRef,
+    pub value: ScalarValue,
+}
+
 pub async fn initial_plan(
     db: &Arc<OptiDBImpl>,
     projection: Vec<usize>,
@@ -403,6 +410,61 @@ pub async fn execute(
     Ok(res)
 }
 
+pub fn decode_filter_single_dictionary(
+    ctx: &Context,
+    metadata: &Arc<MetadataProvider>,
+    cols_hash: &mut HashMap<String, ()>,
+    decode_cols: &mut Vec<(datafusion_common::Column, Arc<SingleDictionaryProvider>)>,
+    filter: &PropValueFilter,
+) -> crate::Result<()> {
+    match filter {
+        PropValueFilter::Property {
+            property,
+            operation,
+            value: _,
+        } => match operation {
+            PropValueOperation::Like
+            | PropValueOperation::NotLike
+            | PropValueOperation::Regex
+            | PropValueOperation::NotRegex => {
+                let prop = match property {
+                    PropertyRef::System(prop_ref) => metadata
+                        .system_properties
+                        .get_by_name(ctx.project_id, prop_ref.as_str())?,
+                    PropertyRef::SystemGroup(prop_ref) => metadata
+                        .system_group_properties
+                        .get_by_name(ctx.project_id, prop_ref.as_str())?,
+                    PropertyRef::Group(prop_ref, group) => metadata.group_properties[*group]
+                        .get_by_name(ctx.project_id, prop_ref.as_str())?,
+                    PropertyRef::Event(prop_ref) => metadata
+                        .event_properties
+                        .get_by_name(ctx.project_id, prop_ref.as_str())?,
+                    PropertyRef::Custom(_) => unreachable!(),
+                };
+
+                if !prop.is_dictionary {
+                    return Ok(());
+                }
+                let col_name = prop.column_name();
+                let dict = SingleDictionaryProvider::new(
+                    ctx.project_id,
+                    col_name.clone(),
+                    metadata.dictionaries.clone(),
+                );
+                let col = datafusion_common::Column::from_name(col_name);
+                decode_cols.push((col, Arc::new(dict)));
+
+                if cols_hash.contains_key(prop.column_name().as_str()) {
+                    return Ok(());
+                }
+                cols_hash.insert(prop.column_name(), ());
+            }
+            _ => {}
+        },
+    }
+
+    Ok(())
+}
 pub mod test_util {
 
     use std::path::PathBuf;

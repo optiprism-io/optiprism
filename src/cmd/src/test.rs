@@ -27,7 +27,6 @@ use metadata::util::CreatePropertyMainRequest;
 use metadata::MetadataProvider;
 use platform::auth;
 use platform::projects::init_project;
-use query::QueryProvider;
 use scan_dir::ScanDir;
 use storage::db::OptiDBImpl;
 use storage::db::Options;
@@ -40,6 +39,7 @@ use tracing::info;
 use query::event_records::EventRecordsProvider;
 use query::event_segmentation::EventSegmentationProvider;
 use query::funnel::FunnelProvider;
+use query::group_records::GroupRecordsProvider;
 use query::properties::PropertiesProvider;
 
 use crate::init_metrics;
@@ -285,15 +285,15 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
     let funnel_prov = Arc::new(FunnelProvider::new(md.clone(), db.clone()));
     let prop_prov = Arc::new(PropertiesProvider::new(md.clone(), db.clone()));
     let er_prov = Arc::new(EventRecordsProvider::new(md.clone(), db.clone()));
+    let gr_prov = Arc::new(GroupRecordsProvider::new(md.clone(), db.clone()));
 
-    let query_provider = Arc::new(QueryProvider::new(md.clone(), db.clone()));
     let platform_provider = Arc::new(platform::PlatformProvider::new(
         md.clone(),
-        query_provider,
         es_prov,
         funnel_prov,
         prop_prov,
         er_prov,
+        gr_prov,
         cfg.clone(),
     ));
 

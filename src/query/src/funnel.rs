@@ -41,7 +41,7 @@ use common::funnel::{Count, ExcludeSteps, Filter, Funnel, StepOrder, TimeWindow,
 use metadata::properties::Property;
 use storage::db::OptiDBImpl;
 
-use crate::{breakdowns_to_dicts, col_name, execute, initial_plan};
+use crate::{breakdowns_to_dicts, col_name, decode_filter_single_dictionary, execute, initial_plan};
 use crate::error::QueryError;
 use crate::error::Result;
 use crate::expr::event_expression;
@@ -54,7 +54,6 @@ use crate::logical_plan::expr::multi_or;
 use crate::logical_plan::funnel::FunnelNode;
 use crate::logical_plan::rename_columns::RenameColumnsNode;
 use crate::logical_plan::SortField;
-use crate::queries::decode_filter_single_dictionary;
 use crate::Context;
 
 

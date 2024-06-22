@@ -10,9 +10,9 @@ use serde_json::{json, Value};
 use common::rbac::ProjectPermission;
 use metadata::MetadataProvider;
 use query::context::Format;
-use query::{event_records, queries};
+use query::{event_records};
 
-use crate::{Context, PlatformError, PropertyRef, QueryParams, QueryResponse, QueryResponseFormat, QueryTime, scalar_to_json, validate_event, validate_event_filter};
+use crate::{Context, PlatformError, PropertyAndValue, PropertyRef, QueryParams, QueryResponse, QueryResponseFormat, QueryTime, scalar_to_json, validate_event, validate_event_filter};
 use crate::EventGroupedFilters;
 use crate::EventRef;
 use crate::ListResponse;
@@ -97,21 +97,13 @@ pub struct EventRecord {
     pub properties: Vec<PropertyAndValue>,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct PropertyAndValue {
-    #[serde(flatten)]
-    property: PropertyRef,
-    value: Value,
-}
-
 impl Into<EventRecord> for query::event_records::EventRecord {
     fn into(self) -> EventRecord {
         EventRecord { properties: self.properties.iter().map(|p| p.to_owned().into()).collect::<Vec<_>>() }
     }
 }
 
-impl Into<PropertyAndValue> for query::event_records::PropertyAndValue {
+impl Into<PropertyAndValue> for query::PropertyAndValue {
     fn into(self) -> PropertyAndValue {
         let value = scalar_to_json(&self.value);
 

@@ -11,7 +11,6 @@ use crate::properties::{ListPropertyValuesRequest, Property};
 use crate::properties::UpdatePropertyRequest;
 use crate::Context;
 use crate::ListResponse;
-use crate::queries::provider::Queries;
 use crate::Result;
 
 async fn get_event_by_id(
