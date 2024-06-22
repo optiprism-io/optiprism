@@ -3,6 +3,7 @@ use std::sync::Arc;
 use std::time::Instant;
 use arrow::array::{Array, BooleanArray, Decimal128Array, Int16Array, Int32Array, Int64Array, Int8Array, StringArray, TimestampMillisecondArray, TimestampMillisecondBuilder};
 use arrow::datatypes::DataType;
+use arrow::util::pretty::print_batches;
 
 use common::query::EventRef;
 use common::query::PropValueFilter;
@@ -11,7 +12,7 @@ use common::query::QueryTime;
 use common::types::{COLUMN_CREATED_AT, COLUMN_EVENT, GROUP_COLUMN_CREATED_AT, GROUP_COLUMN_ID, GROUP_COLUMN_PROJECT_ID, GROUP_COLUMN_VERSION, SortDirection, TABLE_EVENTS};
 use common::types::COLUMN_EVENT_ID;
 use common::types::COLUMN_PROJECT_ID;
-use common::{DECIMAL_PRECISION, DECIMAL_SCALE, GROUPS_COUNT};
+use common::{DECIMAL_PRECISION, DECIMAL_SCALE, group_col, GROUPS_COUNT};
 use datafusion_common::Column;
 use datafusion_common::ScalarValue;
 use datafusion_expr::and;
@@ -60,17 +61,16 @@ impl GroupRecordsProvider {
         id: u64,
     ) -> Result<GroupRecord> {
         let start = Instant::now();
-        let schema = self.db.schema1(TABLE_EVENTS)?;
+        let schema = self.db.schema1(&group_col(group_id))?;
         let projection =
             (0..schema.fields.len()).collect::<Vec<_>>();
 
-        let (session_ctx, state, plan) = initial_plan(&self.db, projection).await?;
+        let (session_ctx, state, plan) = initial_plan(&self.db, group_col(group_id), projection).await?;
         let plan = build_get_by_id_plan(&ctx, self.metadata.clone(), plan, group_id, id)?;
         println!("{plan:?}");
         let result = execute(session_ctx, state, plan).await?;
         let duration = start.elapsed();
         debug!("elapsed: {:?}", duration);
-
         let mut properties = vec![];
 
         for (field, col) in result.schema().fields().iter().zip(result.columns().iter()) {
@@ -144,7 +144,7 @@ impl GroupRecordsProvider {
         req: GroupRecordsSearchRequest,
     ) -> Result<DataTable> {
         let start = Instant::now();
-        let schema = self.db.schema1(TABLE_EVENTS)?;
+        let schema = self.db.schema1(group_col(req.group_id).as_str())?;
         let projection = if req.properties.is_some() {
             let projection = projection(&ctx, &req, &self.metadata)?;
             projection
@@ -155,10 +155,12 @@ impl GroupRecordsProvider {
             (0..schema.fields.len()).collect::<Vec<_>>()
         };
 
-        let (session_ctx, state, plan) = initial_plan(&self.db, projection).await?;
+        let (session_ctx, state, plan) = initial_plan(&self.db, group_col(req.group_id), projection).await?;
         let plan = build_search_plan(ctx, self.metadata.clone(), plan, req.clone())?;
         println!("{plan:?}");
         let result = execute(session_ctx, state, plan).await?;
+        print_batches(&[result.clone()]).unwrap();
+
         let duration = start.elapsed();
         debug!("elapsed: {:?}", duration);
 
@@ -187,6 +189,7 @@ pub fn build_search_plan(
     input: LogicalPlan,
     req: GroupRecordsSearchRequest,
 ) -> Result<LogicalPlan> {
+    return Ok(input);
     let mut properties = vec![];
     let input = if let Some(props) = &req.properties {
         let mut prop_names = vec![];
@@ -253,7 +256,7 @@ pub fn build_search_plan(
         lit(ScalarValue::from(ctx.project_id as i64)),
     )];
 
-    if let Some(time)=&req.time {
+    if let Some(time) = &req.time {
         let expr = time_expression(GROUP_COLUMN_CREATED_AT, input.schema(), time, ctx.cur_time)?;
         filter_exprs.push(expr);
     }

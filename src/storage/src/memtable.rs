@@ -170,16 +170,20 @@ impl Memtable {
                     .as_any()
                     .downcast_ref::<arrow2::array::Int64Array>()
                     .unwrap();
+                let b = arrs[1]
+                    .as_any()
+                    .downcast_ref::<arrow2::array::Int64Array>()
+                    .unwrap();
 
                 let mut last = None;
                 for row_id in 0..arrs[0].len() {
                     if last.is_none() {
-                        last = Some(a.value(row_id));
+                        last = Some(vec![a.value(row_id), b.value(row_id)]);
                         continue;
                     }
-                    if last != Some(a.value(row_id)) {
+                    if last != Some(vec![a.value(row_id), b.value(row_id)]) {
                         indices.push(Some(row_id as i64 - 1));
-                        last = Some(a.value(row_id));
+                        last = Some(vec![a.value(row_id), b.value(row_id)]);
                     }
                 }
                 indices.push(Some(arrs[0].len() as i64 - 1));
@@ -197,6 +201,7 @@ impl Memtable {
                 .collect::<std::result::Result<Vec<_>, _>>()?;
         }
         let chunk = Chunk::new(arrs);
+
         Ok(Some(chunk))
     }
 
@@ -263,6 +268,7 @@ impl Memtable {
         }
     }
 }
+
 #[derive(Debug, Clone)]
 pub(crate) struct Memtable {
     pub(crate) cols: Vec<Column>,
@@ -279,39 +285,69 @@ mod tests {
     #[test]
     fn test_get() {
         let mut mt = Memtable::new();
-        mt.add_column(DType::Int32);
-        mt.add_column(DType::Int32);
-        mt.add_column(DType::Int32);
+        mt.add_column(DType::Int64);
+        mt.add_column(DType::Int64);
+        mt.add_column(DType::Int64);
         mt.push_row(vec![
-            Value::Int32(Some(1)),
-            Value::Int32(Some(1)),
-            Value::Int32(Some(1)),
+            Value::Int64(Some(1)),
+            Value::Int64(Some(1)),
+            Value::Int64(Some(1)),
         ]);
         mt.push_row(vec![
-            Value::Int32(Some(1)),
-            Value::Int32(Some(2)),
-            Value::Int32(Some(2)),
+            Value::Int64(Some(1)),
+            Value::Int64(Some(2)),
+            Value::Int64(Some(2)),
         ]);
         mt.push_row(vec![
-            Value::Int32(Some(2)),
-            Value::Int32(Some(1)),
-            Value::Int32(Some(3)),
+            Value::Int64(Some(2)),
+            Value::Int64(Some(1)),
+            Value::Int64(Some(3)),
         ]);
         mt.push_row(vec![
-            Value::Int32(Some(2)),
-            Value::Int32(Some(2)),
-            Value::Int32(Some(4)),
+            Value::Int64(Some(2)),
+            Value::Int64(Some(2)),
+            Value::Int64(Some(4)),
         ]);
 
-        let res = mt.get(&[KeyValue::Int32(1)]);
+        let res = mt.get(&[KeyValue::Int64(1)]);
 
         assert_eq!(
             res,
             Some(vec![
-                Value::Int32(Some(1)),
-                Value::Int32(Some(2)),
-                Value::Int32(Some(2))
+                Value::Int64(Some(1)),
+                Value::Int64(Some(2)),
+                Value::Int64(Some(2)),
             ])
         );
+
+        let a = mt.chunk(None, 2, true).unwrap();
+        dbg!(a);
+    }
+
+    #[test]
+    fn test_chunk_replacing_2_cols() {
+        let mut mt = Memtable::new();
+        mt.add_column(DType::Int64);
+        mt.add_column(DType::Int64);
+        mt.add_column(DType::Int64);
+        mt.push_row(vec![
+            Value::Int64(Some(1)),
+            Value::Int64(Some(1)),
+            Value::Int64(Some(1)),
+        ]);
+        mt.push_row(vec![
+            Value::Int64(Some(1)),
+            Value::Int64(Some(2)),
+            Value::Int64(Some(2)),
+        ]);
+        mt.push_row(vec![
+            Value::Int64(Some(1)),
+            Value::Int64(Some(2)),
+            Value::Int64(Some(1)),
+        ]);
+
+        let res = mt.chunk(None, 2, true).unwrap();
+
+        dbg!(res);
     }
 }

@@ -63,7 +63,7 @@ impl EventRecordsProvider {
         let projection =
             (0..schema.fields.len()).collect::<Vec<_>>();
 
-        let (session_ctx, state, plan) = initial_plan(&self.db, projection).await?;
+        let (session_ctx, state, plan) = initial_plan(&self.db, TABLE_EVENTS.to_string(), projection).await?;
         let plan = build_get_by_id_plan(&ctx, self.metadata.clone(), plan, id)?;
         println!("{plan:?}");
         let result = execute(session_ctx, state, plan).await?;
@@ -165,7 +165,7 @@ impl EventRecordsProvider {
             (0..schema.fields.len()).collect::<Vec<_>>()
         };
 
-        let (session_ctx, state, plan) = initial_plan(&self.db, projection).await?;
+        let (session_ctx, state, plan) = initial_plan(&self.db, TABLE_EVENTS.to_string(),projection).await?;
         let plan = build_search_plan(ctx, self.metadata.clone(), plan, req.clone())?;
         println!("{plan:?}");
         let result = execute(session_ctx, state, plan).await?;

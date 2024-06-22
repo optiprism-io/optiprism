@@ -1402,7 +1402,7 @@ mod tests {
             .unwrap();
 
             if i % 150 == 0 {
-                db.flush(TABLE_EVENTS).unwrap();
+                db.flush("t1").unwrap();
                 db.compact();
                 db.add_field("t1", format!("f{f}").as_str(), DType::Int64, true)
                     .unwrap();
@@ -1415,6 +1415,7 @@ mod tests {
             .unwrap();
 
         dbg!(res);
+
     }
 
     #[test]

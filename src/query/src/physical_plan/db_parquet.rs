@@ -10,6 +10,7 @@ use arrow::array::RecordBatch;
 use arrow::datatypes::SchemaRef;
 use arrow2::array::Array;
 use arrow2::chunk::Chunk;
+use arrow::util::pretty::print_batches;
 use async_trait::async_trait;
 use datafusion::execution::RecordBatchStream;
 use datafusion::execution::SendableRecordBatchStream;
@@ -37,17 +38,19 @@ use crate::Result;
 #[derive(Debug)]
 pub struct DBParquetExec {
     db: Arc<OptiDBImpl>,
+    table: String,
     projection: Vec<usize>,
     schema: SchemaRef,
     cache: PlanProperties,
 }
 
 impl DBParquetExec {
-    pub fn try_new(db: Arc<OptiDBImpl>, projection: Vec<usize>) -> Result<Self> {
-        let schema = db.schema1("events")?.project(&projection)?;
+    pub fn try_new(db: Arc<OptiDBImpl>, table: String, projection: Vec<usize>) -> Result<Self> {
+        let schema = db.schema1(table.as_str())?.project(&projection)?;
         let cache = Self::compute_properties(Arc::new(schema.clone()));
         Ok(Self {
             db,
+            table,
             projection,
             schema: Arc::new(schema),
             cache,
@@ -92,7 +95,7 @@ impl ExecutionPlan for DBParquetExec {
         _children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
         Ok(Arc::new(
-            DBParquetExec::try_new(self.db.clone(), self.projection.clone())
+            DBParquetExec::try_new(self.db.clone(), self.table.clone(), self.projection.clone())
                 .map_err(QueryError::into_datafusion_execution_error)?,
         ))
     }
@@ -104,13 +107,13 @@ impl ExecutionPlan for DBParquetExec {
     ) -> datafusion_common::Result<SendableRecordBatchStream> {
         let stream = self
             .db
-            .scan("events", self.projection.clone())
+            .scan(&self.table, self.projection.clone())
             .map_err(|e| DataFusionError::Execution(e.to_string()))?;
         Ok(Box::pin(ParquetStream {
             stream: Pin::new(Box::new(stream))
                 as Pin<
-                    Box<dyn Stream<Item = storage::error::Result<Chunk<Box<dyn Array>>>> + Send>,
-                >,
+                Box<dyn Stream<Item=storage::error::Result<Chunk<Box<dyn Array>>>> + Send>,
+            >,
             schema: self.schema.clone(),
         }))
     }
@@ -118,7 +121,7 @@ impl ExecutionPlan for DBParquetExec {
 
 struct ParquetStream {
     #[warn(clippy::type_complexity)]
-    stream: Pin<Box<dyn Stream<Item = storage::error::Result<Chunk<Box<dyn Array>>>> + Send>>,
+    stream: Pin<Box<dyn Stream<Item=storage::error::Result<Chunk<Box<dyn Array>>>> + Send>>,
     schema: SchemaRef,
 }
 
