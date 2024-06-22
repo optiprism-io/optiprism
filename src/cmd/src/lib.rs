@@ -171,10 +171,10 @@ pub fn init_system(
         name: COLUMN_PROJECT_ID.to_string(),
         display_name: Some("Project".to_string()),
         typ: Type::System,
-        data_type: DType::Int64,
+        data_type: DType::String,
         nullable: false,
         hidden: true,
-        dict: None,
+        dict: Some(DictionaryType::Int64),
     })?;
 
     for g in 0..GROUPS_COUNT {
@@ -508,6 +508,7 @@ fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<P
         Ok(proj) => proj,
         Err(_err) => md.projects.get_by_id(1)?,
     };
+    md.dictionaries.create_key(proj.id, "project_id", proj.id, proj.name.as_str())?;
 
     info!("token: {}", token);
     let _user = match md.accounts.create(CreateAccountRequest {

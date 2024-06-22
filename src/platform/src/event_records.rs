@@ -220,11 +220,6 @@ pub(crate) fn validate_search_request(
     match &req.properties {
         None => {}
         Some(props) => {
-            if props.is_empty() {
-                return Err(PlatformError::BadRequest(
-                    "props field can't be empty".to_string(),
-                ));
-            }
             for (idx, prop) in props.iter().enumerate() {
                 match prop {
                     PropertyRef::Group {
@@ -263,6 +258,13 @@ pub(crate) fn fix_search_request(
     req: EventRecordsSearchRequest,
 ) -> Result<EventRecordsSearchRequest> {
     let mut out = req.clone();
+
+    if let Some(props) = &req.properties {
+        if props.is_empty() {
+            out.properties = None;
+        }
+    }
+
 
     if let Some(events) = &req.events {
         if events.is_empty() {
