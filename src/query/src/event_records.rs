@@ -216,7 +216,13 @@ pub fn build_search_plan(
         ];
         prop_names.push(COLUMN_PROJECT_ID.to_string());
         prop_names.push(COLUMN_EVENT_ID.to_string());
-
+        prop_names.push(COLUMN_CREATED_AT.to_string());
+        let p = metadata.system_properties.get_by_column_name(ctx.project_id, COLUMN_PROJECT_ID)?;
+        properties.push(p);
+        let p = metadata.system_properties.get_by_column_name(ctx.project_id, COLUMN_EVENT_ID)?;
+        properties.push(p);
+        let p = metadata.system_properties.get_by_column_name(ctx.project_id, COLUMN_CREATED_AT)?;
+        properties.push(p);
         for prop in props {
             let p = match prop {
                 PropertyRef::System(n) => metadata
@@ -321,6 +327,7 @@ pub fn build_search_plan(
         input: Arc::new(input),
     });
 
+    dbg!(&properties);
     if properties.is_empty() {
         let mut l = metadata.system_properties.list(ctx.project_id)?.data;
         properties.append(&mut (l));
