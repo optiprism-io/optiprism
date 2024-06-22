@@ -17,6 +17,7 @@ use crate::Result;
 
 pub struct DbParquetNode {
     pub db: Arc<OptiDBImpl>,
+    pub table: String,
     pub projection: Vec<usize>,
     schema: DFSchemaRef,
 }
@@ -37,13 +38,14 @@ impl PartialEq for DbParquetNode {
 }
 
 impl DbParquetNode {
-    pub fn try_new(db: Arc<OptiDBImpl>, mut projection: Vec<usize>) -> Result<Self> {
+    pub fn try_new(db: Arc<OptiDBImpl>, table: String, mut projection: Vec<usize>) -> Result<Self> {
         // sort projection to make sure it's sync with fields order in schema
         projection.sort();
         projection.dedup();
-        let schema = db.schema1("events")?.project(&projection)?;
+        let schema = db.schema1(&table)?.project(&projection)?;
         Ok(Self {
             db,
+            table,
             projection,
             schema: Arc::new(DFSchema::try_from(schema)?),
         })
@@ -83,7 +85,7 @@ impl UserDefinedLogicalNode for DbParquetNode {
 
     fn from_template(&self, _: &[Expr], _: &[LogicalPlan]) -> Arc<dyn UserDefinedLogicalNode> {
         Arc::new(
-            DbParquetNode::try_new(self.db.clone(), self.projection.clone())
+            DbParquetNode::try_new(self.db.clone(), self.table.clone(), self.projection.clone())
                 .map_err(QueryError::into_datafusion_plan_error)
                 .unwrap(),
         )
@@ -95,7 +97,7 @@ impl UserDefinedLogicalNode for DbParquetNode {
         inputs: Vec<LogicalPlan>,
     ) -> datafusion_common::Result<Arc<dyn UserDefinedLogicalNode>> {
         Ok(Arc::new(
-            Self::try_new(self.db.clone(), self.projection.clone())
+            Self::try_new(self.db.clone(), self.table.clone(), self.projection.clone())
                 .map_err(QueryError::into_datafusion_plan_error)?,
         ))
     }

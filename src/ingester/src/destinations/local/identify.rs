@@ -77,7 +77,6 @@ impl Destination<Identify> for Local {
             };
             prop_values.push(NamedValue::new(prop.column_name(), value));
         }
-
         self.db
             .insert(group_col(req.group_id as usize).as_str(), prop_values)?;
         Ok(())

@@ -377,6 +377,7 @@ pub struct PropertyAndValue {
 
 pub async fn initial_plan(
     db: &Arc<OptiDBImpl>,
+    table: String,
     projection: Vec<usize>,
 ) -> Result<(SessionContext, SessionState, LogicalPlan)> {
     let runtime = Arc::new(RuntimeEnv::default());
@@ -388,7 +389,7 @@ pub async fn initial_plan(
 
     let exec_ctx = SessionContext::new_with_state(state.clone());
     let plan = LogicalPlan::Extension(Extension {
-        node: Arc::new(DbParquetNode::try_new(db.clone(), projection.clone())?),
+        node: Arc::new(DbParquetNode::try_new(db.clone(), table, projection.clone())?),
     });
 
     Ok((exec_ctx, state, plan))
@@ -465,8 +466,8 @@ pub fn decode_filter_single_dictionary(
 
     Ok(())
 }
-pub mod test_util {
 
+pub mod test_util {
     use std::path::PathBuf;
     use std::sync::Arc;
 
@@ -538,7 +539,7 @@ pub mod test_util {
                     ),
                 ],
             ]
-            .concat(),
+                .concat(),
         );
         let mut options = CsvReadOptions::new();
         options.schema = Some(&schema);

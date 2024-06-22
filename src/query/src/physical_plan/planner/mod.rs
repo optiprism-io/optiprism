@@ -165,7 +165,7 @@ impl DFExtensionPlanner for ExtensionPlanner {
             .map_err(|e| DataFusionError::Plan(e.to_string()))?;
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<DbParquetNode>() {
-            let exec = DBParquetExec::try_new(node.db.clone(), node.projection.clone())
+            let exec = DBParquetExec::try_new(node.db.clone(), node.table.clone(),node.projection.clone())
                 .map_err(|err| DataFusionError::Plan(err.to_string()))?;
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<UnpivotNode>() {
