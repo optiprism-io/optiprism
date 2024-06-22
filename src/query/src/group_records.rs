@@ -189,7 +189,6 @@ pub fn build_search_plan(
     input: LogicalPlan,
     req: GroupRecordsSearchRequest,
 ) -> Result<LogicalPlan> {
-    return Ok(input);
     let mut properties = vec![];
     let input = if let Some(props) = &req.properties {
         let mut prop_names = vec![];

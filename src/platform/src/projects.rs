@@ -95,6 +95,8 @@ impl Projects {
         };
 
         let project = self.md.projects.create(md)?;
+        self.md.dictionaries.create_key(project.id, "project_id", project.id, project.name.as_str())?;
+
         init_project(project.id, &self.md)?;
         Ok(project.into())
     }
@@ -126,7 +128,7 @@ impl Projects {
                     p.id,
                     ProjectPermission::ViewProject,
                 )
-                .is_ok()
+                    .is_ok()
             })
             .collect::<Vec<_>>();
         Ok(ListResponse {
@@ -157,6 +159,7 @@ impl Projects {
         };
 
         let project = self.md.projects.update(project_id, md_req)?;
+        self.md.dictionaries.create_key(project.id, "project_id", project.id, project.name.as_str())?;
 
         Ok(project.into())
     }

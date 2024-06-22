@@ -209,6 +209,10 @@ pub fn build_search_plan(
                 relation: None,
                 name: COLUMN_EVENT_ID.to_string(),
             }),
+            col(Column {
+                relation: None,
+                name: COLUMN_CREATED_AT.to_string(),
+            }),
         ];
         prop_names.push(COLUMN_PROJECT_ID.to_string());
         prop_names.push(COLUMN_EVENT_ID.to_string());
@@ -355,6 +359,7 @@ pub fn build_search_plan(
         input
     };
 
+    dbg!(&properties);
     let mut rename = vec![];
     let mut rename_found: Vec<String> = vec![];
     for prop in properties {
