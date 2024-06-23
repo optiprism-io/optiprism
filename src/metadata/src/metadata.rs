@@ -38,7 +38,6 @@ pub struct MetadataProvider {
     pub event_properties: Arc<Properties>,
     pub group_properties: Vec<Arc<Properties>>,
     pub system_properties: Arc<Properties>,
-    pub system_group_properties: Arc<Properties>,
     pub organizations: Arc<Organizations>,
     pub projects: Arc<Projects>,
     pub accounts: Arc<Accounts>,
@@ -66,10 +65,6 @@ impl MetadataProvider {
             )),
             group_properties: properties::Properties::new_group(db.clone(), opti_db.clone()),
             system_properties: Arc::new(properties::Properties::new_system(
-                db.clone(),
-                opti_db.clone(),
-            )),
-            system_group_properties: Arc::new(properties::Properties::new_system_group(
                 db.clone(),
                 opti_db.clone(),
             )),

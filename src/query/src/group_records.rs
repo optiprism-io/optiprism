@@ -82,15 +82,6 @@ impl GroupRecordsProvider {
                 }
             };
 
-            if property.is_none() {
-                for p in self.metadata.system_group_properties.list(ctx.project_id)?.data {
-                    if p.column_name() == *field.name() {
-                        property = Some(p);
-                        break;
-                    }
-                };
-            }
-
             if let Some(prop) = property {
                 let value = match field.data_type() {
                     DataType::Boolean => {
@@ -220,9 +211,6 @@ pub fn build_search_plan(
                 PropertyRef::Group(n, group_id) => {
                     metadata.group_properties[*group_id].get_by_name(ctx.project_id, n.as_ref())?
                 }
-                PropertyRef::SystemGroup(n) => metadata
-                    .system_group_properties
-                    .get_by_name(ctx.project_id, n.as_ref())?,
                 _ => {
                     return Err(QueryError::Unimplemented(
                         "invalid property type".to_string(),
@@ -297,11 +285,10 @@ pub fn build_search_plan(
     });
 
     if properties.is_empty() {
-        let mut l = metadata.system_group_properties.list(ctx.project_id)?.data;
-        properties.append(&mut (l));
         let mut l = metadata.group_properties[req.group_id]
             .list(ctx.project_id)?
             .data;
+        dbg!(&l);
         properties.append(&mut (l));
     }
 
@@ -384,8 +371,6 @@ pub fn build_get_by_id_plan(
     )?);
 
     let mut properties = vec![];
-    let mut l = metadata.system_group_properties.list(ctx.project_id)?.data;
-    properties.append(&mut (l));
     let mut l = metadata.group_properties[group_id].list(ctx.project_id)?.data;
     properties.append(&mut (l));
 
@@ -452,7 +437,7 @@ fn projection(
 ) -> Result<Vec<String>> {
     let mut fields = vec![
         GROUP_COLUMN_PROJECT_ID.to_string(),
-        GROUP_COLUMN_ID.to_string(),
+        group_col(req.group_id).to_string(),
         GROUP_COLUMN_VERSION.to_string(),
         GROUP_COLUMN_CREATED_AT.to_string(),
     ];

@@ -432,9 +432,6 @@ pub fn decode_filter_single_dictionary(
                     PropertyRef::System(prop_ref) => metadata
                         .system_properties
                         .get_by_name(ctx.project_id, prop_ref.as_str())?,
-                    PropertyRef::SystemGroup(prop_ref) => metadata
-                        .system_group_properties
-                        .get_by_name(ctx.project_id, prop_ref.as_str())?,
                     PropertyRef::Group(prop_ref, group) => metadata.group_properties[*group]
                         .get_by_name(ctx.project_id, prop_ref.as_str())?,
                     PropertyRef::Event(prop_ref) => metadata

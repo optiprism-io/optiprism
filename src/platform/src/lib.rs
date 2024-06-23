@@ -90,8 +90,6 @@ pub struct PlatformProvider {
     pub event_properties: Arc<Properties>,
     pub group_properties: Vec<Arc<Properties>>,
     pub system_properties: Arc<Properties>,
-    pub system_group_properties: Arc<Properties>,
-    pub properties: Arc<Properties>,
     pub accounts: Arc<Accounts>,
     pub auth: Arc<Auth>,
     pub event_segmentation: Arc<EventSegmentation>,
@@ -124,12 +122,6 @@ impl PlatformProvider {
             event_properties: Arc::new(Properties::new_event(md.event_properties.clone(), prop_prov.clone())),
             group_properties,
             system_properties: Arc::new(Properties::new_system(md.system_properties.clone(), prop_prov.clone())),
-            system_group_properties: Arc::new(Properties::new_system_group(
-                md.system_group_properties.clone(), prop_prov.clone(),
-            )),
-            properties: Arc::new(Properties::new(
-                md.system_group_properties.clone(), prop_prov.clone(),
-            )),
             accounts: Arc::new(Accounts::new(md.accounts.clone())),
             auth: Arc::new(Auth::new(md.accounts.clone(), cfg.clone())),
             event_segmentation: Arc::new(EventSegmentation::new(md.clone(), es_prov)),
@@ -427,8 +419,6 @@ pub enum PropertyRef {
     #[serde(rename_all = "camelCase")]
     System { property_name: String },
     #[serde(rename_all = "camelCase")]
-    SystemGroup { property_name: String },
-    #[serde(rename_all = "camelCase")]
     Group { property_name: String, group: usize },
     #[serde(rename_all = "camelCase")]
     Event { property_name: String },
@@ -441,11 +431,6 @@ pub enum PropertyRef {
 pub enum SortablePropertyRef {
     #[serde(rename_all = "camelCase")]
     System {
-        property_name: String,
-        direction: SortDirection,
-    },
-    #[serde(rename_all = "camelCase")]
-    SystemGroup {
         property_name: String,
         direction: SortDirection,
     },
@@ -473,9 +458,6 @@ impl Into<common::query::PropertyRef> for PropertyRef {
             PropertyRef::System { property_name } => {
                 common::query::PropertyRef::System(property_name)
             }
-            PropertyRef::SystemGroup { property_name } => {
-                common::query::PropertyRef::SystemGroup(property_name)
-            }
             PropertyRef::Group {
                 property_name,
                 group,
@@ -493,9 +475,6 @@ impl Into<PropertyRef> for common::query::PropertyRef {
         match self {
             common::query::PropertyRef::System(property_name) => {
                 PropertyRef::System { property_name }
-            }
-            common::query::PropertyRef::SystemGroup(property_name) => {
-                PropertyRef::SystemGroup { property_name }
             }
             common::query::PropertyRef::Group(property_name, group) => PropertyRef::Group {
                 property_name,

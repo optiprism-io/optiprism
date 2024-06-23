@@ -6,7 +6,7 @@ use common::config::Config;
 use common::rbac::OrganizationPermission;
 use common::rbac::Permission;
 use common::rbac::ProjectPermission;
-use common::types::DType;
+use common::types::{DType, GROUP_COLUMN_CREATED_AT, GROUP_COLUMN_ID, GROUP_COLUMN_PROJECT_ID, GROUP_COLUMN_VERSION};
 use common::types::OptionalProperty;
 use common::types::EVENT_CLICK;
 use common::types::EVENT_PAGE;
@@ -45,7 +45,7 @@ use common::types::EVENT_PROPERTY_UTM_TERM;
 use common::types::EVENT_SCREEN;
 use common::types::EVENT_SESSION_BEGIN;
 use common::types::EVENT_SESSION_END;
-use common::GROUP_USER;
+use common::{GROUP_USER, GROUPS_COUNT};
 use common::GROUP_USER_ID;
 use metadata::projects::Projects as MDProjects;
 use metadata::properties::DictionaryType;
@@ -270,6 +270,7 @@ pub fn init_project(project_id: u64, md: &Arc<MetadataProvider>) -> error::Resul
             nullable: true,
             hidden: false,
             dict: Some(DictionaryType::Int64),
+            is_system: false,
         })?;
     }
 
@@ -296,6 +297,7 @@ pub fn init_project(project_id: u64, md: &Arc<MetadataProvider>) -> error::Resul
             nullable: true,
             hidden: false,
             dict: None,
+            is_system: false,
         })?;
     }
 
@@ -307,9 +309,56 @@ pub fn init_project(project_id: u64, md: &Arc<MetadataProvider>) -> error::Resul
         nullable: true,
         hidden: false,
         dict: None,
+        is_system: false,
     })?;
 
+    for g in 0..GROUPS_COUNT {
+        create_property(md, project_id, CreatePropertyMainRequest {
+            name: GROUP_COLUMN_PROJECT_ID.to_string(),
+            display_name: Some("Project ID".to_string()),
+            typ: Type::Group(g),
+            data_type: DType::String,
+            nullable: false,
+            dict: Some(DictionaryType::Int64),
+            hidden: true,
+            is_system: true,
+        })?;
+
+        create_property(md, project_id, CreatePropertyMainRequest {
+            name: GROUP_COLUMN_ID.to_string(),
+            display_name: Some("ID".to_string()),
+            typ: Type::Group(g),
+            data_type: DType::String,
+            nullable: false,
+            dict: Some(DictionaryType::Int64),
+            hidden: true,
+            is_system: true,
+        })?;
+
+        create_property(md, project_id, CreatePropertyMainRequest {
+            name: GROUP_COLUMN_VERSION.to_string(),
+            display_name: Some("Version".to_string()),
+            typ: Type::Group(g),
+            data_type: DType::Int64,
+            nullable: false,
+            dict: None,
+            hidden: true,
+            is_system: true,
+        })?;
+
+        create_property(md, project_id, CreatePropertyMainRequest {
+            name: GROUP_COLUMN_CREATED_AT.to_string(),
+            display_name: Some("Created At".to_string()),
+            typ: Type::Group(g),
+            data_type: DType::Timestamp,
+            nullable: false,
+            hidden: false,
+            dict: None,
+            is_system: true,
+        })?;
+    }
     md.groups
         .get_or_create_group(project_id, GROUP_USER.to_string(), GROUP_USER.to_string())?;
+
     Ok(())
 }

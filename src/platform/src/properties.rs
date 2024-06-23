@@ -35,9 +35,6 @@ impl Properties {
     pub fn new_system(md: Arc<metadata::properties::Properties>,prov:Arc<PropertiesProvider>) -> Self {
         Self { md, prov }
     }
-    pub fn new_system_group(md: Arc<metadata::properties::Properties>,prov:Arc<PropertiesProvider>) -> Self {
-        Self { md, prov }
-    }
     pub async fn get_by_id(&self, ctx: Context, project_id: u64, id: u64) -> Result<Property> {
         ctx.check_project_permission(
             ctx.organization_id,
@@ -144,7 +141,6 @@ pub enum Status {
 #[serde(rename_all = "camelCase")]
 pub enum Type {
     System,
-    SystemGroup,
     Event,
     Group,
 }
@@ -328,7 +324,6 @@ impl Into<Property> for metadata::properties::Property {
     fn into(self) -> Property {
         let (typ, group_id) = match self.typ {
             metadata::properties::Type::System => (Type::System, None),
-            metadata::properties::Type::SystemGroup => (Type::SystemGroup, None),
             metadata::properties::Type::Event => (Type::Event, None),
             metadata::properties::Type::Group(gid) => (Type::Group, Some(gid)),
         };

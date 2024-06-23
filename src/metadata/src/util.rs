@@ -60,6 +60,7 @@ pub struct CreatePropertyMainRequest {
     pub nullable: bool,
     pub hidden: bool,
     pub dict: Option<DictionaryType>,
+    pub is_system: bool,
 }
 
 pub fn create_property(
@@ -77,7 +78,7 @@ pub fn create_property(
         data_type: main_req.data_type.clone(),
         status: properties::Status::Enabled,
         hidden: main_req.hidden,
-        is_system: false,
+        is_system: main_req.is_system,
         nullable: main_req.nullable,
         is_array: false,
         is_dictionary: main_req.dict.is_some(),
@@ -88,7 +89,6 @@ pub fn create_property(
         Type::System => md.system_properties.get_or_create(proj_id, req)?,
         Type::Event => md.event_properties.get_or_create(proj_id, req)?,
         Type::Group(gid) => md.group_properties[gid].get_or_create(proj_id, req)?,
-        Type::SystemGroup => md.system_group_properties.get_or_create(proj_id, req)?,
     };
 
     Ok(prop)

@@ -175,6 +175,7 @@ pub fn init_system(
         nullable: false,
         hidden: true,
         dict: Some(DictionaryType::Int64),
+        is_system: true,
     })?;
 
     for g in 0..GROUPS_COUNT {
@@ -214,6 +215,7 @@ pub fn init_system(
             nullable: true,
             hidden: false,
             dict: Some(DictionaryType::Int64),
+            is_system: true,
         })?;
 
         // create_property(md, 0, CreatePropertyMainRequest {
@@ -245,6 +247,7 @@ pub fn init_system(
         nullable: false,
         hidden: false,
         dict: None,
+        is_system: true,
     })?;
 
     create_property(md, 0, CreatePropertyMainRequest {
@@ -255,6 +258,7 @@ pub fn init_system(
         nullable: false,
         hidden: true,
         dict: None,
+        is_system: true,
     })?;
 
     create_property(md, 0, CreatePropertyMainRequest {
@@ -265,6 +269,7 @@ pub fn init_system(
         nullable: false,
         dict: Some(DictionaryType::Int64),
         hidden: true,
+        is_system: true,
     })?;
 
     create_property(md, 0, CreatePropertyMainRequest {
@@ -275,46 +280,7 @@ pub fn init_system(
         nullable: true,
         dict: None,
         hidden: true,
-    })?;
-
-    create_property(md, 0, CreatePropertyMainRequest {
-        name: GROUP_COLUMN_PROJECT_ID.to_string(),
-        display_name: Some("Project ID".to_string()),
-        typ: Type::SystemGroup,
-        data_type: DType::String,
-        nullable: false,
-        dict: Some(DictionaryType::Int64),
-        hidden: true,
-    })?;
-
-    create_property(md, 0, CreatePropertyMainRequest {
-        name: GROUP_COLUMN_ID.to_string(),
-        display_name: Some("ID".to_string()),
-        typ: Type::SystemGroup,
-        data_type: DType::String,
-        nullable: false,
-        dict: Some(DictionaryType::Int64),
-        hidden: true,
-    })?;
-
-    create_property(md, 0, CreatePropertyMainRequest {
-        name: GROUP_COLUMN_VERSION.to_string(),
-        display_name: Some("Version".to_string()),
-        typ: Type::SystemGroup,
-        data_type: DType::Int64,
-        nullable: false,
-        dict: None,
-        hidden: true,
-    })?;
-
-    create_property(md, 0, CreatePropertyMainRequest {
-        name: GROUP_COLUMN_CREATED_AT.to_string(),
-        display_name: Some("Created At".to_string()),
-        typ: Type::SystemGroup,
-        data_type: DType::Timestamp,
-        nullable: false,
-        hidden: false,
-        dict: None,
+        is_system: true,
     })?;
 
     Ok(())

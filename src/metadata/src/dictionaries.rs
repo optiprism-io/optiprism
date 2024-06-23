@@ -17,8 +17,8 @@ use crate::project_ns;
 
 const NAMESPACE: &[u8] = b"dictinaries";
 
-fn dict_ns(dict: &str) -> Vec<u8> {
-    [NAMESPACE, b"/", dict.as_bytes()].concat()
+fn dict_ns(tbl:&str,dict: &str) -> Vec<u8> {
+    [NAMESPACE, b"/", tbl.as_bytes(),b"/",dict.as_bytes()].concat()
 }
 
 fn make_key_key(project_id: u64, dict: &str, key: u64) -> Vec<u8> {
@@ -27,7 +27,7 @@ fn make_key_key(project_id: u64, dict: &str, key: u64) -> Vec<u8> {
         b"keys/",
         key.to_le_bytes().as_ref(),
     ]
-    .concat()
+        .concat()
 }
 
 fn make_value_key(project_id: u64, dict: &str, value: &str) -> Vec<u8> {
@@ -36,7 +36,7 @@ fn make_value_key(project_id: u64, dict: &str, value: &str) -> Vec<u8> {
         b"values/",
         value.as_bytes(),
     ]
-    .concat()
+        .concat()
 }
 
 pub struct Dictionaries {
@@ -60,6 +60,7 @@ impl Dictionaries {
         &self,
         tx: &Transaction<TransactionDB>,
         project_id: u64,
+        table: &str,
         dict: &str,
         value: &str,
     ) -> Result<u64> {
