@@ -349,6 +349,7 @@ pub fn build_search_plan(
             let col_name = prop.column_name();
             let dict = SingleDictionaryProvider::new(
                 ctx.project_id,
+                TABLE_EVENTS.to_string(),
                 col_name.clone(),
                 metadata.dictionaries.clone(),
             );
@@ -438,6 +439,7 @@ pub fn build_get_by_id_plan(
             let col_name = prop.column_name();
             let dict = SingleDictionaryProvider::new(
                 ctx.project_id,
+                TABLE_EVENTS.to_string(),
                 col_name.clone(),
                 metadata.dictionaries.clone(),
             );

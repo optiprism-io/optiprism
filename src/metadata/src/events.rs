@@ -4,7 +4,7 @@ use bincode::deserialize;
 use bincode::serialize;
 use chrono::DateTime;
 use chrono::Utc;
-use common::types::OptionalProperty;
+use common::types::{OptionalProperty, TABLE_EVENTS};
 use common::types::COLUMN_EVENT;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
@@ -38,7 +38,7 @@ fn index_keys(project_id: u64, name: &str, display_name: Option<String>) -> Vec<
         index_name_key(project_id, name),
         index_display_name_key(project_id, display_name),
     ]
-    .to_vec()
+        .to_vec()
 }
 
 fn index_name_key(project_id: u64, name: &str) -> Option<Vec<u8>> {
@@ -52,7 +52,7 @@ fn index_display_name_key(project_id: u64, display_name: Option<String>) -> Opti
             IDX_DISPLAY_NAME,
             v.as_str(),
         )
-        .to_vec()
+            .to_vec()
     })
 }
 
@@ -179,7 +179,7 @@ impl Events {
         insert_index(tx, idx_keys.as_ref(), event.id)?;
 
         self.dicts
-            ._get_key_or_create(tx, project_id, COLUMN_EVENT, event.name.as_str())?;
+            ._get_key_or_create(tx, project_id, TABLE_EVENTS, COLUMN_EVENT, event.name.as_str())?;
         Ok(event)
     }
 

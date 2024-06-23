@@ -88,7 +88,7 @@ impl Destination<Track> for Local {
 
         let mut prop_values = vec![];
         for prop in &props {
-            let value = property_to_value(ctx, prop, &self.md.dictionaries)?;
+            let value = property_to_value(ctx, TABLE_EVENTS, prop, &self.md.dictionaries)?;
             prop_values.push(NamedValue::new(prop.property.column_name(), value));
         }
 
@@ -131,6 +131,7 @@ impl Destination<Track> for Local {
 
             let value = property_to_value(
                 ctx,
+                TABLE_EVENTS,
                 &PropertyAndValue {
                     property: property.clone(),
                     value,
@@ -147,6 +148,7 @@ impl Destination<Track> for Local {
 
                 let value = property_to_value(
                     ctx,
+                    TABLE_EVENTS,
                     &PropertyAndValue {
                         property: property.clone(),
                         value,
@@ -164,6 +166,7 @@ impl Destination<Track> for Local {
                 let value = PropValue::String(campaign.to_owned());
                 let value = property_to_value(
                     ctx,
+                    TABLE_EVENTS,
                     &PropertyAndValue {
                         property: property.clone(),
                         value,
@@ -181,6 +184,7 @@ impl Destination<Track> for Local {
                 let value = PropValue::String(term.to_owned());
                 let value = property_to_value(
                     ctx,
+                    TABLE_EVENTS,
                     &PropertyAndValue {
                         property: property.clone(),
                         value,
@@ -198,6 +202,7 @@ impl Destination<Track> for Local {
                 let value = PropValue::String(content.to_owned());
                 let value = property_to_value(
                     ctx,
+                    TABLE_EVENTS,
                     &PropertyAndValue {
                         property: property.clone(),
                         value,
@@ -256,7 +261,7 @@ impl Destination<Track> for Local {
                 ],
                 prop_values.clone(),
             ]
-            .concat();
+                .concat();
 
             self.db.insert(TABLE_EVENTS, values)?;
         }
@@ -296,7 +301,7 @@ impl Destination<Track> for Local {
             ],
             prop_values.clone(),
         ]
-        .concat();
+            .concat();
 
         self.db.insert("events", values)?;
         Ok(())

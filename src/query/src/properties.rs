@@ -73,7 +73,7 @@ impl PropertiesProvider {
 pub struct LogicalPlanBuilder {}
 
 macro_rules! property_col {
-    ($ctx:expr,$md:expr,$input:expr,$prop:expr) => {{
+    ($ctx:expr,$md:expr,$tbl:expr,$input:expr,$prop:expr) => {{
         let col_name = $prop.column_name();
         let expr = col(col_name.as_str());
         let _aggr_schema = DFSchema::new_with_metadata(
@@ -87,6 +87,7 @@ macro_rules! property_col {
             Some(_) => {
                 let dict = SingleDictionaryProvider::new(
                     $ctx.project_id,
+                    $tbl,
                     col_name.clone(),
                     $md.dictionaries.clone(),
                 );
@@ -128,20 +129,20 @@ impl LogicalPlanBuilder {
                     .system_properties
                     .get_by_name(ctx.project_id, prop_name)?;
                 let col_name = prop.column_name();
-                (property_col!(ctx, metadata, input, prop), col_name)
+                (property_col!(ctx, metadata, TABLE_EVENTS.to_string(),input, prop), col_name)
             }
             PropertyRef::Group(prop_name, group) => {
                 let prop =
                     metadata.group_properties[*group].get_by_name(ctx.project_id, prop_name)?;
                 let col_name = prop.column_name();
-                (property_col!(ctx, metadata, input, prop), col_name)
+                (property_col!(ctx, metadata, TABLE_EVENTS.to_string(),input, prop), col_name)
             }
             PropertyRef::Event(prop_name) => {
                 let prop = metadata
                     .event_properties
                     .get_by_name(ctx.project_id, prop_name)?;
                 let col_name = prop.column_name();
-                (property_col!(ctx, metadata, input, prop), col_name)
+                (property_col!(ctx, metadata, TABLE_EVENTS.to_string(),input, prop), col_name)
             }
             _ => {
                 return Err(QueryError::Unimplemented(
@@ -155,6 +156,7 @@ impl LogicalPlanBuilder {
                 property_expression(
                     &ctx,
                     &metadata,
+                    TABLE_EVENTS,
                     &req.property,
                     &filter.operation,
                     filter.value.clone(),

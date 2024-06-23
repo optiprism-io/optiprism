@@ -37,6 +37,7 @@ pub struct RequestContext {
     pub client_ip: IpAddr,
     pub token: String,
 }
+
 #[derive(Debug, Clone)]
 pub struct Campaign {
     pub source: String,
@@ -75,6 +76,7 @@ pub struct PropertyAndValue {
     pub property: properties::Property,
     pub value: PropValue,
 }
+
 #[derive(Debug, Clone)]
 pub struct Event {
     pub record_id: u64,
@@ -91,6 +93,7 @@ pub enum PropValue {
 
 fn property_to_value(
     ctx: &RequestContext,
+    tbl: &str,
     prop: &PropertyAndValue,
     dict: &Arc<Dictionaries>,
 ) -> Result<Value> {
@@ -98,6 +101,7 @@ fn property_to_value(
         if let PropValue::String(str_v) = &prop.value {
             let dict_id = dict.get_key_or_create(
                 ctx.project_id.unwrap(),
+                tbl,
                 prop.property.column_name().as_str(),
                 str_v.as_str(),
             )?;

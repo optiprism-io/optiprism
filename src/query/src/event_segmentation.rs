@@ -93,7 +93,7 @@ impl EventSegmentationProvider {
             .iter()
             .map(|x| schema.index_of(x).unwrap())
             .collect();
-        let (session_ctx, state, plan) = initial_plan(&self.db, TABLE_EVENTS.to_string(),projection).await?;
+        let (session_ctx, state, plan) = initial_plan(&self.db, TABLE_EVENTS.to_string(), projection).await?;
         let plan = LogicalPlanBuilder::build(
             ctx.clone(),
             self.metadata.clone(),
@@ -133,7 +133,7 @@ impl EventSegmentationProvider {
 
         Ok(DataTable::new(result.schema(), cols))
     }
-    }
+}
 
 fn projection(
     ctx: &Context,
@@ -316,7 +316,7 @@ impl LogicalPlanBuilder {
             }
         };
 
-        input = builder.decode_breakdowns_dictionaries(input, &mut cols_hash)?;
+        input = builder.decode_breakdowns_dictionaries(input, TABLE_EVENTS, &mut cols_hash)?;
 
         if ctx.format == Format::Compact {
             return Ok(input);
@@ -449,6 +449,7 @@ impl LogicalPlanBuilder {
                 let filter = property_expression(
                     &self.ctx,
                     &self.metadata,
+                    TABLE_EVENTS,
                     &property,
                     operation,
                     value.to_owned(),
@@ -563,17 +564,18 @@ impl LogicalPlanBuilder {
     fn decode_breakdowns_dictionaries(
         &self,
         input: LogicalPlan,
+        tbl: &str,
         cols_hash: &mut HashMap<String, ()>,
     ) -> Result<LogicalPlan> {
         let mut decode_cols: Vec<(Column, Arc<SingleDictionaryProvider>)> = Vec::new();
         for event in &self.es.events {
             if let Some(breakdowns) = &event.breakdowns {
-                breakdowns_to_dicts!(self.metadata, self.ctx, breakdowns, cols_hash, decode_cols);
+                breakdowns_to_dicts!(self.metadata, self.ctx, TABLE_EVENTS.to_string(),breakdowns, cols_hash, decode_cols);
             }
         }
 
         if let Some(breakdowns) = &self.es.breakdowns {
-            breakdowns_to_dicts!(self.metadata, self.ctx, breakdowns, cols_hash, decode_cols);
+            breakdowns_to_dicts!(self.metadata, self.ctx, TABLE_EVENTS.to_string(),breakdowns, cols_hash, decode_cols);
         }
 
         if decode_cols.is_empty() {

@@ -6,7 +6,7 @@ use common::config::Config;
 use common::rbac::OrganizationPermission;
 use common::rbac::Permission;
 use common::rbac::ProjectPermission;
-use common::types::{DType, GROUP_COLUMN_CREATED_AT, GROUP_COLUMN_ID, GROUP_COLUMN_PROJECT_ID, GROUP_COLUMN_VERSION};
+use common::types::{DType, GROUP_COLUMN_CREATED_AT, GROUP_COLUMN_ID, GROUP_COLUMN_PROJECT_ID, GROUP_COLUMN_VERSION, TABLE_EVENTS};
 use common::types::OptionalProperty;
 use common::types::EVENT_CLICK;
 use common::types::EVENT_PAGE;
@@ -45,7 +45,7 @@ use common::types::EVENT_PROPERTY_UTM_TERM;
 use common::types::EVENT_SCREEN;
 use common::types::EVENT_SESSION_BEGIN;
 use common::types::EVENT_SESSION_END;
-use common::{GROUP_USER, GROUPS_COUNT};
+use common::{group_col, GROUP_USER, GROUPS_COUNT};
 use common::GROUP_USER_ID;
 use metadata::projects::Projects as MDProjects;
 use metadata::properties::DictionaryType;
@@ -95,7 +95,10 @@ impl Projects {
         };
 
         let project = self.md.projects.create(md)?;
-        self.md.dictionaries.create_key(project.id, "project_id", project.id, project.name.as_str())?;
+        self.md.dictionaries.create_key(project.id, TABLE_EVENTS, "project_id", project.id, project.name.as_str())?;
+        for g in 0..GROUPS_COUNT {
+            self.md.dictionaries.create_key(project.id, group_col(g).as_str(), "project_id", project.id, project.name.as_str())?;
+        }
 
         init_project(project.id, &self.md)?;
         Ok(project.into())
@@ -159,7 +162,10 @@ impl Projects {
         };
 
         let project = self.md.projects.update(project_id, md_req)?;
-        self.md.dictionaries.create_key(project.id, "project_id", project.id, project.name.as_str())?;
+        self.md.dictionaries.create_key(project.id, TABLE_EVENTS,"project_id", project.id, project.name.as_str())?;
+        for g in 0..GROUPS_COUNT {
+            self.md.dictionaries.create_key(project.id, group_col(g).as_str(), "project_id", project.id, project.name.as_str())?;
+        }
 
         Ok(project.into())
     }
