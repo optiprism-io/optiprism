@@ -76,7 +76,7 @@ impl FunnelProvider {
             .map(|x| schema.index_of(x).unwrap())
             .collect();
 
-        let (session_ctx, state, plan) = initial_plan(&self.db, TABLE_EVENTS.to_string(),projection).await?;
+        let (session_ctx, state, plan) = initial_plan(&self.db, TABLE_EVENTS.to_string(), projection).await?;
         let plan = build(ctx.clone(), self.metadata.clone(), plan, req.clone())?;
 
         let result = execute(session_ctx, state, plan).await?;
@@ -218,6 +218,7 @@ impl FunnelProvider {
         Ok(Response { groups, steps })
     }
 }
+
 pub fn build(
     ctx: Context,
     metadata: Arc<MetadataProvider>,
@@ -312,7 +313,7 @@ pub fn build(
     let mut rename_groups = vec![];
     let mut decode_cols: Vec<(Column, Arc<SingleDictionaryProvider>)> = Vec::new();
     let groups = if let Some(breakdowns) = &req.breakdowns {
-        breakdowns_to_dicts!(metadata, ctx, breakdowns, cols_hash, decode_cols);
+        breakdowns_to_dicts!(metadata, ctx, TABLE_EVENTS.to_string(),breakdowns, cols_hash, decode_cols);
         let mut out = vec![];
         for breakdown in breakdowns {
             let prop = match breakdown {

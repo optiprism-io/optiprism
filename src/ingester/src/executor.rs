@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use common::group_col;
-use common::types::{DType, GROUP_COLUMN_ID};
+use common::types::{DType, GROUP_COLUMN_ID, TABLE_EVENTS};
 use common::GROUP_USER_ID;
 use metadata::events;
 use metadata::events::CreateEventRequest;
@@ -131,6 +131,7 @@ impl Executor<Track> {
                 )?;
                 self.md.dictionaries.create_key(
                     ctx.project_id.unwrap(),
+                    TABLE_EVENTS,
                     group_col(GROUP_USER_ID).as_str(),
                     group.id,
                     user_id.as_str(),
@@ -147,6 +148,7 @@ impl Executor<Track> {
 
                 self.md.dictionaries.create_key(
                     ctx.project_id.unwrap(),
+                    TABLE_EVENTS,
                     group_col(GROUP_USER_ID).as_str(),
                     id,
                     user_id.as_str(),
@@ -282,7 +284,7 @@ impl Executor<Identify> {
         let vals = if let Some(props) = &req.resolved_properties {
             let mut vals = vec![];
             for prop in props {
-                let v = property_to_value(&ctx, prop, &self.md.dictionaries)?;
+                let v = property_to_value(&ctx, group_col(req.group_id as usize).as_str(), prop, &self.md.dictionaries)?;
                 let vv = match v {
                     Value::Int8(v) => metadata::groups::Value::Int8(v),
                     Value::Int16(v) => metadata::groups::Value::Int16(v),
@@ -333,6 +335,7 @@ impl Executor<Identify> {
         // create dict for each group values so we can use it in property values
         self.md.dictionaries.create_key(
             ctx.project_id.unwrap(),
+            TABLE_EVENTS,
             group_col(req.group_id as usize).as_str(),
             group_vals_id,
             req.id.as_str(),
@@ -340,6 +343,7 @@ impl Executor<Identify> {
 
         self.md.dictionaries.create_key(
             ctx.project_id.unwrap(),
+            group_col(req.group_id as usize).as_str(),
             GROUP_COLUMN_ID,
             group_vals_id,
             req.id.as_str(),

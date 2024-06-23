@@ -64,6 +64,7 @@ pub use context::Context;
 pub use error::Result;
 use indexmap::IndexMap;
 use tracing::debug;
+use common::types::TABLE_EVENTS;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
 use storage::db::OptiDBImpl;
@@ -85,7 +86,7 @@ pub const DEFAULT_BATCH_SIZE: usize = 4096;
 
 #[macro_export]
 macro_rules! breakdowns_to_dicts {
-    ($md:expr, $ctx:expr,$breakdowns:expr, $cols_hash:expr,$decode_cols:expr) => {{
+    ($md:expr, $ctx:expr,$tbl:expr,$breakdowns:expr, $cols_hash:expr,$decode_cols:expr) => {{
         for breakdown in $breakdowns.iter() {
             match &breakdown {
                 Breakdown::Property(prop) => {
@@ -109,6 +110,7 @@ macro_rules! breakdowns_to_dicts {
 
                     let dict = SingleDictionaryProvider::new(
                         $ctx.project_id,
+                        $tbl,
                         p.column_name(),
                         $md.dictionaries.clone(),
                     );
@@ -446,6 +448,7 @@ pub fn decode_filter_single_dictionary(
                 let col_name = prop.column_name();
                 let dict = SingleDictionaryProvider::new(
                     ctx.project_id,
+                    TABLE_EVENTS.to_string(),
                     col_name.clone(),
                     metadata.dictionaries.clone(),
                 );
@@ -474,7 +477,7 @@ pub mod test_util {
     use arrow::datatypes::Schema;
     use arrow::datatypes::TimeUnit;
     use common::group_col;
-    use common::types::DType;
+    use common::types::{DType, TABLE_EVENTS};
     use common::types::COLUMN_CREATED_AT;
     use common::types::COLUMN_EVENT;
     use common::types::COLUMN_PROJECT_ID;
@@ -611,9 +614,10 @@ pub mod test_util {
         })?;
 
         md.dictionaries
-            .get_key_or_create(proj_id, country_prop.column_name().as_str(), "spain")?;
+            .get_key_or_create(proj_id, TABLE_EVENTS, country_prop.column_name().as_str(), "spain")?;
         md.dictionaries.get_key_or_create(
             proj_id,
+            TABLE_EVENTS,
             country_prop.column_name().as_str(),
             "german",
         )?;

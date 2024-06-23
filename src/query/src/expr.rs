@@ -11,7 +11,7 @@ use common::query::PropValueFilter;
 use common::query::PropValueOperation;
 use common::query::PropertyRef;
 use common::query::QueryTime;
-use common::types::COLUMN_EVENT;
+use common::types::{COLUMN_EVENT, TABLE_EVENTS};
 use datafusion_common::Column;
 use datafusion_common::ExprSchema;
 use datafusion_common::ScalarValue;
@@ -130,7 +130,7 @@ pub fn event_filters_expression(
                     property,
                     operation,
                     value,
-                } => property_expression(ctx, metadata, property, operation, value.clone()),
+                } => property_expression(ctx, metadata, TABLE_EVENTS, property, operation, value.clone()),
             }
         })
         .collect::<Result<Vec<Expr>>>()?;
@@ -160,6 +160,7 @@ pub fn breakdown_expr(
 
 pub fn encode_property_dict_values(
     ctx: &Context,
+    tbl: &str,
     dictionaries: &Arc<Dictionaries>,
     dict_type: &DictionaryType,
     col_name: &str,
@@ -169,7 +170,7 @@ pub fn encode_property_dict_values(
     for value in values.iter() {
         if let ScalarValue::Utf8(inner) = value {
             if let Some(str_value) = inner {
-                let key = dictionaries.get_key(ctx.project_id, col_name, str_value.as_str())?;
+                let key = dictionaries.get_key(ctx.project_id, tbl, col_name, str_value.as_str())?;
 
                 let scalar_value = match dict_type {
                     DictionaryType::Int8 => ScalarValue::Int8(Some(key as i8)),
@@ -196,6 +197,7 @@ pub fn encode_property_dict_values(
 
 fn prop_expression(
     ctx: &Context,
+    tbl: &str,
     prop: &Arc<metadata::properties::Properties>,
     dicts: &Arc<metadata::dictionaries::Dictionaries>,
     prop_name: &str,
@@ -223,6 +225,7 @@ fn prop_expression(
     if let Some(dict_type) = prop.dictionary_type {
         let dict_values = encode_property_dict_values(
             ctx,
+            tbl,
             dicts,
             &dict_type,
             col_name.as_str(),
@@ -238,6 +241,7 @@ fn prop_expression(
 pub fn property_expression(
     ctx: &Context,
     md: &Arc<MetadataProvider>,
+    tbl: &str,
     property: &PropertyRef,
     operation: &PropValueOperation,
     values: Option<Vec<ScalarValue>>,
@@ -245,6 +249,7 @@ pub fn property_expression(
     match property {
         PropertyRef::System(prop_name) => prop_expression(
             ctx,
+            tbl,
             &md.system_properties,
             &md.dictionaries,
             prop_name,
@@ -253,6 +258,7 @@ pub fn property_expression(
         ),
         PropertyRef::Group(prop_name, group) => prop_expression(
             ctx,
+            tbl,
             &md.group_properties[*group],
             &md.dictionaries,
             prop_name,
@@ -261,6 +267,7 @@ pub fn property_expression(
         ),
         PropertyRef::Event(prop_name) => prop_expression(
             ctx,
+            tbl,
             &md.event_properties,
             &md.dictionaries,
             prop_name,

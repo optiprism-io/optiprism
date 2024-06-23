@@ -117,8 +117,8 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
     })?;
 
     md.dictionaries
-        .get_key_or_create(1, "string_dict", "привет")?;
-    md.dictionaries.get_key_or_create(1, "string_dict", "мир")?;
+        .get_key_or_create(1,TABLE_EVENTS, "string_dict", "привет")?;
+    md.dictionaries.get_key_or_create(1, TABLE_EVENTS,"string_dict", "мир")?;
     let e = create_event(&md, proj.id, "event".to_string())?;
     let now = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0)
         .unwrap()

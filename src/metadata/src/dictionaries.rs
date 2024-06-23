@@ -17,8 +17,8 @@ use crate::project_ns;
 
 const NAMESPACE: &[u8] = b"dictinaries";
 
-fn dict_ns(tbl:&str,dict: &str) -> Vec<u8> {
-    [NAMESPACE, b"/", tbl.as_bytes(),b"/",dict.as_bytes()].concat()
+fn dict_ns(dict: &str) -> Vec<u8> {
+    [NAMESPACE, b"/", dict.as_bytes()].concat()
 }
 
 fn make_key_key(project_id: u64, dict: &str, key: u64) -> Vec<u8> {
@@ -55,6 +55,10 @@ impl Debug for Dictionaries {
     }
 }
 
+fn tbl_dict(tbl: &str, dict: &str) -> String {
+    format!("tables/{tbl}/{dict}")
+}
+
 impl Dictionaries {
     pub fn _get_key_or_create(
         &self,
@@ -68,11 +72,11 @@ impl Dictionaries {
             None => {
                 let id = next_seq(
                     &tx,
-                    make_id_seq_key(project_ns(project_id, dict_ns(dict).as_slice()).as_slice()),
+                    make_id_seq_key(project_ns(project_id, dict_ns(tbl_dict(table, dict).as_str()).as_slice()).as_slice()),
                 )?;
-                tx.put(make_key_key(project_id, dict, id), value.as_bytes())?;
+                tx.put(make_key_key(project_id, tbl_dict(table, dict).as_str(), id), value.as_bytes())?;
                 tx.put(
-                    make_value_key(project_id, dict, value),
+                    make_value_key(project_id, tbl_dict(table, dict).as_str(), value),
                     id.to_le_bytes().as_ref(),
                 )?;
 
@@ -84,28 +88,28 @@ impl Dictionaries {
         res
     }
 
-    pub fn create_key(&self, project_id: u64, dict: &str, key: u64, value: &str) -> Result<()> {
+    pub fn create_key(&self, project_id: u64, table: &str, dict: &str, key: u64, value: &str) -> Result<()> {
         let tx = self.db.transaction();
 
-        tx.put(make_key_key(project_id, dict, key), value.as_bytes())?;
+        tx.put(make_key_key(project_id, tbl_dict(table, dict).as_str(), key), value.as_bytes())?;
         tx.put(
-            make_value_key(project_id, dict, value),
+            make_value_key(project_id, tbl_dict(table, dict).as_str(), value),
             key.to_le_bytes().as_ref(),
         )?;
         tx.commit()?;
         Ok(())
     }
 
-    pub fn get_key_or_create(&self, project_id: u64, dict: &str, value: &str) -> Result<u64> {
+    pub fn get_key_or_create(&self, project_id: u64, table: &str, dict: &str, value: &str) -> Result<u64> {
         let tx = self.db.transaction();
-        let key = self._get_key_or_create(&tx, project_id, dict, value)?;
+        let key = self._get_key_or_create(&tx, project_id, table, dict, value)?;
         tx.commit()?;
         Ok(key)
     }
 
-    pub fn get_value(&self, project_id: u64, dict: &str, key: u64) -> Result<String> {
+    pub fn get_value(&self, project_id: u64, table: &str, dict: &str, key: u64) -> Result<String> {
         let tx = self.db.transaction();
-        let store_key = make_key_key(project_id, dict, key);
+        let store_key = make_key_key(project_id, tbl_dict(table, dict).as_str(), key);
         match tx.get(store_key.as_slice())? {
             None => Err(MetadataError::NotFound(format!(
                 "project {project_id}, dict {dict}, value for key {key} not found"
@@ -114,9 +118,9 @@ impl Dictionaries {
         }
     }
 
-    pub fn get_key(&self, project_id: u64, dict: &str, value: &str) -> Result<u64> {
+    pub fn get_key(&self, project_id: u64, table: &str, dict: &str, value: &str) -> Result<u64> {
         let tx = self.db.transaction();
-        let store_key = make_value_key(project_id, dict, value);
+        let store_key = make_value_key(project_id, tbl_dict(table, dict).as_str(), value);
         match tx.get(store_key.as_slice())? {
             None => Err(MetadataError::NotFound(format!(
                 "dictionary key by value {} not found",
@@ -131,6 +135,7 @@ impl Dictionaries {
 pub struct SingleDictionaryProvider {
     project_id: u64,
     dict: String,
+    table: String,
     dictionaries: Arc<Dictionaries>,
 }
 
@@ -142,26 +147,27 @@ impl Hash for SingleDictionaryProvider {
 }
 
 impl SingleDictionaryProvider {
-    pub fn new(project_id: u64, dict: String, dictionaries: Arc<Dictionaries>) -> Self {
+    pub fn new(project_id: u64, table: String, dict: String, dictionaries: Arc<Dictionaries>) -> Self {
         Self {
             project_id,
             dict,
+            table,
             dictionaries,
         }
     }
 
     pub fn get_key_or_create(&self, value: &str) -> Result<u64> {
         self.dictionaries
-            .get_key_or_create(self.project_id, self.dict.as_str(), value)
+            .get_key_or_create(self.project_id, self.table.as_str(), self.dict.as_str(), value)
     }
 
     pub fn get_value(&self, key: u64) -> Result<String> {
         self.dictionaries
-            .get_value(self.project_id, self.dict.as_str(), key)
+            .get_value(self.project_id, self.table.as_str(), self.dict.as_str(), key)
     }
 
     pub fn get_key(&self, _project_id: u64, _dict: &str, value: &str) -> Result<u64> {
         self.dictionaries
-            .get_key(self.project_id, self.dict.as_str(), value)
+            .get_key(self.project_id, self.table.as_str(), self.dict.as_str(), value)
     }
 }
