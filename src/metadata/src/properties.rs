@@ -174,24 +174,9 @@ impl Properties {
         }
     }
 
-    pub fn new_system_group(db: Arc<TransactionDB>, opti_db: Arc<OptiDBImpl>) -> Self {
-        let id_cache = RwLock::new(LruCache::new(
-            NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
-        ));
-        let name_cache = RwLock::new(LruCache::new(
-            NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
-        ));
-        Properties {
-            db,
-            opti_db,
-            id_cache,
-            name_cache,
-            typ: Type::SystemGroup,
-        }
-    }
     pub fn get_by_column_name_global(&self,
-                          project_id: u64,
-                          name: &str) -> Result<Property> {
+                                     project_id: u64,
+                                     name: &str) -> Result<Property> {
         let tx = self.db.transaction();
         let idx_key = make_index_key(
             project_ns(project_id, self.typ.path().as_bytes()).as_slice(),
@@ -267,7 +252,7 @@ impl Properties {
         project_id: u64,
         req: CreatePropertyRequest,
     ) -> Result<Property> {
-        let project_id = if self.typ == Type::System || self.typ == Type::SystemGroup {
+        let project_id = if self.typ == Type::System {
             0
         } else {
             project_id
@@ -298,6 +283,7 @@ impl Properties {
             ),
         )?;
         let created_at = Utc::now();
+
 
         let prop = Property {
             id,
@@ -343,7 +329,7 @@ impl Properties {
             make_index_key(
                 project_ns(project_id, "global".as_bytes()).as_slice(),
                 IDX_COLUMN_NAME,
-                prop.column_name().as_str()
+                prop.column_name().as_str(),
             )
                 .to_vec(),
         ));
@@ -362,21 +348,7 @@ impl Properties {
             req.data_type.clone()
         };
 
-        return if self.typ == Type::SystemGroup {
-            for g in 0..GROUPS_COUNT {
-                match self.opti_db.add_field(
-                    group_col(g).as_str(),
-                    prop.column_name().as_str(),
-                    dt.clone(),
-                    req.nullable,
-                ) {
-                    Err(StoreError::AlreadyExists(_)) => {}
-                    Err(err) => return Err(err.into()),
-                    Ok(_) => {}
-                }
-            }
-            Ok(prop.clone())
-        } else if let Type::Group(g) = self.typ {
+        return if let Type::Group(g) = self.typ {
             match self.opti_db.add_field(
                 TABLE_EVENTS,
                 prop.column_name().as_str(),
@@ -413,7 +385,7 @@ impl Properties {
     }
 
     pub fn create(&self, project_id: u64, req: CreatePropertyRequest) -> Result<Property> {
-        let project_id = if self.typ == Type::System || self.typ == Type::SystemGroup {
+        let project_id = if self.typ == Type::System {
             0
         } else {
             project_id
@@ -427,7 +399,7 @@ impl Properties {
     }
 
     pub fn get_or_create(&self, project_id: u64, req: CreatePropertyRequest) -> Result<Property> {
-        let project_id = if self.typ == Type::System || self.typ == Type::SystemGroup {
+        let project_id = if self.typ == Type::System {
             0
         } else {
             project_id
@@ -452,7 +424,7 @@ impl Properties {
     }
 
     pub fn get_by_name(&self, project_id: u64, name: &str) -> Result<Property> {
-        let project_id = if self.typ == Type::System || self.typ == Type::SystemGroup {
+        let project_id = if self.typ == Type::System {
             0
         } else {
             project_id
@@ -475,7 +447,7 @@ impl Properties {
         ))
     }
     pub fn list(&self, project_id: u64) -> Result<ListResponse<Property>> {
-        let project_id = if self.typ == Type::System || self.typ == Type::SystemGroup {
+        let project_id = if self.typ == Type::System {
             0
         } else {
             project_id
@@ -494,7 +466,7 @@ impl Properties {
         property_id: u64,
         req: UpdatePropertyRequest,
     ) -> Result<Property> {
-        let project_id = if self.typ == Type::System || self.typ == Type::SystemGroup {
+        let project_id = if self.typ == Type::System {
             0
         } else {
             project_id
@@ -594,7 +566,7 @@ impl Properties {
     }
 
     pub fn delete(&self, project_id: u64, id: u64) -> Result<Property> {
-        let project_id = if self.typ == Type::System || self.typ == Type::SystemGroup {
+        let project_id = if self.typ == Type::System {
             0
         } else {
             project_id
@@ -632,7 +604,6 @@ pub enum Status {
 pub enum Type {
     #[default]
     System,
-    SystemGroup,
     Event,
     Group(usize),
 }
@@ -641,7 +612,6 @@ impl Type {
     pub fn path(&self) -> String {
         match self {
             Type::System => "system_properties".to_string(),
-            Type::SystemGroup => "system_group_properties".to_string(),
             Type::Event => "event_properties".to_string(),
             Type::Group(gid) => {
                 format!("group_{gid}_properties")
@@ -703,8 +673,21 @@ pub struct Property {
 
 impl Property {
     pub fn column_name(&self) -> String {
+        if self.is_system {
+            let mut name: String = self
+                .name
+                .chars()
+                .filter(|c| {
+                    c.is_ascii_alphabetic() || c.is_numeric() || c.is_whitespace() || c == &'_'
+                })
+                .collect();
+            name = name.to_case(Case::Snake);
+            name = name.trim().to_string();
+
+            return name;
+        }
         match self.typ {
-            Type::System | Type::SystemGroup => {
+            Type::System => {
                 let mut name: String = self
                     .name
                     .chars()
@@ -744,7 +727,6 @@ impl Property {
     pub fn reference(&self) -> PropertyRef {
         match self.typ {
             Type::System => PropertyRef::System(self.name.to_owned()),
-            Type::SystemGroup => PropertyRef::SystemGroup(self.name.to_owned()),
             Type::Event => PropertyRef::Event(self.name.to_owned()),
             Type::Group(v) => PropertyRef::Group(self.name.to_owned(), v),
         }

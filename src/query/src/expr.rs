@@ -152,7 +152,6 @@ pub fn breakdown_expr(
         Breakdown::Property(prop_ref) => match prop_ref {
             PropertyRef::System(..)
             | PropertyRef::Group(..)
-            | PropertyRef::SystemGroup(..)
             | PropertyRef::Event(..) => Ok(property_col(ctx, metadata, prop_ref)?),
             PropertyRef::Custom(_) => unimplemented!(),
         },
@@ -252,14 +251,6 @@ pub fn property_expression(
             operation,
             values,
         ),
-        PropertyRef::SystemGroup(prop_name) => prop_expression(
-            ctx,
-            &md.system_group_properties,
-            &md.dictionaries,
-            prop_name,
-            operation,
-            values,
-        ),
         PropertyRef::Group(prop_name, group) => prop_expression(
             ctx,
             &md.group_properties[*group],
@@ -289,12 +280,6 @@ pub fn property_col(
         PropertyRef::System(prop_name) => {
             let prop = md
                 .system_properties
-                .get_by_name(ctx.project_id, prop_name)?;
-            col(prop.column_name().as_str())
-        }
-        PropertyRef::SystemGroup(prop_name) => {
-            let prop = md
-                .system_group_properties
                 .get_by_name(ctx.project_id, prop_name)?;
             col(prop.column_name().as_str())
         }

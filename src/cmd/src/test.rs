@@ -101,6 +101,7 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
             nullable: true,
             hidden: false,
             dict: None,
+            is_system: true,
         })?;
     }
 
@@ -112,6 +113,7 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
         nullable: true,
         hidden: false,
         dict: Some(DictionaryType::Int8),
+        is_system:  true,
     })?;
 
     md.dictionaries

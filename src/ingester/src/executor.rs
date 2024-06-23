@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use common::group_col;
-use common::types::DType;
+use common::types::{DType, GROUP_COLUMN_ID};
 use common::GROUP_USER_ID;
 use metadata::events;
 use metadata::events::CreateEventRequest;
@@ -329,6 +329,7 @@ impl Executor<Identify> {
         req.group_id = group.id;
         req.resolved_group_values = Some(resolved_group_values);
 
+        print!("{group_vals_id} ");
         // create dict for each group values so we can use it in property values
         self.md.dictionaries.create_key(
             ctx.project_id.unwrap(),
@@ -336,6 +337,14 @@ impl Executor<Identify> {
             group_vals_id,
             req.id.as_str(),
         )?;
+
+        self.md.dictionaries.create_key(
+            ctx.project_id.unwrap(),
+            GROUP_COLUMN_ID,
+            group_vals_id,
+            req.id.as_str(),
+        )?;
+
         // if req.group_id == 0 {
         //     print!("{group_vals_id} - {} ", req.id);
         // }
