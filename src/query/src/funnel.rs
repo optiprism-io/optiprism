@@ -105,7 +105,6 @@ impl FunnelProvider {
                 let prop = match breakdown {
                     Breakdown::Property(prop) => {
                         match prop {
-                            PropertyRef::System(name) => self.metadata.system_properties.get_by_name(ctx.project_id, name.as_ref())?,
                             PropertyRef::Group(name, gid) => self.metadata.group_properties[*gid].get_by_name(ctx.project_id, name.as_ref())?,
                             PropertyRef::Event(name) => self.metadata.event_properties.get_by_name(ctx.project_id, name.as_ref())?,
                             PropertyRef::Custom(_) => return Err(QueryError::Unimplemented("custom properties are not implemented for breakdowns".to_string()))
@@ -318,9 +317,6 @@ pub fn build(
         for breakdown in breakdowns {
             let prop = match breakdown {
                 Breakdown::Property(p) => match p {
-                    PropertyRef::System(p) => {
-                        metadata.system_properties.get_by_name(ctx.project_id, p)?
-                    }
                     PropertyRef::Group(p, group) => {
                         metadata.group_properties[*group].get_by_name(ctx.project_id, p)?
                     }

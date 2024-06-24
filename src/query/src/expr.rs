@@ -150,7 +150,6 @@ pub fn breakdown_expr(
 ) -> crate::Result<Expr> {
     match breakdown {
         Breakdown::Property(prop_ref) => match prop_ref {
-            PropertyRef::System(..)
             | PropertyRef::Group(..)
             | PropertyRef::Event(..) => Ok(property_col(ctx, metadata, prop_ref)?),
             PropertyRef::Custom(_) => unimplemented!(),
@@ -247,15 +246,6 @@ pub fn property_expression(
     values: Option<Vec<ScalarValue>>,
 ) -> Result<Expr> {
     match property {
-        PropertyRef::System(prop_name) => prop_expression(
-            ctx,
-            tbl,
-            &md.system_properties,
-            &md.dictionaries,
-            prop_name,
-            operation,
-            values,
-        ),
         PropertyRef::Group(prop_name, group) => prop_expression(
             ctx,
             tbl,
@@ -284,12 +274,6 @@ pub fn property_col(
     property: &PropertyRef,
 ) -> Result<Expr> {
     Ok(match property {
-        PropertyRef::System(prop_name) => {
-            let prop = md
-                .system_properties
-                .get_by_name(ctx.project_id, prop_name)?;
-            col(prop.column_name().as_str())
-        }
         PropertyRef::Group(prop_name, group_id) => {
             let prop = md.group_properties[*group_id].get_by_name(ctx.project_id, prop_name)?;
             col(prop.column_name().as_str())

@@ -754,10 +754,6 @@ pub(crate) fn fix_request(
                             operation,
                         } => {
                             let prop = match property {
-                                common::query::PropertyRef::System(name) => {
-                                    md.system_properties.get_by_name(project_id, name)?
-                                }
-
                                 common::query::PropertyRef::Group(name, group) => {
                                     md.group_properties[*group].get_by_name(project_id, name)?
                                 }

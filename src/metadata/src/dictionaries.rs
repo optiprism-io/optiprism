@@ -133,10 +133,10 @@ impl Dictionaries {
 
 #[derive(Debug)]
 pub struct SingleDictionaryProvider {
-    project_id: u64,
-    dict: String,
-    table: String,
-    dictionaries: Arc<Dictionaries>,
+    pub project_id: u64,
+    pub dict: String,
+    pub table: String,
+    pub dictionaries: Arc<Dictionaries>,
 }
 
 impl Hash for SingleDictionaryProvider {

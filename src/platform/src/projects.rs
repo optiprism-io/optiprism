@@ -6,7 +6,7 @@ use common::config::Config;
 use common::rbac::OrganizationPermission;
 use common::rbac::Permission;
 use common::rbac::ProjectPermission;
-use common::types::{DType, GROUP_COLUMN_CREATED_AT, GROUP_COLUMN_ID, GROUP_COLUMN_PROJECT_ID, GROUP_COLUMN_VERSION, TABLE_EVENTS};
+use common::types::{COLUMN_CREATED_AT, COLUMN_EVENT, COLUMN_EVENT_ID, COLUMN_IP, COLUMN_PROJECT_ID, DType, GROUP_COLUMN_CREATED_AT, GROUP_COLUMN_ID, GROUP_COLUMN_PROJECT_ID, GROUP_COLUMN_VERSION, TABLE_EVENTS};
 use common::types::OptionalProperty;
 use common::types::EVENT_CLICK;
 use common::types::EVENT_PAGE;
@@ -240,6 +240,74 @@ pub struct UpdateProjectRequest {
 }
 
 pub fn init_project(project_id: u64, md: &Arc<MetadataProvider>) -> error::Result<()> {
+    create_property(md, 0, CreatePropertyMainRequest {
+        name: COLUMN_PROJECT_ID.to_string(),
+        display_name: Some("Project".to_string()),
+        typ: Type::Event,
+        data_type: DType::String,
+        nullable: false,
+        hidden: true,
+        dict: Some(DictionaryType::Int64),
+        is_system: true,
+    })?;
+
+
+    for g in 0..GROUPS_COUNT {
+        create_property(md, 0, CreatePropertyMainRequest {
+            name: group_col(g),
+            display_name: Some(format!("Group {g}")),
+            typ: Type::Event,
+            data_type: DType::String,
+            nullable: true,
+            hidden: false,
+            dict: Some(DictionaryType::Int64),
+            is_system: true,
+        })?;
+    }
+    create_property(md, 0, CreatePropertyMainRequest {
+        name: COLUMN_CREATED_AT.to_string(),
+        display_name: Some("Created At".to_string()),
+        typ: Type::Event,
+        data_type: DType::Timestamp,
+        nullable: false,
+        hidden: false,
+        dict: None,
+        is_system: true,
+    })?;
+
+    create_property(md, 0, CreatePropertyMainRequest {
+        name: COLUMN_EVENT_ID.to_string(),
+        display_name: Some("Event ID".to_string()),
+        typ: Type::Event,
+        data_type: DType::Int64,
+        nullable: false,
+        hidden: true,
+        dict: None,
+        is_system: true,
+    })?;
+
+    create_property(md, 0, CreatePropertyMainRequest {
+        name: COLUMN_EVENT.to_string(),
+        display_name: Some("Event".to_string()),
+        typ: Type::Event,
+        data_type: DType::String,
+        nullable: false,
+        dict: Some(DictionaryType::Int64),
+        hidden: true,
+        is_system: true,
+    })?;
+
+    create_property(md, 0, CreatePropertyMainRequest {
+        name: COLUMN_IP.to_string(),
+        display_name: Some("Ip".to_string()),
+        typ: Type::Event,
+        data_type: DType::String,
+        nullable: true,
+        dict: None,
+        hidden: true,
+        is_system: true,
+    })?;
+
     create_event(md, project_id, EVENT_CLICK.to_string())?;
     create_event(md, project_id, EVENT_PAGE.to_string())?;
     create_event(md, project_id, EVENT_SCREEN.to_string())?;
@@ -324,7 +392,7 @@ pub fn init_project(project_id: u64, md: &Arc<MetadataProvider>) -> error::Resul
             display_name: Some("Project ID".to_string()),
             typ: Type::Group(g),
             data_type: DType::String,
-            nullable: false,
+            nullable: true,
             dict: Some(DictionaryType::Int64),
             hidden: true,
             is_system: true,
@@ -335,7 +403,7 @@ pub fn init_project(project_id: u64, md: &Arc<MetadataProvider>) -> error::Resul
             display_name: Some("ID".to_string()),
             typ: Type::Group(g),
             data_type: DType::String,
-            nullable: false,
+            nullable: true, // todo make non-nullable
             dict: Some(DictionaryType::Int64),
             hidden: true,
             is_system: true,
@@ -346,7 +414,7 @@ pub fn init_project(project_id: u64, md: &Arc<MetadataProvider>) -> error::Resul
             display_name: Some("Version".to_string()),
             typ: Type::Group(g),
             data_type: DType::Int64,
-            nullable: false,
+            nullable: true,
             dict: None,
             hidden: true,
             is_system: true,
@@ -357,7 +425,7 @@ pub fn init_project(project_id: u64, md: &Arc<MetadataProvider>) -> error::Resul
             display_name: Some("Created At".to_string()),
             typ: Type::Group(g),
             data_type: DType::Timestamp,
-            nullable: false,
+            nullable: true,
             hidden: false,
             dict: None,
             is_system: true,

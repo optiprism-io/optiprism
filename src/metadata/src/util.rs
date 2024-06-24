@@ -86,7 +86,6 @@ pub fn create_property(
     };
 
     let prop = match main_req.typ {
-        Type::System => md.system_properties.get_or_create(proj_id, req)?,
         Type::Event => md.event_properties.get_or_create(proj_id, req)?,
         Type::Group(gid) => md.group_properties[gid].get_or_create(proj_id, req)?,
     };

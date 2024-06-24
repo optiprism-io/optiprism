@@ -96,7 +96,7 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
         create_property(&md, proj.id, CreatePropertyMainRequest {
             name: name.to_string(),
             display_name: None,
-            typ: Type::System, // do this to keep property names as is
+            typ: Type::Event, // do this to keep property names as is
             data_type: dt,
             nullable: true,
             hidden: false,
@@ -108,7 +108,7 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
     create_property(&md, proj.id, CreatePropertyMainRequest {
         name: "string_dict".to_string(),
         display_name: None,
-        typ: Type::System,
+        typ: Type::Event,
         data_type: DType::String,
         nullable: true,
         hidden: false,

@@ -11,7 +11,7 @@ use common::query::QueryTime;
 use common::types::{COLUMN_CREATED_AT, COLUMN_EVENT, TABLE_EVENTS};
 use common::types::COLUMN_EVENT_ID;
 use common::types::COLUMN_PROJECT_ID;
-use common::{DECIMAL_PRECISION, DECIMAL_SCALE, GROUPS_COUNT};
+use common::{DECIMAL_PRECISION, DECIMAL_SCALE, group_col, GROUPS_COUNT};
 use datafusion_common::Column;
 use datafusion_common::ScalarValue;
 use datafusion_expr::and;
@@ -30,6 +30,7 @@ use datafusion_expr::Sort;
 use tracing::debug;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
+use metadata::properties::Type;
 use storage::db::OptiDBImpl;
 
 use crate::error::QueryError;
@@ -80,15 +81,6 @@ impl EventRecordsProvider {
                     break;
                 }
             };
-
-            if property.is_none() {
-                for p in self.metadata.system_properties.list(ctx.project_id)?.data {
-                    if p.column_name() == *field.name() {
-                        property = Some(p);
-                        break;
-                    }
-                };
-            }
 
             if property.is_none() {
                 for g in 0..GROUPS_COUNT {
@@ -165,7 +157,7 @@ impl EventRecordsProvider {
             (0..schema.fields.len()).collect::<Vec<_>>()
         };
 
-        let (session_ctx, state, plan) = initial_plan(&self.db, TABLE_EVENTS.to_string(),projection).await?;
+        let (session_ctx, state, plan) = initial_plan(&self.db, TABLE_EVENTS.to_string(), projection).await?;
         let plan = build_search_plan(ctx, self.metadata.clone(), plan, req.clone())?;
         println!("{plan:?}");
         let result = execute(session_ctx, state, plan).await?;
@@ -217,17 +209,14 @@ pub fn build_search_plan(
         prop_names.push(COLUMN_PROJECT_ID.to_string());
         prop_names.push(COLUMN_EVENT_ID.to_string());
         prop_names.push(COLUMN_CREATED_AT.to_string());
-        let p = metadata.system_properties.get_by_column_name(ctx.project_id, COLUMN_PROJECT_ID)?;
+        let p = metadata.event_properties.get_by_column_name(ctx.project_id, COLUMN_PROJECT_ID)?;
         properties.push(p);
-        let p = metadata.system_properties.get_by_column_name(ctx.project_id, COLUMN_EVENT_ID)?;
+        let p = metadata.event_properties.get_by_column_name(ctx.project_id, COLUMN_EVENT_ID)?;
         properties.push(p);
-        let p = metadata.system_properties.get_by_column_name(ctx.project_id, COLUMN_CREATED_AT)?;
+        let p = metadata.event_properties.get_by_column_name(ctx.project_id, COLUMN_CREATED_AT)?;
         properties.push(p);
         for prop in props {
             let p = match prop {
-                PropertyRef::System(n) => metadata
-                    .system_properties
-                    .get_by_name(ctx.project_id, n.as_ref())?,
                 PropertyRef::Group(n, group_id) => {
                     metadata.group_properties[*group_id].get_by_name(ctx.project_id, n.as_ref())?
                 }
@@ -327,10 +316,7 @@ pub fn build_search_plan(
         input: Arc::new(input),
     });
 
-    dbg!(&properties);
     if properties.is_empty() {
-        let mut l = metadata.system_properties.list(ctx.project_id)?.data;
-        properties.append(&mut (l));
         let mut l = metadata.event_properties.list(ctx.project_id)?.data;
         properties.append(&mut (l));
         for g in 0..GROUPS_COUNT {
@@ -347,12 +333,20 @@ pub fn build_search_plan(
         .iter()
         .map(|prop| {
             let col_name = prop.column_name();
-            let dict = SingleDictionaryProvider::new(
-                ctx.project_id,
-                TABLE_EVENTS.to_string(),
-                col_name.clone(),
-                metadata.dictionaries.clone(),
-            );
+            let dict = match prop.typ {
+                Type::Event => SingleDictionaryProvider::new(
+                    ctx.project_id,
+                    TABLE_EVENTS.to_string(),
+                    col_name.clone(),
+                    metadata.dictionaries.clone(),
+                ),
+                Type::Group(g) => SingleDictionaryProvider::new(
+                    ctx.project_id,
+                    group_col(g),
+                    col_name.clone(),
+                    metadata.dictionaries.clone(),
+                )
+            };
             let col = Column::from_name(col_name);
             cols_hash.insert(prop.column_name(), ());
 
@@ -367,7 +361,6 @@ pub fn build_search_plan(
         input
     };
 
-    dbg!(&properties);
     let mut rename = vec![];
     let mut rename_found: Vec<String> = vec![];
     for prop in properties {
@@ -419,8 +412,6 @@ pub fn build_get_by_id_plan(
     )?);
 
     let mut properties = vec![];
-    let mut l = metadata.system_properties.list(ctx.project_id)?.data;
-    properties.append(&mut (l));
     let mut l = metadata.event_properties.list(ctx.project_id)?.data;
     properties.append(&mut (l));
     for g in 0..GROUPS_COUNT {
