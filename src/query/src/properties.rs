@@ -124,13 +124,6 @@ impl LogicalPlanBuilder {
         let input = LogicalPlan::Filter(PlanFilter::try_new(expr, Arc::new(input))?);
 
         let (input, col_name) = match &req.property {
-            PropertyRef::System(prop_name) => {
-                let prop = metadata
-                    .system_properties
-                    .get_by_name(ctx.project_id, prop_name)?;
-                let col_name = prop.column_name();
-                (property_col!(ctx, metadata, TABLE_EVENTS.to_string(),input, prop), col_name)
-            }
             PropertyRef::Group(prop_name, group) => {
                 let prop =
                     metadata.group_properties[*group].get_by_name(ctx.project_id, prop_name)?;

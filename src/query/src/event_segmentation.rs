@@ -343,9 +343,6 @@ impl LogicalPlanBuilder {
                 for breakdown in breakdowns.iter() {
                     let prop = match breakdown {
                         Breakdown::Property(p) => match p {
-                            PropertyRef::System(p) => {
-                                metadata.system_properties.get_by_name(ctx.project_id, p)?
-                            }
                             PropertyRef::Group(p, group) => {
                                 metadata.group_properties[*group].get_by_name(ctx.project_id, p)?
                             }
@@ -383,9 +380,6 @@ impl LogicalPlanBuilder {
             for breakdown in breakdowns.iter() {
                 let prop = match breakdown {
                     Breakdown::Property(p) => match p {
-                        PropertyRef::System(p) => {
-                            metadata.system_properties.get_by_name(ctx.project_id, p)?
-                        }
                         PropertyRef::Group(p, group) => {
                             metadata.group_properties[*group].get_by_name(ctx.project_id, p)?
                         }
@@ -418,7 +412,6 @@ impl LogicalPlanBuilder {
             }
         }
 
-        dbg!(&group_cols,&rename_groups);
         group_cols.push(COL_AGG_NAME.to_string());
         rename_groups.push((COL_AGG_NAME.to_string(), "Formula".to_string()));
 
@@ -784,10 +777,6 @@ impl LogicalPlanBuilder {
             for breakdown in breakdowns.iter() {
                 let prop = match breakdown {
                     Breakdown::Property(p) => match p {
-                        PropertyRef::System(p) => self
-                            .metadata
-                            .system_properties
-                            .get_by_name(self.ctx.project_id, p)?,
                         PropertyRef::Group(p, group) => self.metadata.group_properties[*group]
                             .get_by_name(self.ctx.project_id, p)?,
                         PropertyRef::Event(p) => self
@@ -813,10 +802,6 @@ impl LogicalPlanBuilder {
             for breakdown in breakdowns.iter() {
                 let prop = match breakdown {
                     Breakdown::Property(p) => match p {
-                        PropertyRef::System(p) => self
-                            .metadata
-                            .system_properties
-                            .get_by_name(self.ctx.project_id, p)?,
                         PropertyRef::Group(p, group) => self.metadata.group_properties[*group]
                             .get_by_name(self.ctx.project_id, p)?,
                         PropertyRef::Event(p) => self

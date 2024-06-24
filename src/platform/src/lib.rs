@@ -89,7 +89,6 @@ pub struct PlatformProvider {
     pub groups: Arc<Groups>,
     pub event_properties: Arc<Properties>,
     pub group_properties: Vec<Arc<Properties>>,
-    pub system_properties: Arc<Properties>,
     pub accounts: Arc<Accounts>,
     pub auth: Arc<Auth>,
     pub event_segmentation: Arc<EventSegmentation>,
@@ -121,7 +120,6 @@ impl PlatformProvider {
             groups: Arc::new(Groups::new(md.groups.clone())),
             event_properties: Arc::new(Properties::new_event(md.event_properties.clone(), prop_prov.clone())),
             group_properties,
-            system_properties: Arc::new(Properties::new_system(md.system_properties.clone(), prop_prov.clone())),
             accounts: Arc::new(Accounts::new(md.accounts.clone())),
             auth: Arc::new(Auth::new(md.accounts.clone(), cfg.clone())),
             event_segmentation: Arc::new(EventSegmentation::new(md.clone(), es_prov)),
@@ -417,8 +415,6 @@ impl Into<EventRef> for common::query::EventRef {
 #[serde(tag = "propertyType", rename_all = "camelCase")]
 pub enum PropertyRef {
     #[serde(rename_all = "camelCase")]
-    System { property_name: String },
-    #[serde(rename_all = "camelCase")]
     Group { property_name: String, group: usize },
     #[serde(rename_all = "camelCase")]
     Event { property_name: String },
@@ -429,11 +425,6 @@ pub enum PropertyRef {
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 #[serde(tag = "propertyType", rename_all = "camelCase")]
 pub enum SortablePropertyRef {
-    #[serde(rename_all = "camelCase")]
-    System {
-        property_name: String,
-        direction: SortDirection,
-    },
     #[serde(rename_all = "camelCase")]
     Group {
         property_name: String,
@@ -455,9 +446,6 @@ pub enum SortablePropertyRef {
 impl Into<common::query::PropertyRef> for PropertyRef {
     fn into(self) -> common::query::PropertyRef {
         match self {
-            PropertyRef::System { property_name } => {
-                common::query::PropertyRef::System(property_name)
-            }
             PropertyRef::Group {
                 property_name,
                 group,
@@ -473,9 +461,6 @@ impl Into<common::query::PropertyRef> for PropertyRef {
 impl Into<PropertyRef> for common::query::PropertyRef {
     fn into(self) -> PropertyRef {
         match self {
-            common::query::PropertyRef::System(property_name) => {
-                PropertyRef::System { property_name }
-            }
             common::query::PropertyRef::Group(property_name, group) => PropertyRef::Group {
                 property_name,
                 group,
@@ -1422,11 +1407,6 @@ pub fn validate_event_property(
                 .get_by_name(project_id, &property_name)
                 .map_err(|err| PlatformError::BadRequest(format!("{err_prefix}: {err}")))?;
         }
-        PropertyRef::System { property_name } => {
-            md.system_properties
-                .get_by_name(project_id, &property_name)
-                .map_err(|err| PlatformError::BadRequest(format!("{err_prefix}: {err}")))?;
-        }
         _ => {
             return Err(PlatformError::Unimplemented(
                 "invalid property type".to_string(),
@@ -1453,10 +1433,6 @@ pub fn validate_event_filter_property(
             .map_err(|err| PlatformError::BadRequest(format!("{err_prefix}: {err}")))?,
         PropertyRef::Event { property_name } => md
             .event_properties
-            .get_by_name(project_id, &property_name)
-            .map_err(|err| PlatformError::BadRequest(format!("{err_prefix}: {err}")))?,
-        PropertyRef::System { property_name } => md
-            .system_properties
             .get_by_name(project_id, &property_name)
             .map_err(|err| PlatformError::BadRequest(format!("{err_prefix}: {err}")))?,
         _ => {

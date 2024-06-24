@@ -167,17 +167,6 @@ pub fn init_system(
         },
     }
 
-    create_property(md, 0, CreatePropertyMainRequest {
-        name: COLUMN_PROJECT_ID.to_string(),
-        display_name: Some("Project".to_string()),
-        typ: Type::System,
-        data_type: DType::String,
-        nullable: false,
-        hidden: true,
-        dict: Some(DictionaryType::Int64),
-        is_system: true,
-    })?;
-
     for g in 0..GROUPS_COUNT {
         let tbl = TableOptions {
             levels: 7,
@@ -206,82 +195,7 @@ pub fn init_system(
                 other => return Err(other.into()),
             },
         }
-
-        create_property(md, 0, CreatePropertyMainRequest {
-            name,
-            display_name: Some(format!("Group {g}")),
-            typ: Type::System,
-            data_type: DType::String,
-            nullable: true,
-            hidden: false,
-            dict: Some(DictionaryType::Int64),
-            is_system: true,
-        })?;
-
-        // create_property(md, 0, CreatePropertyMainRequest {
-        // name: GROUP_COLUMN_ID.to_string(),
-        // display_name: Some("Id".to_string()),
-        // typ: Type::SystemGroup(g),
-        // data_type: DType::String,
-        // nullable: false,
-        // hidden: false,
-        // dict: Some(DictionaryType::Int64),
-        // })?;
-        //
-        // create_property(md, 0, CreatePropertyMainRequest {
-        // name: GROUP_COLUMN_VERSION.to_string(),
-        // display_name: Some("Version".to_string()),
-        // typ: Type::SystemGroup(g),
-        // data_type: DType::String,
-        // nullable: false,
-        // hidden: false,
-        // dict: Some(DictionaryType::Int64),
-        // })?;
     }
-
-    create_property(md, 0, CreatePropertyMainRequest {
-        name: COLUMN_CREATED_AT.to_string(),
-        display_name: Some("Created At".to_string()),
-        typ: Type::System,
-        data_type: DType::Timestamp,
-        nullable: false,
-        hidden: false,
-        dict: None,
-        is_system: true,
-    })?;
-
-    create_property(md, 0, CreatePropertyMainRequest {
-        name: COLUMN_EVENT_ID.to_string(),
-        display_name: Some("Event ID".to_string()),
-        typ: Type::System,
-        data_type: DType::Int64,
-        nullable: false,
-        hidden: true,
-        dict: None,
-        is_system: true,
-    })?;
-
-    create_property(md, 0, CreatePropertyMainRequest {
-        name: COLUMN_EVENT.to_string(),
-        display_name: Some("Event".to_string()),
-        typ: Type::System,
-        data_type: DType::String,
-        nullable: false,
-        dict: Some(DictionaryType::Int64),
-        hidden: true,
-        is_system: true,
-    })?;
-
-    create_property(md, 0, CreatePropertyMainRequest {
-        name: COLUMN_IP.to_string(),
-        display_name: Some("Ip".to_string()),
-        typ: Type::System,
-        data_type: DType::String,
-        nullable: true,
-        dict: None,
-        hidden: true,
-        is_system: true,
-    })?;
 
     Ok(())
 }
@@ -474,7 +388,7 @@ fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<P
         Ok(proj) => proj,
         Err(_err) => md.projects.get_by_id(1)?,
     };
-    md.dictionaries.create_key(proj.id, TABLE_EVENTS,"project_id", proj.id, proj.name.as_str())?;
+    md.dictionaries.create_key(proj.id, TABLE_EVENTS, "project_id", proj.id, proj.name.as_str())?;
     for g in 0..GROUPS_COUNT {
         md.dictionaries.create_key(proj.id, group_col(g).as_str(), "project_id", proj.id, proj.name.as_str())?;
     }

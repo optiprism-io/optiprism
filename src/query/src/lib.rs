@@ -91,9 +91,6 @@ macro_rules! breakdowns_to_dicts {
             match &breakdown {
                 Breakdown::Property(prop) => {
                     let p = match prop {
-                        PropertyRef::System(name) => $md
-                            .system_properties
-                            .get_by_name($ctx.project_id, name.as_str())?,
                         PropertyRef::Group(name, group) => $md.group_properties[*group]
                             .get_by_name($ctx.project_id, name.as_str())?,
                         PropertyRef::Event(name) => $md
@@ -431,9 +428,6 @@ pub fn decode_filter_single_dictionary(
             | PropValueOperation::Regex
             | PropValueOperation::NotRegex => {
                 let prop = match property {
-                    PropertyRef::System(prop_ref) => metadata
-                        .system_properties
-                        .get_by_name(ctx.project_id, prop_ref.as_str())?,
                     PropertyRef::Group(prop_ref, group) => metadata.group_properties[*group]
                         .get_by_name(ctx.project_id, prop_ref.as_str())?,
                     PropertyRef::Event(prop_ref) => metadata
@@ -739,10 +733,6 @@ pub mod test_util {
 
 pub fn col_name(ctx: &Context, prop: &PropertyRef, md: &Arc<MetadataProvider>) -> Result<String> {
     let name = match prop {
-        PropertyRef::System(v) => md
-            .system_properties
-            .get_by_name(ctx.project_id, v)?
-            .column_name(),
         PropertyRef::Group(v, group) => md.group_properties[*group]
             .get_by_name(ctx.project_id, v)?
             .column_name(),

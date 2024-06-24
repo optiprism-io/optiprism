@@ -158,22 +158,6 @@ impl Properties {
         }
     }
 
-    pub fn new_system(db: Arc<TransactionDB>, opti_db: Arc<OptiDBImpl>) -> Self {
-        let id_cache = RwLock::new(LruCache::new(
-            NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
-        ));
-        let name_cache = RwLock::new(LruCache::new(
-            NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
-        ));
-        Properties {
-            db,
-            opti_db,
-            id_cache,
-            name_cache,
-            typ: Type::System,
-        }
-    }
-
     pub fn get_by_column_name_global(&self,
                                      project_id: u64,
                                      name: &str) -> Result<Property> {
@@ -252,11 +236,6 @@ impl Properties {
         project_id: u64,
         req: CreatePropertyRequest,
     ) -> Result<Property> {
-        let project_id = if self.typ == Type::System {
-            0
-        } else {
-            project_id
-        };
         let mut idx_keys = index_keys(project_id, &self.typ, &req.name, req.display_name.clone());
 
         for key in idx_keys.iter().flatten() {
@@ -277,7 +256,7 @@ impl Properties {
             make_id_seq_key(
                 project_ns(
                     project_id,
-                    format!("{}/{}", self.typ.order_path(), req.data_type.short_name()).as_bytes(),
+                    format!("properties/order/{}", req.data_type.short_name()).as_bytes(),
                 )
                     .as_slice(),
             ),
@@ -385,12 +364,6 @@ impl Properties {
     }
 
     pub fn create(&self, project_id: u64, req: CreatePropertyRequest) -> Result<Property> {
-        let project_id = if self.typ == Type::System {
-            0
-        } else {
-            project_id
-        };
-
         let tx = self.db.transaction();
         let ret = self.create_(&tx, project_id, req)?;
         tx.commit()?;
@@ -399,12 +372,6 @@ impl Properties {
     }
 
     pub fn get_or_create(&self, project_id: u64, req: CreatePropertyRequest) -> Result<Property> {
-        let project_id = if self.typ == Type::System {
-            0
-        } else {
-            project_id
-        };
-
         let tx = self.db.transaction();
         match self.get_by_name_(&tx, project_id, req.name.as_str()) {
             Ok(event) => return Ok(event),
@@ -424,12 +391,6 @@ impl Properties {
     }
 
     pub fn get_by_name(&self, project_id: u64, name: &str) -> Result<Property> {
-        let project_id = if self.typ == Type::System {
-            0
-        } else {
-            project_id
-        };
-
         let tx = self.db.transaction();
         self.get_by_name_(&tx, project_id, name)
     }
@@ -447,12 +408,6 @@ impl Properties {
         ))
     }
     pub fn list(&self, project_id: u64) -> Result<ListResponse<Property>> {
-        let project_id = if self.typ == Type::System {
-            0
-        } else {
-            project_id
-        };
-
         let tx = self.db.transaction();
         list_data(
             &tx,
@@ -466,12 +421,6 @@ impl Properties {
         property_id: u64,
         req: UpdatePropertyRequest,
     ) -> Result<Property> {
-        let project_id = if self.typ == Type::System {
-            0
-        } else {
-            project_id
-        };
-
         let tx = self.db.transaction();
 
         let prev_prop = self.get_by_id(project_id, property_id)?;
@@ -566,12 +515,6 @@ impl Properties {
     }
 
     pub fn delete(&self, project_id: u64, id: u64) -> Result<Property> {
-        let project_id = if self.typ == Type::System {
-            0
-        } else {
-            project_id
-        };
-
         let tx = self.db.transaction();
         let prop = self.get_by_id_(&tx, project_id, id)?;
         tx.delete(make_data_value_key(
@@ -603,7 +546,6 @@ pub enum Status {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 pub enum Type {
     #[default]
-    System,
     Event,
     Group(usize),
 }
@@ -611,18 +553,10 @@ pub enum Type {
 impl Type {
     pub fn path(&self) -> String {
         match self {
-            Type::System => "system_properties".to_string(),
             Type::Event => "event_properties".to_string(),
             Type::Group(gid) => {
                 format!("group_{gid}_properties")
             }
-        }
-    }
-
-    pub fn order_path(&self) -> &str {
-        match self {
-            Type::System => "system_properties/order",
-            _ => "properties/order",
         }
     }
 }
@@ -686,23 +620,9 @@ impl Property {
 
             return name;
         }
-        match self.typ {
-            Type::System => {
-                let mut name: String = self
-                    .name
-                    .chars()
-                    .filter(|c| {
-                        c.is_ascii_alphabetic() || c.is_numeric() || c.is_whitespace() || c == &'_'
-                    })
-                    .collect();
-                name = name.to_case(Case::Snake);
-                name = name.trim().to_string();
 
-                name
-            }
-            Type::Event => {
-                format!("e_{}_{}", self.data_type.short_name(), self.order)
-            }
+        match self.typ {
+            Type::Event => format!("e_{}_{}", self.data_type.short_name(), self.order),
             Type::Group(gid) => {
                 format!("g_{gid}_{}_{}", self.data_type.short_name(), self.order)
             }
@@ -726,7 +646,6 @@ impl Property {
 
     pub fn reference(&self) -> PropertyRef {
         match self.typ {
-            Type::System => PropertyRef::System(self.name.to_owned()),
             Type::Event => PropertyRef::Event(self.name.to_owned()),
             Type::Group(v) => PropertyRef::Group(self.name.to_owned(), v),
         }

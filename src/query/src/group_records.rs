@@ -288,7 +288,6 @@ pub fn build_search_plan(
         let mut l = metadata.group_properties[req.group_id]
             .list(ctx.project_id)?
             .data;
-        dbg!(&l);
         properties.append(&mut (l));
     }
 

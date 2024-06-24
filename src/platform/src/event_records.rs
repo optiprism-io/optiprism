@@ -236,12 +236,6 @@ pub(crate) fn validate_search_request(
                         .map_err(|err| {
                             PlatformError::BadRequest(format!("property {idx}: {err}"))
                         })?,
-                    PropertyRef::System { property_name } => md
-                        .system_properties
-                        .get_by_name(project_id, &property_name)
-                        .map_err(|err| {
-                            PlatformError::BadRequest(format!("property {idx}: {err}"))
-                        })?,
                     _ => {
                         return Err(PlatformError::Unimplemented(
                             "invalid property type".to_string(),

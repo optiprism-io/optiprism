@@ -290,7 +290,6 @@ impl Into<metadata::properties::Property> for Property {
             metadata::properties::Type::Group(gid)
         } else {
             match self.typ {
-                Type::System => metadata::properties::Type::System,
                 Type::Event => metadata::properties::Type::Event,
                 _ => unreachable!(),
             }
@@ -323,7 +322,6 @@ impl Into<metadata::properties::Property> for Property {
 impl Into<Property> for metadata::properties::Property {
     fn into(self) -> Property {
         let (typ, group_id) = match self.typ {
-            metadata::properties::Type::System => (Type::System, None),
             metadata::properties::Type::Event => (Type::Event, None),
             metadata::properties::Type::Group(gid) => (Type::Group, Some(gid)),
         };
@@ -431,11 +429,6 @@ pub(crate) fn validate_request(
         }
         PropertyRef::Event { property_name } => {
             md.event_properties
-                .get_by_name(project_id, &property_name)
-                .map_err(|err| PlatformError::BadRequest(format!("{err}")))?;
-        }
-        PropertyRef::System { property_name } => {
-            md.system_properties
                 .get_by_name(project_id, &property_name)
                 .map_err(|err| PlatformError::BadRequest(format!("{err}")))?;
         }
