@@ -162,7 +162,7 @@ impl Projects {
         };
 
         let project = self.md.projects.update(project_id, md_req)?;
-        self.md.dictionaries.create_key(project.id, TABLE_EVENTS,"project_id", project.id, project.name.as_str())?;
+        self.md.dictionaries.create_key(project.id, TABLE_EVENTS, "project_id", project.id, project.name.as_str())?;
         for g in 0..GROUPS_COUNT {
             self.md.dictionaries.create_key(project.id, group_col(g).as_str(), "project_id", project.id, project.name.as_str())?;
         }
