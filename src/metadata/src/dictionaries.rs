@@ -68,7 +68,7 @@ impl Dictionaries {
         dict: &str,
         value: &str,
     ) -> Result<u64> {
-        let res = match tx.get(make_value_key(project_id, dict, value))? {
+        let res = match tx.get(make_value_key(project_id, tbl_dict(table, dict).as_str(), value))? {
             None => {
                 let id = next_seq(
                     &tx,
