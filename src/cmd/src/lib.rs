@@ -475,6 +475,10 @@ fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<P
         Err(_err) => md.projects.get_by_id(1)?,
     };
     md.dictionaries.create_key(proj.id, TABLE_EVENTS,"project_id", proj.id, proj.name.as_str())?;
+    for g in 0..GROUPS_COUNT {
+        md.dictionaries.create_key(proj.id, group_col(g).as_str(), "project_id", proj.id, proj.name.as_str())?;
+    }
+
 
     info!("token: {}", token);
     let _user = match md.accounts.create(CreateAccountRequest {
