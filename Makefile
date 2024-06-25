@@ -58,5 +58,14 @@ docker-publish:
 
 docker-release: docker-build docker-publish
 
+docker-backend-build:
+	docker buildx build  --ssh default --load --file docker/backend.Dockerfile --platform=linux/amd64 --progress plain -t $(IMAGE) .
+
+docker-backend-publish:
+	$(pushing pushing $(IMAGE) docker image...)
+	docker push $(IMAGE)
+
+docker-backend-release: docker-backend-build docker-backend-publish
+
 release:
 	helm upgrade --install --values ./helm/optiprism/values.yaml --set image.tag=v$(VERSION) --set podAnnotations.version=$(VERSION) optiprism ./helm/optiprism -n optiprism
