@@ -331,7 +331,6 @@ impl Executor<Identify> {
         req.group_id = group.id;
         req.resolved_group_values = Some(resolved_group_values);
 
-        print!("{group_vals_id} ");
         // create dict for each group values so we can use it in property values
         self.md.dictionaries.create_key(
             ctx.project_id.unwrap(),

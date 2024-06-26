@@ -566,13 +566,7 @@ impl Into<common::event_segmentation::EventSegmentationRequest> for EventSegment
             analysis: self.analysis.into(),
             compare: self.compare.map(|v| v.into()),
             events: self.events.iter().map(|v| v.into()).collect::<Vec<_>>(),
-            filters: self.filters.map(|v| {
-                v.groups[0]
-                    .filters
-                    .iter()
-                    .map(|f| f.to_owned().into())
-                    .collect::<Vec<_>>()
-            }),
+            filters: None,
             breakdowns: self.breakdowns.map_or_else(
                 || None,
                 |v| {
@@ -884,6 +878,7 @@ mod tests {
                     PropValueFilter::Property {
                         property: PropertyRef::Group {
                             property_name: "p1".to_string(),
+                            group: 0,
                         },
                         operation: PropValueOperation::Eq,
                         value: Some(vec![json!(true)]),
@@ -913,6 +908,7 @@ mod tests {
                 breakdowns: Some(vec![Breakdown::Property {
                     property: PropertyRef::Group {
                         property_name: "Device".to_string(),
+                        group: 0,
                     },
                 }]),
                 queries: vec![
@@ -950,6 +946,7 @@ mod tests {
             breakdowns: Some(vec![Breakdown::Property {
                 property: PropertyRef::Group {
                     property_name: "Device".to_string(),
+                    group: 0,
                 },
             }]),
             segments: None,
