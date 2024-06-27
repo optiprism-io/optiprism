@@ -64,6 +64,7 @@ pub use context::Context;
 pub use error::Result;
 use indexmap::IndexMap;
 use tracing::debug;
+use common::group_col;
 use common::types::TABLE_EVENTS;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
@@ -86,16 +87,16 @@ pub const DEFAULT_BATCH_SIZE: usize = 4096;
 
 #[macro_export]
 macro_rules! breakdowns_to_dicts {
-    ($md:expr, $ctx:expr,$tbl:expr,$breakdowns:expr, $cols_hash:expr,$decode_cols:expr) => {{
+    ($md:expr, $ctx:expr,$breakdowns:expr, $cols_hash:expr,$decode_cols:expr) => {{
         for breakdown in $breakdowns.iter() {
             match &breakdown {
                 Breakdown::Property(prop) => {
-                    let p = match prop {
-                        PropertyRef::Group(name, group) => $md.group_properties[*group]
-                            .get_by_name($ctx.project_id, name.as_str())?,
-                        PropertyRef::Event(name) => $md
+                    let (p,tbl) = match prop {
+                        PropertyRef::Group(name, group) => ($md.group_properties[*group]
+                            .get_by_name($ctx.project_id, name.as_str())?,group_col(*group)),
+                        PropertyRef::Event(name) => ($md
                             .event_properties
-                            .get_by_name($ctx.project_id, name.as_str())?,
+                            .get_by_name($ctx.project_id, name.as_str())?,TABLE_EVENTS.to_string()),
                         _ => unimplemented!(),
                     };
                     if !p.is_dictionary {
@@ -107,7 +108,7 @@ macro_rules! breakdowns_to_dicts {
 
                     let dict = SingleDictionaryProvider::new(
                         $ctx.project_id,
-                        $tbl,
+                        tbl,
                         p.column_name(),
                         $md.dictionaries.clone(),
                     );
@@ -427,12 +428,13 @@ pub fn decode_filter_single_dictionary(
             | PropValueOperation::NotLike
             | PropValueOperation::Regex
             | PropValueOperation::NotRegex => {
-                let prop = match property {
-                    PropertyRef::Group(prop_ref, group) => metadata.group_properties[*group]
-                        .get_by_name(ctx.project_id, prop_ref.as_str())?,
-                    PropertyRef::Event(prop_ref) => metadata
-                        .event_properties
-                        .get_by_name(ctx.project_id, prop_ref.as_str())?,
+                let (prop,tbl) = match property {
+                    PropertyRef::Group(prop_ref, group) => (metadata.group_properties[*group].get_by_name(ctx.project_id, prop_ref.as_str())?,group_col(*group)),
+                    PropertyRef::Event(prop_ref) => {
+                        (metadata
+                            .event_properties
+                            .get_by_name(ctx.project_id, prop_ref.as_str())?,TABLE_EVENTS.to_string())
+                    },
                     PropertyRef::Custom(_) => unreachable!(),
                 };
 
@@ -442,7 +444,7 @@ pub fn decode_filter_single_dictionary(
                 let col_name = prop.column_name();
                 let dict = SingleDictionaryProvider::new(
                     ctx.project_id,
-                    TABLE_EVENTS.to_string(),
+                    tbl,
                     col_name.clone(),
                     metadata.dictionaries.clone(),
                 );

@@ -312,7 +312,7 @@ pub fn build(
     let mut rename_groups = vec![];
     let mut decode_cols: Vec<(Column, Arc<SingleDictionaryProvider>)> = Vec::new();
     let groups = if let Some(breakdowns) = &req.breakdowns {
-        breakdowns_to_dicts!(metadata, ctx, TABLE_EVENTS.to_string(),breakdowns, cols_hash, decode_cols);
+        breakdowns_to_dicts!(metadata, ctx, breakdowns, cols_hash, decode_cols);
         let mut out = vec![];
         for breakdown in breakdowns {
             let prop = match breakdown {
