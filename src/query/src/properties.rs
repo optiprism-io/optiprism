@@ -25,6 +25,7 @@ use datafusion_expr::LogicalPlan;
 use datafusion_expr::Operator;
 use datafusion_expr::Sort;
 use tracing::debug;
+use common::group_col;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
 use storage::db::OptiDBImpl;
@@ -128,7 +129,7 @@ impl LogicalPlanBuilder {
                 let prop =
                     metadata.group_properties[*group].get_by_name(ctx.project_id, prop_name)?;
                 let col_name = prop.column_name();
-                (property_col!(ctx, metadata, TABLE_EVENTS.to_string(),input, prop), col_name)
+                (property_col!(ctx, metadata, group_col(*group),input, prop), col_name)
             }
             PropertyRef::Event(prop_name) => {
                 let prop = metadata

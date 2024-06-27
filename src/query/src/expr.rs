@@ -23,6 +23,7 @@ use datafusion_expr::or;
 use datafusion_expr::Expr;
 use datafusion_expr::ExprSchemable;
 use datafusion_expr::Operator;
+use common::group_col;
 use metadata::dictionaries::Dictionaries;
 use metadata::properties::DictionaryType;
 use metadata::MetadataProvider;
@@ -130,7 +131,16 @@ pub fn event_filters_expression(
                     property,
                     operation,
                     value,
-                } => property_expression(ctx, metadata, TABLE_EVENTS, property, operation, value.clone()),
+                } => {
+                    let tbl = match property {
+                        PropertyRef::Group(_, g) => {
+                            group_col(*g)
+                        }
+                        PropertyRef::Event(_) => TABLE_EVENTS.to_string(),
+                        PropertyRef::Custom(_) => unimplemented!()
+                    };
+                    property_expression(ctx, metadata, &tbl, property, operation, value.clone())
+                },
             }
         })
         .collect::<Result<Vec<Expr>>>()?;
