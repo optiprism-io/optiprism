@@ -90,7 +90,6 @@ impl Dictionaries {
 
     pub fn create_key(&self, project_id: u64, table: &str, dict: &str, key: u64, value: &str) -> Result<()> {
         let tx = self.db.transaction();
-
         tx.put(make_key_key(project_id, tbl_dict(table, dict).as_str(), key), value.as_bytes())?;
         tx.put(
             make_value_key(project_id, tbl_dict(table, dict).as_str(), value),
@@ -123,7 +122,7 @@ impl Dictionaries {
         let store_key = make_value_key(project_id, tbl_dict(table, dict).as_str(), value);
         match tx.get(store_key.as_slice())? {
             None => Err(MetadataError::NotFound(format!(
-                "dictionary key by value {} not found",
+                "table {table}, project {project_id}, dict {dict}: dictionary key by value {} not found",
                 value
             ))),
             Some(key) => Ok(LittleEndian::read_u64(key.as_slice())),

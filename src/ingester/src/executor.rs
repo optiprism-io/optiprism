@@ -189,14 +189,14 @@ impl Executor<Track> {
                     group_name.to_owned(),
                 )?;
 
-                let resolved_group = self.md.groups.get_or_create(
+                let resolved_group_values = self.md.groups.get_or_create(
                     ctx.project_id.unwrap(),
                     group.id,
                     group_val,
                     vec![],
                 )?;
 
-                resolved_groups.push((group.id as usize, resolved_group));
+                resolved_groups.push((group.id as usize, resolved_group_values));
             }
             req.resolved_group_values = Some(resolved_groups);
         }
