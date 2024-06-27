@@ -563,12 +563,12 @@ impl LogicalPlanBuilder {
         let mut decode_cols: Vec<(Column, Arc<SingleDictionaryProvider>)> = Vec::new();
         for event in &self.es.events {
             if let Some(breakdowns) = &event.breakdowns {
-                breakdowns_to_dicts!(self.metadata, self.ctx, TABLE_EVENTS.to_string(),breakdowns, cols_hash, decode_cols);
+                breakdowns_to_dicts!(self.metadata, self.ctx,breakdowns, cols_hash, decode_cols);
             }
         }
 
         if let Some(breakdowns) = &self.es.breakdowns {
-            breakdowns_to_dicts!(self.metadata, self.ctx, TABLE_EVENTS.to_string(),breakdowns, cols_hash, decode_cols);
+            breakdowns_to_dicts!(self.metadata, self.ctx,breakdowns, cols_hash, decode_cols);
         }
 
         if decode_cols.is_empty() {
