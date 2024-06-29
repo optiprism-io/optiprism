@@ -150,7 +150,6 @@ pub enum Query {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
 pub struct Report {
     pub id: u64,
     pub created_at: DateTime<Utc>,
@@ -167,7 +166,6 @@ pub struct Report {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
 pub struct CreateReportRequest {
     pub created_by: u64,
     pub tags: Option<Vec<String>>,
@@ -179,7 +177,6 @@ pub struct CreateReportRequest {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
 pub struct UpdateReportRequest {
     pub updated_by: u64,
     pub tags: OptionalProperty<Option<Vec<String>>>,
