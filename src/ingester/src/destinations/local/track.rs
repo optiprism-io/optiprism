@@ -303,7 +303,7 @@ impl Destination<Track> for Local {
         ]
             .concat();
 
-        self.db.insert("events", values)?;
+        self.db.insert(TABLE_EVENTS, values)?;
         Ok(())
     }
 }

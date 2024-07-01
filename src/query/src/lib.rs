@@ -550,7 +550,7 @@ pub mod test_util {
 
         let config = ListingTableConfig::new(table_path)
             .with_listing_options(listing_options)
-            .with_schema(Arc::new(db.schema1("events")?));
+            .with_schema(Arc::new(db.schema1(TABLE_EVENTS)?));
         let provider = ListingTable::try_new(config)?;
         Ok(
             LogicalPlanBuilder::scan(UNNAMED_TABLE, provider_as_source(Arc::new(provider)), None)?
