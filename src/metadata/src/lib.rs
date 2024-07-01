@@ -19,6 +19,7 @@ pub mod rocksdb;
 pub mod sessions;
 pub mod teams;
 pub mod util;
+pub mod bookmarks;
 
 use std::fmt::Debug;
 

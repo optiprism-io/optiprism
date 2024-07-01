@@ -12,6 +12,7 @@ pub mod properties;
 pub mod reports;
 mod event_segmentation;
 pub mod funnel;
+mod bookmarks;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -60,6 +61,7 @@ pub fn attach_routes(
     router = properties::attach_group_routes(router);
     router = dashboards::attach_routes(router);
     router = reports::attach_routes(router);
+    router = bookmarks::attach_routes(router);
     router = event_records::attach_routes(router);
     router = event_segmentation::attach_routes(router);
     router = funnel::attach_routes(router);
@@ -90,6 +92,7 @@ pub fn attach_routes(
         .layer(Extension(platform.funnel.clone()))
         .layer(Extension(platform.dashboards.clone()))
         .layer(Extension(platform.reports.clone()))
+        .layer(Extension(platform.bookmarks.clone()))
         .layer(Extension(platform.event_records.clone()))
         .layer(Extension(platform.group_records.clone()));
 

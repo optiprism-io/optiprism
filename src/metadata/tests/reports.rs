@@ -14,6 +14,8 @@ use metadata::reports::Reports;
 use metadata::reports::Type;
 use metadata::reports::UpdateReportRequest;
 use uuid::Uuid;
+use common::event_segmentation::{Analysis, ChartType, EventSegmentationRequest};
+
 #[test]
 fn test_reports() -> Result<()> {
     let mut path = temp_dir();
@@ -27,13 +29,13 @@ fn test_reports() -> Result<()> {
         name: "".to_string(),
         description: None,
         typ: Type::EventSegmentation,
-        query: Query::EventSegmentation(EventSegmentation {
+        query: Query::EventSegmentation(EventSegmentationRequest {
             time: QueryTime::Last {
                 last: 1,
-                unit: TimeIntervalUnit::Second,
+                unit: TimeIntervalUnit::Day,
             },
-            group_id: "sdf".to_string(),
-            interval_unit: TimeIntervalUnit::Second,
+            group_id: 1,
+            interval_unit: TimeIntervalUnit::Day,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
             compare: None,
@@ -50,13 +52,13 @@ fn test_reports() -> Result<()> {
         name: OptionalProperty::None,
         description: OptionalProperty::None,
         typ: OptionalProperty::Some(Type::EventSegmentation),
-        query: OptionalProperty::Some(Query::EventSegmentation(EventSegmentation {
+        query: OptionalProperty::Some(Query::EventSegmentation(EventSegmentationRequest {
             time: QueryTime::Last {
                 last: 1,
-                unit: TimeIntervalUnit::Second,
+                unit: TimeIntervalUnit::Day,
             },
-            group_id: "sdf".to_string(),
-            interval_unit: TimeIntervalUnit::Second,
+            group_id: 1,
+            interval_unit: TimeIntervalUnit::Day,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
             compare: None,
