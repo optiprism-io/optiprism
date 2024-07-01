@@ -14,7 +14,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use validator::validate_email;
 
-use super::password::make_password_hash;
+use super::password::{check_password_complexity, make_password_hash};
 use super::password::verify_password;
 use super::token::make_access_token;
 use super::token::make_refresh_token;
@@ -44,13 +44,13 @@ impl Auth {
                 self.cfg.access_token_duration.clone(),
                 "access",
             )
-            .map_err(|err| err.wrap_into(AuthError::CantMakeAccessToken))?,
+                .map_err(|err| err.wrap_into(AuthError::CantMakeAccessToken))?,
             refresh_token: make_refresh_token(
                 account_id,
                 self.cfg.refresh_token_duration.clone(),
                 "refresh",
             )
-            .map_err(|err| err.wrap_into(AuthError::CantMakeRefreshToken))?,
+                .map_err(|err| err.wrap_into(AuthError::CantMakeRefreshToken))?,
         })
     }
 
@@ -59,26 +59,18 @@ impl Auth {
             return Err(PlatformError::invalid_field("email", "invalid email"));
         }
 
-        match zxcvbn::zxcvbn(&req.password, &[&req.email]) {
-            Ok(ent) if ent.score() < 3 => {
-                return Err(PlatformError::invalid_field(
-                    "password",
-                    "password is too simple",
-                ));
-            }
-            Err(err) => return Err(PlatformError::invalid_field("password", err.to_string())),
-            _ => {}
-        }
+        check_password_complexity(&req.password, &vec![req.email.as_str()])?;
 
         let password_hash = make_password_hash(req.password.as_str())
             .map_err(|err| err.wrap_into(AuthError::InvalidPasswordHashing))?;
 
         let maybe_account = self.accounts.create(CreateAccountRequest {
-            created_by: ADMIN_ID,
+            created_by: ADMIN_ID, // todo make it meaningful
             password_hash,
             email: req.email,
             name: req.name,
             force_update_password: false,
+            force_update_email: false,
             role: None,
             organizations: None,
             projects: None,
@@ -114,7 +106,7 @@ impl Auth {
             req.password,
             PasswordHash::new(account.password_hash.as_str())?,
         )
-        .map_err(|_err| AuthError::InvalidCredentials)?;
+            .map_err(|_err| AuthError::InvalidCredentials)?;
         let tokens = self.make_tokens(account.id)?;
 
         Ok(tokens)
@@ -152,6 +144,7 @@ impl Auth {
             teams: OptionalProperty::None,
             password_hash: OptionalProperty::None,
             force_update_password: OptionalProperty::None,
+            force_update_email: OptionalProperty::None,
         };
 
         self.accounts.update(ctx.account_id, md_req)?;
@@ -187,6 +180,7 @@ impl Auth {
             teams: OptionalProperty::None,
             password_hash: OptionalProperty::None,
             force_update_password: OptionalProperty::None,
+            force_update_email: OptionalProperty::None,
         };
 
         match self.accounts.update(ctx.account_id, md_req) {
@@ -216,10 +210,12 @@ impl Auth {
             &req.password,
             PasswordHash::new(account.password_hash.as_str())?,
         )
-        .is_err()
+            .is_err()
         {
             return Err(PlatformError::invalid_field("password", "invalid password"));
         }
+
+        check_password_complexity(&req.new_password, &vec![])?;
 
         let password_hash = make_password_hash(req.new_password.as_str())
             .map_err(|err| err.wrap_into(AuthError::InvalidPasswordHashing))?;
@@ -234,6 +230,7 @@ impl Auth {
             teams: OptionalProperty::None,
             password_hash: OptionalProperty::Some(password_hash),
             force_update_password: OptionalProperty::None,
+            force_update_email: OptionalProperty::None,
         };
 
         self.accounts.update(ctx.account_id, md_req)?;
@@ -265,6 +262,36 @@ impl Auth {
             teams: OptionalProperty::None,
             password_hash: OptionalProperty::Some(password_hash),
             force_update_password: OptionalProperty::Some(false),
+            force_update_email: OptionalProperty::None,
+        };
+
+        self.accounts.update(ctx.account_id, md_req)?;
+
+        let tokens = self.make_tokens(account.id)?;
+
+        Ok(tokens)
+    }
+
+    pub async fn set_email(
+        &self,
+        ctx: Context,
+        req: SetEmailRequest,
+    ) -> Result<TokensResponse> {
+        let account = self.accounts.get_by_id(ctx.account_id)?;
+        if !account.force_update_email {
+            return Err(PlatformError::Forbidden("forbidden".to_string()));
+        }
+        let md_req = UpdateAccountRequest {
+            updated_by: ctx.account_id,
+            name: OptionalProperty::None,
+            email: OptionalProperty::Some(req.email),
+            role: OptionalProperty::None,
+            organizations: OptionalProperty::None,
+            projects: OptionalProperty::None,
+            teams: OptionalProperty::None,
+            password_hash: OptionalProperty::None,
+            force_update_password: OptionalProperty::None,
+            force_update_email: OptionalProperty::Some(false),
         };
 
         self.accounts.update(ctx.account_id, md_req)?;
@@ -328,6 +355,12 @@ pub struct UpdatePasswordRequest {
 #[serde(rename_all = "camelCase")]
 pub struct SetPasswordRequest {
     pub password: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SetEmailRequest {
+    pub email: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]

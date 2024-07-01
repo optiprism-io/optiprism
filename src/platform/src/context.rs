@@ -41,6 +41,7 @@ pub struct Context {
     pub account_id: u64,
     pub organization_id: u64,
     pub force_update_password: bool,
+    pub force_update_email: bool,
     pub role: Option<Role>,
     pub organizations: Option<Vec<(u64, OrganizationRole)>>,
     pub projects: Option<Vec<(u64, ProjectRole)>>,
@@ -53,6 +54,11 @@ impl Context {
         /*if self.force_update_password {
             return Err(PlatformError::Forbidden(
                 "password must be changed".to_string(),
+            ));
+        }
+        if self.force_update_email {
+            return Err(PlatformError::Forbidden(
+                "email must be changed".to_string(),
             ));
         }*/
         if let Some(role) = &self.role {
@@ -191,6 +197,7 @@ where
             account_id: acc.id,
             organization_id: claims.organization_id,
             force_update_password: acc.force_update_password,
+            force_update_email: acc.force_update_email,
             role: acc.role,
             organizations: acc.organizations,
             projects: acc.projects,

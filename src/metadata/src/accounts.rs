@@ -163,6 +163,7 @@ pub struct Account {
     pub name: Option<String>,
     pub role: Option<Role>,
     pub force_update_password: bool,
+    pub force_update_email: bool,
     pub organizations: Option<Vec<(u64, OrganizationRole)>>,
     pub projects: Option<Vec<(u64, ProjectRole)>>,
     pub teams: Option<Vec<(u64, Role)>>,
@@ -175,6 +176,7 @@ pub struct CreateAccountRequest {
     pub email: String,
     pub name: Option<String>,
     pub force_update_password: bool,
+    pub force_update_email: bool,
     pub role: Option<Role>,
     pub organizations: Option<Vec<(u64, OrganizationRole)>>,
     pub projects: Option<Vec<(u64, ProjectRole)>>,
@@ -197,6 +199,7 @@ impl CreateAccountRequest {
             organizations: self.organizations,
             projects: self.projects,
             teams: self.teams,
+            force_update_email: self.force_update_email,
         }
     }
 }
@@ -208,6 +211,7 @@ pub struct UpdateAccountRequest {
     pub email: OptionalProperty<String>,
     pub name: OptionalProperty<Option<String>>,
     pub force_update_password: OptionalProperty<bool>,
+    pub force_update_email: OptionalProperty<bool>,
     pub role: OptionalProperty<Option<Role>>,
     pub organizations: OptionalProperty<Option<Vec<(u64, OrganizationRole)>>>,
     pub projects: OptionalProperty<Option<Vec<(u64, ProjectRole)>>>,
