@@ -339,7 +339,7 @@ fn init_session_cleaner(
                         ]
                             .concat();
 
-                        db.insert("events", values).unwrap();
+                        db.insert(TABLE_EVENTS, values).unwrap();
 
                         Ok(true)
                     })

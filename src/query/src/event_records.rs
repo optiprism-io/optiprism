@@ -334,18 +334,22 @@ pub fn build_search_plan(
         .map(|prop| {
             let col_name = prop.column_name();
             let dict = match prop.typ {
-                Type::Event => SingleDictionaryProvider::new(
-                    ctx.project_id,
-                    TABLE_EVENTS.to_string(),
-                    col_name.clone(),
-                    metadata.dictionaries.clone(),
-                ),
-                Type::Group(g) => SingleDictionaryProvider::new(
-                    ctx.project_id,
-                    group_col(g),
-                    col_name.clone(),
-                    metadata.dictionaries.clone(),
-                )
+                Type::Event => {
+                    SingleDictionaryProvider::new(
+                        ctx.project_id,
+                        TABLE_EVENTS.to_string(),
+                        col_name.clone(),
+                        metadata.dictionaries.clone(),
+                    )
+                },
+                Type::Group(g) => {
+                    SingleDictionaryProvider::new(
+                        ctx.project_id,
+                        group_col(g),
+                        col_name.clone(),
+                        metadata.dictionaries.clone(),
+                    )
+                }
             };
             let col = Column::from_name(col_name);
             cols_hash.insert(prop.column_name(), ());
@@ -428,12 +432,24 @@ pub fn build_get_by_id_plan(
         .iter()
         .map(|prop| {
             let col_name = prop.column_name();
-            let dict = SingleDictionaryProvider::new(
-                ctx.project_id,
-                TABLE_EVENTS.to_string(),
-                col_name.clone(),
-                metadata.dictionaries.clone(),
-            );
+            let dict = match prop.typ {
+                Type::Event => {
+                    SingleDictionaryProvider::new(
+                        ctx.project_id,
+                        TABLE_EVENTS.to_string(),
+                        col_name.clone(),
+                        metadata.dictionaries.clone(),
+                    )
+                }
+                Type::Group(g) => {
+                    SingleDictionaryProvider::new(
+                        ctx.project_id,
+                        group_col(g).to_string(),
+                        col_name.clone(),
+                        metadata.dictionaries.clone(),
+                    )
+                }
+            };
             let col = Column::from_name(col_name);
             cols_hash.insert(prop.column_name(), ());
 
