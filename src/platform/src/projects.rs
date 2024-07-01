@@ -240,7 +240,7 @@ pub struct UpdateProjectRequest {
 }
 
 pub fn init_project(project_id: u64, md: &Arc<MetadataProvider>) -> error::Result<()> {
-    create_property(md, 0, CreatePropertyMainRequest {
+    create_property(md, project_id, CreatePropertyMainRequest {
         name: COLUMN_PROJECT_ID.to_string(),
         display_name: Some("Project".to_string()),
         typ: Type::Event,
@@ -253,7 +253,7 @@ pub fn init_project(project_id: u64, md: &Arc<MetadataProvider>) -> error::Resul
 
 
     for g in 0..GROUPS_COUNT {
-        create_property(md, 0, CreatePropertyMainRequest {
+        create_property(md, project_id, CreatePropertyMainRequest {
             name: group_col(g),
             display_name: Some(format!("Group {g}")),
             typ: Type::Event,
@@ -264,7 +264,7 @@ pub fn init_project(project_id: u64, md: &Arc<MetadataProvider>) -> error::Resul
             is_system: true,
         })?;
     }
-    create_property(md, 0, CreatePropertyMainRequest {
+    create_property(md, project_id, CreatePropertyMainRequest {
         name: COLUMN_CREATED_AT.to_string(),
         display_name: Some("Created At".to_string()),
         typ: Type::Event,
@@ -275,7 +275,7 @@ pub fn init_project(project_id: u64, md: &Arc<MetadataProvider>) -> error::Resul
         is_system: true,
     })?;
 
-    create_property(md, 0, CreatePropertyMainRequest {
+    create_property(md, project_id, CreatePropertyMainRequest {
         name: COLUMN_EVENT_ID.to_string(),
         display_name: Some("Event ID".to_string()),
         typ: Type::Event,
@@ -286,7 +286,7 @@ pub fn init_project(project_id: u64, md: &Arc<MetadataProvider>) -> error::Resul
         is_system: true,
     })?;
 
-    create_property(md, 0, CreatePropertyMainRequest {
+    create_property(md, project_id, CreatePropertyMainRequest {
         name: COLUMN_EVENT.to_string(),
         display_name: Some("Event".to_string()),
         typ: Type::Event,
@@ -297,7 +297,7 @@ pub fn init_project(project_id: u64, md: &Arc<MetadataProvider>) -> error::Resul
         is_system: true,
     })?;
 
-    create_property(md, 0, CreatePropertyMainRequest {
+    create_property(md, project_id, CreatePropertyMainRequest {
         name: COLUMN_IP.to_string(),
         display_name: Some("Ip".to_string()),
         typ: Type::Event,
