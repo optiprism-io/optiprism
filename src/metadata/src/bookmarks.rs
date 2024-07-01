@@ -15,6 +15,7 @@ use common::funnel::Funnel;
 
 use crate::error::MetadataError;
 use crate::project_ns;
+use crate::reports::Query;
 use crate::Result;
 
 const NAMESPACE: &str = "bookmarks";
@@ -88,11 +89,6 @@ impl Bookmarks {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub enum Query {
-    EventSegmentation(EventSegmentationRequest),
-    Funnel(Funnel),
-}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Bookmark {

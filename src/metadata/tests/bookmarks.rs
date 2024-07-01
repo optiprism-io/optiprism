@@ -39,6 +39,8 @@ fn test_reports() -> Result<()> {
     };
 
     let b = bookmarks.create(1, create_bookmark_req)?;
-    dbg!(b);
+    dbg!(&b);
+    let bb = bookmarks.get_by_id(1,1, &b.id)?;
+    dbg!(bb);
     Ok(())
 }

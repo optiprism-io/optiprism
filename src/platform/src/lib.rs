@@ -71,6 +71,7 @@ use query::properties::PropertiesProvider;
 
 use crate::accounts::Accounts;
 use crate::auth::Auth;
+use crate::bookmarks::Bookmarks;
 use crate::custom_events::CustomEvents;
 use crate::dashboards::Dashboards;
 use crate::event_records::EventRecords;
@@ -96,6 +97,7 @@ pub struct PlatformProvider {
     pub funnel: Arc<Funnel>,
     pub dashboards: Arc<Dashboards>,
     pub reports: Arc<Reports>,
+    pub bookmarks: Arc<Bookmarks>,
     pub projects: Arc<Projects>,
     pub organizations: Arc<Organizations>,
     pub event_records: Arc<EventRecords>,
@@ -131,6 +133,7 @@ impl PlatformProvider {
             group_records: Arc::new(GroupRecords::new(md.clone(), group_records_prov)),
             projects: Arc::new(Projects::new(md.clone(), cfg.clone())),
             organizations: Arc::new(Organizations::new(md.clone(), cfg.clone())),
+            bookmarks: Arc::new(Bookmarks::new(md.bookmarks.clone())),
         }
     }
 }
