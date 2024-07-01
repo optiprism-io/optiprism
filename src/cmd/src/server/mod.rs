@@ -61,6 +61,7 @@ pub async fn start(cfg: Config) -> Result<()> {
             email: "admin@admin.com".to_string(),
             name: Some("admin".to_string()),
             force_update_password: true,
+            force_update_email: true,
             role: Some(Role::Admin),
             organizations: None,
             projects: None,
