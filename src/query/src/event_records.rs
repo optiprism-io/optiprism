@@ -30,7 +30,7 @@ use datafusion_expr::Sort;
 use tracing::debug;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
-use metadata::properties::Type;
+use metadata::properties::{Property, Type};
 use storage::db::OptiDBImpl;
 
 use crate::error::QueryError;
@@ -42,7 +42,7 @@ use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::logical_plan::expr::multi_and;
 use crate::logical_plan::expr::multi_or;
 use crate::logical_plan::rename_columns::RenameColumnsNode;
-use crate::{col_name, ColumnType, Context, DataTable, decode_filter_single_dictionary, execute, initial_plan, PropertyAndValue};
+use crate::{col_name, ColumnType, Context, ColumnarDataTable, decode_filter_single_dictionary, execute, initial_plan, PropertyAndValue};
 
 pub struct EventRecordsProvider {
     metadata: Arc<MetadataProvider>,
@@ -144,42 +144,51 @@ impl EventRecordsProvider {
         &self,
         ctx: Context,
         req: EventRecordsSearchRequest,
-    ) -> Result<DataTable> {
+    ) -> Result<ColumnarDataTable> {
         let start = Instant::now();
         let schema = self.db.schema1(TABLE_EVENTS)?;
-        let projection = if req.properties.is_some() {
-            let projection = projection(&ctx, &req, &self.metadata)?;
-            projection
+        let mut proj = if req.properties.is_some() {
+            let p = projection(&ctx, &req, &self.metadata)?;
+            p
                 .iter()
                 .map(|x| schema.index_of(x).unwrap())
                 .collect()
         } else {
             (0..schema.fields.len()).collect::<Vec<_>>()
         };
+        proj.sort();
+        proj.dedup();
 
-        let (session_ctx, state, plan) = initial_plan(&self.db, TABLE_EVENTS.to_string(), projection).await?;
-        let plan = build_search_plan(ctx, self.metadata.clone(), plan, req.clone())?;
+        // todo make tests for schema evolution: add property here. Move initial plan behind build_search_plan
+        let (session_ctx, state, plan) = initial_plan(&self.db, TABLE_EVENTS.to_string(), proj).await?;
+        let (plan, props) = build_search_plan(ctx, self.metadata.clone(), plan, req.clone())?;
         println!("{plan:?}");
+        dbg!(&props);
         let result = execute(session_ctx, state, plan).await?;
         let duration = start.elapsed();
         debug!("elapsed: {:?}", duration);
+
 
         let cols = result
             .schema()
             .fields()
             .iter()
             .enumerate()
-            .map(|(idx, field)| crate::Column {
-                name: field.name().to_owned(),
-                typ: ColumnType::Dimension,
-                is_nullable: field.is_nullable(),
-                data_type: field.data_type().to_owned(),
-                hidden: false,
-                data: result.column(idx).to_owned(),
+            .map(|(idx, field)| {
+                let prop = &props[idx];
+                crate::Column {
+                    property: Some(prop.reference()),
+                    name: field.name().to_owned(),
+                    typ: ColumnType::Dimension,
+                    is_nullable: field.is_nullable(),
+                    data_type: field.data_type().to_owned(),
+                    hidden: false,
+                    data: result.column(idx).to_owned(),
+                }
             })
             .collect();
 
-        Ok(DataTable::new(result.schema(), cols))
+        Ok(ColumnarDataTable::new(result.schema(), cols))
     }
 }
 
@@ -188,7 +197,7 @@ pub fn build_search_plan(
     metadata: Arc<MetadataProvider>,
     input: LogicalPlan,
     req: EventRecordsSearchRequest,
-) -> Result<LogicalPlan> {
+) -> Result<(LogicalPlan, Vec<Property>)> {
     let mut properties = vec![];
     let input = if let Some(props) = &req.properties {
         let mut prop_names = vec![];
@@ -207,8 +216,8 @@ pub fn build_search_plan(
             }),
         ];
         prop_names.push(COLUMN_PROJECT_ID.to_string());
-        prop_names.push(COLUMN_EVENT_ID.to_string());
         prop_names.push(COLUMN_CREATED_AT.to_string());
+        prop_names.push(COLUMN_EVENT_ID.to_string());
         let p = metadata.event_properties.get_by_column_name(ctx.project_id, COLUMN_PROJECT_ID)?;
         properties.push(p);
         let p = metadata.event_properties.get_by_column_name(ctx.project_id, COLUMN_EVENT_ID)?;
@@ -341,7 +350,7 @@ pub fn build_search_plan(
                         col_name.clone(),
                         metadata.dictionaries.clone(),
                     )
-                },
+                }
                 Type::Group(g) => {
                     SingleDictionaryProvider::new(
                         ctx.project_id,
@@ -367,7 +376,7 @@ pub fn build_search_plan(
 
     let mut rename = vec![];
     let mut rename_found: Vec<String> = vec![];
-    for prop in properties {
+    for prop in &properties {
         let mut found = 0;
         for f in rename_found.iter() {
             if f == &prop.name() {
@@ -388,7 +397,7 @@ pub fn build_search_plan(
         node: Arc::new(RenameColumnsNode::try_new(input, rename)?),
     });
 
-    Ok(input)
+    Ok((input, properties))
 }
 
 pub fn build_get_by_id_plan(
@@ -516,8 +525,8 @@ fn projection(
 ) -> Result<Vec<String>> {
     let mut fields = vec![
         COLUMN_PROJECT_ID.to_string(),
-        COLUMN_CREATED_AT.to_string(),
         COLUMN_EVENT.to_string(),
+        COLUMN_CREATED_AT.to_string(),
         COLUMN_EVENT_ID.to_string(),
     ];
     if let Some(filters) = &req.filters {
@@ -547,7 +556,6 @@ pub struct Event {
 pub struct EventRecord {
     pub properties: Vec<PropertyAndValue>,
 }
-
 
 #[derive(Clone, Debug)]
 pub struct EventRecordsSearchRequest {

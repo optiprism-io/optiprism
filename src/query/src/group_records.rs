@@ -42,7 +42,7 @@ use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::logical_plan::expr::multi_and;
 use crate::logical_plan::expr::multi_or;
 use crate::logical_plan::rename_columns::RenameColumnsNode;
-use crate::{col_name, ColumnType, Context, DataTable, decode_filter_single_dictionary, execute, initial_plan, PropertyAndValue};
+use crate::{col_name, ColumnType, Context, ColumnarDataTable, decode_filter_single_dictionary, execute, initial_plan, PropertyAndValue};
 
 pub struct GroupRecordsProvider {
     metadata: Arc<MetadataProvider>,
@@ -133,7 +133,7 @@ impl GroupRecordsProvider {
         &self,
         ctx: Context,
         req: GroupRecordsSearchRequest,
-    ) -> Result<DataTable> {
+    ) -> Result<ColumnarDataTable> {
         let start = Instant::now();
         let schema = self.db.schema1(group_col(req.group_id).as_str())?;
         let projection = if req.properties.is_some() {
@@ -161,6 +161,7 @@ impl GroupRecordsProvider {
             .iter()
             .enumerate()
             .map(|(idx, field)| crate::Column {
+                property: None, //todo add property
                 name: field.name().to_owned(),
                 typ: ColumnType::Dimension,
                 is_nullable: field.is_nullable(),
@@ -170,7 +171,7 @@ impl GroupRecordsProvider {
             })
             .collect();
 
-        Ok(DataTable::new(result.schema(), cols))
+        Ok(ColumnarDataTable::new(result.schema(), cols))
     }
 }
 

@@ -160,7 +160,7 @@ macro_rules! int_arr_to_json_values {
 }
 
 
-pub fn scalar_to_json(v:&ScalarValue)->Value {
+pub fn scalar_to_json(v: &ScalarValue) -> Value {
     if v.is_null() {
         return Value::Null;
     }
@@ -189,7 +189,7 @@ pub fn scalar_to_json(v:&ScalarValue)->Value {
         ScalarValue::Int64(Some(v)) => Value::Number(Number::from(*v)),
         ScalarValue::Utf8(Some(v)) => Value::String(v.to_owned()),
         ScalarValue::TimestampMillisecond(Some(v), _) => Value::Number(Number::from(*v)),
-        _=>unimplemented!()
+        _ => unimplemented!()
     }
 }
 pub fn array_ref_to_json_values(arr: &ArrayRef) -> Vec<Value> {
@@ -548,6 +548,8 @@ pub enum ColumnType {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Column {
+    #[serde(flatten)]
+    pub property: Option<PropertyRef>,
     #[serde(rename = "type")]
     pub typ: ColumnType,
     pub name: String,
@@ -592,6 +594,7 @@ impl QueryResponse {
             .map(|column| {
                 let data = array_ref_to_json_values(&column.data);
                 Column {
+                    property: column.property.map(|p|p.into()),
                     typ: column.typ.into(),
                     name: column.name,
                     is_nullable: column.is_nullable,
@@ -1380,7 +1383,6 @@ impl Into<QueryAggregate> for common::query::QueryAggregate {
         }
     }
 }
-
 
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]

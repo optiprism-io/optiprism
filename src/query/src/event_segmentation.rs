@@ -39,7 +39,7 @@ use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
 use storage::db::OptiDBImpl;
 
-use crate::{breakdowns_to_dicts, col_name, ColumnType, DataTable, decode_filter_single_dictionary, execute, initial_plan};
+use crate::{breakdowns_to_dicts, col_name, ColumnType, ColumnarDataTable, decode_filter_single_dictionary, execute, initial_plan};
 use crate::context::Format;
 use crate::error::QueryError;
 use crate::error::Result;
@@ -85,7 +85,7 @@ impl EventSegmentationProvider {
         &self,
         ctx: Context,
         req: EventSegmentationRequest,
-    ) -> Result<DataTable> {
+    ) -> Result<ColumnarDataTable> {
         let start = Instant::now();
         let schema = self.db.schema1(TABLE_EVENTS)?;
         let projection = projection(&ctx, &req, &self.metadata)?;
@@ -121,6 +121,7 @@ impl EventSegmentationProvider {
                 let arr = result.column(idx).to_owned();
 
                 crate::Column {
+                    property: None,
                     name: field.name().to_owned(),
                     typ,
                     is_nullable: field.is_nullable(),
@@ -131,7 +132,7 @@ impl EventSegmentationProvider {
             })
             .collect();
 
-        Ok(DataTable::new(result.schema(), cols))
+        Ok(ColumnarDataTable::new(result.schema(), cols))
     }
 }
 

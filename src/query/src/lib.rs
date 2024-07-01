@@ -350,6 +350,7 @@ pub enum ColumnType {
 
 #[derive(Clone, Debug)]
 pub struct Column {
+    pub property: Option<PropertyRef>,
     pub name: String,
     pub typ: ColumnType,
     pub is_nullable: bool,
@@ -358,12 +359,12 @@ pub struct Column {
     pub data: ArrayRef,
 }
 
-pub struct DataTable {
+pub struct ColumnarDataTable {
     pub schema: SchemaRef,
     pub columns: Vec<Column>,
 }
 
-impl DataTable {
+impl ColumnarDataTable {
     pub fn new(schema: SchemaRef, columns: Vec<Column>) -> Self {
         Self { schema, columns }
     }
@@ -428,13 +429,13 @@ pub fn decode_filter_single_dictionary(
             | PropValueOperation::NotLike
             | PropValueOperation::Regex
             | PropValueOperation::NotRegex => {
-                let (prop,tbl) = match property {
-                    PropertyRef::Group(prop_ref, group) => (metadata.group_properties[*group].get_by_name(ctx.project_id, prop_ref.as_str())?,group_col(*group)),
+                let (prop, tbl) = match property {
+                    PropertyRef::Group(prop_ref, group) => (metadata.group_properties[*group].get_by_name(ctx.project_id, prop_ref.as_str())?, group_col(*group)),
                     PropertyRef::Event(prop_ref) => {
                         (metadata
-                            .event_properties
-                            .get_by_name(ctx.project_id, prop_ref.as_str())?,TABLE_EVENTS.to_string())
-                    },
+                             .event_properties
+                             .get_by_name(ctx.project_id, prop_ref.as_str())?, TABLE_EVENTS.to_string())
+                    }
                     PropertyRef::Custom(_) => unreachable!(),
                 };
 
