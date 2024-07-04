@@ -150,9 +150,12 @@ impl Accounts {
         Ok(account)
     }
 
-    pub(crate) fn add_organization_(&self, tx: &Transaction<TransactionDB>, account_id: u64, org_id: u64, role: OrganizationRole) -> Result<()> {
-        let mut account = self.get_by_id_(&tx, account_id)?;
+    pub(crate) fn add_organization_(&self, tx: &Transaction<TransactionDB>, member_id: u64, org_id: u64, role: OrganizationRole) -> Result<()> {
+        let mut account = self.get_by_id_(&tx, member_id)?;
         let orgs = account.organizations.get_or_insert(Vec::new());
+        if orgs.iter().any(|(id, _)| *id == org_id) {
+            return Err(MetadataError::AlreadyExists(format!("member {member_id} already in organization {org_id}").to_string()));
+        }
         orgs.push((org_id, role));
         let data = serialize(&account)?;
         tx.put(make_data_value_key(NAMESPACE, account.id), &data)?;
@@ -160,14 +163,31 @@ impl Accounts {
         Ok(())
     }
 
-    pub(crate) fn remove_organization_(&self, tx: &Transaction<TransactionDB>, account_id: u64, org_id: u64) -> Result<()> {
-        let mut account = self.get_by_id_(&tx, account_id)?;
+    pub(crate) fn remove_organization_(&self, tx: &Transaction<TransactionDB>, member_id: u64, org_id: u64) -> Result<()> {
+        let mut account = self.get_by_id_(&tx, member_id)?;
         let orgs = account.organizations.get_or_insert(Vec::new());
+        if orgs.iter().all(|(id, _)| *id != org_id) {
+            return Err(MetadataError::NotFound(format!("member {member_id} not found in organization {org_id}").to_string()));
+        }
         orgs.retain(|(id, _)| *id != org_id);
         let data = serialize(&account)?;
         tx.put(make_data_value_key(NAMESPACE, account.id), &data)?;
 
         Ok(())
+    }
+
+    pub(crate) fn change_organization_role_(&self, tx: &Transaction<TransactionDB>, member_id: u64, org_id: u64, role: OrganizationRole) -> Result<()> {
+        let mut account = self.get_by_id_(&tx, member_id)?;
+        let orgs = account.organizations.get_or_insert(Vec::new());
+        for (id, r) in orgs.iter_mut() {
+            if *id == org_id {
+                *r = role;
+                let data = serialize(&account)?;
+                tx.put(make_data_value_key(NAMESPACE, account.id), &data)?;
+                return Ok(());
+            }
+        }
+        Err(MetadataError::NotFound(format!("member {member_id} not found in organization {org_id}").to_string()))
     }
 }
 
