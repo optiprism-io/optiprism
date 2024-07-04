@@ -130,9 +130,15 @@ impl Organizations {
 
     pub fn add_member(&self, id: u64, member_id: u64, role: OrganizationRole) -> Result<()> {
         let tx = self.db.transaction();
-        self.accs.add_organization_(&tx, member_id, id, role)?;
         let mut org = self.get_by_id_(&tx, id)?;
-        org.members.push(member_id);
+        if org.members.iter().any(|(id, _)| *id == member_id) {
+            return Err(MetadataError::AlreadyExists(
+                format!("member {member_id} already exists").to_string(),
+            ));
+        }
+        org.members.push((member_id, role.clone()));
+
+        self.accs.add_organization_(&tx, member_id, id, role)?;
         let data = serialize(&org)?;
         tx.put(make_data_value_key(NAMESPACE, org.id), &data)?;
         tx.commit()?;
@@ -141,9 +147,33 @@ impl Organizations {
 
     pub fn remove_member(&self, id: u64, member_id: u64) -> Result<()> {
         let tx = self.db.transaction();
-        self.accs.remove_organization_(&tx, member_id, id)?;
         let mut org = self.get_by_id_(&tx, id)?;
-        org.members.retain(|&x| x != member_id);
+        if !org.members.iter().any(|(id, _)| *id == member_id) {
+            return Err(MetadataError::NotFound(
+                format!("member {member_id} not found").to_string(),
+            ));
+        }
+        org.members.retain(|(id, _)| *id != member_id);
+
+        self.accs.remove_organization_(&tx, member_id, id)?;
+        let data = serialize(&org)?;
+        tx.put(make_data_value_key(NAMESPACE, org.id), &data)?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    pub fn change_member_role(&self, id: u64, member_id: u64, role: OrganizationRole) -> Result<()> {
+        let tx = self.db.transaction();
+        let mut org = self.get_by_id_(&tx, id)?;
+        if let Some(member) = org.members.iter_mut().find(|(id, _)| *id == member_id) {
+            member.1 = role.clone();
+            self.accs.change_organization_role_(&tx, member_id, id, role)?;
+        } else {
+            return Err(MetadataError::NotFound(
+                format!("member {member_id} not found").to_string(),
+            ));
+        }
+
         let data = serialize(&org)?;
         tx.put(make_data_value_key(NAMESPACE, org.id), &data)?;
         tx.commit()?;
@@ -170,7 +200,7 @@ pub struct Organization {
     pub updated_at: Option<DateTime<Utc>>,
     pub updated_by: Option<u64>,
     pub name: String,
-    pub members: Vec<u64>,
+    pub members: Vec<(u64, OrganizationRole)>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

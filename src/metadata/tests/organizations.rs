@@ -43,6 +43,12 @@ fn test_organizations() {
     let org = orgs.get_by_id(org.id).unwrap();
     let acc = accs.get_by_id(org.id).unwrap();
 
-    assert_eq!(org.members, vec![acc.id]);
+    assert_eq!(org.members, vec![(acc.id,OrganizationRole::Owner)]);
     assert_eq!(acc.organizations, Some(vec![(org.id, OrganizationRole::Owner)]));
+
+    orgs.change_member_role(org.id, acc.id, OrganizationRole::Admin).unwrap();
+    let org = orgs.get_by_id(org.id).unwrap();
+    let acc = accs.get_by_id(org.id).unwrap();
+    assert_eq!(org.members, vec![(acc.id,OrganizationRole::Admin)]);
+    assert_eq!(acc.organizations, Some(vec![(org.id, OrganizationRole::Admin)]));
 }
