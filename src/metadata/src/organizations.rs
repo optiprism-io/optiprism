@@ -9,7 +9,8 @@ use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
-
+use common::rbac::OrganizationRole;
+use crate::accounts::Accounts;
 use crate::error::MetadataError;
 use crate::index::check_insert_constraints;
 use crate::index::check_update_constraints;
@@ -37,11 +38,12 @@ fn index_name_key(name: &str) -> Option<Vec<u8>> {
 
 pub struct Organizations {
     db: Arc<TransactionDB>,
+    accs: Arc<Accounts>,
 }
 
 impl Organizations {
-    pub fn new(db: Arc<TransactionDB>) -> Self {
-        Organizations { db }
+    pub fn new(db: Arc<TransactionDB>, accs: Arc<Accounts>) -> Self {
+        Organizations { db, accs }
     }
 
     fn get_by_id_(&self, tx: &Transaction<TransactionDB>, id: u64) -> Result<Organization> {
@@ -71,6 +73,7 @@ impl Organizations {
             updated_at: None,
             updated_by: None,
             name: req.name,
+            members: vec![],
         };
 
         let data = serialize(&org)?;
@@ -93,9 +96,7 @@ impl Organizations {
         list_data(&tx, NAMESPACE)
     }
 
-    pub fn update(&self, id: u64, req: UpdateOrganizationRequest) -> Result<Organization> {
-        let tx = self.db.transaction();
-
+    pub fn update_(&self, tx: &Transaction<TransactionDB>, id: u64, req: UpdateOrganizationRequest) -> Result<Organization> {
         let prev_org = self.get_by_id_(&tx, id)?;
 
         let mut org = prev_org.clone();
@@ -117,8 +118,36 @@ impl Organizations {
         tx.put(make_data_value_key(NAMESPACE, org.id), &data)?;
 
         update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), org.id)?;
+        Ok(org)
+    }
+
+    pub fn update(&self, id: u64, req: UpdateOrganizationRequest) -> Result<Organization> {
+        let tx = self.db.transaction();
+        let org = self.update_(&tx, id, req)?;
         tx.commit()?;
         Ok(org)
+    }
+
+    pub fn add_member(&self, id: u64, member_id: u64, role: OrganizationRole) -> Result<()> {
+        let tx = self.db.transaction();
+        self.accs.add_organization_(&tx, member_id, id, role)?;
+        let mut org = self.get_by_id_(&tx, id)?;
+        org.members.push(member_id);
+        let data = serialize(&org)?;
+        tx.put(make_data_value_key(NAMESPACE, org.id), &data)?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    pub fn remove_member(&self, id: u64, member_id: u64) -> Result<()> {
+        let tx = self.db.transaction();
+        self.accs.remove_organization_(&tx, member_id, id)?;
+        let mut org = self.get_by_id_(&tx, id)?;
+        org.members.retain(|&x| x != member_id);
+        let data = serialize(&org)?;
+        tx.put(make_data_value_key(NAMESPACE, org.id), &data)?;
+        tx.commit()?;
+        Ok(())
     }
 
     pub fn delete(&self, id: u64) -> Result<Organization> {
@@ -141,6 +170,7 @@ pub struct Organization {
     pub updated_at: Option<DateTime<Utc>>,
     pub updated_by: Option<u64>,
     pub name: String,
+    pub members: Vec<u64>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

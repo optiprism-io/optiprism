@@ -51,6 +51,7 @@ impl MetadataProvider {
     pub fn try_new(db: Arc<TransactionDB>, opti_db: Arc<OptiDBImpl>) -> Result<Self> {
         let dicts = Arc::new(Dictionaries::new(db.clone()));
         let events = Arc::new(events::Events::new(db.clone(), dicts.clone()));
+        let accounts = Arc::new(accounts::Accounts::new(db.clone()));
         Ok(MetadataProvider {
             dashboards: Arc::new(dashboards::Dashboards::new(db.clone())),
             reports: Arc::new(reports::Reports::new(db.clone())),
@@ -66,9 +67,9 @@ impl MetadataProvider {
                 opti_db.clone(),
             )),
             group_properties: properties::Properties::new_group(db.clone(), opti_db.clone()),
-            organizations: Arc::new(organizations::Organizations::new(db.clone())),
+            organizations: Arc::new(organizations::Organizations::new(db.clone(),accounts.clone())),
             projects: Arc::new(projects::Projects::new(db.clone())),
-            accounts: Arc::new(accounts::Accounts::new(db.clone())),
+            accounts: accounts.clone(),
             dictionaries: dicts.clone(),
             sessions: Arc::new(sessions::Sessions::new(db.clone())),
             groups: Arc::new(Groups::new(db)),

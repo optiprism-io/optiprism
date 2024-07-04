@@ -149,6 +149,26 @@ impl Accounts {
         tx.commit()?;
         Ok(account)
     }
+
+    pub(crate) fn add_organization_(&self, tx: &Transaction<TransactionDB>, account_id: u64, org_id: u64, role: OrganizationRole) -> Result<()> {
+        let mut account = self.get_by_id_(&tx, account_id)?;
+        let orgs = account.organizations.get_or_insert(Vec::new());
+        orgs.push((org_id, role));
+        let data = serialize(&account)?;
+        tx.put(make_data_value_key(NAMESPACE, account.id), &data)?;
+
+        Ok(())
+    }
+
+    pub(crate) fn remove_organization_(&self, tx: &Transaction<TransactionDB>, account_id: u64, org_id: u64) -> Result<()> {
+        let mut account = self.get_by_id_(&tx, account_id)?;
+        let orgs = account.organizations.get_or_insert(Vec::new());
+        orgs.retain(|(id, _)| *id != org_id);
+        let data = serialize(&account)?;
+        tx.put(make_data_value_key(NAMESPACE, account.id), &data)?;
+
+        Ok(())
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
