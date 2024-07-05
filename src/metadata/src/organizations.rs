@@ -80,6 +80,8 @@ impl Organizations {
         tx.put(make_data_value_key(NAMESPACE, id), &data)?;
 
         insert_index(&tx, idx_keys.as_ref(), org.id)?;
+
+        self.accs.add_organization_(&tx, req.created_by, id, OrganizationRole::Owner)?;
         tx.commit()?;
         Ok(org)
     }
