@@ -13,7 +13,7 @@ use password_hash::PasswordHash;
 use serde::Deserialize;
 use serde::Serialize;
 use validator::validate_email;
-
+use common::rbac::OrganizationPermission;
 use super::password::{check_password_complexity, make_password_hash};
 use super::password::verify_password;
 use super::token::make_access_token;
@@ -22,33 +22,35 @@ use super::token::parse_refresh_token;
 use crate::accounts::Account;
 use crate::error::AuthError;
 use crate::Context;
+use crate::organizations::Organizations;
 use crate::PlatformError;
 use crate::Result;
-
+use metadata::organizations::Organizations as MDOrganizations;
 #[derive(Clone)]
 pub struct Auth {
     accounts: Arc<Accounts>,
+    orgs: Arc<MDOrganizations>,
     cfg: Config,
 }
 
 impl Auth {
-    pub fn new(accounts: Arc<Accounts>, cfg: Config) -> Self {
-        Self { accounts, cfg }
+    pub fn new(accounts: Arc<Accounts>, orgs: Arc<MDOrganizations>, cfg: Config) -> Self {
+        Self { accounts, orgs, cfg }
     }
 
-    fn make_tokens(&self, account_id: u64) -> Result<TokensResponse> {
+    fn make_tokens(&self, account_id: u64, organisation_id: u64) -> Result<TokensResponse> {
         Ok(TokensResponse {
             access_token: make_access_token(
                 account_id,
-                1, // todo implement org management
+                organisation_id,
                 self.cfg.access_token_duration.clone(),
-                "access",
+                self.cfg.access_token_key.clone(),
             )
                 .map_err(|err| err.wrap_into(AuthError::CantMakeAccessToken))?,
             refresh_token: make_refresh_token(
                 account_id,
                 self.cfg.refresh_token_duration.clone(),
-                "refresh",
+                self.cfg.refresh_token_key.clone(),
             )
                 .map_err(|err| err.wrap_into(AuthError::CantMakeRefreshToken))?,
         })
@@ -87,7 +89,7 @@ impl Auth {
             Err(other) => return Err(other.into()),
         };
 
-        let tokens = self.make_tokens(account.id)?;
+        let tokens = self.make_tokens(account.id, 0)?;
 
         Ok(tokens)
     }
@@ -107,15 +109,15 @@ impl Auth {
             PasswordHash::new(account.password_hash.as_str())?,
         )
             .map_err(|_err| AuthError::InvalidCredentials)?;
-        let tokens = self.make_tokens(account.id)?;
+        let tokens = self.make_tokens(account.id, 0)?;
 
         Ok(tokens)
     }
 
-    pub async fn refresh_token(&self, refresh_token: &str) -> Result<TokensResponse> {
-        let refresh_claims = parse_refresh_token(refresh_token, "refresh")
+    pub async fn refresh_token(&self, ctx: Context, refresh_token: &str) -> Result<TokensResponse> {
+        let refresh_claims = parse_refresh_token(refresh_token, self.cfg.refresh_token_key.clone())
             .map_err(|err| err.wrap_into(AuthError::InvalidRefreshToken))?;
-        let tokens = self.make_tokens(refresh_claims.account_id)?;
+        let tokens = self.make_tokens(refresh_claims.account_id, ctx.organization_id)?;
 
         Ok(tokens)
     }
@@ -194,7 +196,7 @@ impl Auth {
             Err(other) => return Err(other.into()),
         };
 
-        let tokens = self.make_tokens(account.id)?;
+        let tokens = self.make_tokens(account.id, ctx.organization_id)?;
 
         Ok(tokens)
     }
@@ -235,7 +237,7 @@ impl Auth {
 
         self.accounts.update(ctx.account_id, md_req)?;
 
-        let tokens = self.make_tokens(account.id)?;
+        let tokens = self.make_tokens(account.id, ctx.organization_id)?;
 
         Ok(tokens)
     }
@@ -267,7 +269,7 @@ impl Auth {
 
         self.accounts.update(ctx.account_id, md_req)?;
 
-        let tokens = self.make_tokens(account.id)?;
+        let tokens = self.make_tokens(account.id, ctx.organization_id)?;
 
         Ok(tokens)
     }
@@ -296,8 +298,19 @@ impl Auth {
 
         self.accounts.update(ctx.account_id, md_req)?;
 
-        let tokens = self.make_tokens(account.id)?;
+        let tokens = self.make_tokens(account.id, ctx.organization_id)?;
 
+        Ok(tokens)
+    }
+
+    pub async fn switch_organization(
+        &self,
+        ctx: Context,
+        org_id: u64,
+    ) -> Result<TokensResponse> {
+        ctx.check_organization_permission(org_id, OrganizationPermission::ViewOrganization)?;
+        self.orgs.get_by_id(org_id)?;
+        let tokens = self.make_tokens(ctx.account_id, org_id)?;
         Ok(tokens)
     }
 }
