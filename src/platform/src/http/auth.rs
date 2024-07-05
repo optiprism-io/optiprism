@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use axum::extract::Extension;
+use axum::extract::{Extension, Path};
 use axum::http::StatusCode;
 use axum::routing::get;
 use axum::routing::post;
@@ -46,6 +46,25 @@ fn set_refresh_token_cookie(cookies: &Cookies, refresh_token: &str, expires: Off
 }
 
 #[debug_handler]
+async fn switch_organization(
+    ctx: Context,
+    cookies: Cookies,
+    Extension(provider): Extension<Arc<Auth>>,
+    Extension(cfg): Extension<Config>,
+    Path(id): Path<u64>,
+) -> Result<(StatusCode, Json<TokensResponse>)> {
+    let tokens = provider.switch_organization(ctx, id).await?;
+
+    set_refresh_token_cookie(
+        &cookies,
+        tokens.refresh_token.as_str(),
+        OffsetDateTime::now_utc() + cfg.refresh_token_duration.to_std().unwrap(),
+    );
+
+    Ok((StatusCode::OK, Json(tokens)))
+}
+
+#[debug_handler]
 async fn sign_up(
     cookies: Cookies,
     Extension(provider): Extension<Arc<Auth>>,
@@ -79,6 +98,7 @@ async fn log_in(
 }
 
 async fn refresh_token(
+    ctx: Context,
     cookies: Cookies,
     Extension(provider): Extension<Arc<Auth>>,
     Extension(cfg): Extension<Config>,
@@ -95,7 +115,7 @@ async fn refresh_token(
         ));
     };
 
-    let tokens = provider.refresh_token(refresh_token.as_str()).await?;
+    let tokens = provider.refresh_token(ctx, refresh_token.as_str()).await?;
     set_refresh_token_cookie(
         &cookies,
         tokens.refresh_token.as_str(),
@@ -164,6 +184,7 @@ pub fn attach_routes(router: Router) -> Router {
         .route("/api/v1/auth/signup", post(sign_up))
         .route("/api/v1/auth/login", post(log_in))
         .route("/api/v1/auth/refresh-token", post(refresh_token))
+        .route("/api/v1/auth/switch-organization/:org_id", post(switch_organization))
         .route("/api/v1/profile", get(get_profile))
         .route("/api/v1/profile/name", put(update_name))
         .route("/api/v1/profile/email", put(update_email))

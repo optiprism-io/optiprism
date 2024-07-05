@@ -13,6 +13,8 @@ pub struct Config {
     pub geo_city_path: PathBuf,
     pub session_cleaner_interval: Duration,
     pub project_default_session_duration: Duration,
+    pub access_token_key: String,
+    pub refresh_token_key: String,
     pub access_token_duration: Duration,
     pub refresh_token_duration: Duration,
 }
@@ -27,6 +29,8 @@ impl Default for Config {
             geo_city_path: Default::default(),
             session_cleaner_interval: Duration::seconds(1),
             project_default_session_duration: Duration::days(1),
+            access_token_key: Default::default(),
+            refresh_token_key: Default::default(),
             access_token_duration: Duration::hours(1),
             refresh_token_duration: Duration::days(1),
         }

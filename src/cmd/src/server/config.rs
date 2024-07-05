@@ -13,6 +13,8 @@ pub struct Config {
     pub geo_city_path: PathBuf,
     pub session_cleaner_interval: String,
     pub project_default_session_duration: String,
+    pub access_token_key: String,
+    pub refresh_token_key: String,
     pub access_token_duration: String,
     pub refresh_token_duration: String,
 }
@@ -34,6 +36,8 @@ impl TryInto<common::config::Config> for Config {
             project_default_session_duration: parse_duration(
                 self.project_default_session_duration.as_str(),
             )?,
+            access_token_key: self.access_token_key,
+            refresh_token_key: self.refresh_token_key,
             access_token_duration: parse_duration(self.access_token_duration.as_str())?,
             refresh_token_duration: parse_duration(self.refresh_token_duration.as_str())?,
         })

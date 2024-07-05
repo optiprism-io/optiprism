@@ -124,7 +124,11 @@ impl PlatformProvider {
             event_properties: Arc::new(Properties::new_event(md.event_properties.clone(), prop_prov.clone())),
             group_properties,
             accounts: Arc::new(Accounts::new(md.accounts.clone())),
-            auth: Arc::new(Auth::new(md.accounts.clone(), cfg.clone())),
+            auth: Arc::new(Auth::new(
+                md.accounts.clone(),
+                md.organizations.clone(),
+                cfg.clone(),
+            )),
             event_segmentation: Arc::new(EventSegmentation::new(md.clone(), es_prov)),
             funnel: Arc::new(Funnel::new(md.clone(), funnel_prov)),
             dashboards: Arc::new(Dashboards::new(md.dashboards.clone())),
@@ -594,7 +598,7 @@ impl QueryResponse {
             .map(|column| {
                 let data = array_ref_to_json_values(&column.data);
                 Column {
-                    property: column.property.map(|p|p.into()),
+                    property: column.property.map(|p| p.into()),
                     typ: column.typ.into(),
                     name: column.name,
                     is_nullable: column.is_nullable,
