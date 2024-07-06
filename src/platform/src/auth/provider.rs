@@ -94,7 +94,7 @@ impl Auth {
         Ok(tokens)
     }
 
-    pub async fn log_in(&self, req: LogInRequest) -> Result<TokensResponse> {
+    pub async fn log_in(&self, req: LogInRequest, org_id: Option<u64>) -> Result<TokensResponse> {
         if !validate_email(&req.email) {
             return Err(PlatformError::invalid_field("email", "invalid email"));
         }
@@ -109,7 +109,29 @@ impl Auth {
             PasswordHash::new(account.password_hash.as_str())?,
         )
             .map_err(|_err| AuthError::InvalidCredentials)?;
-        let tokens = self.make_tokens(account.id, 0)?;
+
+        // if org_id is provided, check if the account is a member of the org
+        let org_id = if let Some(org_id) = org_id {
+            let org = self.orgs.get_by_id(org_id)?;
+            if !org.is_member(account.id) {
+                0
+            } else {
+                org.id
+            }
+        } else {
+            // find first organization
+            let orgs = self.orgs.list()?;
+            let org = orgs.data.iter().find(|org| {
+                org.is_member(account.id)
+            });
+            if let Some(org) = org {
+                org.id
+            } else {
+                0
+            }
+        };
+
+        let tokens = self.make_tokens(account.id, org_id)?;
 
         Ok(tokens)
     }
