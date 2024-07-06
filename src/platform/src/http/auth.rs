@@ -1,3 +1,4 @@
+use std::num::ParseIntError;
 use std::sync::Arc;
 
 use axum::extract::{Extension, Path};
@@ -30,6 +31,7 @@ use crate::PlatformError;
 use crate::Result;
 
 pub const COOKIE_NAME_REFRESH_TOKEN: &str = "refresh_token";
+pub const COOKIE_NAME_ORGANIZATION_ID: &str = "organization_id";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -87,7 +89,18 @@ async fn log_in(
     Extension(cfg): Extension<Config>,
     Json(req): Json<LogInRequest>,
 ) -> Result<Json<TokensResponse>> {
-    let tokens = provider.log_in(req).await?;
+    // check org id in cookies. Skip if none
+    let org_id = if let Some(cookie) = cookies.get(COOKIE_NAME_ORGANIZATION_ID) {
+        let org_id = cookie.value().parse::<u64>();
+        match org_id {
+            Ok(id) => Some(id),
+            Err(_) => None
+        }
+    } else {
+        None
+    };
+
+    let tokens = provider.log_in(req, org_id).await?;
     set_refresh_token_cookie(
         &cookies,
         tokens.refresh_token.as_str(),

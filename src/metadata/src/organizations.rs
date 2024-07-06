@@ -73,7 +73,7 @@ impl Organizations {
             updated_at: None,
             updated_by: None,
             name: req.name,
-            members: vec![],
+            members: vec![(req.created_by, OrganizationRole::Owner)],
         };
 
         let data = serialize(&org)?;
@@ -205,6 +205,11 @@ pub struct Organization {
     pub members: Vec<(u64, OrganizationRole)>,
 }
 
+impl Organization {
+    pub fn is_member(&self, member_id: u64) -> bool {
+        self.members.iter().any(|(id, _)| *id == member_id)
+    }
+}
 #[derive(Serialize, Deserialize, Clone)]
 pub struct CreateOrganizationRequest {
     pub created_by: u64,
