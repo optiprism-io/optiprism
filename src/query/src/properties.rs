@@ -55,7 +55,7 @@ impl PropertiesProvider {
             .iter()
             .map(|x| schema.index_of(x).unwrap())
             .collect();
-        let (session_ctx, state, plan) = initial_plan(&self.db, TABLE_EVENTS.to_string(), projection).await?;
+        let (session_ctx, state, plan) = initial_plan(&self.db, TABLE_EVENTS.to_string(), projection)?;
         let plan = LogicalPlanBuilder::build(
             ctx,
             self.metadata.clone(),

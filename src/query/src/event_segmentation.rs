@@ -39,7 +39,7 @@ use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
 use storage::db::OptiDBImpl;
 
-use crate::{breakdowns_to_dicts, col_name, ColumnType, ColumnarDataTable, decode_filter_single_dictionary, execute, initial_plan};
+use crate::{breakdowns_to_dicts, col_name, ColumnType, ColumnarDataTable, decode_filter_single_dictionary, execute, initial_plan, segment_projection, segment_plan};
 use crate::context::Format;
 use crate::error::QueryError;
 use crate::error::Result;
@@ -93,11 +93,24 @@ impl EventSegmentationProvider {
             .iter()
             .map(|x| schema.index_of(x).unwrap())
             .collect();
-        let (session_ctx, state, plan) = initial_plan(&self.db, TABLE_EVENTS.to_string(), projection).await?;
+        let (session_ctx, state, plan) = initial_plan(&self.db, TABLE_EVENTS.to_string(), projection)?;
+        let segment_plan = if let Some(segments) = &req.segments {
+            let segment_projection = segment_projection(&ctx, segments, req.group_id, &self.metadata)?;
+            let segment_projection = segment_projection
+                .iter()
+                .map(|x| schema.index_of(x).unwrap())
+                .collect();
+            Some(segment_plan(&self.db, TABLE_EVENTS.to_string(), segment_projection)?)
+        } else {
+            None
+        };
+
+
         let plan = LogicalPlanBuilder::build(
             ctx.clone(),
             self.metadata.clone(),
             plan,
+            segment_plan,
             req.clone(),
         )?;
 
@@ -221,6 +234,7 @@ impl LogicalPlanBuilder {
         ctx: Context,
         metadata: Arc<MetadataProvider>,
         input: LogicalPlan,
+        segment_input: Option<LogicalPlan>,
         es: EventSegmentationRequest,
     ) -> Result<LogicalPlan> {
         let events = es.events.clone();
@@ -434,12 +448,11 @@ impl LogicalPlanBuilder {
         let expr = match condition {
             SegmentCondition::HasPropertyValue { .. } => unimplemented!(),
             SegmentCondition::HadPropertyValue {
-                property_name,
+                property,
                 operation,
                 value,
                 time,
             } => {
-                let property = PropertyRef::Group(property_name.to_owned(), group_id);
                 let filter = property_expression(
                     &self.ctx,
                     &self.metadata,

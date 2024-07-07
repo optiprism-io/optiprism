@@ -981,14 +981,14 @@ impl Into<common::query::SegmentTime> for SegmentTime {
 pub enum SegmentCondition {
     #[serde(rename_all = "camelCase")]
     HasPropertyValue {
-        property_name: String,
+        property: PropertyRef,
         operation: PropValueOperation,
         #[serde(skip_serializing_if = "Option::is_none")]
         value: Option<Vec<Value>>,
     },
     #[serde(rename_all = "camelCase")]
     HadPropertyValue {
-        property_name: String,
+        property: PropertyRef,
         operation: PropValueOperation,
         #[serde(skip_serializing_if = "Option::is_none")]
         value: Option<Vec<Value>>,
@@ -1014,11 +1014,11 @@ impl Into<common::query::SegmentCondition> for SegmentCondition {
     fn into(self) -> common::query::SegmentCondition {
         match self {
             SegmentCondition::HasPropertyValue {
-                property_name,
+                property,
                 operation,
                 value,
             } => common::query::SegmentCondition::HasPropertyValue {
-                property_name,
+                property:property.into(),
                 operation: operation.into(),
                 value: match value {
                     Some(v) if !v.is_empty() => {
@@ -1028,12 +1028,12 @@ impl Into<common::query::SegmentCondition> for SegmentCondition {
                 },
             },
             SegmentCondition::HadPropertyValue {
-                property_name,
+                property,
                 operation,
                 value,
                 time,
             } => common::query::SegmentCondition::HadPropertyValue {
-                property_name,
+                property:property.into(),
                 operation: operation.into(),
                 value: match value {
                     Some(v) if !v.is_empty() => {
@@ -1154,11 +1154,11 @@ impl Into<SegmentCondition> for common::query::SegmentCondition {
     fn into(self) -> SegmentCondition {
         match self {
             common::query::SegmentCondition::HasPropertyValue {
-                property_name,
+                property,
                 operation,
                 value,
             } => SegmentCondition::HasPropertyValue {
-                property_name,
+                property:property.into(),
                 operation: operation.into(),
                 value: value.map_or_else(
                     || None,
@@ -1172,12 +1172,12 @@ impl Into<SegmentCondition> for common::query::SegmentCondition {
                 ),
             },
             common::query::SegmentCondition::HadPropertyValue {
-                property_name,
+                property,
                 operation,
                 value,
                 time,
             } => SegmentCondition::HadPropertyValue {
-                property_name,
+                property:property.into(),
                 operation: operation.into(),
                 value: value.map_or_else(
                     || None,
