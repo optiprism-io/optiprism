@@ -35,7 +35,8 @@ use crate::physical_plan::expressions::segmentation::SegmentExpr;
 
 #[derive(Debug, Clone)]
 pub enum AggregateFunction<T>
-where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
+where
+    T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display,
 {
     Sum(T),
     Min(T),
@@ -45,7 +46,8 @@ where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
 }
 
 impl<T> AggregateFunction<T>
-where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
+where
+    T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display,
 {
     pub fn new_sum() -> Self {
         AggregateFunction::Sum(T::zero())
@@ -141,7 +143,8 @@ where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
 
 #[derive(Debug)]
 struct Inner<T>
-where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
+where
+    T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display,
 {
     agg: AggregateFunction<T>,
     last_partition: i64,
@@ -151,11 +154,13 @@ where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
 
 #[derive(Debug)]
 pub struct Aggregate<T, OT, Op>
-where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
+where
+    OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display,
 {
     filter: PhysicalExprRef,
     predicate: Column,
     ts_col: Column,
+    partition_col: Column,
     inner: Mutex<Inner<OT>>,
     time_range: TimeRange,
     op: PhantomData<Op>,
@@ -164,11 +169,13 @@ where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Displa
 }
 #[allow(clippy::too_many_arguments)]
 impl<T, OT, Op> Aggregate<T, OT, Op>
-where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
+where
+    OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display,
 {
     pub fn new(
         filter: PhysicalExprRef,
         ts_col: Column,
+        partition_col: Column,
         predicate: Column,
         agg: AggregateFunction<OT>,
         right: OT,
@@ -184,6 +191,7 @@ where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Displa
             filter,
             predicate,
             ts_col,
+            partition_col,
             inner: Mutex::new(inner),
             time_range,
             op: Default::default(),
@@ -201,7 +209,6 @@ macro_rules! agg {
             fn evaluate(
                 &self,
                 batch: &RecordBatch,
-                partitions: &ScalarBuffer<i64>,
             ) -> Result<()> {
                 let ts = self
                     .ts_col
@@ -230,11 +237,16 @@ macro_rules! agg {
                     .unwrap()
                     .clone();
 
-                let mut inner = self.inner.lock().unwrap();
-                for (row_id, partition) in partitions.into_iter().enumerate() {
+                    let mut inner = self.inner.lock().unwrap();
+                    let partition = self.partition_col.evaluate(batch)?.into_array(batch.num_rows())?
+                                    .as_any()
+                                    .downcast_ref::<Int64Array>()
+                                    .unwrap()
+                                    .clone();
+                for (row_id, partition) in partition.into_iter().enumerate() {
                     if inner.first {
                         inner.first = false;
-                        inner.last_partition = *partition;
+                        inner.last_partition = partition.unwrap();
                     }
                     if !self.time_range.check_bounds(ts.value(row_id)) {
                         continue;
@@ -244,7 +256,7 @@ macro_rules! agg {
                         continue;
                     }
 
-                    if inner.last_partition != *partition {
+                    if inner.last_partition != partition.unwrap() {
                         let res = Op::perform(inner.agg.result(), self.right);
 
                         if !res {
@@ -255,7 +267,7 @@ macro_rules! agg {
                         }
 
                         inner.agg.reset();
-                        inner.last_partition = *partition;
+                        inner.last_partition = partition.unwrap();
                     }
                     inner.agg.accumulate(predicate.value(row_id) as $acc_ty);
                 }
@@ -357,6 +369,7 @@ mod tests {
             let agg = Aggregate::<i64, i128, Gt>::new(
                 Arc::new(f) as PhysicalExprRef,
                 Column::new_with_schema("ts", &schema).unwrap(),
+                Column::new_with_schema("user_id", &res[0].schema()).unwrap(),
                 Column::new_with_schema("v", &schema).unwrap(),
                 AggregateFunction::new_sum(),
                 3,
@@ -364,13 +377,7 @@ mod tests {
             );
 
             for b in res {
-                let p = b.columns()[0]
-                    .as_any()
-                    .downcast_ref::<Int64Array>()
-                    .unwrap()
-                    .values();
-
-                let _res = agg.evaluate(&b, p).unwrap();
+                let _res = agg.evaluate(&b).unwrap();
             }
             let res = agg.finalize().unwrap();
             let exp = Int64Array::from(vec![None, Some(1), None]);
@@ -410,6 +417,7 @@ mod tests {
             let agg = Aggregate::<i128, i128, boolean_op::Eq>::new(
                 Arc::new(f) as PhysicalExprRef,
                 Column::new_with_schema("ts", &schema).unwrap(),
+                Column::new_with_schema("user_id", &schema).unwrap(),
                 Column::new_with_schema("v", &schema).unwrap(),
                 AggregateFunction::new_sum(),
                 right.mantissa(),
@@ -423,7 +431,7 @@ mod tests {
                     .unwrap()
                     .values();
 
-                let _res = agg.evaluate(&b, p).unwrap();
+                let _res = agg.evaluate(&b).unwrap();
             }
             let res = agg.finalize().unwrap();
             let exp = Int64Array::from(vec![None, Some(1)]);

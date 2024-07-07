@@ -173,18 +173,8 @@ impl Stream for SegmentStream {
         loop {
             let res = match self.stream.poll_next_unpin(cx) {
                 Poll::Ready(Some(Ok(batch))) => {
-                    let partition = self
-                        .partition_col
-                        .evaluate(&batch)?
-                        .into_array(batch.num_rows())?
-                        .as_any()
-                        .downcast_ref::<Int64Array>()
-                        .unwrap()
-                        .clone();
-
-                    let vals = partition.values();
                     self.expr
-                        .evaluate(&batch, vals)
+                        .evaluate(&batch)
                         .map_err(|e| e.into_datafusion_execution_error())?;
                     None
                 }
@@ -276,6 +266,7 @@ mod tests {
         let count = Count::<boolean_op::Gt>::new(
             Arc::new(f) as PhysicalExprRef,
             Column::new_with_schema("ts", &schema).unwrap(),
+            Column::new_with_schema("user_id", &schema).unwrap(),
             2,
             TimeRange::None,
         );

@@ -33,6 +33,7 @@ struct Inner {
 pub struct Count<Op> {
     filter: PhysicalExprRef,
     ts_col: Column,
+    partition_col: Column,
     inner: Mutex<Inner>,
     time_range: TimeRange,
     op: PhantomData<Op>,
@@ -43,6 +44,7 @@ impl<Op> Count<Op> {
     pub fn new(
         filter: PhysicalExprRef,
         ts_col: Column,
+        partition_col: Column,
         right: i64,
         time_range: TimeRange,
     ) -> Self {
@@ -55,6 +57,7 @@ impl<Op> Count<Op> {
         Self {
             filter,
             ts_col,
+            partition_col,
             inner: Mutex::new(inner),
             time_range,
             op: Default::default(),
@@ -64,12 +67,12 @@ impl<Op> Count<Op> {
 }
 
 impl<Op> SegmentExpr for Count<Op>
-where Op: ComparisonOp<i64>
+where
+    Op: ComparisonOp<i64>,
 {
     fn evaluate(
         &self,
         batch: &RecordBatch,
-        partitions: &ScalarBuffer<i64>,
     ) -> Result<()> {
         let ts = self
             .ts_col
@@ -89,10 +92,15 @@ where Op: ComparisonOp<i64>
             .clone();
 
         let mut inner = self.inner.lock().unwrap();
-        for (row_id, partition) in partitions.into_iter().enumerate() {
+        let partition = self.partition_col.evaluate(batch)?.into_array(batch.num_rows())?
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap()
+            .clone();
+        for (row_id, partition) in partition.into_iter().enumerate() {
             if inner.first {
                 inner.first = false;
-                inner.last_partition = *partition;
+                inner.last_partition = partition.unwrap();
             }
             if !self.time_range.check_bounds(ts.value(row_id)) {
                 continue;
@@ -102,7 +110,7 @@ where Op: ComparisonOp<i64>
                 continue;
             }
 
-            if inner.last_partition != *partition {
+            if inner.last_partition != partition.unwrap() {
                 let res = match Op::op() {
                     Operator::Lt => inner.count < self.right,
                     Operator::LtEq => inner.count <= self.right,
@@ -118,7 +126,7 @@ where Op: ComparisonOp<i64>
                     let v = inner.last_partition;
                     inner.res.append_value(v);
                 }
-                inner.last_partition = *partition;
+                inner.last_partition = partition.unwrap();
 
                 inner.count = 0;
             }
@@ -195,18 +203,13 @@ mod tests {
             let count = Count::<boolean_op::Gt>::new(
                 Arc::new(f) as PhysicalExprRef,
                 Column::new_with_schema("ts", &res[0].schema()).unwrap(),
+                Column::new_with_schema("user_id", &res[0].schema()).unwrap(),
                 2,
                 TimeRange::None,
             );
 
             for b in res {
-                let p = b.columns()[0]
-                    .as_any()
-                    .downcast_ref::<Int64Array>()
-                    .unwrap()
-                    .values();
-
-                let _res = count.evaluate(&b, p).unwrap();
+                count.evaluate(&b).unwrap();
             }
             let res = count.finalize().unwrap();
             dbg!(&res);
