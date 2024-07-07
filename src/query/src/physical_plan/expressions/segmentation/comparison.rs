@@ -26,26 +26,19 @@ impl And {
         Self { inner }
     }
 
-    pub fn and(left: Option<Int64Array>, right: Option<Int64Array>) -> Option<Int64Array> {
-        match (left, right) {
-            (Some(left), Some(right)) => {
-                let mut out = Int64Builder::with_capacity(left.len());
-
-                left.iter().zip(right.iter()).for_each(|(l, r)| {
-                    if let Some(l) = l
-                        && r.is_some()
-                    {
-                        out.append_value(l);
-                    } else {
-                        out.append_null();
-                    }
-                });
-
-                Some(out.finish())
+    pub fn and(left: Int64Array, right: Int64Array) -> Int64Array {
+        let mut out = Int64Builder::with_capacity(left.len());
+        left.iter().zip(right.iter()).for_each(|(l, r)| {
+            if let Some(l) = l
+                && r.is_some()
+            {
+                out.append_value(l);
+            } else {
+                out.append_null();
             }
-            (None, None) => None,
-            _ => unreachable!(),
-        }
+        });
+
+        out.finish()
     }
 }
 
@@ -54,16 +47,17 @@ impl SegmentExpr for And {
         &self,
         batch: &RecordBatch,
         partitions: &ScalarBuffer<i64>,
-    ) -> Result<Option<Int64Array>> {
+    ) -> Result<()> {
         let inner = self.inner.lock().unwrap();
-        let left = inner.left.evaluate(batch, partitions)?;
-        let right = inner.right.evaluate(batch, partitions)?;
-        Ok(Self::and(left, right))
+        inner.left.evaluate(batch, partitions)?;
+        inner.right.evaluate(batch, partitions)?;
+
+        Ok(())
     }
 
     fn finalize(&self) -> Result<Int64Array> {
         let inner = self.inner.lock().unwrap();
-        Ok(Self::and(Some(inner.left.finalize()?), Some(inner.right.finalize()?)).unwrap())
+        Ok(Self::and(inner.left.finalize()?, inner.right.finalize()?))
     }
 }
 
@@ -78,24 +72,18 @@ impl Or {
         Self { inner }
     }
 
-    pub fn or(left: Option<Int64Array>, right: Option<Int64Array>) -> Option<Int64Array> {
-        match (left, right) {
-            (Some(left), Some(right)) => {
-                let mut out = Int64Builder::with_capacity(left.len());
+    pub fn or(left: Int64Array, right: Int64Array) -> Int64Array {
+        let mut out = Int64Builder::with_capacity(left.len());
 
-                left.iter().zip(right.iter()).for_each(|(l, r)| {
-                    if l.is_some() || r.is_some() {
-                        out.append_value(l.or(r).unwrap());
-                    } else {
-                        out.append_null();
-                    }
-                });
-
-                Some(out.finish())
+        left.iter().zip(right.iter()).for_each(|(l, r)| {
+            if l.is_some() || r.is_some() {
+                out.append_value(l.or(r).unwrap());
+            } else {
+                out.append_null();
             }
-            (None, None) => None,
-            _ => unreachable!(),
-        }
+        });
+
+        out.finish()
     }
 }
 
@@ -104,16 +92,16 @@ impl SegmentExpr for Or {
         &self,
         batch: &RecordBatch,
         partitions: &ScalarBuffer<i64>,
-    ) -> Result<Option<Int64Array>> {
+    ) -> Result<()> {
         let inner = self.inner.lock().unwrap();
-        let left = inner.left.evaluate(batch, partitions)?;
-        let right = inner.right.evaluate(batch, partitions)?;
-        Ok(Self::or(left, right))
+        inner.left.evaluate(batch, partitions)?;
+        inner.right.evaluate(batch, partitions)?;
+        Ok(())
     }
 
     fn finalize(&self) -> Result<Int64Array> {
         let inner = self.inner.lock().unwrap();
-        Ok(Self::or(Some(inner.left.finalize()?), Some(inner.right.finalize()?)).unwrap())
+        Ok(Self::or(inner.left.finalize()?, inner.right.finalize()?))
     }
 }
 
@@ -144,8 +132,8 @@ mod tests {
             &self,
             _batch: &RecordBatch,
             _partitions: &ScalarBuffer<i64>,
-        ) -> Result<Option<Int64Array>> {
-            Ok(self.a.clone())
+        ) -> Result<()> {
+            Ok(())
         }
 
         fn finalize(&self) -> Result<Int64Array> {
@@ -169,9 +157,11 @@ mod tests {
 
         let schema = Schema::new(vec![Field::new("sdf", DataType::Boolean, true)]);
         let rb = &RecordBatch::new_empty(Arc::new(schema));
-        let _res = and
+        let res = and
             .evaluate(rb, &ScalarBuffer::from(vec![1, 2, 3]))
             .unwrap();
+
+        dbg!(&res);
     }
 
     #[test]

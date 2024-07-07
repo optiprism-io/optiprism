@@ -161,8 +161,6 @@ where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Displa
     op: PhantomData<Op>,
     right: OT,
     typ: PhantomData<T>,
-    _time_window: i64,
-    out_batch_size: usize,
 }
 #[allow(clippy::too_many_arguments)]
 impl<T, OT, Op> Aggregate<T, OT, Op>
@@ -175,8 +173,6 @@ where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Displa
         agg: AggregateFunction<OT>,
         right: OT,
         time_range: TimeRange,
-        time_window: Option<i64>,
-        out_batch_size: usize,
     ) -> Self {
         let inner = Inner {
             agg,
@@ -193,8 +189,6 @@ where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Displa
             op: Default::default(),
             right,
             typ: Default::default(),
-            _time_window: time_window.unwrap_or(Duration::days(365).num_milliseconds()),
-            out_batch_size,
         }
     }
 }
@@ -208,7 +202,7 @@ macro_rules! agg {
                 &self,
                 batch: &RecordBatch,
                 partitions: &ScalarBuffer<i64>,
-            ) -> Result<Option<Int64Array>> {
+            ) -> Result<()> {
                 let ts = self
                     .ts_col
                     .evaluate(batch)?
@@ -265,11 +259,7 @@ macro_rules! agg {
                     }
                     inner.agg.accumulate(predicate.value(row_id) as $acc_ty);
                 }
-                if inner.res.len() > self.out_batch_size {
-                    Ok(Some(inner.res.finish()))
-                } else {
-                    Ok(None)
-                }
+                Ok(())
             }
 
             fn finalize(&self) -> Result<Int64Array> {
@@ -371,8 +361,6 @@ mod tests {
                 AggregateFunction::new_sum(),
                 3,
                 TimeRange::None,
-                None,
-                100500,
             );
 
             for b in res {
@@ -426,8 +414,6 @@ mod tests {
                 AggregateFunction::new_sum(),
                 right.mantissa(),
                 TimeRange::None,
-                None,
-                100500,
             );
 
             for b in res {

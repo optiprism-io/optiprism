@@ -48,7 +48,6 @@ pub struct SegmentExec {
     schema: SchemaRef,
     metrics: ExecutionPlanMetricsSet,
     partition_col: Column,
-    out_buffer_size: usize,
     cache: PlanProperties,
 }
 
@@ -57,7 +56,6 @@ impl SegmentExec {
         input: Arc<dyn ExecutionPlan>,
         expr: Arc<dyn SegmentExpr>,
         partition_col: Column,
-        out_buffer_size: usize,
     ) -> Result<Self> {
         let field = Field::new("partition", DataType::Int64, true);
         let schema = Arc::new(Schema::new(vec![field]));
@@ -68,7 +66,6 @@ impl SegmentExec {
             metrics: ExecutionPlanMetricsSet::new(),
             expr,
             partition_col,
-            out_buffer_size,
             cache,
         })
     }
@@ -115,7 +112,6 @@ impl ExecutionPlan for SegmentExec {
                 children[0].clone(),
                 self.expr.clone(),
                 self.partition_col.clone(),
-                self.out_buffer_size,
             )
                 .map_err(QueryError::into_datafusion_execution_error)?,
         ))
@@ -133,8 +129,6 @@ impl ExecutionPlan for SegmentExec {
             stream,
             partition_col: self.partition_col.clone(),
             expr: self.expr.clone(),
-            out_buf: Vec::with_capacity(10),
-            out_buffer_size: self.out_buffer_size,
             schema: self.schema.clone(),
             is_ended: false,
             baseline_metrics: BaselineMetrics::new(&self.metrics, partition),
@@ -154,8 +148,6 @@ struct SegmentStream {
     stream: SendableRecordBatchStream,
     partition_col: Column,
     expr: Arc<dyn SegmentExpr>,
-    out_buf: Vec<Int64Array>,
-    out_buffer_size: usize,
     schema: SchemaRef,
     is_ended: bool,
     baseline_metrics: BaselineMetrics,
@@ -193,7 +185,8 @@ impl Stream for SegmentStream {
                     let vals = partition.values();
                     self.expr
                         .evaluate(&batch, vals)
-                        .map_err(|e| e.into_datafusion_execution_error())?
+                        .map_err(|e| e.into_datafusion_execution_error())?;
+                    None
                 }
                 Poll::Ready(None) => {
                     self.is_ended = true;
@@ -201,7 +194,6 @@ impl Stream for SegmentStream {
                         .expr
                         .finalize()
                         .map_err(|e| e.into_datafusion_execution_error())?;
-
                     Some(res)
                 }
                 other => return other,
@@ -210,33 +202,7 @@ impl Stream for SegmentStream {
             if res.is_none() {
                 continue;
             }
-            let v = res
-                .unwrap()
-                .iter()
-                .filter(|v| v.is_some())
-                .collect::<Vec<_>>();
-            if !v.is_empty() {
-                let arr = Int64Array::from(v);
-                self.out_buf.push(arr);
-            }
-
-            if self.out_buf.iter().map(|arr| arr.len()).sum::<usize>() <= self.out_buffer_size
-                && !self.is_ended
-            {
-                continue;
-            }
-            let arrs = self
-                .out_buf
-                .drain(..)
-                .map(|v| Arc::new(v) as ArrayRef)
-                .collect::<Vec<_>>();
-
-            if arrs.is_empty() {
-                return Poll::Ready(None);
-            }
-            let arrs = arrs.iter().map(|a| a.as_ref()).collect::<Vec<_>>();
-            let arr = Arc::new(concat(arrs.as_slice())?);
-            let result = RecordBatch::try_new(self.schema.clone(), vec![arr])?;
+            let result = RecordBatch::try_new(self.schema.clone(), vec![Arc::new(res.unwrap())])?;
 
             return Poll::Ready(Some(Ok(result)));
         }
@@ -312,15 +278,12 @@ mod tests {
             Column::new_with_schema("ts", &schema).unwrap(),
             2,
             TimeRange::None,
-            None,
-            1,
         );
 
         let seg = SegmentExec::try_new(
             Arc::new(input),
             Arc::new(count),
             Column::new_with_schema("user_id", &schema).unwrap(),
-            1,
         )?;
 
         let session_ctx = SessionContext::new();
