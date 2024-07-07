@@ -37,8 +37,6 @@ pub struct Count<Op> {
     time_range: TimeRange,
     op: PhantomData<Op>,
     right: i64,
-    _time_window: i64,
-    out_batch_size: usize,
 }
 
 impl<Op> Count<Op> {
@@ -47,8 +45,6 @@ impl<Op> Count<Op> {
         ts_col: Column,
         right: i64,
         time_range: TimeRange,
-        time_window: Option<i64>,
-        out_batch_size: usize,
     ) -> Self {
         let inner = Inner {
             count: 0,
@@ -63,8 +59,6 @@ impl<Op> Count<Op> {
             time_range,
             op: Default::default(),
             right,
-            _time_window: time_window.unwrap_or(Duration::days(365).num_milliseconds()),
-            out_batch_size,
         }
     }
 }
@@ -76,7 +70,7 @@ where Op: ComparisonOp<i64>
         &self,
         batch: &RecordBatch,
         partitions: &ScalarBuffer<i64>,
-    ) -> Result<Option<Int64Array>> {
+    ) -> Result<()> {
         let ts = self
             .ts_col
             .evaluate(batch)?
@@ -130,11 +124,7 @@ where Op: ComparisonOp<i64>
             }
             inner.count += 1;
         }
-        if inner.res.len() > self.out_batch_size {
-            Ok(Some(inner.res.finish()))
-        } else {
-            Ok(None)
-        }
+        Ok(())
     }
 
     fn finalize(&self) -> Result<Int64Array> {
@@ -198,7 +188,6 @@ mod tests {
 | 3            | 8      | 1          |
 "#;
         let res = parse_markdown_tables(data).unwrap();
-
         {
             let left = Arc::new(Column::new_with_schema("event", &res[0].schema()).unwrap());
             let right = Arc::new(Literal::new(ScalarValue::Utf8(Some("1".to_string()))));
@@ -208,8 +197,6 @@ mod tests {
                 Column::new_with_schema("ts", &res[0].schema()).unwrap(),
                 2,
                 TimeRange::None,
-                None,
-                1,
             );
 
             for b in res {
@@ -221,7 +208,8 @@ mod tests {
 
                 let _res = count.evaluate(&b, p).unwrap();
             }
-            let _res = count.finalize().unwrap();
+            let res = count.finalize().unwrap();
+            dbg!(&res);
         }
     }
 }

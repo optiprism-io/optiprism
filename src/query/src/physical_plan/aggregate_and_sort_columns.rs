@@ -261,7 +261,7 @@ mod tests {
         let schema = res[0].schema();
         let input = MemoryExec::try_new(&[res], schema.clone(), None).unwrap();
 
-        let exec = AggregateAndSortColumnsExec::try_new(Arc::new(input), 2);
+        let exec = AggregateAndSortColumnsExec::try_new(Arc::new(input), 2).unwrap();
         let session_ctx = SessionContext::new();
         let task_ctx = session_ctx.task_ctx();
         let stream = exec.execute(0, task_ctx).unwrap();

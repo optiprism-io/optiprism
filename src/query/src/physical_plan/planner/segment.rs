@@ -52,20 +52,18 @@ fn build_time_range(time_range: logical_plan::segment::TimeRange) -> TimeRange {
 }
 
 macro_rules! count {
-    ($op:ident,$filter:expr,$ts_col:expr,$right:expr,$time_range:expr,$time_window:expr) => {
+    ($op:ident,$filter:expr,$ts_col:expr,$right:expr,$time_range:expr) => {
         Arc::new(Count::<$op>::new(
             $filter,
             $ts_col,
             $right,
             $time_range,
-            $time_window,
-            10_000,
         )) as Arc<dyn SegmentExpr>
     };
 }
 
 macro_rules! _aggregate {
-    ($t1:ident,$t2:ident, $op:ty, $filter:expr,$ts_col:expr,$predicate_col:expr,$agg:expr,$right:expr,$time_range:expr,$time_window:expr) => {
+    ($t1:ident,$t2:ident, $op:ty, $filter:expr,$ts_col:expr,$predicate_col:expr,$agg:expr,$right:expr,$time_range:expr) => {
         Arc::new(Aggregate::<$t1, $t2, $op>::new(
             $filter,
             $ts_col,
@@ -73,13 +71,11 @@ macro_rules! _aggregate {
             $agg,
             $right,
             $time_range,
-            $time_window,
-            10_000,
         )) as Arc<dyn SegmentExpr>
     };
 }
 macro_rules! aggregate {
-    ($op:ty, $filter:expr,$ts_col:expr,$predicate_col:expr,$agg:expr,$right:expr,$time_range:expr,$time_window:expr) => {
+    ($op:ty, $filter:expr,$ts_col:expr,$predicate_col:expr,$agg:expr,$right:expr,$time_range:expr) => {
         match $right {
             // ScalarValue::Int8(Some(v)) => _aggregate!(
             // i8,
@@ -126,8 +122,7 @@ macro_rules! aggregate {
                 $predicate_col,
                 $agg,
                 v as i128,
-                $time_range,
-                $time_window
+                $time_range
             ),
             // ScalarValue::UInt8(Some(v)) => _aggregate!(
             // u8,
@@ -210,8 +205,7 @@ macro_rules! aggregate {
                 $predicate_col,
                 $agg,
                 v,
-                $time_range,
-                $time_window
+                $time_range
             ),
             _ => unimplemented!(),
         }
@@ -251,22 +245,22 @@ pub fn build_segment_expr(
             let time_range = build_time_range(time_range);
             let expr = match op {
                 logical_plan::segment::Operator::Eq => {
-                    count!(Eq, filter, ts_col, right, time_range, time_window)
+                    count!(Eq, filter, ts_col, right, time_range)
                 }
                 logical_plan::segment::Operator::NotEq => {
-                    count!(NotEq, filter, ts_col, right, time_range, time_window)
+                    count!(NotEq, filter, ts_col, right, time_range)
                 }
                 logical_plan::segment::Operator::Lt => {
-                    count!(Lt, filter, ts_col, right, time_range, time_window)
+                    count!(Lt, filter, ts_col, right, time_range)
                 }
                 logical_plan::segment::Operator::LtEq => {
-                    count!(LtEq, filter, ts_col, right, time_range, time_window)
+                    count!(LtEq, filter, ts_col, right, time_range)
                 }
                 logical_plan::segment::Operator::Gt => {
-                    count!(Gt, filter, ts_col, right, time_range, time_window)
+                    count!(Gt, filter, ts_col, right, time_range)
                 }
                 logical_plan::segment::Operator::GtEq => {
-                    count!(GtEq, filter, ts_col, right, time_range, time_window)
+                    count!(GtEq, filter, ts_col, right, time_range)
                 }
             };
             Ok(expr)
@@ -299,8 +293,7 @@ pub fn build_segment_expr(
                         predicate_col,
                         agg,
                         right,
-                        time_range,
-                        time_window
+                        time_range
                     )
                 }
                 logical_plan::segment::Operator::NotEq => aggregate!(
@@ -310,8 +303,7 @@ pub fn build_segment_expr(
                     predicate_col,
                     agg,
                     right,
-                    time_range,
-                    time_window
+                    time_range
                 ),
                 logical_plan::segment::Operator::Lt => aggregate!(
                     Lt,
@@ -320,8 +312,7 @@ pub fn build_segment_expr(
                     predicate_col,
                     agg,
                     right,
-                    time_range,
-                    time_window
+                    time_range
                 ),
                 logical_plan::segment::Operator::LtEq => aggregate!(
                     LtEq,
@@ -330,8 +321,7 @@ pub fn build_segment_expr(
                     predicate_col,
                     agg,
                     right,
-                    time_range,
-                    time_window
+                    time_range
                 ),
                 logical_plan::segment::Operator::Gt => aggregate!(
                     Gt,
@@ -340,8 +330,7 @@ pub fn build_segment_expr(
                     predicate_col,
                     agg,
                     right,
-                    time_range,
-                    time_window
+                    time_range
                 ),
                 logical_plan::segment::Operator::GtEq => aggregate!(
                     GtEq,
@@ -350,8 +339,7 @@ pub fn build_segment_expr(
                     predicate_col,
                     agg,
                     right,
-                    time_range,
-                    time_window
+                    time_range
                 ),
             };
 

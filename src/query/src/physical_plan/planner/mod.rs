@@ -271,8 +271,6 @@ impl DFExtensionPlanner for ExtensionPlanner {
                 physical_inputs[0].clone(),
                 segment_expr,
                 partition_col,
-                // todo define out_buffer_size
-                10_000,
             )
             .map_err(|err| DataFusionError::Plan(err.to_string()))
             .map_err(|err| DataFusionError::Plan(err.to_string()))?;
