@@ -452,7 +452,7 @@ impl LogicalPlanBuilder {
                 SegmentExpr::Count {
                     filter,
                     ts_col: Column::from_qualified_name(COLUMN_CREATED_AT),
-                    partition_col: Column::from_qualified_name(GROUP_COLUMN_ID),
+                    partition_col: col(group_col(group_id)).try_into_col()?,
                     time_range: time.into(),
                     op: segment::Operator::GtEq,
                     right: 1,
@@ -481,7 +481,7 @@ impl LogicalPlanBuilder {
                     } => SegmentExpr::Count {
                         filter: event_expr,
                         ts_col: Column::from_qualified_name(COLUMN_CREATED_AT),
-                        partition_col: Column::from_qualified_name(GROUP_COLUMN_ID),
+                        partition_col: col(group_col(group_id)).try_into_col()?,
                         time_range: time.into(),
                         op: operation.into(),
                         right: *value,
@@ -499,7 +499,7 @@ impl LogicalPlanBuilder {
                         predicate: property_col(&self.ctx, &self.metadata, property)?
                             .try_into_col()?,
                         ts_col: Column::from_qualified_name(COLUMN_CREATED_AT),
-                        partition_col: Column::from_qualified_name(GROUP_COLUMN_ID),
+                        partition_col: col(group_col(group_id)).try_into_col()?,
                         time_range: time.into(),
                         agg: aggregate.into(),
                         op: operation.into(),
