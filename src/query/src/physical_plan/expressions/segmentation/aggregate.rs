@@ -306,6 +306,7 @@ agg!(Decimal128Array, Decimal128Array, i128);
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
     use std::sync::Arc;
 
     use arrow::array::Array;
@@ -318,6 +319,7 @@ mod tests {
     use datafusion_common::ScalarValue;
     use datafusion_expr::Operator;
     use rust_decimal::Decimal;
+    use common::DECIMAL_SCALE;
     use storage::test_util::parse_markdown_tables;
 
     use crate::physical_plan::expressions::segmentation::aggregate::Aggregate;
@@ -385,15 +387,14 @@ mod tests {
         }
     }
 
-    // TODO fix
-    // #[test]
-    fn _test_decimal() {
+    #[test]
+    fn test_decimal() {
         let data = r#"
 | user_id(i64) | ts(ts) | event(utf8) | v(decimal) |
 |--------------|--------|-------------|--------|
 | 0            | 1      | e1          | 0.5   |
 | 0            | 1      | e1          | 0.5   |
-| 1            | 8      | e1          | 4.18   |
+| 1            | 8      | e1          | 4.33   |
 | 1            | 8      | e1          | 0.15   |
 "#;
 
@@ -413,7 +414,8 @@ mod tests {
             let left = Arc::new(Column::new_with_schema("event", &schema).unwrap());
             let right = Arc::new(Literal::new(ScalarValue::Utf8(Some("e1".to_string()))));
             let f = BinaryExpr::new(left, Operator::Eq, right);
-            let right = Decimal::from_str_exact("4.33").unwrap();
+            let mut right = Decimal::from_str("448").unwrap();
+            right.rescale(DECIMAL_SCALE as u32);
             let agg = Aggregate::<i128, i128, boolean_op::Eq>::new(
                 Arc::new(f) as PhysicalExprRef,
                 Column::new_with_schema("ts", &schema).unwrap(),
@@ -425,15 +427,10 @@ mod tests {
             );
 
             for b in res {
-                let p = b.columns()[0]
-                    .as_any()
-                    .downcast_ref::<Int64Array>()
-                    .unwrap()
-                    .values();
-
-                let _res = agg.evaluate(&b).unwrap();
+                agg.evaluate(&b).unwrap();
             }
             let res = agg.finalize().unwrap();
+
             let exp = Int64Array::from(vec![None, Some(1)]);
             assert_eq!(res, exp);
         }
