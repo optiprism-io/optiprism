@@ -66,7 +66,7 @@ impl GroupRecordsProvider {
         let projection =
             (0..schema.fields.len()).collect::<Vec<_>>();
 
-        let (session_ctx, state, plan) = initial_plan(&self.db, group_col(group_id), projection).await?;
+        let (session_ctx, state, plan) = initial_plan(&self.db, group_col(group_id), projection)?;
         let plan = build_get_by_id_plan(&ctx, self.metadata.clone(), plan, group_id, id)?;
         println!("{plan:?}");
         let result = execute(session_ctx, state, plan).await?;
@@ -147,7 +147,7 @@ impl GroupRecordsProvider {
             (0..schema.fields.len()).collect::<Vec<_>>()
         };
 
-        let (session_ctx, state, plan) = initial_plan(&self.db, group_col(req.group_id), projection).await?;
+        let (session_ctx, state, plan) = initial_plan(&self.db, group_col(req.group_id), projection)?;
         let (plan,props) = build_search_plan(ctx, self.metadata.clone(), plan, req.clone())?;
         println!("{plan:?}");
         let result = execute(session_ctx, state, plan).await?;

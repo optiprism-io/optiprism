@@ -374,13 +374,13 @@ pub enum DidEventAggregate {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum SegmentCondition {
     HasPropertyValue {
-        property_name: String,
+        property: PropertyRef,
         operation: PropValueOperation,
         #[serde_as(as = "Option<Vec<ScalarValueRef>>")]
         value: Option<Vec<ScalarValue>>,
     },
     HadPropertyValue {
-        property_name: String,
+        property: PropertyRef,
         operation: PropValueOperation,
         #[serde_as(as = "Option<Vec<ScalarValueRef>>")]
         value: Option<Vec<ScalarValue>>,

@@ -59,13 +59,14 @@ use datafusion::physical_plan::display::DisplayableExecutionPlan;
 use datafusion::prelude::{SessionConfig, SessionContext};
 use datafusion_common::ScalarValue;
 use datafusion_expr::{Extension, LogicalPlan};
-use common::query::{PropertyRef, PropValueFilter, PropValueOperation};
+use common::query::{Breakdown, PropertyRef, PropValueFilter, PropValueOperation, Segment, SegmentCondition};
 pub use context::Context;
 pub use error::Result;
 use indexmap::IndexMap;
 use tracing::debug;
+use common::event_segmentation::{EventSegmentationRequest, Query};
 use common::group_col;
-use common::types::TABLE_EVENTS;
+use common::types::{COLUMN_CREATED_AT, COLUMN_EVENT, COLUMN_PROJECT_ID, TABLE_EVENTS};
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
 use storage::db::OptiDBImpl;
@@ -376,7 +377,7 @@ pub struct PropertyAndValue {
     pub value: ScalarValue,
 }
 
-pub async fn initial_plan(
+pub fn initial_plan(
     db: &Arc<OptiDBImpl>,
     table: String,
     projection: Vec<usize>,
@@ -396,6 +397,15 @@ pub async fn initial_plan(
     Ok((exec_ctx, state, plan))
 }
 
+fn segment_plan(db: &Arc<OptiDBImpl>,
+                table: String,
+                projection: Vec<usize>, ) -> Result<LogicalPlan>{
+    let plan = LogicalPlan::Extension(Extension {
+        node: Arc::new(DbParquetNode::try_new(db.clone(), table, projection.clone())?),
+    });
+
+    Ok(plan)
+}
 pub async fn execute(
     ctx: SessionContext,
     state: SessionState,
@@ -462,6 +472,116 @@ pub fn decode_filter_single_dictionary(
     }
 
     Ok(())
+}
+
+fn projection(
+    ctx: &Context,
+    req: &EventSegmentationRequest,
+    md: &Arc<MetadataProvider>,
+) -> Result<Vec<String>> {
+    let mut fields = vec![
+        COLUMN_PROJECT_ID.to_string(),
+        group_col(req.group_id),
+        COLUMN_CREATED_AT.to_string(),
+        COLUMN_EVENT.to_string(),
+    ];
+
+    for event in &req.events {
+        if let Some(filters) = &event.filters {
+            for filter in filters {
+                match filter {
+                    PropValueFilter::Property { property, .. } => {
+                        fields.push(col_name(ctx, property, md)?)
+                    }
+                }
+            }
+        }
+
+        for query in &event.queries {
+            match &query.agg {
+                Query::CountEvents => {}
+                Query::CountUniqueGroups => {}
+                Query::DailyActiveGroups => {}
+                Query::WeeklyActiveGroups => {}
+                Query::MonthlyActiveGroups => {}
+                Query::CountPerGroup { .. } => {}
+                Query::AggregatePropertyPerGroup { property, .. } => {
+                    fields.push(col_name(ctx, property, md)?)
+                }
+                Query::AggregateProperty { property, .. } => {
+                    fields.push(col_name(ctx, property, md)?)
+                }
+                Query::QueryFormula { .. } => {}
+            }
+        }
+
+        if let Some(breakdowns) = &event.breakdowns {
+            for breakdown in breakdowns {
+                match breakdown {
+                    Breakdown::Property(property) => fields.push(col_name(ctx, property, md)?),
+                }
+            }
+        }
+    }
+
+    if let Some(filters) = &req.filters {
+        for filter in filters {
+            match filter {
+                PropValueFilter::Property { property, .. } => {
+                    fields.push(col_name(ctx, property, md)?)
+                }
+            }
+        }
+    }
+
+    if let Some(breakdowns) = &req.breakdowns {
+        for breakdown in breakdowns {
+            match breakdown {
+                Breakdown::Property(property) => fields.push(col_name(ctx, property, md)?),
+            }
+        }
+    }
+
+    fields.dedup();
+
+    Ok(fields)
+}
+
+fn segment_projection(
+    ctx: &Context,
+    segments: &Vec<Segment>,
+    group_id: usize,
+    md: &Arc<MetadataProvider>,
+) -> Result<Vec<String>> {
+    let mut fields = vec![
+        COLUMN_PROJECT_ID.to_string(),
+        group_col(group_id),
+        COLUMN_CREATED_AT.to_string(),
+    ];
+
+    for segment in segments {
+        for conditions in &segment.conditions {
+            for condition in conditions {
+                match condition {
+                    SegmentCondition::HasPropertyValue { property, .. } => fields.push(col_name(ctx, property, md)?),
+                    SegmentCondition::HadPropertyValue { property, .. } => fields.push(col_name(ctx, property, md)?),
+                    SegmentCondition::DidEvent { filters, .. } => match filters {
+                        None => {}
+                        Some(filters) => for filter in filters {
+                            match filter {
+                                PropValueFilter::Property { property, .. } => {
+                                    fields.push(col_name(ctx, property, md)?)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    fields.dedup();
+
+    Ok(fields)
 }
 
 pub mod test_util {
