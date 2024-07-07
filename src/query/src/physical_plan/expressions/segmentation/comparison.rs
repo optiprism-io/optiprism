@@ -46,11 +46,10 @@ impl SegmentExpr for And {
     fn evaluate(
         &self,
         batch: &RecordBatch,
-        partitions: &ScalarBuffer<i64>,
     ) -> Result<()> {
         let inner = self.inner.lock().unwrap();
-        inner.left.evaluate(batch, partitions)?;
-        inner.right.evaluate(batch, partitions)?;
+        inner.left.evaluate(batch)?;
+        inner.right.evaluate(batch)?;
 
         Ok(())
     }
@@ -59,8 +58,6 @@ impl SegmentExpr for And {
         let inner = self.inner.lock().unwrap();
         let left = inner.left.finalize()?;
         let right = inner.right.finalize()?;
-        dbg!(&left,&right);
-
         Ok(Self::and(left, right))
     }
 }
@@ -95,11 +92,10 @@ impl SegmentExpr for Or {
     fn evaluate(
         &self,
         batch: &RecordBatch,
-        partitions: &ScalarBuffer<i64>,
     ) -> Result<()> {
         let inner = self.inner.lock().unwrap();
-        inner.left.evaluate(batch, partitions)?;
-        inner.right.evaluate(batch, partitions)?;
+        inner.left.evaluate(batch)?;
+        inner.right.evaluate(batch)?;
         Ok(())
     }
 
@@ -129,31 +125,30 @@ mod tests {
 
     #[derive(Debug)]
     struct Test {
-        f: Int64Array,
+        v: Int64Array,
     }
 
     impl SegmentExpr for Test {
         fn evaluate(
             &self,
             _batch: &RecordBatch,
-            _partitions: &ScalarBuffer<i64>,
         ) -> Result<()> {
             Ok(())
         }
 
         fn finalize(&self) -> Result<Int64Array> {
-            Ok(self.f.clone())
+            Ok(self.v.clone())
         }
     }
 
     #[test]
     fn and() {
         let a = Test {
-            f: Int64Array::from(vec![Some(4), None, Some(6)]),
+            v: Int64Array::from(vec![Some(4), None, Some(6)]),
         };
 
         let b = Test {
-            f: Int64Array::from(vec![4, 5, 6]),
+            v: Int64Array::from(vec![4, 5, 6]),
         };
 
         let and = And::new(Arc::new(a), Arc::new(b));
@@ -161,19 +156,20 @@ mod tests {
         let schema = Schema::new(vec![Field::new("sdf", DataType::Boolean, true)]);
         let rb = &RecordBatch::new_empty(Arc::new(schema));
         and
-            .evaluate(rb, &ScalarBuffer::from(vec![1, 2, 3]))
+            .evaluate(rb)
             .unwrap();
         let res = and.finalize().unwrap();
+        dbg!(&res);
     }
 
     #[test]
     fn or() {
         let a = Test {
-            f: Int64Array::from(vec![Some(4), None, None]),
+            v: Int64Array::from(vec![Some(4), None, None]),
         };
 
         let b = Test {
-            f: Int64Array::from(vec![Some(4), None, Some(6)]),
+            v: Int64Array::from(vec![Some(4), None, Some(6)]),
         };
 
         let and = Or::new(Arc::new(a), Arc::new(b));
@@ -181,7 +177,7 @@ mod tests {
         let schema = Schema::new(vec![Field::new("sdf", DataType::Boolean, true)]);
         let rb = &RecordBatch::new_empty(Arc::new(schema));
         let res = and
-            .evaluate(rb, &ScalarBuffer::from(vec![1, 2, 3]))
+            .evaluate(rb)
             .unwrap();
         dbg!(and.finalize().unwrap());
     }

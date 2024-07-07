@@ -17,7 +17,6 @@ pub trait SegmentExpr: Send + Sync + Debug {
     fn evaluate(
         &self,
         batch: &RecordBatch,
-        partitions: &ScalarBuffer<i64>,
     ) -> Result<()>;
     fn finalize(&self) -> Result<Int64Array>;
 }

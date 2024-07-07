@@ -11,7 +11,7 @@ use common::query::Breakdown;
 use common::query::DidEventAggregate;
 use common::query::PropertyRef;
 use common::query::SegmentCondition;
-use common::types::{COLUMN_CREATED_AT, TABLE_EVENTS};
+use common::types::{COLUMN_CREATED_AT, COLUMN_IP, GROUP_COLUMN_ID, TABLE_EVENTS};
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_PROJECT_ID;
 use common::types::COLUMN_SEGMENT;
@@ -452,6 +452,7 @@ impl LogicalPlanBuilder {
                 SegmentExpr::Count {
                     filter,
                     ts_col: Column::from_qualified_name(COLUMN_CREATED_AT),
+                    partition_col: Column::from_qualified_name(GROUP_COLUMN_ID),
                     time_range: time.into(),
                     op: segment::Operator::GtEq,
                     right: 1,
@@ -480,6 +481,7 @@ impl LogicalPlanBuilder {
                     } => SegmentExpr::Count {
                         filter: event_expr,
                         ts_col: Column::from_qualified_name(COLUMN_CREATED_AT),
+                        partition_col: Column::from_qualified_name(GROUP_COLUMN_ID),
                         time_range: time.into(),
                         op: operation.into(),
                         right: *value,
@@ -497,6 +499,7 @@ impl LogicalPlanBuilder {
                         predicate: property_col(&self.ctx, &self.metadata, property)?
                             .try_into_col()?,
                         ts_col: Column::from_qualified_name(COLUMN_CREATED_AT),
+                        partition_col: Column::from_qualified_name(GROUP_COLUMN_ID),
                         time_range: time.into(),
                         agg: aggregate.into(),
                         op: operation.into(),

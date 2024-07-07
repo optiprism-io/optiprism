@@ -32,7 +32,9 @@ use crate::physical_plan::planner::build_filter;
 use crate::physical_plan::planner::col;
 
 fn aggregate<T>(agg: &logical_plan::segment::AggregateFunction) -> AggregateFunction<T>
-where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display {
+where
+    T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display,
+{
     match agg {
         logical_plan::segment::AggregateFunction::Sum => AggregateFunction::new_sum(),
         logical_plan::segment::AggregateFunction::Min => AggregateFunction::new_min(),
@@ -52,21 +54,23 @@ fn build_time_range(time_range: logical_plan::segment::TimeRange) -> TimeRange {
 }
 
 macro_rules! count {
-    ($op:ident,$filter:expr,$ts_col:expr,$right:expr,$time_range:expr) => {
+    ($op:ident,$filter:expr,$ts_col:expr,$partition_col:expr,$right:expr,$time_range:expr) => {
         Arc::new(Count::<$op>::new(
             $filter,
             $ts_col,
+            $partition_col,
             $right,
             $time_range,
         )) as Arc<dyn SegmentExpr>
     };
 }
 
-macro_rules! _aggregate {
-    ($t1:ident,$t2:ident, $op:ty, $filter:expr,$ts_col:expr,$predicate_col:expr,$agg:expr,$right:expr,$time_range:expr) => {
+macro_rules! aggregate_ {
+    ($t1:ident,$t2:ident, $op:ty, $filter:expr,$ts_col:expr,$partition_col:expr,$predicate_col:expr,$agg:expr,$right:expr,$time_range:expr) => {
         Arc::new(Aggregate::<$t1, $t2, $op>::new(
             $filter,
             $ts_col,
+            $partition_col,
             $predicate_col,
             $agg,
             $right,
@@ -75,7 +79,7 @@ macro_rules! _aggregate {
     };
 }
 macro_rules! aggregate {
-    ($op:ty, $filter:expr,$ts_col:expr,$predicate_col:expr,$agg:expr,$right:expr,$time_range:expr) => {
+    ($op:ty, $filter:expr,$ts_col:expr,$partition_col:expr,$predicate_col:expr,$agg:expr,$right:expr,$time_range:expr) => {
         match $right {
             // ScalarValue::Int8(Some(v)) => _aggregate!(
             // i8,
@@ -113,12 +117,13 @@ macro_rules! aggregate {
             // $time_range,
             // $time_window
             // ),
-            ScalarValue::Int64(Some(v)) => _aggregate!(
+            ScalarValue::Int64(Some(v)) => aggregate_!(
                 i64,
                 i128,
                 $op,
                 $filter,
                 $ts_col,
+                $partition_col,
                 $predicate_col,
                 $agg,
                 v as i128,
@@ -196,12 +201,13 @@ macro_rules! aggregate {
             // $time_range,
             // $time_window
             // ),
-            ScalarValue::Decimal128(Some(v), _, _) => _aggregate!(
+            ScalarValue::Decimal128(Some(v), _, _) => aggregate_!(
                 Decimal128Array,
                 i128,
                 $op,
                 $filter,
                 $ts_col,
+                $partition_col,
                 $predicate_col,
                 $agg,
                 v,
@@ -233,6 +239,7 @@ pub fn build_segment_expr(
         logical_plan::segment::SegmentExpr::Count {
             filter,
             ts_col,
+            partition_col,
             time_range,
             op,
             right,
@@ -242,25 +249,26 @@ pub fn build_segment_expr(
             let execution_props = ExecutionProps::new();
             let filter = build_filter(Some(filter), &dfschema, schema, &execution_props)?.unwrap();
             let ts_col = col(ts_col, &dfschema);
+            let partition_col = col(partition_col, &dfschema);
             let time_range = build_time_range(time_range);
             let expr = match op {
                 logical_plan::segment::Operator::Eq => {
-                    count!(Eq, filter, ts_col, right, time_range)
+                    count!(Eq, filter, ts_col, partition_col,right, time_range)
                 }
                 logical_plan::segment::Operator::NotEq => {
-                    count!(NotEq, filter, ts_col, right, time_range)
+                    count!(NotEq, filter, ts_col, partition_col,right, time_range)
                 }
                 logical_plan::segment::Operator::Lt => {
-                    count!(Lt, filter, ts_col, right, time_range)
+                    count!(Lt, filter, ts_col, partition_col,right, time_range)
                 }
                 logical_plan::segment::Operator::LtEq => {
-                    count!(LtEq, filter, ts_col, right, time_range)
+                    count!(LtEq, filter, ts_col, partition_col,right, time_range)
                 }
                 logical_plan::segment::Operator::Gt => {
-                    count!(Gt, filter, ts_col, right, time_range)
+                    count!(Gt, filter, ts_col, partition_col,right, time_range)
                 }
                 logical_plan::segment::Operator::GtEq => {
-                    count!(GtEq, filter, ts_col, right, time_range)
+                    count!(GtEq, filter, ts_col,partition_col, right, time_range)
                 }
             };
             Ok(expr)
@@ -269,6 +277,7 @@ pub fn build_segment_expr(
             filter,
             predicate,
             ts_col,
+            partition_col,
             time_range,
             agg,
             op,
@@ -279,6 +288,7 @@ pub fn build_segment_expr(
             let execution_props = ExecutionProps::new();
             let filter = build_filter(Some(filter), &dfschema, schema, &execution_props)?.unwrap();
             let ts_col = col(ts_col, &dfschema);
+            let partition_col = col(partition_col, &dfschema);
             let predicate_col = col(predicate, &dfschema);
 
             let time_range = build_time_range(time_range);
@@ -290,6 +300,7 @@ pub fn build_segment_expr(
                         Eq,
                         filter,
                         ts_col,
+                        partition_col,
                         predicate_col,
                         agg,
                         right,
@@ -300,6 +311,7 @@ pub fn build_segment_expr(
                     NotEq,
                     filter,
                     ts_col,
+                    partition_col,
                     predicate_col,
                     agg,
                     right,
@@ -309,6 +321,7 @@ pub fn build_segment_expr(
                     Lt,
                     filter,
                     ts_col,
+                    partition_col,
                     predicate_col,
                     agg,
                     right,
@@ -318,6 +331,7 @@ pub fn build_segment_expr(
                     LtEq,
                     filter,
                     ts_col,
+                    partition_col,
                     predicate_col,
                     agg,
                     right,
@@ -327,6 +341,7 @@ pub fn build_segment_expr(
                     Gt,
                     filter,
                     ts_col,
+                    partition_col,
                     predicate_col,
                     agg,
                     right,
@@ -336,6 +351,7 @@ pub fn build_segment_expr(
                     GtEq,
                     filter,
                     ts_col,
+                    partition_col,
                     predicate_col,
                     agg,
                     right,
