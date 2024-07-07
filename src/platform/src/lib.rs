@@ -1026,17 +1026,6 @@ impl Into<common::query::SegmentCondition> for SegmentCondition {
                     }
                     _ => None,
                 },
-                // value
-                // .map(|v| {
-                // if v.is_empty() {
-                // None
-                // } else {
-                // v.iter()
-                // .map(|v| json_value_to_scalar(v))
-                // .collect::<Result<_>>()
-                // }
-                // })
-                // .transpose()?,
             },
             SegmentCondition::HadPropertyValue {
                 property_name,

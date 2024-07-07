@@ -15,7 +15,7 @@ use query::context::Format;
 use query::event_segmentation::EventSegmentationProvider;
 
 use crate::error::Result;
-use crate::{json_value_to_scalar, QueryParams, QueryResponse, QueryResponseFormat, validate_event, validate_event_filter, validate_event_property};
+use crate::{json_value_to_scalar, QueryParams, QueryResponse, QueryResponseFormat, SegmentCondition, validate_event, validate_event_filter, validate_event_property};
 use crate::AggregateFunction;
 use crate::Breakdown;
 use crate::PartitionedAggregateFunction;
@@ -461,100 +461,6 @@ pub struct EventSegmentationRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub segments: Option<Vec<Segment>>,
 }
-
-// impl TryInto<common::event_segmentation::SegmentCondition> for SegmentCondition {
-// type Error = PlatformError;
-//
-// fn try_into(self) -> Result<common::event_segmentation::SegmentCondition, Self::Error> {
-// match self {
-// SegmentCondition::HasPropertyValue {
-// property_name,
-// operation,
-// value,
-// } => common::event_segmentation::SegmentCondition::HasPropertyValue {
-// property_name,
-// operation: operation.try_into()?,
-// value: value
-// .map(|v| v.iter().map(json_value_to_scalar))
-// .collect::<std::result::Result<_, _>>()
-// .transpose()?,
-// },
-// SegmentCondition::HadPropertyValue {
-// property_name,
-// operation,
-// value,
-// time,
-// } => common::event_segmentation::SegmentCondition::HadPropertyValue {
-// property_name,
-// operation: operation.try_into()?,
-// value: value
-// .map(|v| v.iter().map(json_value_to_scalar))
-// .collect::<Result<Vec<_>, _>>()
-// .transpose()?,
-// time: time.try_into()?,
-// },
-// SegmentCondition::DidEvent {
-// event,
-// filters,
-// aggregate,
-// } => common::event_segmentation::SegmentCondition::DidEvent {
-// event: event.try_into()?,
-// filters: filters
-// .map(|v| v.iter().map(|v| v.try_into()))
-// .collect::<std::result::Result<Vec<_>, _>>()
-// .transpose()?,
-// aggregate: aggregate.try_into()?,
-// },
-// }
-// }
-// }
-//
-// impl TryInto<SegmentCondition> for common::event_segmentation::SegmentCondition {
-// type Error = PlatformError;
-//
-// fn try_into(self) -> Result<SegmentCondition, Self::Error> {
-// match self {
-// common::event_segmentation::SegmentCondition::HasPropertyValue {
-// property_name,
-// operation,
-// value,
-// } => SegmentCondition::HasPropertyValue {
-// property_name,
-// operation: operation.try_into()?,
-// value: value
-// .map(|v| v.iter().map(|v| json_value_to_scalar(v)))
-// .collect::<std::result::Result<_, _>>()
-// .transpose()?,
-// },
-// common::event_segmentation::SegmentCondition::HadPropertyValue {
-// property_name,
-// operation,
-// value,
-// time,
-// } => SegmentCondition::HadPropertyValue {
-// property_name,
-// operation: operation.try_into()?,
-// value: value
-// .map(|v| v.iter().map(|v| json_value_to_scalar(v)))
-// .collect::<std::result::Result<_, _>>()
-// .transpose()?,
-// time: time.try_into()?,
-// },
-// SegmentCondition::DidEvent {
-// event,
-// filters,
-// aggregate,
-// } => common::event_segmentation::SegmentCondition::DidEvent {
-// event: event.try_into()?,
-// filters: filters
-// .map(|v| v.iter().map(|v| scalar_to_json_value(v)))
-// .collect::<std::result::Result<_, _>>()
-// .transpose()?,
-// aggregate: aggregate.try_into()?,
-// },
-// }
-// }
-// }
 
 impl Into<common::event_segmentation::EventSegmentationRequest> for EventSegmentationRequest {
     fn into(self) -> common::event_segmentation::EventSegmentationRequest {
