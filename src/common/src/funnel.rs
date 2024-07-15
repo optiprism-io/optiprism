@@ -25,8 +25,7 @@ pub struct Funnel {
     pub chart_type: ChartType,
     pub count: Count,
     pub filter: Option<Filter>,
-    pub touch: Touch,
-    pub attribution: Option<Touch>,
+    pub touch: Option<Touch>,
     pub holding_constants: Option<Vec<PropertyRef>>,
     pub exclude: Option<Vec<Exclude>>,
     pub breakdowns: Option<Vec<Breakdown>>,
@@ -118,7 +117,8 @@ pub enum Count {
 }
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Exclude {
-    pub event: Event,
+    pub event: EventRef,
+    pub filters: Option<Vec<PropValueFilter>>,
     pub steps: Option<ExcludeSteps>,
 }
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]

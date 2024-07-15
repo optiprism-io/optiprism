@@ -269,8 +269,8 @@ pub fn build(
     let exclude = if let Some(excludes) = &req.exclude {
         let mut out = vec![];
         for exclude in excludes {
-            let mut expr = event_expression(&ctx, &metadata, &exclude.event.event)?;
-            if let Some(filters) = &exclude.event.filters {
+            let mut expr = event_expression(&ctx, &metadata, &exclude.event)?;
+            if let Some(filters) = &exclude.filters {
                 expr = and(expr, event_filters_expression(&ctx, &metadata, &filters)?);
             }
             let steps = if let Some(steps) = &exclude.steps {
@@ -369,11 +369,11 @@ pub fn build(
                 chrono::Duration::milliseconds(to),
             ),
         }),
-        touch: match req.touch {
+        touch: req.touch.map(|t| match t {
             Touch::First => logical_plan::funnel::Touch::First,
             Touch::Last => logical_plan::funnel::Touch::Last,
             Touch::Step { step } => logical_plan::funnel::Touch::Step(step),
-        },
+        }),
         partition_col: col(Column {
             relation: None,
             name: group_col(req.group_id),
@@ -499,7 +499,7 @@ fn projection(
 
     if let Some(exclude) = &req.exclude {
         for e in exclude {
-            if let Some(filters) = &e.event.filters {
+            if let Some(filters) = &e.filters {
                 for filter in filters {
                     match filter {
                         PropValueFilter::Property { property, .. } => {

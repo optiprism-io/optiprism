@@ -96,6 +96,8 @@ pub struct Store {
     ua_db_path: PathBuf,
     #[arg(long)]
     pub geo_city_path: PathBuf,
+    #[arg(long)]
+    pub config: PathBuf,
 }
 
 pub struct Config<R> {
@@ -112,7 +114,7 @@ pub struct Config<R> {
     pub partitions: usize,
 }
 
-pub async fn start(args: &Store) -> Result<()> {
+pub async fn start(args: &Store,cfg:crate::Config) -> Result<()> {
     debug!("db path: {:?}", args.path);
 
     if args.generate {
@@ -228,8 +230,8 @@ pub async fn start(args: &Store) -> Result<()> {
         info!("successfully generated!");
     }
 
-    let cfg = common::config::Config::default();
     let router = Router::new();
+
     info!("initializing platform...");
     let router = init_platform(md.clone(), db.clone(), router, cfg.clone())?;
     info!("initializing session cleaner...");

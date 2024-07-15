@@ -40,7 +40,7 @@ pub struct Funnel {
     pub constants: Option<Vec<Expr>>,
     pub count: Count,
     pub filter: Option<Filter>,
-    pub touch: Touch,
+    pub touch: Option<Touch>,
     pub partition_col: Expr,
     pub time_interval: Option<TimeIntervalUnit>,
     pub groups: Option<Vec<(Expr, String, SortField)>>,

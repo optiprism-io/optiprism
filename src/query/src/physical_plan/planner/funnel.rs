@@ -131,11 +131,11 @@ pub(crate) fn build_funnel(
                 Filter::TimeToConvert(from, to)
             }
         }),
-        touch: match f.touch {
+        touch: f.touch.map(|f|match f {
             logical_plan::funnel::Touch::First => Touch::First,
             logical_plan::funnel::Touch::Last => Touch::Last,
             logical_plan::funnel::Touch::Step(n) => Touch::Step(n),
-        },
+        }),
         partition_col: Arc::new(partition_col.clone()),
         time_interval: f.time_interval,
         groups: groups.clone(),
