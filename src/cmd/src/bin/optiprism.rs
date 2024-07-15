@@ -60,7 +60,12 @@ async fn main() -> Result<()> {
                 cmd::server::start(cfg.try_into()?).await?;
             }
             Commands::Store(store) => {
-                cmd::store::start(store).await?;
+                let config = config::Config::builder()
+                    .add_source(config::File::from(store.config.clone()))
+                    .build()?;
+
+                let cfg: Config = config.try_deserialize()?;
+                cmd::store::start(store, cfg.try_into()?).await?;
             }
             Commands::Test(args) => {
                 test::gen(args).await?;

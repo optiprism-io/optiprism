@@ -183,7 +183,7 @@ pub(crate) fn validate_request(
             validate_event(
                 md,
                 project_id,
-                &exclude.event.event,
+                &exclude.event,
                 exclude_id,
                 format!("exclude #{exclude_id}, "),
             )?;
@@ -295,9 +295,21 @@ pub(crate) fn fix_request(
     }
 
     if let Some(exclude) = &req.exclude
-        && exclude.is_empty()
     {
-        out.exclude = None;
+        if exclude.is_empty() {
+            out.exclude = None;
+        } else {
+            let mut out_exclude = exclude.to_vec();
+            for (exclude_id, exclude) in exclude.iter().enumerate() {
+                if let Some(filters) = &exclude.filters {
+                    if filters.is_empty() {
+                        out_exclude[exclude_id].filters = None;
+                    }
+                }
+            }
+
+            out.exclude = Some(out_exclude)
+        }
     }
 
     if let Some(breakdowns) = &req.breakdowns
@@ -330,8 +342,7 @@ pub struct FunnelRequest {
     pub chart_type: ChartType,
     pub count: Count,
     pub filter: Option<Filter>,
-    pub touch: Touch,
-    pub attribution: Option<Touch>,
+    pub touch: Option<Touch>,
     pub holding_constants: Option<Vec<PropertyRef>>,
     pub exclude: Option<Vec<Exclude>>,
     pub breakdowns: Option<Vec<Breakdown>>,
@@ -569,7 +580,10 @@ impl Into<Count> for common::funnel::Count {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Exclude {
-    pub event: Event,
+    #[serde(flatten)]
+    pub event: EventRef,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filters: Option<Vec<PropValueFilter>>,
     pub steps: Option<ExcludeSteps>,
 }
 
@@ -577,6 +591,7 @@ impl Into<common::funnel::Exclude> for Exclude {
     fn into(self) -> common::funnel::Exclude {
         common::funnel::Exclude {
             event: self.event.into(),
+            filters: self.filters.map(|v| v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>()),
             steps: self.steps.map(|s| s.into()),
         }
     }
@@ -586,6 +601,7 @@ impl Into<Exclude> for common::funnel::Exclude {
     fn into(self) -> Exclude {
         Exclude {
             event: self.event.into(),
+            filters: self.filters.map(|v| v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>()),
             steps: self.steps.map(|s| s.into()),
         }
     }
@@ -740,8 +756,7 @@ impl Into<common::funnel::Funnel> for FunnelRequest {
             chart_type: self.chart_type.into(),
             count: self.count.into(),
             filter: self.filter.map(|f| f.into()),
-            touch: self.touch.into(),
-            attribution: self.attribution.map(|attr| attr.into()),
+            touch: self.touch.map(|t| t.into()),
             holding_constants: self
                 .holding_constants
                 .map(|hc| hc.iter().map(|p| p.to_owned().into()).collect::<Vec<_>>()),
@@ -779,8 +794,7 @@ impl Into<FunnelRequest> for common::funnel::Funnel {
             chart_type: self.chart_type.into(),
             count: self.count.into(),
             filter: self.filter.map(|f| f.into()),
-            touch: self.touch.into(),
-            attribution: self.attribution.map(|attr| attr.into()),
+            touch: self.touch.map(|t| t.into()),
             holding_constants: self
                 .holding_constants
                 .map(|hc| hc.iter().map(|p| p.to_owned().into()).collect::<Vec<_>>()),
