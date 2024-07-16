@@ -10,7 +10,6 @@ members = [
     "src/metadata",
     "src/platform",
     "src/query",
-    "src/service",
     "src/storage",
     "src/ingester",
     "src/cmd"

@@ -60,7 +60,7 @@ async fn switch_organization(
     set_refresh_token_cookie(
         &cookies,
         tokens.refresh_token.as_str(),
-        OffsetDateTime::now_utc() + cfg.refresh_token_duration.to_std().unwrap(),
+        OffsetDateTime::now_utc() + cfg.auth.refresh_token_duration.to_std().unwrap(),
     );
 
     Ok((StatusCode::OK, Json(tokens)))
@@ -77,7 +77,7 @@ async fn sign_up(
     set_refresh_token_cookie(
         &cookies,
         tokens.refresh_token.as_str(),
-        OffsetDateTime::now_utc() + cfg.refresh_token_duration.to_std().unwrap(),
+        OffsetDateTime::now_utc() + cfg.auth.refresh_token_duration.to_std().unwrap(),
     );
 
     Ok((StatusCode::CREATED, Json(tokens)))
@@ -104,7 +104,7 @@ async fn log_in(
     set_refresh_token_cookie(
         &cookies,
         tokens.refresh_token.as_str(),
-        OffsetDateTime::now_utc() + cfg.refresh_token_duration.to_std().unwrap(),
+        OffsetDateTime::now_utc() + cfg.auth.refresh_token_duration.to_std().unwrap(),
     );
 
     Ok(Json(tokens))
@@ -132,7 +132,7 @@ async fn refresh_token(
     set_refresh_token_cookie(
         &cookies,
         tokens.refresh_token.as_str(),
-        OffsetDateTime::now_utc() + cfg.refresh_token_duration.to_std().unwrap(),
+        OffsetDateTime::now_utc() + cfg.auth.refresh_token_duration.to_std().unwrap(),
     );
 
     Ok(Json(tokens))

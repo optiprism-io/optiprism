@@ -104,6 +104,7 @@ pub mod error;
 pub mod server;
 pub mod store;
 pub mod test;
+pub mod config;
 
 pub fn init_metrics() {
     let builder = PrometheusBuilder::new();
@@ -281,7 +282,7 @@ fn init_session_cleaner(
 ) -> crate::error::Result<()> {
     thread::spawn(move || {
         loop {
-            thread::sleep(cfg.session_cleaner_interval.to_std().unwrap());
+            thread::sleep(cfg.misc.session_cleaner_interval.to_std().unwrap());
             for project in md.projects.list().unwrap() {
                 md.sessions
                     .check_for_deletion(project.id, |sess| {
