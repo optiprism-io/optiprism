@@ -20,6 +20,7 @@ pub mod sessions;
 pub mod teams;
 pub mod util;
 pub mod bookmarks;
+pub mod config;
 
 use std::fmt::Debug;
 
