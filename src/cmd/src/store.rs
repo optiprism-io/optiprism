@@ -251,7 +251,7 @@ pub async fn start(args: &Store,cfg:crate::Config) -> Result<()> {
             _=sig_term.recv()=>info!("SIGTERM received"),
         }
     };
-    let listener = tokio::net::TcpListener::bind(cfg.host).await?;
+    let listener = tokio::net::TcpListener::bind(cfg.server.host).await?;
     Ok(axum::serve(
         listener,
         router.into_make_service_with_connect_info::<SocketAddr>(),

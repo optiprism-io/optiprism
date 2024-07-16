@@ -89,7 +89,7 @@ impl Projects {
             description: request.description,
             session_duration_seconds: request
                 .session_duration_seconds
-                .unwrap_or(self.cfg.project_default_session_duration.num_seconds() as u64),
+                .unwrap_or(self.cfg.misc.project_default_session_duration.num_seconds() as u64),
             organization_id: ctx.organization_id,
             token,
         };

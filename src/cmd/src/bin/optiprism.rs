@@ -2,16 +2,17 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use clap::Subcommand;
+use metrics::Level;
+use tracing_subscriber::FmtSubscriber;
+use cmd::config::{Config, LogLevel};
 use cmd::store::Store;
 use cmd::test::Test;
-use service::tracing::TracingCliArgs;
 
 extern crate parse_duration;
 
 use cmd::error::Error;
 use cmd::error::Result;
 use cmd::server;
-use cmd::server::config::Config;
 use cmd::test;
 
 #[derive(Parser, Clone)]
@@ -34,8 +35,6 @@ enum Commands {
 #[command(propagate_version = true)]
 #[command(author, version, about, long_about = None)]
 pub struct Cli {
-    #[clap(flatten)]
-    tracing: TracingCliArgs,
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -43,8 +42,6 @@ pub struct Cli {
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Cli::parse();
-    args.tracing.init()?;
-
     if args.command.is_none() {
         return Err(Error::BadRequest("no command specified".to_string()));
     }
@@ -57,6 +54,14 @@ async fn main() -> Result<()> {
                     .build()?;
 
                 let cfg: Config = config.try_deserialize()?;
+
+                let subscriber = FmtSubscriber::builder()
+                    .with_max_level(cfg.log.level)
+                    .finish();
+
+                tracing::subscriber::set_global_default(subscriber).map_err(|e| Error::SetGlobalDefaultError(e))?;
+
+
                 cmd::server::start(cfg.try_into()?).await?;
             }
             Commands::Store(store) => {
@@ -65,6 +70,12 @@ async fn main() -> Result<()> {
                     .build()?;
 
                 let cfg: Config = config.try_deserialize()?;
+                let subscriber = FmtSubscriber::builder()
+                    .with_max_level(cfg.log.level)
+                    .finish();
+
+                tracing::subscriber::set_global_default(subscriber).map_err(|e| Error::SetGlobalDefaultError(e))?;
+
                 cmd::store::start(store, cfg.try_into()?).await?;
             }
             Commands::Test(args) => {

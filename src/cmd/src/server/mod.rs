@@ -1,4 +1,3 @@
-pub mod config;
 
 use std::fs;
 use std::net::SocketAddr;
@@ -32,19 +31,19 @@ use crate::init_session_cleaner;
 use crate::init_system;
 
 pub async fn start(cfg: Config) -> Result<()> {
-    debug!("db path: {:?}", cfg.path);
+    debug!("db path: {:?}", cfg.data.path);
 
-    fs::create_dir_all(cfg.path.join("data/md"))?;
-    fs::create_dir_all(cfg.path.join("data/storage"))?;
-    let rocks = Arc::new(metadata::rocksdb::new(cfg.path.join("data/md"))?);
-    let db = Arc::new(OptiDBImpl::open(cfg.path.join("data/storage"), Options {})?);
+    fs::create_dir_all(cfg.data.path.join("data/md"))?;
+    fs::create_dir_all(cfg.data.path.join("data/storage"))?;
+    let rocks = Arc::new(metadata::rocksdb::new(cfg.data.path.join("data/md"))?);
+    let db = Arc::new(OptiDBImpl::open(cfg.data.path.join("data/storage"), Options {})?);
     let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
     info!("metrics initialization...");
     init_metrics();
     info!("system initialization...");
     init_system(&md, &db, num_cpus::get())?;
 
-    if let Some(ui_path) = &cfg.ui_path {
+    if let Some(ui_path) = &cfg.data.ui_path {
         if !ui_path.try_exists()? {
             return Err(Error::FileNotFound(format!(
                 "ui path {ui_path:?} doesn't exist"
@@ -83,7 +82,7 @@ pub async fn start(cfg: Config) -> Result<()> {
     info!("initializing session cleaner...");
     init_session_cleaner(md.clone(), db.clone(), cfg.clone())?;
     info!("initializing ingester...");
-    let router = init_ingester(&cfg.geo_city_path, &cfg.ua_db_path, &md, &db, router)?;
+    let router = init_ingester(&cfg.data.geo_city_path, &cfg.data.ua_db_path, &md, &db, router)?;
     info!("initializing platform...");
     let router = init_platform(md.clone(), db.clone(), router, cfg.clone())?;
 
@@ -98,11 +97,11 @@ pub async fn start(cfg: Config) -> Result<()> {
         }
     };
 
-    info!("Web Interface: https://{}", cfg.host);
+    info!("Web Interface: https://{}", cfg.server.host);
     if just_initialized {
         info!("email: admin@admin.com, password: admin, (DON'T FORGET TO CHANGE)");
     }
-    let listener = tokio::net::TcpListener::bind(cfg.host).await?;
+    let listener = tokio::net::TcpListener::bind(cfg.server.host).await?;
     Ok(axum::serve(
         listener,
         router.into_make_service_with_connect_info::<SocketAddr>(),

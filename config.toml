@@ -1,11 +1,19 @@
+[server]
 host = "0.0.0.0:8080"
+
+[data]
 path = "/tmp/db"
 ua_db_path = "init/ingester/regexes.yaml"
 geo_city_path = "init/ingester/GeoLite2-City.mmdb"
 ui_path = "/Users/maximbogdanov/optiprism/frontend/dist"
+
+[misc]
 session_cleaner_interval = "1 second"
-project_default_session_duration = "2 days"
+project_default_session_duration = "1 day"
+
+[auth]
 access_token_duration = "1 hour"
 refresh_token_duration = "24 hours"
-access_token_key = "DFZ@#$#@$D@#FWGVBREereR23E"
-refresh_token_key = "WER@#$dddWR#ffwfv#fwcwrWR"
+
+[log]
+level = "debug"

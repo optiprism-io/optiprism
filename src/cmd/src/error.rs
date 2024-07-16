@@ -13,6 +13,7 @@ use platform::PlatformError;
 use query::error::QueryError;
 use storage::error::StoreError;
 use thiserror::Error;
+use tracing::dispatcher::SetGlobalDefaultError;
 
 pub type Result<T> = result::Result<T, Error>;
 
@@ -62,4 +63,6 @@ pub enum Error {
     Hyper(#[from] hyper::Error),
     #[error("config: {0:?}")]
     Config(#[from] config::ConfigError),
+    #[error("global default: {0:?}")]
+    SetGlobalDefaultError(#[from] SetGlobalDefaultError),
 }

@@ -40,7 +40,6 @@ storage = { path = "../storage" }
 rand = "0.8.5"
 rust_decimal = { version = "1.27.0", features = ["serde-float"] }
 serde = { version = "1.0.149", features = ["derive"] }
-service = { path = "../service" }
 strum = "0.24"
 strum_macros = "0.24"
 thiserror = "1.0.37"

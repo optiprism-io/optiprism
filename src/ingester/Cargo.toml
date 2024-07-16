@@ -36,7 +36,6 @@ common = { path = "../common" }
 storage = { path = "../storage" }
 futures = "0.3.25"
 clap = { version = "4.5.0", features = ["derive"] }
-service = { path = "../service" }
 anyhow = "1.0.75"
 hyper = "0.14.27"
 metrics-util = "0.16.0"
