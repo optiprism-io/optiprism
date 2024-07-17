@@ -13,7 +13,7 @@ pub struct Server {
 #[derive(Debug, Deserialize, PartialEq, Eq)]
 pub struct Data {
     pub path: PathBuf,
-    pub ui_path: Option<PathBuf>,
+    pub ui_path: PathBuf,
     pub ua_db_path: PathBuf,
     pub geo_city_path: PathBuf,
 }

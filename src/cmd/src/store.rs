@@ -73,10 +73,6 @@ use crate::init_system;
 #[derive(Parser, Clone)]
 pub struct Store {
     #[arg(long)]
-    path: PathBuf,
-    #[arg(long, default_value = "0.0.0.0:8080")]
-    host: SocketAddr,
-    #[arg(long)]
     demo_data_path: PathBuf,
     #[arg(long, default_value = "365 days")]
     duration: Option<String>,
@@ -89,13 +85,7 @@ pub struct Store {
     #[arg(long, default_value = "false")]
     generate: bool,
     #[arg(long)]
-    ui_path: Option<PathBuf>,
-    #[arg(long)]
     partitions: Option<usize>,
-    #[arg(long)]
-    ua_db_path: PathBuf,
-    #[arg(long)]
-    pub geo_city_path: PathBuf,
     #[arg(long)]
     pub config: PathBuf,
 }
@@ -115,14 +105,17 @@ pub struct Config<R> {
 }
 
 pub async fn start(args: &Store, mut cfg: crate::Config) -> Result<()> {
-    debug!("db path: {:?}", args.path);
+    debug!("db path: {:?}", cfg.data.path);
 
     if args.generate {
-        fs::remove_dir_all(&args.path).unwrap();
+        match fs::remove_dir_all(&cfg.data.path) {
+            Ok(_) => {}
+            Err(_) => {}
+        }
     }
-    let rocks = Arc::new(metadata::rocksdb::new(args.path.join(DATA_PATH_METADATA))?);
+    let rocks = Arc::new(metadata::rocksdb::new(cfg.data.path.join(DATA_PATH_METADATA))?);
     let db = Arc::new(OptiDBImpl::open(
-        args.path.join(DATA_PATH_STORAGE),
+        cfg.data.path.join(DATA_PATH_STORAGE),
         Options {},
     )?);
     let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
@@ -132,14 +125,12 @@ pub async fn start(args: &Store, mut cfg: crate::Config) -> Result<()> {
     init_system(&md, &db, args.partitions.unwrap_or_else(num_cpus::get))?;
     init_config(&md, &mut cfg)?;
 
-    if let Some(ui_path) = &args.ui_path {
-        if !ui_path.try_exists()? {
-            return Err(Error::FileNotFound(format!(
-                "ui path {ui_path:?} doesn't exist"
-            )));
-        }
-        debug!("ui path: {:?}", ui_path);
+    if !cfg.data.ui_path.try_exists()? {
+        return Err(Error::FileNotFound(format!(
+            "ui path {:?} doesn't exist", cfg.data.ui_path
+        )));
     }
+    debug!("ui path: {:?}", cfg.data.ui_path);
 
     if !args.demo_data_path.try_exists()? {
         return Err(Error::FileNotFound(format!(
@@ -238,9 +229,9 @@ pub async fn start(args: &Store, mut cfg: crate::Config) -> Result<()> {
     info!("initializing session cleaner...");
     init_session_cleaner(md.clone(), db.clone(), cfg.clone())?;
     info!("initializing ingester...");
-    let router = init_ingester(&args.geo_city_path, &args.ua_db_path, &md, &db, router)?;
+    let router = init_ingester(&cfg.data.geo_city_path, &cfg.data.ua_db_path, &md, &db, router)?;
 
-    info!("listening on {}", args.host);
+    info!("listening on {}", cfg.server.host);
 
     let signal = async {
         let mut sig_int =

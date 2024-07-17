@@ -16,9 +16,9 @@ pub struct Data {
     pub path: PathBuf,
     pub ua_db_path: PathBuf,
     pub geo_city_path: PathBuf,
-    pub ui_path: Option<PathBuf>,
-
+    pub ui_path: PathBuf,
 }
+
 #[derive(Debug, Clone)]
 pub struct Auth {
     pub access_token_duration: Duration,
@@ -55,7 +55,7 @@ impl Default for Config {
                 path: Default::default(),
                 ua_db_path: Default::default(),
                 geo_city_path: Default::default(),
-                ui_path: None,
+                ui_path: Default::default()
             },
             auth: Auth {
                 access_token_duration: Default::default(),

@@ -45,12 +45,19 @@ spec:
           volumeMounts:
             - name: optiprism
               mountPath: /var/lib/optiprism/data
-#          readinessProbe:
-#            httpGet:
-#              path: /api
-#              port: {{ .Values.service.port }}
+            - name: config-volume
+              mountPath: /etc/config.d/production.toml
+              subPath: config.toml
+          readinessProbe:
+            httpGet:
+              path: /api
+              port: {{ .Values.service.port }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: config-volume
+          configMap:
+            name: { { include "optiprism.fullname" . } }
   volumeClaimTemplates:
     - metadata:
         name: optiprism
