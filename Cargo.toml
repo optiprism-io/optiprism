@@ -13,4 +13,4 @@ members = [
     "src/storage",
     "src/ingester",
     "src/cmd"
-    ]
+]

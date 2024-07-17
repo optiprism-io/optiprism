@@ -101,7 +101,6 @@ use query::group_records::GroupRecordsProvider;
 use query::properties::PropertiesProvider;
 use crate::error::Result;
 use crate::error::Error;
-
 pub mod error;
 pub mod server;
 pub mod store;
@@ -225,12 +224,14 @@ fn init_platform(
     ));
 
     info!("attaching platform routes...");
-    Ok(platform::http::attach_routes(
+    let router = platform::http::attach_routes(
         router,
         &md,
         &platform_provider,
         cfg,
-    ))
+    );
+
+    Ok(router)
 }
 
 fn init_ingester(

@@ -41,15 +41,13 @@ pub async fn start(mut cfg: Config) -> Result<()> {
     init_metrics();
     info!("system initialization...");
     init_system(&md, &db, num_cpus::get())?;
-    init_config(&md,&mut cfg)?;
-    if let Some(ui_path) = &cfg.data.ui_path {
-        if !ui_path.try_exists()? {
-            return Err(Error::FileNotFound(format!(
-                "ui path {ui_path:?} doesn't exist"
-            )));
-        }
-        debug!("ui path: {:?}", ui_path);
+    init_config(&md, &mut cfg)?;
+    if !cfg.data.ui_path.try_exists()? {
+        return Err(Error::FileNotFound(format!(
+            "ui path {:?} doesn't exist", cfg.data.ui_path
+        )));
     }
+    debug!("ui path: {:?}", cfg.data.ui_path);
 
     let just_initialized = if md.accounts.list()?.is_empty() {
         info!("creating admin account...");
