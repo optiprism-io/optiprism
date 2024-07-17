@@ -773,7 +773,7 @@ impl Funnel {
                         Decimal::from_f64(100.).unwrap()
                     } else {
                         Decimal::from_f64(if step.total > 0 {
-                            step.total as f64 / bucket.steps[step_id - 1].total as f64 * 100.
+                            step.total as f64 / bucket.steps[0].total as f64 * 100.
                         } else {
                             0.
                         })
