@@ -14,7 +14,7 @@ use chrono::Duration;
 use chrono::NaiveDateTime;
 use chrono::Utc;
 use clap::Parser;
-use common::group_col;
+use common::{DATA_PATH_METADATA, DATA_PATH_STORAGE, group_col};
 use common::types::COLUMN_EVENT;
 use common::types::EVENT_PROPERTY_CITY;
 use common::types::EVENT_PROPERTY_COUNTRY;
@@ -64,7 +64,7 @@ use uaparser::UserAgentParser;
 
 use crate::error::Error;
 use crate::error::Result;
-use crate::init_ingester;
+use crate::{init_config, init_ingester};
 use crate::init_metrics;
 use crate::init_platform;
 use crate::init_session_cleaner;
@@ -114,15 +114,15 @@ pub struct Config<R> {
     pub partitions: usize,
 }
 
-pub async fn start(args: &Store,cfg:crate::Config) -> Result<()> {
+pub async fn start(args: &Store, mut cfg: crate::Config) -> Result<()> {
     debug!("db path: {:?}", args.path);
 
     if args.generate {
         fs::remove_dir_all(&args.path).unwrap();
     }
-    let rocks = Arc::new(metadata::rocksdb::new(args.path.join("data/md"))?);
+    let rocks = Arc::new(metadata::rocksdb::new(args.path.join(DATA_PATH_METADATA))?);
     let db = Arc::new(OptiDBImpl::open(
-        args.path.join("data/storage"),
+        args.path.join(DATA_PATH_STORAGE),
         Options {},
     )?);
     let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
@@ -130,6 +130,7 @@ pub async fn start(args: &Store,cfg:crate::Config) -> Result<()> {
     init_metrics();
     info!("system initialization...");
     init_system(&md, &db, args.partitions.unwrap_or_else(num_cpus::get))?;
+    init_config(&md, &mut cfg)?;
 
     if let Some(ui_path) = &args.ui_path {
         if !ui_path.try_exists()? {
@@ -256,7 +257,7 @@ pub async fn start(args: &Store,cfg:crate::Config) -> Result<()> {
         listener,
         router.into_make_service_with_connect_info::<SocketAddr>(),
     )
-    .await?)
+        .await?)
 }
 
 pub fn gen<R>(

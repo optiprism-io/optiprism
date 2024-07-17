@@ -6,9 +6,10 @@ use serde::Deserialize;
 use serde::Serialize;
 use storage::db::OptiDBImpl;
 
-use crate::{accounts, bookmarks};
+use crate::{accounts, bookmarks, config};
 use crate::accounts::Accounts;
 use crate::bookmarks::Bookmarks;
+use crate::config::Config;
 use crate::custom_events;
 use crate::custom_events::CustomEvents;
 use crate::dashboards;
@@ -31,6 +32,7 @@ use crate::sessions::Sessions;
 use crate::Result;
 
 pub struct MetadataProvider {
+    pub config: Arc<Config>,
     pub dashboards: Arc<Dashboards>,
     pub reports: Arc<Reports>,
     pub bookmarks: Arc<Bookmarks>,
@@ -53,6 +55,7 @@ impl MetadataProvider {
         let events = Arc::new(events::Events::new(db.clone(), dicts.clone()));
         let accounts = Arc::new(accounts::Accounts::new(db.clone()));
         Ok(MetadataProvider {
+            config: Arc::new(config::Config::new(db.clone())),
             dashboards: Arc::new(dashboards::Dashboards::new(db.clone())),
             reports: Arc::new(reports::Reports::new(db.clone())),
             bookmarks: Arc::new(bookmarks::Bookmarks::new(db.clone())),

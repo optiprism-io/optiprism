@@ -89,15 +89,17 @@ use platform::auth::password::make_password_hash;
 use platform::PlatformProvider;
 use rand::distributions::Alphanumeric;
 use rand::distributions::DistString;
-use rand::thread_rng;
+use rand::{Rng, thread_rng};
 use tracing::info;
 use uaparser::UserAgentParser;
+use metadata::config::StringKey;
+use metadata::error::MetadataError;
 use query::event_records::EventRecordsProvider;
 use query::event_segmentation::EventSegmentationProvider;
 use query::funnel::FunnelProvider;
 use query::group_records::GroupRecordsProvider;
 use query::properties::PropertiesProvider;
-
+use crate::error::Result;
 use crate::error::Error;
 
 pub mod error;
@@ -352,6 +354,36 @@ fn init_session_cleaner(
     Ok(())
 }
 
+fn get_random_key64() -> [u8; 64] {
+    let mut arr = [0u8; 64];
+    thread_rng().try_fill(&mut arr[..]).unwrap();
+    return arr;
+}
+fn init_config(md: &Arc<MetadataProvider>, cfg: &mut Config) -> Result<()> {
+    match md.config.get_string(StringKey::AuthAccessToken) {
+        Err(MetadataError::NotFound(_)) => {
+            let key = hex::encode(get_random_key64());
+            md.config.set_string(StringKey::AuthAccessToken, Some(key.to_owned()))?;
+            cfg.auth.access_token_key = key;
+        }
+        other => {
+            other?;
+        },
+    }
+
+    match md.config.get_string(StringKey::AuthRefreshToken) {
+        Err(MetadataError::NotFound(_)) => {
+            let key = hex::encode(get_random_key64());
+            md.config.set_string(StringKey::AuthRefreshToken, Some(key.to_owned()))?;
+            cfg.auth.refresh_token_key = key;
+        }
+        other => {
+            other?;
+        },
+    }
+
+    Ok(())
+}
 fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<Project> {
     let admin = match md.accounts.create(CreateAccountRequest {
         created_by: ADMIN_ID,
