@@ -5,17 +5,22 @@
 image:
   repository: docker.io/optiprismio/optiprism
   pullPolicy: Always
-  tag: ""
+  tag: "v0.6.0"
 
 nameOverride: ""
 fullnameOverride: ""
+
+configFile: config.toml
 
 serviceAccount:
   create: true
   annotations: { }
   name: ""
 
-podAnnotations: { }
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "9102"
+  prometheus.io/path: "/metrics"
 
 podSecurityContext: { }
 
