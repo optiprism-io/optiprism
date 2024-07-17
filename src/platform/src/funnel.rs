@@ -533,7 +533,7 @@ impl Into<common::funnel::ExcludeSteps> for ExcludeSteps {
         match self {
             ExcludeSteps::All => common::funnel::ExcludeSteps::All,
             ExcludeSteps::Between { from, to } => {
-                common::funnel::ExcludeSteps::Between(from, to)
+                common::funnel::ExcludeSteps::Between(from - 1, to - 1)
             }
         }
     }

@@ -1,4 +1,3 @@
-
 use std::fs;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -6,7 +5,7 @@ use std::sync::Arc;
 use axum::Router;
 use common::config::Config;
 use common::rbac::Role;
-use common::ADMIN_ID;
+use common::{ADMIN_ID, DATA_PATH_METADATA, DATA_PATH_STORAGE};
 use hyper::Server;
 use metadata::accounts::CreateAccountRequest;
 use metadata::error::MetadataError;
@@ -24,25 +23,25 @@ use tracing::info;
 
 use crate::error::Error;
 use crate::error::Result;
-use crate::init_ingester;
+use crate::{init_config, init_ingester};
 use crate::init_metrics;
 use crate::init_platform;
 use crate::init_session_cleaner;
 use crate::init_system;
 
-pub async fn start(cfg: Config) -> Result<()> {
+pub async fn start(mut cfg: Config) -> Result<()> {
     debug!("db path: {:?}", cfg.data.path);
 
-    fs::create_dir_all(cfg.data.path.join("data/md"))?;
-    fs::create_dir_all(cfg.data.path.join("data/storage"))?;
-    let rocks = Arc::new(metadata::rocksdb::new(cfg.data.path.join("data/md"))?);
-    let db = Arc::new(OptiDBImpl::open(cfg.data.path.join("data/storage"), Options {})?);
+    fs::create_dir_all(cfg.data.path.join(DATA_PATH_METADATA))?;
+    fs::create_dir_all(cfg.data.path.join(DATA_PATH_STORAGE))?;
+    let rocks = Arc::new(metadata::rocksdb::new(cfg.data.path.join(DATA_PATH_METADATA))?);
+    let db = Arc::new(OptiDBImpl::open(cfg.data.path.join(DATA_PATH_STORAGE), Options {})?);
     let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
     info!("metrics initialization...");
     init_metrics();
     info!("system initialization...");
     init_system(&md, &db, num_cpus::get())?;
-
+    init_config(&md,&mut cfg)?;
     if let Some(ui_path) = &cfg.data.ui_path {
         if !ui_path.try_exists()? {
             return Err(Error::FileNotFound(format!(
@@ -106,5 +105,5 @@ pub async fn start(cfg: Config) -> Result<()> {
         listener,
         router.into_make_service_with_connect_info::<SocketAddr>(),
     )
-    .await?)
+        .await?)
 }
