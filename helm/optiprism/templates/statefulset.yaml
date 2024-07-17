@@ -46,18 +46,24 @@ spec:
             - name: optiprism
               mountPath: /var/lib/optiprism/data
             - name: config-volume
-              mountPath: /etc/config.d/production.toml
+              mountPath: /etc/optiprism/config.d/production.toml
               subPath: config.toml
           readinessProbe:
-            httpGet:
-              path: /api
+            tcpSocket:
               port: {{ .Values.service.port }}
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: 15
+            periodSeconds: 10
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       volumes:
         - name: config-volume
           configMap:
-            name: { { include "optiprism.fullname" . } }
+            name: {{ include "optiprism.fullname" . }}
   volumeClaimTemplates:
     - metadata:
         name: optiprism
