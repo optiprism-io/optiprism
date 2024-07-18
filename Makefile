@@ -51,23 +51,15 @@ docker-publish:
 
 docker-release: docker-build docker-publish
 
-docker-backend-build:
-	docker buildx build  --no-cache --ssh default --load --file docker/backend.Dockerfile --platform=linux/amd64 --progress plain -t $(IMAGE) .
+docker-local-build:
+	docker buildx build  --ssh default --load --file docker/local.Dockerfile --platform=linux/amd64 --progress plain -t $(IMAGE) .
 
-docker-backend-publish:
+docker-local-publish:
 	$(pushing pushing $(IMAGE) docker image...)
 	docker push $(IMAGE)
 
-docker-backend-release: docker-backend-build docker-backend-publish
+docker-local-release: docker-local-build docker-local-publish
 
-docker-frontend-build:
-	docker buildx build  --no-cache --ssh default --load --file docker/frontend.Dockerfile --platform=linux/amd64 --progress plain -t $(IMAGE)-frontend .
-
-docker-frontend-publish:
-	$(pushing pushing $(IMAGE)-frontend docker image...)
-	docker push $(IMAGE)-frontend
-
-docker-frontend-release: docker-frontend-build docker-frontend-publish
 
 release:
 	helm upgrade --install --values ./helm/optiprism/values.yaml --set image.tag=v$(VERSION) --set podAnnotations.version=$(VERSION) optiprism ./helm/optiprism -n optiprism
