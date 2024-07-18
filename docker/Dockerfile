@@ -5,6 +5,9 @@ RUN mkdir -p -m 0700 ~/.ssh && ssh-keyscan github.com >> ~/.ssh/known_hosts
 RUN --mount=type=ssh git clone ssh://git@github.com/optiprism-io/frontend.git .
 RUN npm i yarn --legacy-peer-deps
 RUN npm i --legacy-peer-deps
+ENV VITE_MOCK_API false
+ENV VITE_API_BASE_PATH /api
+ENV VITE_API_VERSION v1
 RUN yarn build
 
 FROM node as tracker

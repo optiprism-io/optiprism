@@ -21,3 +21,5 @@ playwright-report/
 playwright/.cache/
 __pycache__
 /init/
+/frontend/
+/optiprism-js/

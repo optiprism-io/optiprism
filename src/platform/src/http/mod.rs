@@ -69,7 +69,7 @@ pub fn attach_routes(
     let serve_dir = ServeDir::new(cfg.data.ui_path.to_owned())
         .not_found_service(ServeFile::new(cfg.data.ui_path.join("index.html")));
     router = router
-        .nest_service("", serve_dir.clone())
+        .nest_service("/", serve_dir.clone())
         .fallback_service(serve_dir);
 
     router = router
