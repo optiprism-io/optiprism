@@ -11,5 +11,9 @@ spec:
       targetPort: http
       protocol: TCP
       name: http
+    - port: 9102
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
   selector:
     {{- include "optiprism.selectorLabels" . | nindent 4 }}
