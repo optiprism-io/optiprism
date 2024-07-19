@@ -34,6 +34,9 @@ spec:
             - {{ . }}
           {{- end }}
           ports:
+            - name: metrics
+              containerPort: 9102
+              protocol: TCP
             - name: http
               containerPort: {{ .Values.service.port }}
               protocol: TCP
