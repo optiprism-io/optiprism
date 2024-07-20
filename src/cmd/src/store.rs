@@ -119,11 +119,11 @@ pub async fn start(args: &Store, mut cfg: crate::Config) -> Result<()> {
         Options {},
     )?);
     let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
+    init_config(&md, &mut cfg)?;
     info!("metrics initialization...");
     init_metrics();
     info!("system initialization...");
-    init_system(&md, &db, args.partitions.unwrap_or_else(num_cpus::get))?;
-    init_config(&md, &mut cfg)?;
+    init_system(&md, &db, &cfg)?;
 
     if !cfg.data.ui_path.try_exists()? {
         return Err(Error::FileNotFound(format!(

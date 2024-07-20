@@ -19,7 +19,6 @@ use crate::Value;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Options {
-    pub parallelism: usize,
     pub index_cols: usize,
     pub is_replacing: bool,
     pub levels: usize,
@@ -42,7 +41,6 @@ impl Options {
         Options {
             levels: 7,
             merge_array_size: 10000,
-            parallelism: 1,
             index_cols: 1,
             is_replacing,
             l1_max_size_bytes: 1024 * 1024 * 10,

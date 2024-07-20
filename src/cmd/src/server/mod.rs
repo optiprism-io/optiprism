@@ -7,6 +7,8 @@ use common::config::Config;
 use common::rbac::Role;
 use common::{ADMIN_ID, DATA_PATH_METADATA, DATA_PATH_STORAGE};
 use hyper::Server;
+use rand::distributions::Alphanumeric;
+use rand::Rng;
 use metadata::accounts::CreateAccountRequest;
 use metadata::error::MetadataError;
 use metadata::organizations::CreateOrganizationRequest;
@@ -20,7 +22,7 @@ use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tracing::debug;
 use tracing::info;
-
+use metadata::config::StringKey::AdminDefaultPassword;
 use crate::error::Error;
 use crate::error::Result;
 use crate::{init_config, init_ingester};
@@ -37,11 +39,11 @@ pub async fn start(mut cfg: Config) -> Result<()> {
     let rocks = Arc::new(metadata::rocksdb::new(cfg.data.path.join(DATA_PATH_METADATA))?);
     let db = Arc::new(OptiDBImpl::open(cfg.data.path.join(DATA_PATH_STORAGE), Options {})?);
     let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
+    init_config(&md, &mut cfg)?;
     info!("metrics initialization...");
     init_metrics();
     info!("system initialization...");
-    init_system(&md, &db, num_cpus::get())?;
-    init_config(&md, &mut cfg)?;
+    init_system(&md, &db, &cfg)?;
     if !cfg.data.ui_path.try_exists()? {
         return Err(Error::FileNotFound(format!(
             "ui path {:?} doesn't exist", cfg.data.ui_path
@@ -49,32 +51,41 @@ pub async fn start(mut cfg: Config) -> Result<()> {
     }
     debug!("ui path: {:?}", cfg.data.ui_path);
 
-    let just_initialized = if md.accounts.list()?.is_empty() {
-        info!("creating admin account...");
-        let acc = md.accounts.create(CreateAccountRequest {
-            created_by: ADMIN_ID,
-            password_hash: make_password_hash("admin")?,
-            email: "admin@admin.com".to_string(),
-            name: Some("admin".to_string()),
-            force_update_password: true,
-            force_update_email: true,
-            role: Some(Role::Admin),
-            organizations: None,
-            projects: None,
-            teams: None,
-        })?;
+    let admin_acc = match md.accounts.get_by_id(ADMIN_ID){
+        Ok(acc) => acc,
+        Err(err) => match err {
+            MetadataError::NotFound(_) => {
+                let pwd: String = rand::thread_rng()
+                    .sample_iter(&Alphanumeric)
+                    .take(32)
+                    .map(char::from)
+                    .collect();
+                md.config.set_string(AdminDefaultPassword,Some(pwd.to_owned())).map_err(|e|Error::Metadata(e))?;
+                info!("creating admin account...");
+                let acc = md.accounts.create(CreateAccountRequest {
+                    created_by: ADMIN_ID,
+                    password_hash: make_password_hash(&pwd)?,
+                    email: "admin@admin.com".to_string(),
+                    name: Some("admin".to_string()),
+                    force_update_password: true,
+                    force_update_email: true,
+                    role: Some(Role::Admin),
+                    organizations: None,
+                    projects: None,
+                    teams: None,
+                })?;
 
-        info!("creating organization...");
-        md.organizations.create(CreateOrganizationRequest {
-            created_by: acc.id,
-            name: "My Organization".to_string(),
-        })?;
+                info!("creating organization...");
+                md.organizations.create(CreateOrganizationRequest {
+                    created_by: acc.id,
+                    name: "My Organization".to_string(),
+                })?;
 
-        true
-    } else {
-        false
+                acc
+            }
+            other => return Err(other.into()),
+        }
     };
-
     let router = Router::new();
     info!("initializing session cleaner...");
     init_session_cleaner(md.clone(), db.clone(), cfg.clone())?;
@@ -95,8 +106,12 @@ pub async fn start(mut cfg: Config) -> Result<()> {
     };
 
     info!("Web Interface: https://{}", cfg.server.host);
-    if just_initialized {
-        info!("email: admin@admin.com, password: admin, (DON'T FORGET TO CHANGE)");
+    if admin_acc.force_update_email {
+        info!("email: {}",admin_acc.email);
+    }
+    if admin_acc.force_update_password {
+        let pwd = md.config.get_string(AdminDefaultPassword)?;
+        info!("password: {}",pwd.unwrap());
     }
     let listener = tokio::net::TcpListener::bind(cfg.server.host).await?;
     Ok(axum::serve(

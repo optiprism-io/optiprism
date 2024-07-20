@@ -36,11 +36,30 @@ pub struct Log {
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
+pub struct Table {
+    pub levels: usize,
+    l0_max_parts: usize,
+    l1_max_size_bytes: usize,
+    level_size_multiplier: usize,
+    max_log_length_bytes: usize,
+    merge_max_l1_part_size_bytes: usize,
+    merge_part_size_multiplier: usize,
+    merge_data_page_size_limit_bytes: usize,
+    merge_row_group_values_limit: usize,
+    merge_array_size: usize,
+    merge_chunk_size: usize,
+    merge_array_page_size: usize,
+    merge_max_page_size: usize,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
 pub struct Config {
     pub server: Server,
     pub data: Data,
     pub misc: Misc,
     pub auth: Auth,
+    pub events_table: Table,
+    pub group_table: Table,
     pub log: Log,
 }
 
@@ -67,13 +86,43 @@ impl TryInto<common::config::Config> for Config {
                 access_token_key: "".to_string(),
                 refresh_token_key: "".to_string(),
             },
-            log: common::config::Log { level: self.log.level.into()},
+            log: common::config::Log { level: self.log.level.into() },
             misc: common::config::Misc {
                 session_cleaner_interval: parse_duration(self.misc.session_cleaner_interval.as_str())?,
                 project_default_session_duration: parse_duration(
                     self.misc.project_default_session_duration.as_str(),
                 )?,
             },
+            events_table: common::config::Table {
+                levels: self.events_table.levels,
+                l0_max_parts: self.events_table.l0_max_parts,
+                l1_max_size_bytes: self.events_table.l1_max_size_bytes,
+                level_size_multiplier: self.events_table.level_size_multiplier,
+                max_log_length_bytes: self.events_table.max_log_length_bytes,
+                merge_max_l1_part_size_bytes: self.events_table.merge_max_l1_part_size_bytes,
+                merge_part_size_multiplier: self.events_table.merge_part_size_multiplier,
+                merge_data_page_size_limit_bytes: self.events_table.merge_data_page_size_limit_bytes,
+                merge_row_group_values_limit: self.events_table.merge_row_group_values_limit,
+                merge_array_size: self.events_table.merge_array_size,
+                merge_chunk_size: self.events_table.merge_chunk_size,
+                merge_array_page_size: self.events_table.merge_array_page_size,
+                merge_max_page_size: self.events_table.merge_max_page_size,
+            },
+            group_table: common::config::Table {
+                levels: self.group_table.levels,
+                l0_max_parts: self.group_table.l0_max_parts,
+                l1_max_size_bytes: self.group_table.l1_max_size_bytes,
+                level_size_multiplier: self.group_table.level_size_multiplier,
+                max_log_length_bytes: self.group_table.max_log_length_bytes,
+                merge_max_l1_part_size_bytes: self.group_table.merge_max_l1_part_size_bytes,
+                merge_part_size_multiplier: self.group_table.merge_part_size_multiplier,
+                merge_data_page_size_limit_bytes: self.group_table.merge_data_page_size_limit_bytes,
+                merge_row_group_values_limit: self.group_table.merge_row_group_values_limit,
+                merge_array_size: self.group_table.merge_array_size,
+                merge_chunk_size: self.group_table.merge_chunk_size,
+                merge_array_page_size: self.group_table.merge_array_page_size,
+                merge_max_page_size: self.group_table.merge_max_page_size,
+            }
         })
     }
 }

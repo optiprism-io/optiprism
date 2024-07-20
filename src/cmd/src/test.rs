@@ -11,7 +11,6 @@ use chrono::DurationRound;
 use chrono::NaiveDateTime;
 use chrono::Utc;
 use clap::Parser;
-use common::config::Config;
 use common::types::DType;
 use common::types::TABLE_EVENTS;
 use common::DECIMAL_SCALE;
@@ -36,12 +35,12 @@ use tokio::net::TcpListener;
 use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tracing::info;
+use common::config::Config;
 use query::event_records::EventRecordsProvider;
 use query::event_segmentation::EventSegmentationProvider;
 use query::funnel::FunnelProvider;
 use query::group_records::GroupRecordsProvider;
 use query::properties::PropertiesProvider;
-
 use crate::init_metrics;
 use crate::init_system;
 
@@ -57,9 +56,11 @@ pub struct Test {
     partitions: Option<usize>,
     #[arg(long, default_value = "4096")]
     batch_size: usize,
+    #[arg(long)]
+    pub config: PathBuf,
 }
 
-pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
+pub async fn gen(args: &Test, cfg: Config) -> Result<(), anyhow::Error> {
     fs::remove_dir_all(&args.path).unwrap();
     let rocks = Arc::new(metadata::rocksdb::new(args.path.join("md"))?);
     let db = Arc::new(OptiDBImpl::open(args.path.join("store"), Options {})?);
@@ -67,7 +68,7 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
     info!("metrics initialization...");
     init_metrics();
     info!("system initialization...");
-    init_system(&md, &db, num_cpus::get())?;
+    init_system(&md, &db, &cfg)?;
 
     info!("creating org structure and admin account...");
     let proj = crate::init_test_org_structure(&md)?;
@@ -76,7 +77,6 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
     init_project(proj.id, &md)?;
 
     info!("starting sample data generation...");
-    let _partitions = args.partitions.unwrap_or_else(num_cpus::get);
 
     let props = [
         ("i_8", DType::Int8),
@@ -113,12 +113,12 @@ pub async fn gen(args: &Test) -> Result<(), anyhow::Error> {
         nullable: true,
         hidden: false,
         dict: Some(DictionaryType::Int8),
-        is_system:  true,
+        is_system: true,
     })?;
 
     md.dictionaries
-        .get_key_or_create(1,TABLE_EVENTS, "string_dict", "привет")?;
-    md.dictionaries.get_key_or_create(1, TABLE_EVENTS,"string_dict", "мир")?;
+        .get_key_or_create(1, TABLE_EVENTS, "string_dict", "привет")?;
+    md.dictionaries.get_key_or_create(1, TABLE_EVENTS, "string_dict", "мир")?;
     let e = create_event(&md, proj.id, "event".to_string())?;
     let now = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0)
         .unwrap()

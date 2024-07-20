@@ -10,13 +10,15 @@ use crate::Result;
 pub enum StringKey {
     AuthAccessToken,
     AuthRefreshToken,
+    AdminDefaultPassword,
 }
 
 impl StringKey {
     fn as_str(&self) -> &'static str {
         match self {
             StringKey::AuthAccessToken => "auth_access_token",
-            StringKey::AuthRefreshToken => "auth_refresh_token"
+            StringKey::AuthRefreshToken => "auth_refresh_token",
+            StringKey::AdminDefaultPassword => "admin_default_password"
         }
     }
 }
