@@ -109,6 +109,10 @@ pub const METRIC_INGESTER_TRACKED_TOTAL: &str = "optiprism_ingester_tracked_tota
 pub const METRIC_INGESTER_TRACK_TIME_MS: &str = "optiprism_ingester_track_time_ms";
 
 pub const METRIC_QUERY_EXECUTION_TIME_MS: &str = "optiprism_query_execution_time_ms";
+
+pub const METRIC_HTTP_REQUEST_TIME_MS: &str = "optiprism_http_request_time_ms";
+pub const METRIC_HTTP_REQUESTS_TOTAL: &str = "optiprism_http_requests_total";
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 #[derive(Default)]

@@ -15,7 +15,7 @@ use axum::Router;
 use axum_macros::debug_handler;
 use chrono::DateTime;
 use chrono::Utc;
-use common::http::print_request_response;
+use common::http::{measure_request_response, print_request_response};
 use common::types::{EVENT_CLICK, METRIC_INGESTER_TRACK_TIME_MS, METRIC_INGESTER_TRACKED_TOTAL};
 use common::types::EVENT_PAGE;
 use common::types::EVENT_SCREEN;
@@ -270,6 +270,7 @@ pub fn attach_routes(
         .layer(cors)
         .layer(Extension(app))
         .layer(Extension(TraceLayer::new_for_http()))
+        .layer(middleware::from_fn(measure_request_response))
         .layer(middleware::from_fn(print_request_response))
 }
 

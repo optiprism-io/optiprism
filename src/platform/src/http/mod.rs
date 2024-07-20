@@ -21,7 +21,7 @@ use axum::middleware;
 use axum::Extension;
 use axum::Router;
 use common::config::Config;
-use common::http::print_request_response;
+use common::http::{measure_request_response, print_request_response};
 use metadata::MetadataProvider;
 use tower::ServiceBuilder;
 use tower_cookies::CookieManagerLayer;
@@ -103,6 +103,7 @@ pub fn attach_routes(
         .layer(cors)
         .layer(CookieManagerLayer::new())
         .layer(Extension(TraceLayer::new_for_http()))
+        .layer(middleware::from_fn(measure_request_response))
         .layer(middleware::from_fn(print_request_response));
 
     router

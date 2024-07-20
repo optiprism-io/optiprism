@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt::Display;
 use std::fmt::Formatter;
-
+use std::time::Instant;
 use async_trait::async_trait;
 use axum::body::HttpBody;
 use axum::extract::rejection::JsonRejection;
@@ -26,6 +26,7 @@ use bytes::Bytes;
 use http_body_util::BodyExt;
 use lazy_static::lazy_static;
 use log::debug;
+use metrics::{counter, histogram};
 use regex::Regex;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -35,6 +36,7 @@ use thiserror::Error;
 
 use crate::error::CommonError;
 use crate::error::Result;
+use crate::types::{METRIC_HTTP_REQUEST_TIME_MS, METRIC_HTTP_REQUESTS_TOTAL};
 
 #[derive(Error, Serialize, Debug, Clone)]
 pub struct ApiError {
@@ -188,7 +190,8 @@ where
 }
 
 impl<T> IntoResponse for Json<T>
-where T: Serialize
+where
+    T: Serialize,
 {
     fn into_response(self) -> Response {
         axum::Json(self.0).into_response()
@@ -201,6 +204,19 @@ pub fn content_length(headers: &HeaderMap<HeaderValue>) -> Option<u64> {
         .and_then(|value| value.to_str().ok()?.parse::<u64>().ok())
 }
 
+pub async fn measure_request_response(
+    req: Request,
+    next: Next,
+) -> std::result::Result<impl IntoResponse, (StatusCode, String)> {
+    let start = Instant::now();
+    let path = req.uri().path().to_string();
+    let res = next.run(req).await;
+    histogram!(METRIC_HTTP_REQUEST_TIME_MS,"path"=>path.to_owned()).record(start.elapsed());
+    counter!(METRIC_HTTP_REQUESTS_TOTAL,"path"=>path).increment(1);
+    Ok(res)
+}
+
+
 pub async fn print_request_response(
     req: Request,
     next: Next,
@@ -211,9 +227,6 @@ pub async fn print_request_response(
     let req = Request::from_parts(parts, Body::from(bytes));
 
     let res = next.run(req).await;
-    // let (parts, body) = res.into_parts();
-    // let bytes = buffer_and_print("response", body).await?;
-    // let res = Response::from_parts(parts, Body::from(bytes));
 
     Ok(res)
 }
@@ -223,7 +236,7 @@ async fn buffer_and_print<B>(
     body: B,
 ) -> std::result::Result<Bytes, (StatusCode, String)>
 where
-    B: axum::body::HttpBody<Data = Bytes>,
+    B: axum::body::HttpBody<Data=Bytes>,
     B::Error: std::fmt::Display,
 {
     let bytes = match body.collect().await {
