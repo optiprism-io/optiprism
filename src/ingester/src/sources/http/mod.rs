@@ -16,7 +16,7 @@ use axum_macros::debug_handler;
 use chrono::DateTime;
 use chrono::Utc;
 use common::http::print_request_response;
-use common::types::EVENT_CLICK;
+use common::types::{EVENT_CLICK, METRIC_INGESTER_TRACK_TIME_MS, METRIC_INGESTER_TRACKED_TOTAL};
 use common::types::EVENT_PAGE;
 use common::types::EVENT_SCREEN;
 use metrics::counter;
@@ -128,8 +128,8 @@ async fn track(
     };
     app.track(&ctx, request)?;
 
-    counter!("ingester.tracked_total").increment(1);
-    histogram!("ingester.track_time_seconds").record(init_time.elapsed());
+    counter!(METRIC_INGESTER_TRACKED_TOTAL).increment(1);
+    histogram!(METRIC_INGESTER_TRACK_TIME_MS).record(init_time.elapsed());
 
     Ok(StatusCode::CREATED)
 }

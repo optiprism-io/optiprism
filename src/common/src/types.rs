@@ -83,28 +83,32 @@ pub const RESERVED_COLUMN_AGG_PARTITIONED_COUNT: &str = "partitioned_count";
 pub const RESERVED_COLUMN_AGG: &str = "agg";
 pub const RESERVED_COLUMN_COUNT: &str = "count";
 
-pub const METRIC_STORE_INSERTS_TOTAL: &str = "store.inserts_total";
-pub const METRIC_STORE_INSERT_TIME_MS: &str = "store.insert_time_ms";
-pub const METRIC_STORE_SCANS_TOTAL: &str = "store.scans_total";
-pub const METRIC_STORE_SCAN_PARTS_TOTAL: &str = "store.scan_parts_total";
-pub const METRIC_STORE_MERGES_TOTAL: &str = "store.merges_total";
-pub const METRIC_STORE_SCAN_TIME_MS: &str = "store.scan_time_ms";
-pub const METRIC_STORE_TABLE_FIELDS: &str = "store.table_fields";
-pub const METRIC_STORE_SEQUENCE: &str = "store.sequence";
-pub const METRIC_STORE_PARTS_SIZE_BYTES: &str = "store.parts_size_bytes";
-pub const METRIC_STORE_PART_SIZE_BYTES: &str = "store.part_size_bytes";
-pub const METRIC_STORE_PART_VALUES: &str = "store.part_values";
-pub const METRIC_STORE_PARTS: &str = "store.parts";
-pub const METRIC_STORE_PARTS_VALUES: &str = "store.parts_values";
-pub const METRIC_STORE_MEMTABLE_ROWS: &str = "store.memtable_rows";
-pub const METRIC_STORE_SCAN_MEMTABLE_MS: &str = "store.scan_memtable_ms";
-pub const METRIC_STORE_COMPACTIONS_TOTAL: &str = "store.compactions_total";
-pub const METRIC_STORE_LEVEL_COMPACTION_TIME_MS: &str = "store.level_compaction_time_ms";
-pub const METRIC_STORE_COMPACTION_TIME_MS: &str = "store.compaction_time_ms";
-pub const METRIC_STORE_RECOVERY_TIME_MS: &str = "store.recovery_time_ms";
-pub const METRIC_STORE_FLUSH_TIME_MS: &str = "store.flush_time_ms";
-pub const METRIC_STORE_FLUSHES_TOTAL: &str = "store.flushes_total";
+pub const METRIC_STORE_INSERTS_TOTAL: &str = "optiprism_store_inserts_total";
+pub const METRIC_STORE_INSERT_TIME_MS: &str = "optiprism_store_insert_time_ms";
+pub const METRIC_STORE_SCANS_TOTAL: &str = "optiprism_store_scans_total";
+pub const METRIC_STORE_SCAN_PARTS_TOTAL: &str = "optiprism_store_scan_parts_total";
+pub const METRIC_STORE_MERGES_TOTAL: &str = "optiprism_store_merges_total";
+pub const METRIC_STORE_SCAN_TIME_MS: &str = "optiprism_store_scan_time_ms";
+pub const METRIC_STORE_TABLE_FIELDS: &str = "optiprism_store_table_fields";
+pub const METRIC_STORE_SEQUENCE: &str = "optiprism_store_sequence";
+pub const METRIC_STORE_PARTS_SIZE_BYTES: &str = "optiprism_store_parts_size_bytes";
+pub const METRIC_STORE_PART_SIZE_BYTES: &str = "optiprism_store_part_size_bytes";
+pub const METRIC_STORE_PART_VALUES: &str = "optiprism_store_part_values";
+pub const METRIC_STORE_PARTS: &str = "optiprism_store_parts";
+pub const METRIC_STORE_PARTS_VALUES: &str = "optiprism_store_parts_values";
+pub const METRIC_STORE_MEMTABLE_ROWS: &str = "optiprism_store_memtable_rows";
+pub const METRIC_STORE_SCAN_MEMTABLE_MS: &str = "optiprism_store_scan_memtable_ms";
+pub const METRIC_STORE_COMPACTIONS_TOTAL: &str = "optiprism_store_compactions_total";
+pub const METRIC_STORE_LEVEL_COMPACTION_TIME_MS: &str = "optiprism_store_level_compaction_time_ms";
+pub const METRIC_STORE_COMPACTION_TIME_MS: &str = "optiprism_store_compaction_time_ms";
+pub const METRIC_STORE_RECOVERY_TIME_MS: &str = "optiprism_store_recovery_time_ms";
+pub const METRIC_STORE_FLUSH_TIME_MS: &str = "optiprism_store_flush_time_ms";
+pub const METRIC_STORE_FLUSHES_TOTAL: &str = "optiprism_store_flushes_total";
 
+pub const METRIC_INGESTER_TRACKED_TOTAL: &str = "optiprism_ingester_tracked_total";
+pub const METRIC_INGESTER_TRACK_TIME_MS: &str = "optiprism_ingester_track_time_ms";
+
+pub const METRIC_QUERY_EXECUTION_TIME_MS: &str = "optiprism_query_execution_time_ms";
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 #[derive(Default)]

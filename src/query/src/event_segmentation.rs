@@ -11,7 +11,7 @@ use common::query::Breakdown;
 use common::query::DidEventAggregate;
 use common::query::PropertyRef;
 use common::query::SegmentCondition;
-use common::types::{COLUMN_CREATED_AT, COLUMN_IP, GROUP_COLUMN_ID, TABLE_EVENTS};
+use common::types::{COLUMN_CREATED_AT, COLUMN_IP, GROUP_COLUMN_ID, METRIC_QUERY_EXECUTION_TIME_MS, TABLE_EVENTS};
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_PROJECT_ID;
 use common::types::COLUMN_SEGMENT;
@@ -34,6 +34,7 @@ use datafusion_expr::LogicalPlan;
 use datafusion_expr::Operator;
 use datafusion_expr::ScalarUDF;
 use datafusion_expr::Sort;
+use metrics::histogram;
 use tracing::debug;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
@@ -118,6 +119,9 @@ impl EventSegmentationProvider {
         let result = execute(session_ctx, state, plan).await?;
         let duration = start.elapsed();
         debug!("elapsed: {:?}", duration);
+        let elapsed = start.elapsed();
+        histogram!(METRIC_QUERY_EXECUTION_TIME_MS, "query"=>"event_segmentation_search").record(elapsed);
+        debug!("elapsed: {:?}", elapsed);
 
         let metric_cols = req.time_columns(ctx.cur_time);
         let cols = result
