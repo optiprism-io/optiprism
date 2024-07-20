@@ -79,7 +79,12 @@ async fn main() -> Result<()> {
                 cmd::store::start(store, cfg.try_into()?).await?;
             }
             Commands::Test(args) => {
-                test::gen(args).await?;
+                let config = config::Config::builder()
+                    .add_source(config::File::from(args.config.clone()))
+                    .build()?;
+
+                let cfg: Config = config.try_deserialize()?;
+                test::gen(args,cfg.try_into()?).await?;
             }
         },
         _ => unreachable!(),

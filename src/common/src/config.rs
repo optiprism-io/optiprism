@@ -35,13 +35,33 @@ pub struct Misc {
 pub struct Log {
     pub level: LevelFilter,
 }
+
+#[derive(Debug, Clone)]
+pub struct Table {
+    pub levels: usize,
+    pub l0_max_parts: usize,
+    pub l1_max_size_bytes: usize,
+    pub level_size_multiplier: usize,
+    pub max_log_length_bytes: usize,
+    pub merge_max_l1_part_size_bytes: usize,
+    pub merge_part_size_multiplier: usize,
+    pub merge_data_page_size_limit_bytes: usize,
+    pub merge_row_group_values_limit: usize,
+    pub merge_array_size: usize,
+    pub merge_chunk_size: usize,
+    pub merge_array_page_size: usize,
+    pub merge_max_page_size: usize,
+}
+
 #[derive(Debug, Clone)]
 pub struct Config {
     pub server: Server,
     pub data: Data,
     pub auth: Auth,
-    pub log: Log,
     pub misc: Misc,
+    pub events_table: Table,
+    pub group_table: Table,
+    pub log: Log,
 
 }
 
@@ -67,6 +87,36 @@ impl Default for Config {
             misc: Misc {
                 session_cleaner_interval: Default::default(),
                 project_default_session_duration: Default::default()
+            },
+            events_table: Table {
+                levels: 0,
+                l0_max_parts: 0,
+                l1_max_size_bytes: 0,
+                level_size_multiplier: 0,
+                max_log_length_bytes: 0,
+                merge_max_l1_part_size_bytes: 0,
+                merge_part_size_multiplier: 0,
+                merge_data_page_size_limit_bytes: 0,
+                merge_row_group_values_limit: 0,
+                merge_array_size: 0,
+                merge_chunk_size: 0,
+                merge_array_page_size: 0,
+                merge_max_page_size: 0,
+            },
+            group_table: Table {
+                levels: 0,
+                l0_max_parts: 0,
+                l1_max_size_bytes: 0,
+                level_size_multiplier: 0,
+                max_log_length_bytes: 0,
+                merge_max_l1_part_size_bytes: 0,
+                merge_part_size_multiplier: 0,
+                merge_data_page_size_limit_bytes: 0,
+                merge_row_group_values_limit: 0,
+                merge_array_size: 0,
+                merge_chunk_size: 0,
+                merge_array_page_size: 0,
+                merge_max_page_size: 0,
             },
         }
     }

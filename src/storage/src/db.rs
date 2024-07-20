@@ -169,7 +169,6 @@ fn recover_op(op: LogOp, memtable: &mut Memtable, metadata: &mut Metadata) -> Re
     match op {
         LogOp::Insert(k, v) => {
             let phash = siphash(&k);
-            let _pid = phash as usize % metadata.opts.parallelism;
             let kv: Vec<Value> = k.iter().map(|k| k.into()).collect::<Vec<_>>();
             let vv = [kv, v].concat();
             for (idx, val) in vv.into_iter().enumerate() {
@@ -1241,7 +1240,6 @@ mod tests {
         let topts = table::Options {
             levels: 7,
             merge_array_size: 10000,
-            parallelism: 1,
             index_cols: 2,
             l1_max_size_bytes: 1024 * 1024 * 10,
             level_size_multiplier: 10,
@@ -1311,7 +1309,6 @@ mod tests {
         let topts = table::Options {
             levels: 7,
             merge_array_size: 10000,
-            parallelism: 1,
             index_cols: 2,
             l1_max_size_bytes: 1024 * 1024 * 10,
             level_size_multiplier: 10,
@@ -1375,7 +1372,6 @@ mod tests {
         let topts = table::Options {
             levels: 7,
             merge_array_size: 10000,
-            parallelism: 1,
             index_cols: 2,
             l1_max_size_bytes: 1024 * 1024 * 10,
             level_size_multiplier: 10,
@@ -1428,7 +1424,6 @@ mod tests {
         let topts = table::Options {
             levels: 7,
             merge_array_size: 10000,
-            parallelism: 1,
             index_cols: 2,
             l1_max_size_bytes: 1024 * 1024 * 10,
             level_size_multiplier: 10,
@@ -1563,7 +1558,6 @@ mod tests {
         let topts = table::Options {
             levels: 7,
             merge_array_size: 10000,
-            parallelism: 1,
             index_cols: 2,
             l1_max_size_bytes: 1024 * 1024 * 10,
             level_size_multiplier: 10,
@@ -1627,7 +1621,6 @@ mod tests {
         let topts = table::Options {
             levels: 7,
             merge_array_size: 10000,
-            parallelism: 1,
             index_cols: 2,
             l1_max_size_bytes: 1024 * 1024 * 10,
             level_size_multiplier: 10,
@@ -1674,7 +1667,6 @@ mod tests {
     // let topts = table::Options {
     // levels: 7,
     // merge_array_size: 10000,
-    // parallelism: 1,
     // index_cols: 1,
     // l1_max_size_bytes: 1024 * 1024 * 10,
     // level_size_multiplier: 10,
