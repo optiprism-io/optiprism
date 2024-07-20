@@ -82,6 +82,29 @@ pub const RESERVED_COLUMN_AGG_PARTITIONED_AGGREGATE: &str = "partitioned_agg";
 pub const RESERVED_COLUMN_AGG_PARTITIONED_COUNT: &str = "partitioned_count";
 pub const RESERVED_COLUMN_AGG: &str = "agg";
 pub const RESERVED_COLUMN_COUNT: &str = "count";
+
+pub const METRIC_STORE_INSERTS_TOTAL: &str = "store.inserts_total";
+pub const METRIC_STORE_INSERT_TIME_MS: &str = "store.insert_time_ms";
+pub const METRIC_STORE_SCANS_TOTAL: &str = "store.scans_total";
+pub const METRIC_STORE_SCAN_PARTS_TOTAL: &str = "store.scan_parts_total";
+pub const METRIC_STORE_MERGES_TOTAL: &str = "store.merges_total";
+pub const METRIC_STORE_SCAN_TIME_MS: &str = "store.scan_time_ms";
+pub const METRIC_STORE_TABLE_FIELDS: &str = "store.table_fields";
+pub const METRIC_STORE_SEQUENCE: &str = "store.sequence";
+pub const METRIC_STORE_PARTS_SIZE_BYTES: &str = "store.parts_size_bytes";
+pub const METRIC_STORE_PART_SIZE_BYTES: &str = "store.part_size_bytes";
+pub const METRIC_STORE_PART_VALUES: &str = "store.part_values";
+pub const METRIC_STORE_PARTS: &str = "store.parts";
+pub const METRIC_STORE_PARTS_VALUES: &str = "store.parts_values";
+pub const METRIC_STORE_MEMTABLE_ROWS: &str = "store.memtable_rows";
+pub const METRIC_STORE_SCAN_MEMTABLE_MS: &str = "store.scan_memtable_ms";
+pub const METRIC_STORE_COMPACTIONS_TOTAL: &str = "store.compactions_total";
+pub const METRIC_STORE_LEVEL_COMPACTION_TIME_MS: &str = "store.level_compaction_time_ms";
+pub const METRIC_STORE_COMPACTION_TIME_MS: &str = "store.compaction_time_ms";
+pub const METRIC_STORE_RECOVERY_TIME_MS: &str = "store.recovery_time_ms";
+pub const METRIC_STORE_FLUSH_TIME_MS: &str = "store.flush_time_ms";
+pub const METRIC_STORE_FLUSHES_TOTAL: &str = "store.flushes_total";
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 #[derive(Default)]
@@ -263,7 +286,9 @@ impl<T> OptionalProperty<T> {
     }
 
     pub fn into<X>(self) -> OptionalProperty<X>
-    where T: Into<X> {
+    where
+        T: Into<X>,
+    {
         match self {
             OptionalProperty::None => OptionalProperty::None,
             OptionalProperty::Some(v) => OptionalProperty::Some(v.into()),
@@ -271,7 +296,9 @@ impl<T> OptionalProperty<T> {
     }
 
     pub fn try_into<X>(self) -> std::result::Result<OptionalProperty<X>, <T as TryInto<X>>::Error>
-    where T: TryInto<X> {
+    where
+        T: TryInto<X>,
+    {
         Ok(match self {
             OptionalProperty::None => OptionalProperty::None,
             OptionalProperty::Some(v) => OptionalProperty::Some(v.try_into()?),
@@ -279,7 +306,9 @@ impl<T> OptionalProperty<T> {
     }
 
     pub fn map<F, U>(self, f: F) -> OptionalProperty<U>
-    where F: FnOnce(T) -> U {
+    where
+        F: FnOnce(T) -> U,
+    {
         match self {
             OptionalProperty::None => OptionalProperty::None,
             OptionalProperty::Some(v) => OptionalProperty::Some(f(v)),
@@ -288,10 +317,13 @@ impl<T> OptionalProperty<T> {
 }
 
 impl<T> Serialize for OptionalProperty<T>
-where T: Serialize
+where
+    T: Serialize,
 {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where S: Serializer {
+    where
+        S: Serializer,
+    {
         match self {
             OptionalProperty::None => panic!("!"),
             OptionalProperty::Some(v) => serializer.serialize_some(v),
@@ -300,10 +332,13 @@ where T: Serialize
 }
 
 impl<'de, T> Deserialize<'de> for OptionalProperty<T>
-where T: Deserialize<'de>
+where
+    T: Deserialize<'de>,
 {
     fn deserialize<D>(de: D) -> std::result::Result<Self, D::Error>
-    where D: Deserializer<'de> {
+    where
+        D: Deserializer<'de>,
+    {
         let a = Deserialize::deserialize(de);
         a.map(OptionalProperty::Some)
     }

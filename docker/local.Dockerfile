@@ -14,7 +14,7 @@ RUN groupadd -r optiprism --gid=101 && useradd -r -g optiprism --uid=101 --home-
 RUN apt-get update
 RUN apt-get install -y openssl ca-certificates locales && apt-get clean
 RUN mkdir -p /var/lib/optiprism /var/log/optiprism /etc/optiprism /etc/optiprism/config.d
-COPY frontend/dist/* /var/lib/optiprism/frontend
+COPY frontend/dist /var/lib/optiprism/frontend
 COPY optiprism-js/dist/optiprism-min.umd.js /var/lib/optiprism/frontend/tracker.js
 COPY docker/config.toml /etc/optiprism/config.d/config.toml
 RUN chown -R optiprism:optiprism /var/lib/optiprism /var/log/optiprism /etc/optiprism
