@@ -8,7 +8,7 @@ use common::query::EventRef;
 use common::query::PropValueFilter;
 use common::query::PropertyRef;
 use common::query::QueryTime;
-use common::types::{COLUMN_CREATED_AT, COLUMN_EVENT, TABLE_EVENTS};
+use common::types::{COLUMN_CREATED_AT, COLUMN_EVENT, METRIC_QUERY_EXECUTION_TIME_MS, TABLE_EVENTS};
 use common::types::COLUMN_EVENT_ID;
 use common::types::COLUMN_PROJECT_ID;
 use common::{DECIMAL_PRECISION, DECIMAL_SCALE, group_col, GROUPS_COUNT};
@@ -27,6 +27,7 @@ use datafusion_expr::LogicalPlan;
 use datafusion_expr::Operator;
 use datafusion_expr::Projection;
 use datafusion_expr::Sort;
+use metrics::histogram;
 use tracing::debug;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
@@ -68,8 +69,9 @@ impl EventRecordsProvider {
         let plan = build_get_by_id_plan(&ctx, self.metadata.clone(), plan, id)?;
         println!("{plan:?}");
         let result = execute(session_ctx, state, plan).await?;
-        let duration = start.elapsed();
-        debug!("elapsed: {:?}", duration);
+        let elapsed = start.elapsed();
+        histogram!(METRIC_QUERY_EXECUTION_TIME_MS, "query"=>"event_records_get_by_id").record(elapsed);
+        debug!("elapsed: {:?}", elapsed);
 
         let mut properties = vec![];
 
@@ -166,7 +168,9 @@ impl EventRecordsProvider {
         let result = execute(session_ctx, state, plan).await?;
         let duration = start.elapsed();
         debug!("elapsed: {:?}", duration);
-
+        let elapsed = start.elapsed();
+        histogram!(METRIC_QUERY_EXECUTION_TIME_MS, "query"=>"event_records_search").record(elapsed);
+        debug!("elapsed: {:?}", elapsed);
 
         let cols = result
             .schema()

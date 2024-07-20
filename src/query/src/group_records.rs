@@ -9,7 +9,7 @@ use common::query::EventRef;
 use common::query::PropValueFilter;
 use common::query::PropertyRef;
 use common::query::QueryTime;
-use common::types::{COLUMN_CREATED_AT, COLUMN_EVENT, GROUP_COLUMN_CREATED_AT, GROUP_COLUMN_ID, GROUP_COLUMN_PROJECT_ID, GROUP_COLUMN_VERSION, SortDirection, TABLE_EVENTS};
+use common::types::{COLUMN_CREATED_AT, COLUMN_EVENT, GROUP_COLUMN_CREATED_AT, GROUP_COLUMN_ID, GROUP_COLUMN_PROJECT_ID, GROUP_COLUMN_VERSION, METRIC_QUERY_EXECUTION_TIME_MS, SortDirection, TABLE_EVENTS};
 use common::types::COLUMN_EVENT_ID;
 use common::types::COLUMN_PROJECT_ID;
 use common::{DECIMAL_PRECISION, DECIMAL_SCALE, group_col, GROUPS_COUNT};
@@ -28,6 +28,7 @@ use datafusion_expr::LogicalPlan;
 use datafusion_expr::Operator;
 use datafusion_expr::Projection;
 use datafusion_expr::Sort;
+use metrics::histogram;
 use tracing::debug;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
@@ -72,6 +73,9 @@ impl GroupRecordsProvider {
         let result = execute(session_ctx, state, plan).await?;
         let duration = start.elapsed();
         debug!("elapsed: {:?}", duration);
+        let elapsed = start.elapsed();
+        histogram!(METRIC_QUERY_EXECUTION_TIME_MS, "query"=>"group_records_get_by_id").record(elapsed);
+        debug!("elapsed: {:?}", elapsed);
         let mut properties = vec![];
 
         for (field, col) in result.schema().fields().iter().zip(result.columns().iter()) {
@@ -154,6 +158,9 @@ impl GroupRecordsProvider {
 
         let duration = start.elapsed();
         debug!("elapsed: {:?}", duration);
+        let elapsed = start.elapsed();
+        histogram!(METRIC_QUERY_EXECUTION_TIME_MS, "query"=>"event_records_search").record(elapsed);
+        debug!("elapsed: {:?}", elapsed);
 
         let cols = result
             .schema()
