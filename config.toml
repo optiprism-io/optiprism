@@ -5,7 +5,7 @@ host = "0.0.0.0:8080"
 path = "/tmp/db"
 ua_db_path = "init/ingester/regexes.yaml"
 geo_city_path = "init/ingester/GeoLite2-City.mmdb"
-ui_path = "/Users/maximbogdanov/optiprism/frontend/dist"
+ui_path = "/Users/maximbogdanov/optiprism/optiprism/frontend/dist"
 
 [misc]
 session_cleaner_interval = "1 second"

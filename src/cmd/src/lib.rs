@@ -1,4 +1,5 @@
 use std::fs::File;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread;
@@ -10,13 +11,14 @@ use ::storage::NamedValue;
 use ::storage::Value;
 use axum::Router;
 use chrono::Duration;
+use std::time::Duration as StdDuration;
 use chrono::Utc;
 use common::config::Config;
 use common::group_col;
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::rbac::Role;
-use common::types::DType;
+use common::types::{DType, METRIC_STORE_COMPACTION_TIME_MS, METRIC_STORE_COMPACTIONS_TOTAL, METRIC_STORE_FLUSH_TIME_MS, METRIC_STORE_FLUSHES_TOTAL, METRIC_STORE_INSERT_TIME_MS, METRIC_STORE_INSERTS_TOTAL, METRIC_STORE_LEVEL_COMPACTION_TIME_MS, METRIC_STORE_MEMTABLE_ROWS, METRIC_STORE_MERGES_TOTAL, METRIC_STORE_PART_SIZE_BYTES, METRIC_STORE_PART_VALUES, METRIC_STORE_PARTS, METRIC_STORE_PARTS_SIZE_BYTES, METRIC_STORE_PARTS_VALUES, METRIC_STORE_RECOVERY_TIME_MS, METRIC_STORE_SCAN_MEMTABLE_MS, METRIC_STORE_SCAN_PARTS_TOTAL, METRIC_STORE_SCAN_TIME_MS, METRIC_STORE_SCANS_TOTAL, METRIC_STORE_SEQUENCE, METRIC_STORE_TABLE_FIELDS};
 use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_EVENT_ID;
@@ -80,10 +82,11 @@ use metadata::util::create_event;
 use metadata::util::create_property;
 use metadata::util::CreatePropertyMainRequest;
 use metadata::MetadataProvider;
-use metrics::describe_counter;
+use metrics::{describe_counter, describe_gauge};
 use metrics::describe_histogram;
 use metrics::Unit;
 use metrics_exporter_prometheus::PrometheusBuilder;
+use metrics_util::MetricKindMask;
 use platform::auth;
 use platform::auth::password::make_password_hash;
 use platform::PlatformProvider;
@@ -108,34 +111,56 @@ pub mod test;
 pub mod config;
 
 pub fn init_metrics() {
-    let builder = PrometheusBuilder::new();
-    builder
+    PrometheusBuilder::new()
+        .idle_timeout(
+            MetricKindMask::COUNTER | MetricKindMask::HISTOGRAM | MetricKindMask::GAUGE,
+            Some(StdDuration::from_secs(10)),
+        )
+        .with_http_listener(SocketAddr::new(
+            IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
+            9102,
+        ))
         .install()
         .expect("failed to install Prometheus recorder");
 
-    describe_counter!("store.inserts_total", "number of inserts processed");
-    describe_histogram!("store.insert_time_seconds", Unit::Seconds, "insert time");
-    describe_counter!("store.scans_total", "number of scans processed");
-    describe_counter!("store.scan_merges_total", "number of merges during scan");
-    describe_histogram!("store.scan_time_seconds", Unit::Seconds, "scan time");
+    describe_counter!(METRIC_STORE_INSERTS_TOTAL, "number of inserts processed");
+    describe_histogram!(METRIC_STORE_INSERT_TIME_MS, Unit::Milliseconds, "insert time");
+    describe_counter!(METRIC_STORE_SCANS_TOTAL, "number of scans processed");
+    describe_counter!(METRIC_STORE_SCAN_PARTS_TOTAL, "number of scans parts");
+    describe_counter!(METRIC_STORE_MERGES_TOTAL, "number of merges during scan");
+    describe_histogram!(METRIC_STORE_SCAN_TIME_MS, Unit::Milliseconds, "scan time");
+    describe_gauge!(METRIC_STORE_TABLE_FIELDS, "number of table fields");
+    describe_gauge!(METRIC_STORE_SEQUENCE, "store sequence");
+    describe_gauge!(METRIC_STORE_PARTS_SIZE_BYTES, "parts size in bytes");
+    describe_histogram!(METRIC_STORE_PART_SIZE_BYTES, "part size in bytes");
+    describe_gauge!(METRIC_STORE_PARTS, "parts");
+    describe_histogram!(METRIC_STORE_PART_VALUES, "part values");
+    describe_gauge!(METRIC_STORE_PARTS_VALUES, "parts values");
+    describe_histogram!(METRIC_STORE_MEMTABLE_ROWS, "number of memtable rows");
     describe_histogram!(
-        "store.scan_memtable_seconds",
-        Unit::Seconds,
+        METRIC_STORE_SCAN_MEMTABLE_MS,
+        Unit::Milliseconds,
         "scan memtable time"
     );
-    describe_counter!("store.compactions_total", "number of compactions");
+    describe_counter!(METRIC_STORE_COMPACTIONS_TOTAL, "number of compactions");
     describe_histogram!(
-        "store.compaction_time_seconds",
-        Unit::Seconds,
+        METRIC_STORE_LEVEL_COMPACTION_TIME_MS,
+        Unit::Milliseconds,
+        "level compaction time"
+    );
+    describe_histogram!(
+        METRIC_STORE_COMPACTION_TIME_MS,
+        Unit::Milliseconds,
         "compaction time"
     );
     describe_histogram!(
-        "store.recovery_time_seconds",
-        Unit::Seconds,
+        METRIC_STORE_RECOVERY_TIME_MS,
+        Unit::Milliseconds,
         "recovery time"
     );
 
-    describe_histogram!("store.flush_time_seconds", Unit::Seconds, "recovery time");
+    describe_histogram!(METRIC_STORE_FLUSH_TIME_MS, Unit::Milliseconds, "recovery time");
+    describe_counter!(METRIC_STORE_FLUSHES_TOTAL, "number of flushes");
 }
 
 pub fn init_system(
@@ -369,7 +394,7 @@ fn init_config(md: &Arc<MetadataProvider>, cfg: &mut Config) -> Result<()> {
         }
         other => {
             other?;
-        },
+        }
     }
 
     match md.config.get_string(StringKey::AuthRefreshToken) {
@@ -380,7 +405,7 @@ fn init_config(md: &Arc<MetadataProvider>, cfg: &mut Config) -> Result<()> {
         }
         other => {
             other?;
-        },
+        }
     }
 
     Ok(())

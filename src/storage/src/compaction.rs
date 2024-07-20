@@ -17,7 +17,7 @@ use log::trace;
 use metrics::counter;
 use metrics::histogram;
 use parking_lot::RwLock;
-
+use common::types::{METRIC_STORE_COMPACTION_TIME_MS, METRIC_STORE_COMPACTIONS_TOTAL, METRIC_STORE_LEVEL_COMPACTION_TIME_MS};
 use crate::db::log_metadata;
 use crate::error::Result;
 use crate::parquet::parquet_merger;
@@ -337,12 +337,12 @@ fn compact(
                         .collect::<Vec<_>>()
                         .as_mut(),
                 );
-                histogram!("store.level_compaction_time_seconds","table"=>tbl_name.to_string(),"level"=>level_id.to_string()).record(start_time.elapsed());
+                histogram!(METRIC_STORE_LEVEL_COMPACTION_TIME_MS,"table"=>tbl_name.to_string(),"level"=>level_id.to_string()).record(start_time.elapsed());
             }
         }
     }
-    counter!("store.compactions_total","table"=>tbl_name.to_string()).increment(1);
-    histogram!("store.compaction_time_seconds","table"=>tbl_name.to_string())
+    counter!(METRIC_STORE_COMPACTIONS_TOTAL,"table"=>tbl_name.to_string()).increment(1);
+    histogram!(METRIC_STORE_COMPACTION_TIME_MS,"table"=>tbl_name.to_string())
         .record(init_time.elapsed());
 
     Ok(Some(CompactResult {

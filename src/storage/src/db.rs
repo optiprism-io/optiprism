@@ -41,7 +41,7 @@ use arrow_array::StringArray;
 use arrow_array::TimestampNanosecondArray;
 use bincode::deserialize;
 use bincode::serialize;
-use common::types::DType;
+use common::types::{DType, METRIC_STORE_FLUSH_TIME_MS, METRIC_STORE_FLUSHES_TOTAL, METRIC_STORE_INSERT_TIME_MS, METRIC_STORE_INSERTS_TOTAL, METRIC_STORE_MEMTABLE_ROWS, METRIC_STORE_PART_SIZE_BYTES, METRIC_STORE_PART_VALUES, METRIC_STORE_PARTS, METRIC_STORE_PARTS_SIZE_BYTES, METRIC_STORE_PARTS_VALUES, METRIC_STORE_RECOVERY_TIME_MS, METRIC_STORE_SCAN_MEMTABLE_MS, METRIC_STORE_SCAN_PARTS_TOTAL, METRIC_STORE_SCAN_TIME_MS, METRIC_STORE_SCANS_TOTAL, METRIC_STORE_SEQUENCE, METRIC_STORE_TABLE_FIELDS};
 use futures::Stream;
 use lru::LruCache;
 use metrics::counter;
@@ -90,25 +90,25 @@ fn collect_metrics(tables: Arc<RwLock<Vec<Table>>>) {
             drop(md_mx);
 
             let mem_mx = t.memtable.lock();
-            histogram!("store.memtable_rows","table"=>t.name.to_string())
+            histogram!(METRIC_STORE_MEMTABLE_ROWS,"table"=>t.name.to_string())
                 .record(mem_mx.len().to_f64().unwrap());
             drop(mem_mx);
 
-            gauge!("store.table_fields", "table"=>t.name.to_string())
+            gauge!(METRIC_STORE_TABLE_FIELDS, "table"=>t.name.to_string())
                 .set(md.schema.fields.len().to_f64().unwrap());
-            gauge!("store.sequence","table"=>t.name.to_string()).set(md.seq_id.to_f64().unwrap());
+            gauge!(METRIC_STORE_SEQUENCE,"table"=>t.name.to_string()).set(md.seq_id.to_f64().unwrap());
             for (lvlid, lvl) in md.levels.iter().enumerate() {
                 let sz = lvl.parts.iter().map(|v| v.size_bytes).sum::<u64>();
                 let values = lvl.parts.iter().map(|v| v.values).sum::<usize>();
-                gauge!("store.parts_size_bytes","table"=>t.name.to_string(),"level"=>lvlid.to_string()).set(sz.to_f64().unwrap());
+                gauge!(METRIC_STORE_PARTS_SIZE_BYTES,"table"=>t.name.to_string(),"level"=>lvlid.to_string()).set(sz.to_f64().unwrap());
                 for part in lvl.parts.iter() {
                     // trace
-                    histogram!("store.part_size_bytes","table"=>t.name.to_string(),"level"=>lvlid.to_string()).record(part.size_bytes.to_f64().unwrap());
-                    histogram!("store.part_values","table"=>t.name.to_string(),"level"=>lvlid.to_string()).record(part.values.to_f64().unwrap());
+                    histogram!(METRIC_STORE_PART_SIZE_BYTES,"table"=>t.name.to_string(),"level"=>lvlid.to_string()).record(part.size_bytes.to_f64().unwrap());
+                    histogram!(METRIC_STORE_PART_VALUES,"table"=>t.name.to_string(),"level"=>lvlid.to_string()).record(part.values.to_f64().unwrap());
                 }
-                gauge!("store.parts","table"=>t.name.to_string(),"level"=>lvlid.to_string())
+                gauge!(METRIC_STORE_PARTS,"table"=>t.name.to_string(),"level"=>lvlid.to_string())
                     .set(lvl.parts.len().to_f64().unwrap());
-                gauge!("store.parts_values","table"=>t.name.to_string(),"level"=>lvlid.to_string())
+                gauge!(METRIC_STORE_PARTS_VALUES,"table"=>t.name.to_string(),"level"=>lvlid.to_string())
                     .set(values.to_f64().unwrap());
             }
         }
@@ -302,7 +302,7 @@ fn try_recover_table(path: PathBuf, name: String) -> Result<Table> {
     // if trigger_compact {
     //     // compactor_outbox.send(CompactorMessage::Compact).unwrap();
     // }
-    histogram!("store.recovery_time_seconds").record(start_time.elapsed());
+    histogram!(METRIC_STORE_RECOVERY_TIME_MS).record(start_time.elapsed());
     Ok(Table {
         name,
         memtable: Arc::new(Mutex::new(memtable)),
@@ -459,8 +459,8 @@ fn flush(
         metadata.log_id - 1
     )))?;
 
-    histogram!("store.flush_time_seconds").record(start_time.elapsed());
-    counter!("store.flushes_total").increment(1);
+    histogram!(METRIC_STORE_FLUSH_TIME_MS).record(start_time.elapsed());
+    counter!(METRIC_STORE_FLUSHES_TOTAL).increment(1);
 
     Ok(log)
 }
@@ -490,7 +490,7 @@ impl Stream for ScanStream {
     fn poll_next(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         match self.iter.next() {
             None => {
-                histogram!("store.scan_time_seconds","table"=>self.table_name.to_string())
+                histogram!(METRIC_STORE_SCAN_TIME_MS,"table"=>self.table_name.to_string())
                     .record(self.start_time.elapsed());
                 Poll::Ready(None)
             }
@@ -545,7 +545,7 @@ impl OptiDBImpl {
             metadata.opts.index_cols,
             metadata.opts.is_replacing,
         )?;
-        histogram!("store.scan_memtable_seconds","table"=>tbl_name.to_string())
+        histogram!(METRIC_STORE_SCAN_MEMTABLE_MS,"table"=>tbl_name.to_string())
             .record(start_time.elapsed());
         let mut rdrs = vec![];
         // todo remove?
@@ -557,7 +557,7 @@ impl OptiDBImpl {
                 rdrs.push(rdr);
             }
         }
-        counter!("store.scan_parts_total", "table"=>tbl_name.to_string())
+        counter!(METRIC_STORE_SCAN_PARTS_TOTAL, "table"=>tbl_name.to_string())
             .increment(rdrs.len() as u64);
         let iter = if rdrs.is_empty() {
             Box::new(MemChunkIterator::new(maybe_chunk))
@@ -582,7 +582,7 @@ impl OptiDBImpl {
             )?) as Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>
         };
 
-        counter!("store.scans_total", "table"=>tbl_name.to_string()).increment(1);
+        counter!(METRIC_STORE_SCANS_TOTAL, "table"=>tbl_name.to_string()).increment(1);
         Ok(ScanStream::new(iter, tbl_name.to_string()))
     }
 
@@ -675,8 +675,8 @@ impl OptiDBImpl {
             //         .unwrap();
             // }
         }
-        counter!("store.inserts_total", "table"=>tbl_name.to_string()).increment(1);
-        histogram!("store.insert_time_seconds","table"=>tbl_name.to_string())
+        counter!(METRIC_STORE_INSERTS_TOTAL, "table"=>tbl_name.to_string()).increment(1);
+        histogram!(METRIC_STORE_INSERT_TIME_MS,"table"=>tbl_name.to_string())
             .record(start_time.elapsed());
         // !@#debug!("insert finished in {: ?}", duration);
         Ok(())
