@@ -6,6 +6,7 @@ fn main() {
             "src/pb/custom_event.proto",
             "src/pb/dashboard.proto",
             "src/pb/event.proto",
+            "src/pb/group.proto",
         ],
         &["src"],
     ).unwrap();
