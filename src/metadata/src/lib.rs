@@ -56,6 +56,10 @@ pub mod group {
     include!(concat!(env!("OUT_DIR"), "/group.rs"));
 }
 
+pub mod organization {
+    include!(concat!(env!("OUT_DIR"), "/organization.rs"));
+}
+
 pub fn project_ns(project_id: u64, ns: &[u8]) -> Vec<u8> {
     [b"projects/", project_id.to_le_bytes().as_ref(), b"/", ns].concat()
 }

@@ -1,0 +1,36 @@
+syntax = "proto3";
+package organization;
+
+message Organization {
+  uint64 id = 1;
+  int64  created_at = 2;
+  uint64  created_by = 3;
+  optional int64  updated_at = 4;
+  optional uint64 updated_by = 5;
+  string name = 6;
+  repeated Member members = 7;
+}
+
+message Member {
+  uint64 id = 1;
+  OrganizationRole role = 2;
+}
+
+enum Role {
+  NONE = 0;
+  ROLE_ADMIN = 1;
+}
+enum OrganizationRole {
+  ORGANIZATION_NONE = 0;
+  ORGANIZATION_ROLE_OWNER = 1;
+  ORGANIZATION_ROLE_ADMIN = 2;
+  ORGANIZATION_ROLE_MEMBER = 3;
+}
+
+enum ProjectRole {
+  PROJECT_NONE=0;
+  PROJECT_ROLE_OWNER = 1;
+  PROJECT_ROLE_ADMIN = 2;
+  PROJECT_ROLE_MEMBER = 3;
+  PROJECT_ROLE_READER = 4;
+}

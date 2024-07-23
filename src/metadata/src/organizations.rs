@@ -1,9 +1,8 @@
 use std::sync::Arc;
 
-use bincode::deserialize;
-use bincode::serialize;
 use chrono::DateTime;
 use chrono::Utc;
+use prost::Message;
 use common::types::OptionalProperty;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
@@ -18,7 +17,7 @@ use crate::index::delete_index;
 use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
-use crate::list_data;
+use crate::{list_data, organization};
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
@@ -194,7 +193,7 @@ impl Organizations {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Organization {
     pub id: u64,
     pub created_at: DateTime<Utc>,
@@ -220,4 +219,75 @@ pub struct CreateOrganizationRequest {
 pub struct UpdateOrganizationRequest {
     pub updated_by: u64,
     pub name: OptionalProperty<String>,
+}
+
+// serialize into protobuf
+fn serialize(org: &Organization) -> Result<Vec<u8>> {
+    let v = organization::Organization {
+        id: org.id,
+        created_at: org.created_at.timestamp(),
+        created_by: org.created_by,
+        updated_at: org.updated_at.map(|t| t.timestamp()),
+        updated_by: org.updated_by,
+        name: org.name.clone(),
+        members: org
+            .members
+            .iter()
+            .map(|(id, role)| organization::Member {
+                id: *id,
+                role: role.clone() as i32,
+            })
+            .collect(),
+    };
+
+    Ok(v.encode_to_vec())
+}
+
+// deserialize from protobuf
+fn deserialize(data: &Vec<u8>) -> Result<Organization> {
+    let from = organization::Organization::decode(data.as_ref())?;
+
+    Ok(Organization {
+        id: from.id,
+        created_at: chrono::DateTime::from_timestamp(from.created_at, 0).unwrap(),
+        created_by: from.created_by,
+        updated_at: from.updated_at.map(|t| chrono::DateTime::from_timestamp(t, 0).unwrap()),
+        updated_by: from.updated_by,
+        name: from.name,
+        members: from
+            .members
+            .iter()
+            .map(|m| (m.id, match m.role {
+                1 => OrganizationRole::Owner,
+                2 => OrganizationRole::Admin,
+                3 => OrganizationRole::Member,
+                _ => unreachable!()
+            }))
+            .collect(),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::{DateTime, Utc};
+    use common::rbac::OrganizationRole;
+    use crate::organizations::{Organization, deserialize, serialize};
+
+    #[test]
+    fn test_roundtrip() {
+        let org = Organization {
+            id: 1,
+            created_at: DateTime::from_timestamp(1, 0).unwrap(),
+            created_by: 1,
+            updated_at: Some(DateTime::from_timestamp(2, 0).unwrap()),
+            updated_by: Some(2),
+            name: "test".to_string(),
+            members: vec![(1, OrganizationRole::Owner)],
+        };
+
+        let data = serialize(&org).unwrap();
+        let org2 = deserialize(&data).unwrap();
+
+        assert_eq!(org, org2);
+    }
 }
