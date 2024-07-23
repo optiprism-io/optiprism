@@ -4,6 +4,7 @@ use bincode::deserialize;
 use bincode::serialize;
 use chrono::DateTime;
 use chrono::Utc;
+use prost::Message;
 use common::types::OptionalProperty;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
@@ -14,7 +15,7 @@ use common::funnel::Funnel;
 
 use crate::error::MetadataError;
 use crate::index::next_seq;
-use crate::list_data;
+use crate::{list_data, report, reports};
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::metadata::ListResponse;
@@ -184,4 +185,94 @@ pub struct UpdateReportRequest {
     pub description: OptionalProperty<Option<String>>,
     pub typ: OptionalProperty<Type>,
     pub query: OptionalProperty<Query>,
+}
+
+// serialize report into protobuf
+fn serialize_report(r: &Report) -> Result<Vec<u8>> {
+    let v = report::Report {
+        id: r.id,
+        created_at: r.created_at.timestamp(),
+        updated_at: r.updated_at.map(|t| t.timestamp()),
+        created_by: r.created_by,
+        updated_by: r.updated_by,
+        project_id: r.project_id,
+        tags: r.tags.clone().unwrap_or_default(),
+        name: r.name.clone(),
+        description: r.description.clone(),
+        query: serialize(&r.query)?,
+        r#type: match r.typ {
+            Type::EventSegmentation => report::Type::EventSegmentation,
+            Type::Funnel => report::Type::Funnel,
+        } as i32,
+    };
+
+    Ok(v.encode_to_vec())
+}
+
+// deserialize report from protobuf
+fn deserialize_report(data: &Vec<u8>) -> Result<Report> {
+    let from = report::Report::decode(data.as_ref())?;
+
+    Ok(Report {
+        id: from.id,
+        created_at: chrono::DateTime::from_timestamp(from.created_at, 0).unwrap(),
+        updated_at: from.updated_at.map(|t| chrono::DateTime::from_timestamp(t, 0).unwrap()),
+        created_by: from.created_by,
+        updated_by: from.updated_by,
+        project_id: from.project_id,
+        tags: if from.tags.is_empty() {
+            None
+        } else {
+            Some(from.tags)
+        },
+        name: from.name,
+        description: from.description,
+        typ: match from.r#type {
+            1 => Type::EventSegmentation,
+            2 => Type::Funnel,
+            _ => unreachable!(),
+        },
+        query: deserialize(&from.query)?,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::DateTime;
+    use common::event_segmentation::{Analysis, ChartType, EventSegmentationRequest};
+    use common::query::{QueryTime, TimeIntervalUnit};
+    use crate::reports::{deserialize_report, Query, Report, serialize_report, Type};
+
+    #[test]
+    fn test_roundtrip(){
+        let report = Report {
+            id: 1,
+            created_at: DateTime::from_timestamp(1, 0).unwrap(),
+            updated_at: Some(DateTime::from_timestamp(2, 0).unwrap()),
+            created_by: 1,
+            updated_by: Some(2),
+            project_id: 1,
+            tags: Some(vec!["tag1".to_string(), "tag2".to_string()]),
+            name: "name".to_string(),
+            description: Some("description".to_string()),
+            typ: Type::EventSegmentation,
+            query: Query::EventSegmentation(EventSegmentationRequest {
+                time: QueryTime::Last { last: 1, unit: TimeIntervalUnit::Day },
+                group_id: 0,
+                interval_unit: TimeIntervalUnit::Hour,
+                chart_type: ChartType::Line,
+                analysis: Analysis::Linear,
+                compare: None,
+                events: vec![],
+                filters: None,
+                breakdowns: None,
+                segments: None,
+            }),
+        };
+
+        let data = serialize_report(&report).unwrap();
+        let from = deserialize_report(&data).unwrap();
+
+        assert_eq!(report, from);
+    }
 }
