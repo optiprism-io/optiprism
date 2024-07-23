@@ -9,7 +9,7 @@ use serde::Serialize;
 
 use crate::error::MetadataError;
 use crate::{list, session};
-use crate::metadata::ListResponse;
+use crate::metadata::{ListResponse, ResponseMetadata};
 use crate::project_ns;
 use crate::Result;
 
@@ -91,7 +91,25 @@ impl Sessions {
         callback: impl Fn(&Session) -> Result<bool>,
     ) -> Result<()> {
         let tx = self.db.transaction();
-        let list: ListResponse<Session> = list(&tx, project_ns(project_id, NAMESPACE).as_ref())?;
+        let prefix = NAMESPACE;
+
+        let list = tx
+            .prefix_iterator("")
+            .filter_map(|x| {
+                let x = x.unwrap();
+                if x.0.len() < prefix.len() || !prefix.cmp(&x.0[..prefix.len()]).is_eq() {
+                    return None;
+                }
+
+                Some(deserialize(x.1.as_ref()))
+            })
+            .collect::<Result<_>>()?;
+
+        let list = ListResponse {
+            data: list,
+            meta: ResponseMetadata { next: None },
+        };
+
         let tx = self.db.transaction();
         for s in list.into_iter() {
             if callback(&s)? {
