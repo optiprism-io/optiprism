@@ -1,17 +1,16 @@
 use std::sync::Arc;
 
-use bincode::deserialize;
-use bincode::serialize;
 use chrono::DateTime;
 use chrono::Utc;
-use common::query::EventRef;
+use datafusion_common::ScalarValue;
+use common::query::{EventRef, PropertyRef, PropValueOperation};
 use common::query::PropValueFilter;
 use common::types::OptionalProperty;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
-
+use crate::bookmarks::Bookmark;
 use crate::error::MetadataError;
 use crate::events::Events;
 use crate::index::check_insert_constraints;
@@ -21,7 +20,7 @@ use crate::index::get_index;
 use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
-use crate::list_data;
+use crate::{bookmark, custom_event, list_data};
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
@@ -304,4 +303,154 @@ pub struct UpdateCustomEventRequest {
     pub status: OptionalProperty<Status>,
     pub is_system: OptionalProperty<bool>,
     pub events: OptionalProperty<Vec<Event>>,
+}
+
+fn serialize(v: &CustomEvent) -> Result<Vec<u8>>{panic!()}
+/*fn serialize(v: &CustomEvent) -> Result<Vec<u8>> {
+    let status = match v.status {
+        Status::Enabled => custom_event::Status::Enabled,
+        Status::Disabled => custom_event::Status::Disabled,
+    };
+
+    for e in &v.events {
+        let mut ce = custom_event::Event {
+            regular_name: None,
+            regular: None,
+            custom: None,
+            filters: vec![],
+        };
+        match &e.event {
+            EventRef::RegularName(name) => ce.regular_name = Some(name.to_owned()),
+            EventRef::Regular(id) => ce.regular = Some(*id),
+            EventRef::Custom(id) => ce.custom = Some(*id),
+        }
+
+        if let Some(filters) = &e.filters {
+            for filter in filters {
+                match filter
+                {
+                    PropValueFilter::Property { property, operation, value } => {
+                        let mut pvf = custom_event::PropValueFilter {
+                            property_name: None,
+                            property_group: None,
+                            property_custom_id: None,
+                            operation: 0,
+                            values: vec![],
+                        };
+                        match property {
+                            PropertyRef::Group(n, gid) => {
+                                pvf.property_name = Some(n.to_owned());
+                                pvf.property_group = Some(*gid as u64);
+                            }
+                            PropertyRef::Event(n) => {
+                                pvf.property_name = Some(n.to_owned());
+                            }
+                            PropertyRef::Custom(id) => {
+                                pvf.property_custom_id = Some(*id)
+                            }
+                        }
+
+                        let op = match operation {
+                            PropValueOperation::Eq => custom_event::PropValueOperation::Eq,
+                            PropValueOperation::Neq => custom_event::PropValueOperation::Neq,
+                            PropValueOperation::Gt => custom_event::PropValueOperation::Gt,
+                            PropValueOperation::Gte => custom_event::PropValueOperation::Gte,
+                            PropValueOperation::Lt => custom_event::PropValueOperation::Lt,
+                            PropValueOperation::Lte => custom_event::PropValueOperation::Lte,
+                            PropValueOperation::True => custom_event::PropValueOperation::True,
+                            PropValueOperation::False => custom_event::PropValueOperation::False,
+                            PropValueOperation::Exists => custom_event::PropValueOperation::Exists,
+                            PropValueOperation::Empty => custom_event::PropValueOperation::Empty,
+                            PropValueOperation::Like => custom_event::PropValueOperation::Like,
+                            PropValueOperation::NotLike => custom_event::PropValueOperation::NotLike,
+                            PropValueOperation::Regex => custom_event::PropValueOperation::Regex,
+                            PropValueOperation::NotRegex => custom_event::PropValueOperation::NotRegex,
+                        };
+                        pvf.operation = op as i32;
+
+                        let v = if let Some(v)=value {
+                            v.iter().map(|v|{
+                                match v {
+                                    ScalarValue::Null => {}
+                                    ScalarValue::Boolean(_) => {}
+                                    ScalarValue::Float16(_) => {}
+                                    ScalarValue::Float32(_) => {}
+                                    ScalarValue::Float64(_) => {}
+                                    ScalarValue::Decimal128(_, _, _) => {}
+                                    ScalarValue::Decimal256(_, _, _) => {}
+                                    ScalarValue::Int8(_) => {}
+                                    ScalarValue::Int16(_) => {}
+                                    ScalarValue::Int32(_) => {}
+                                    ScalarValue::Int64(_) => {}
+                                    ScalarValue::UInt8(_) => {}
+                                    ScalarValue::UInt16(_) => {}
+                                    ScalarValue::UInt32(_) => {}
+                                    ScalarValue::UInt64(_) => {}
+                                    ScalarValue::Utf8(_) => {}
+                                    ScalarValue::LargeUtf8(_) => {}
+                                    ScalarValue::Binary(_) => {}
+                                    ScalarValue::FixedSizeBinary(_, _) => {}
+                                    ScalarValue::LargeBinary(_) => {}
+                                    ScalarValue::FixedSizeList(_) => {}
+                                    ScalarValue::List(_) => {}
+                                    ScalarValue::LargeList(_) => {}
+                                    ScalarValue::Struct(_) => {}
+                                    ScalarValue::Date32(_) => {}
+                                    ScalarValue::Date64(_) => {}
+                                    ScalarValue::Time32Second(_) => {}
+                                    ScalarValue::Time32Millisecond(_) => {}
+                                    ScalarValue::Time64Microsecond(_) => {}
+                                    ScalarValue::Time64Nanosecond(_) => {}
+                                    ScalarValue::TimestampSecond(_, _) => {}
+                                    ScalarValue::TimestampMillisecond(_, _) => {}
+                                    ScalarValue::TimestampMicrosecond(_, _) => {}
+                                    ScalarValue::TimestampNanosecond(_, _) => {}
+                                    ScalarValue::IntervalYearMonth(_) => {}
+                                    ScalarValue::IntervalDayTime(_) => {}
+                                    ScalarValue::IntervalMonthDayNano(_) => {}
+                                    ScalarValue::DurationSecond(_) => {}
+                                    ScalarValue::DurationMillisecond(_) => {}
+                                    ScalarValue::DurationMicrosecond(_) => {}
+                                    ScalarValue::DurationNanosecond(_) => {}
+                                    ScalarValue::Union(_, _, _) => {}
+                                    ScalarValue::Dictionary(_, _) => {}
+                                }
+                            }).collect::<Vec<_>>()
+
+                        };
+                        pvf.values.push(v);
+                        ce.filters.push(pvf);
+                    }
+                }
+            }
+        }
+    }
+
+    custom_event::CustomEvent {
+        id: v.id.clone(),
+        created_at: v.created_at.timestamp(),
+        created_by: v.created_by,
+        updated_at: None,
+        updated_by: None,
+        project_id: v.project_id,
+        tags: vec![],
+        name: v.name.clone(),
+        description: v.description.clone(),
+        status,
+        is_system: v.is_system,
+        events: None,
+    }
+}*/
+
+fn deserialize(data: &Vec<u8>) -> Result<CustomEvent> {
+    /*let from = bookmark::Bookmark::decode(data.as_ref())?;
+
+    Ok(Bookmark{
+        id: from.id,
+        created_at: DateTime::from_timestamp(from.created_at, 0).unwrap(),
+        created_by: from.created_by,
+        project_id: from.project_id,
+        query: from.query.map(|q|bincode::deserialize(&q).unwrap()),
+    })*/
+    unimplemented!()
 }
