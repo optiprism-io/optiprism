@@ -1,0 +1,17 @@
+syntax = "proto3";
+package project;
+
+message Project {
+  uint64 id = 1;
+  int64  created_at = 2;
+  uint64  created_by = 3;
+  optional int64  updated_at = 4;
+  optional uint64 updated_by = 5;
+  uint64 organization_id = 6;
+  string name = 7;
+  optional string description = 8;
+  repeated string tags = 9;
+  string token = 10;
+  uint64 session_duration_seconds = 11;
+  uint64 events_count = 12;
+}
