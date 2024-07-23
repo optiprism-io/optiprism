@@ -9,6 +9,7 @@ fn main() {
             "src/pb/group.proto",
             "src/pb/organization.proto",
             "src/pb/project.proto",
+            "src/pb/property.proto",
         ],
         &["src"],
     ).unwrap();

@@ -4,8 +4,6 @@ use std::sync::RwLock;
 
 use arrow::datatypes;
 use arrow::datatypes::DataType;
-use bincode::deserialize;
-use bincode::serialize;
 use chrono::DateTime;
 use chrono::Utc;
 use common::group_col;
@@ -16,6 +14,7 @@ use common::GROUPS_COUNT;
 use convert_case::Case;
 use convert_case::Casing;
 use lru::LruCache;
+use prost::Message;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
@@ -33,7 +32,7 @@ use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::next_zero_seq;
 use crate::index::update_index;
-use crate::list_data;
+use crate::{list_data, property};
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
@@ -685,4 +684,149 @@ pub struct UpdatePropertyRequest {
     pub is_array: OptionalProperty<bool>,
     pub is_dictionary: OptionalProperty<bool>,
     pub dictionary_type: OptionalProperty<Option<DictionaryType>>,
+}
+
+// serialize property to protobuf
+fn serialize(prop: &Property) -> Result<Vec<u8>> {
+    let mut v = property::Property {
+        id: prop.id,
+        created_at: prop.created_at.timestamp(),
+        created_by: prop.created_by,
+        updated_at: prop.updated_at.map(|t| t.timestamp()),
+        updated_by: prop.updated_by,
+        project_id: prop.project_id,
+        tags: prop.tags.clone().unwrap_or_default(),
+        name: prop.name.clone(),
+        description: prop.description.clone(),
+        display_name: prop.display_name.clone(),
+        order: prop.order,
+        type_event: None,
+        type_group: None,
+        dtype: match &prop.data_type {
+            DType::Int8 => property::DataType::Int8 as i32,
+            DType::Int16 => property::DataType::Int16 as i32,
+            DType::Int32 => property::DataType::Int32 as i32,
+            DType::Int64 => property::DataType::Int64 as i32,
+            DType::Boolean => property::DataType::Boolean as i32,
+            DType::Timestamp => property::DataType::Timestamp as i32,
+            DType::Decimal => property::DataType::Decimal as i32,
+            DType::String => property::DataType::String as i32,
+            _ => unreachable!()
+        },
+        status: match &prop.status {
+            Status::Enabled => property::Status::Enabled as i32,
+            Status::Disabled => property::Status::Disabled as i32,
+        },
+        is_system: prop.is_system,
+        nullable: prop.nullable,
+        hidden: prop.hidden,
+        is_array: prop.is_array,
+        is_dictionary: prop.is_dictionary,
+        dictionary_type: prop.dictionary_type.clone().map(|v| match v {
+            DictionaryType::Int8 => property::DictionaryType::DictionaryInt8 as i32,
+            DictionaryType::Int16 => property::DictionaryType::DictionaryInt16 as i32,
+            DictionaryType::Int32 => property::DictionaryType::DictionaryInt32 as i32,
+            DictionaryType::Int64 => property::DictionaryType::DictionaryInt64 as i32,
+        }),
+    };
+    match prop.typ {
+        Type::Event => v.type_event = Some(true),
+        Type::Group(g) => v.type_group = Some(g as u64),
+    }
+
+    Ok(v.encode_to_vec())
+}
+
+// deserialize property from protobuf
+fn deserialize(data: &Vec<u8>) -> Result<Property> {
+    let from = property::Property::decode(data.as_ref())?;
+
+    Ok(Property {
+        id: from.id,
+        created_at: chrono::DateTime::from_timestamp(from.created_at, 0).unwrap(),
+        created_by: from.created_by,
+        updated_at: from.updated_at.map(|t| chrono::DateTime::from_timestamp(t, 0).unwrap()),
+        updated_by: from.updated_by,
+        project_id: from.project_id,
+        tags: if from.tags.is_empty() {
+            None
+        } else {
+            Some(from.tags)
+        },
+        name: from.name,
+        description: from.description,
+        display_name: from.display_name,
+        order: from.order,
+        typ: if from.type_event.unwrap_or(false) {
+            Type::Event
+        } else {
+            Type::Group(from.type_group.unwrap() as usize)
+        },
+        data_type: match from.dtype {
+            1 => DType::String,
+            2 => DType::Int8,
+            3 => DType::Int16,
+            4 => DType::Int32,
+            5 => DType::Int64,
+            6 => DType::Decimal,
+            7 => DType::Boolean,
+            8 => DType::Timestamp,
+            _ => unreachable!()
+        },
+        status: match from.status {
+            1 => Status::Enabled,
+            2 => Status::Disabled,
+            _ => unreachable!()
+        },
+        is_system: from.is_system,
+        nullable: from.nullable,
+        hidden: from.hidden,
+        is_array: from.is_array,
+        is_dictionary: from.is_dictionary,
+        dictionary_type: from.dictionary_type.map(|v| match v {
+            1 => DictionaryType::Int8,
+            2 => DictionaryType::Int16,
+            3 => DictionaryType::Int32,
+            4 => DictionaryType::Int64,
+            _ => unreachable!()
+        }),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::DateTime;
+    use common::types::DType;
+    use crate::properties::{deserialize, DictionaryType, Property, serialize, Status, Type};
+
+    #[test]
+    fn test_roundtrip() {
+        let prop = Property {
+            id: 1,
+            created_at: DateTime::from_timestamp(1, 0).unwrap(),
+            created_by: 1,
+            updated_at: Some(DateTime::from_timestamp(2, 0).unwrap()),
+            updated_by: Some(2),
+            project_id: 1,
+            tags: Some(vec!["tag1".to_string(), "tag2".to_string()]),
+            name: "name".to_string(),
+            description: Some("description".to_string()),
+            display_name: Some("display_name".to_string()),
+            order: 1,
+            typ: Type::Event,
+            data_type: DType::Int32,
+            status: Status::Enabled,
+            is_system: true,
+            nullable: true,
+            hidden: true,
+            is_array: true,
+            is_dictionary: true,
+            dictionary_type: Some(DictionaryType::Int16),
+        };
+
+        let data = serialize(&prop).unwrap();
+        let prop2 = deserialize(&data).unwrap();
+
+        assert_eq!(prop, prop2);
+    }
 }

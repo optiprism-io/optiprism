@@ -1,0 +1,51 @@
+syntax = "proto3";
+package property;
+
+message Property {
+  uint64 id = 1;
+  int64  created_at = 2;
+  uint64  created_by = 3;
+  optional int64  updated_at = 4;
+  optional uint64 updated_by = 5;
+  uint64 project_id = 6;
+  repeated string tags = 7;
+  string name = 8;
+  optional string display_name = 9;
+  optional string description = 10;
+  uint64 order = 11;
+  optional bool type_event = 12;
+  optional uint64 type_group = 13;
+  DataType dtype = 14;
+  Status status = 15;
+  bool is_system = 16;
+  bool nullable = 17;
+  bool hidden = 18;
+  bool is_array = 19;
+  bool is_dictionary = 20;
+  optional DictionaryType dictionary_type = 21;
+}
+
+enum DictionaryType {
+  DICTIONARY_NONE = 0;
+  DICTIONARY_INT8 = 1;
+  DICTIONARY_INT16 = 2;
+  DICTIONARY_INT32 = 3;
+  DICTIONARY_INT64 = 4;
+}
+enum Status {
+  STATUS_NONE = 0;
+  STATUS_ENABLED = 1;
+  STATUS_DISABLED = 2;
+}
+
+enum DataType {
+  DATA_TYPE_NONE = 0;
+  DATA_TYPE_STRING = 1;
+  DATA_TYPE_INT8 = 2;
+  DATA_TYPE_INT16 = 3;
+  DATA_TYPE_INT32 = 4;
+  DATA_TYPE_INT64 = 5;
+  DATA_TYPE_DECIMAL = 6;
+  DATA_TYPE_BOOLEAN = 7;
+  DATA_TYPE_TIMESTAMP = 8;
+}
