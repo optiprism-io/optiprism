@@ -1,9 +1,8 @@
 use std::sync::Arc;
 
-use bincode::deserialize;
-use bincode::serialize;
 use chrono::DateTime;
 use chrono::Utc;
+use prost::Message;
 use rand::distributions::Alphanumeric;
 use rand::Rng;
 use rocksdb::Transaction;
@@ -12,9 +11,9 @@ use serde::Deserialize;
 use serde::Serialize;
 use common::event_segmentation::EventSegmentationRequest;
 use common::funnel::Funnel;
-
+use crate::accounts::Account;
 use crate::error::MetadataError;
-use crate::project_ns;
+use crate::{account, bookmark, project_ns};
 use crate::reports::Query;
 use crate::Result;
 
@@ -103,4 +102,50 @@ pub struct Bookmark {
 pub struct CreateBookmarkRequest {
     pub created_by: u64,
     pub query: Option<Query>,
+}
+
+fn serialize(bm: &Bookmark) -> Result<Vec<u8>> {
+    let b = bookmark::Bookmark{
+        id: bm.id.clone(),
+        created_at: bm.created_at.timestamp(),
+        created_by: bm.created_by,
+        project_id: bm.project_id,
+        query: bm.query.to_owned().map(|q|bincode::serialize(&q).unwrap()),
+    };
+
+    Ok(b.encode_to_vec())
+}
+
+fn deserialize(data: &Vec<u8>) -> Result<Bookmark> {
+    let from = bookmark::Bookmark::decode(data.as_ref())?;
+
+    Ok(Bookmark{
+        id: from.id,
+        created_at: DateTime::from_timestamp(from.created_at, 0).unwrap(),
+        created_by: from.created_by,
+        project_id: from.project_id,
+        query: from.query.map(|q|bincode::deserialize(&q).unwrap()),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::{DateTime, Utc};
+    use crate::bookmarks::{Bookmark, deserialize, serialize};
+
+    #[test]
+    fn test_roundtrip() {
+        let bm = Bookmark {
+            id: "test".to_string(),
+            created_at: DateTime::from_timestamp(1,0).unwrap(),
+            created_by: 1,
+            project_id: 1,
+            query: None,
+        };
+
+        let data = serialize(&bm).unwrap();
+        let bm2 = deserialize(&data).unwrap();
+
+        assert_eq!(bm, bm2);
+    }
 }
