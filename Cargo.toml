@@ -12,5 +12,5 @@ members = [
     "src/query",
     "src/storage",
     "src/ingester",
-    "src/cmd"
+    "src/cmd",
 ]

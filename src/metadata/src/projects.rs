@@ -1,3 +1,4 @@
+use std::str::from_utf8;
 use std::sync::Arc;
 use chrono::DateTime;
 use chrono::Utc;
@@ -24,7 +25,7 @@ use crate::{list_data, project};
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
-use crate::metadata::ListResponse;
+use crate::metadata::{ListResponse, ResponseMetadata};
 use crate::Result;
 
 const NAMESPACE: &[u8] = b"projects";
@@ -110,8 +111,24 @@ impl Projects {
 
     pub fn list(&self) -> Result<ListResponse<Project>> {
         let tx = self.db.transaction();
+        let prefix = [NAMESPACE, b"/data"].concat();
 
-        list_data(&tx, NAMESPACE)
+        let iter = tx.prefix_iterator(prefix.clone());
+        let mut list = vec![];
+        for kv in iter {
+            let (key, value) = kv?;
+            // check if key contains the prefix
+            if key.len() < prefix.len() || !prefix.as_slice().cmp(&key[..prefix.len()]).is_eq() {
+                continue;
+            }
+            list.push(deserialize(&value)?);
+            break;
+        }
+
+        Ok(ListResponse {
+            data: list,
+            meta: ResponseMetadata { next: None },
+        })
     }
 
     pub fn update(&self, project_id: u64, req: UpdateProjectRequest) -> Result<Project> {
@@ -243,7 +260,7 @@ fn serialize(project: &Project) -> Result<Vec<u8>> {
 }
 
 // deserialize project from protobuf
-fn deserialize(data: &Vec<u8>) -> Result<Project> {
+fn deserialize(data: &[u8]) -> Result<Project> {
     let from = project::Project::decode(data.as_ref())?;
 
     Ok(Project {
@@ -267,7 +284,6 @@ fn deserialize(data: &Vec<u8>) -> Result<Project> {
 }
 
 #[cfg(test)]
-
 mod tests {
     use chrono::DateTime;
     use crate::projects::{deserialize, Project, serialize};

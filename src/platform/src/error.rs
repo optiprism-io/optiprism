@@ -106,6 +106,7 @@ impl PlatformError {
                 MetadataError::Other(err) => ApiError::internal(err.to_string()),
                 MetadataError::Store(err) => ApiError::internal(err.to_string()),
                 MetadataError::Forbidden(err) => ApiError::forbidden(err),
+                MetadataError::ProstDecodeError(err) => ApiError::internal(err.to_string()),
             },
             PlatformError::Query(err) => match err {
                 QueryError::Internal(err) => ApiError::internal(err),
