@@ -1,6 +1,5 @@
 use std::str::pattern::Pattern;
 use std::sync::Arc;
-use bincode::{deserialize, serialize};
 use byteorder::ByteOrder;
 use byteorder::LittleEndian;
 use prost::Message;
@@ -208,7 +207,7 @@ impl Groups {
             if !key.is_prefix_of(v.as_ref()) {
                 break;
             }
-            let group = deserialize(&i.1)?;
+            let group = deserialize_group(&i.1)?;
             res.push(group);
         }
 
@@ -243,11 +242,11 @@ impl Groups {
                     name,
                     display_name,
                 };
-                tx.put(key.as_bytes(), serialize(&group)?)?;
+                tx.put(key.as_bytes(), serialize_group(&group)?)?;
 
                 group
             }
-            Some(value) => deserialize(&value)?,
+            Some(value) => deserialize_group(&value)?,
         };
 
         tx.commit()?;
@@ -360,11 +359,31 @@ fn deserialize_group_values(data: &[u8]) -> Result<GroupValues> {
     })
 }
 
-#[cfg(test)]
+// serialize group into protobuf
+fn serialize_group(group: &Group) -> Result<Vec<u8>> {
+    let v = group::Group{
+        id: group.id,
+        name: group.name.clone(),
+        display_name: Some(group.display_name.clone()),
+    };
 
+    Ok(v.encode_to_vec())
+}
+
+// deserialize group from protobuf
+fn deserialize_group(data: &[u8]) -> Result<Group> {
+    let from = group::Group::decode(data)?;
+
+    Ok(Group {
+        id: from.id,
+        name: from.name.clone(),
+        display_name: from.display_name.unwrap(),
+    })
+}
+#[cfg(test)]
 mod tests {
     #[test]
-    fn test_roundtrip() {
+    fn test_group_values_roundtrip() {
         let group = super::GroupValues {
             id: 1,
             values: vec![
@@ -381,6 +400,20 @@ mod tests {
 
         let data = super::serialize_group_values(&group).unwrap();
         let group2 = super::deserialize_group_values(&data).unwrap();
+
+        assert_eq!(group, group2);
+    }
+
+    #[test]
+    fn test_group_roundtrip() {
+        let group = super::Group {
+            id: 1,
+            name: "test".to_string(),
+            display_name: "Test".to_string(),
+        };
+
+        let data = super::serialize_group(&group).unwrap();
+        let group2 = super::deserialize_group(&data).unwrap();
 
         assert_eq!(group, group2);
     }
