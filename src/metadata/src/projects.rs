@@ -1,9 +1,7 @@
 use std::sync::Arc;
-
-use bincode::deserialize;
-use bincode::serialize;
 use chrono::DateTime;
 use chrono::Utc;
+use prost::Message;
 use common::types::OptionalProperty;
 use rand::distributions::Alphanumeric;
 use rand::distributions::DistString;
@@ -22,7 +20,7 @@ use crate::index::get_index;
 use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
-use crate::list_data;
+use crate::{list_data, project};
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
@@ -181,7 +179,7 @@ impl Projects {
 }
 
 #[serde_as]
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Project {
     pub id: u64,
     pub created_at: DateTime<Utc>,
@@ -218,4 +216,81 @@ pub struct UpdateProjectRequest {
     pub tags: OptionalProperty<Option<Vec<String>>>,
     pub token: OptionalProperty<String>,
     pub session_duration_seconds: OptionalProperty<u64>,
+}
+
+// serialize project to protobuf
+fn serialize(project: &Project) -> Result<Vec<u8>> {
+    let tags = if let Some(tags) = &project.tags {
+        tags.to_vec()
+    } else { vec![] };
+
+
+    let v = project::Project {
+        id: project.id,
+        created_at: project.created_at.timestamp(),
+        created_by: project.created_by,
+        updated_at: project.updated_at.map(|t| t.timestamp()),
+        updated_by: project.updated_by,
+        organization_id: project.organization_id,
+        name: project.name.clone(),
+        description: project.description.clone(),
+        tags,
+        token: project.token.clone(),
+        session_duration_seconds: project.session_duration_seconds,
+        events_count: project.events_count as u64,
+    };
+    Ok(v.encode_to_vec())
+}
+
+// deserialize project from protobuf
+fn deserialize(data: &Vec<u8>) -> Result<Project> {
+    let from = project::Project::decode(data.as_ref())?;
+
+    Ok(Project {
+        id: from.id,
+        created_at: chrono::DateTime::from_timestamp(from.created_at, 0).unwrap(),
+        created_by: from.created_by,
+        updated_at: from.updated_at.map(|t| chrono::DateTime::from_timestamp(t, 0).unwrap()),
+        updated_by: from.updated_by,
+        organization_id: from.organization_id,
+        name: from.name,
+        description: from.description,
+        tags: if from.tags.is_empty() {
+            None
+        } else {
+            Some(from.tags)
+        },
+        token: from.token,
+        session_duration_seconds: from.session_duration_seconds,
+        events_count: from.events_count as usize,
+    })
+}
+
+#[cfg(test)]
+
+mod tests {
+    use chrono::DateTime;
+    use crate::projects::{deserialize, Project, serialize};
+
+    #[test]
+    fn test_roundtrip() {
+        let project = Project {
+            id: 1,
+            created_at: DateTime::from_timestamp(1, 0).unwrap(),
+            created_by: 1,
+            updated_at: Some(DateTime::from_timestamp(2, 0).unwrap()),
+            updated_by: Some(2),
+            organization_id: 1,
+            name: "test".to_string(),
+            description: Some("test".to_string()),
+            tags: Some(vec!["test".to_string()]),
+            token: "test".to_string(),
+            session_duration_seconds: 1,
+            events_count: 1,
+        };
+
+        let data = serialize(&project).unwrap();
+        let project2 = deserialize(&data).unwrap();
+        assert_eq!(project, project2);
+    }
 }
