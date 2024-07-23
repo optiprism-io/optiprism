@@ -44,6 +44,11 @@ pub mod custom_event {
     include!(concat!(env!("OUT_DIR"), "/custom_event.rs"));
 }
 
+pub mod dashboard {
+    include!(concat!(env!("OUT_DIR"), "/dashboard.rs"));
+}
+
+
 pub fn project_ns(project_id: u64, ns: &[u8]) -> Vec<u8> {
     [b"projects/", project_id.to_le_bytes().as_ref(), b"/", ns].concat()
 }

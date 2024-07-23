@@ -1,18 +1,17 @@
 use std::sync::Arc;
 
-use bincode::deserialize;
-use bincode::serialize;
 use chrono::DateTime;
 use chrono::Utc;
+use prost::Message;
 use common::types::OptionalProperty;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
-
+use crate::bookmarks::Bookmark;
 use crate::error::MetadataError;
 use crate::index::next_seq;
-use crate::list_data;
+use crate::{bookmark, dashboard, list_data};
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::metadata::ListResponse;
@@ -185,4 +184,97 @@ pub struct UpdateDashboardRequest {
     pub name: OptionalProperty<String>,
     pub description: OptionalProperty<Option<String>>,
     pub panels: OptionalProperty<Vec<Panel>>,
+}
+
+fn serialize(v: &Dashboard) -> Result<Vec<u8>> {
+    let tags = if let Some(tags) = &v.tags {
+        tags.to_vec()
+    } else { vec![] };
+
+    let panels = v.panels.iter().map(|p| dashboard::Panel {
+        r#type: match p.typ {
+            Type::Report => 1,
+        },
+        report_id: p.report_id,
+        x: p.x as u32,
+        y: p.y as u32,
+        w: p.w as u32,
+        h: p.h as u32,
+    }).collect::<Vec<_>>();
+
+    let d = dashboard::Dashboard {
+        id: v.id,
+        created_at: v.created_at.timestamp(),
+        created_by: v.created_by,
+        updated_at: v.updated_at.map(|t| t.timestamp()),
+        updated_by: v.updated_by,
+        project_id: v.project_id,
+        tags,
+        name: v.name.clone(),
+        description: v.description.clone(),
+        panels,
+    };
+    Ok(d.encode_to_vec())
+}
+
+fn deserialize(data: &Vec<u8>) -> Result<Dashboard> {
+    let from = dashboard::Dashboard::decode(data.as_ref())?;
+
+    Ok(Dashboard {
+        id: from.id,
+        created_at: chrono::DateTime::from_timestamp(from.created_at, 0).unwrap(),
+        created_by: from.created_by,
+        updated_at: from.updated_at.map(|t| chrono::DateTime::from_timestamp(t, 0).unwrap()),
+        updated_by: from.updated_by,
+        project_id: from.project_id,
+        tags: if from.tags.is_empty() { None } else { Some(from.tags) },
+        name: from.name,
+        description: from.description,
+        panels: from.panels.iter().map(|p| Panel {
+            typ: match p.r#type {
+                1 => Type::Report,
+                _ => unreachable!(),
+            },
+            report_id: p.report_id,
+            x: p.x as usize,
+            y: p.y as usize,
+            w: p.w as usize,
+            h: p.h as usize,
+        }).collect::<Vec<_>>()
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::{DateTime, Utc};
+    use crate::dashboards::{Dashboard, deserialize, serialize};
+
+    #[test]
+    fn test_roundtrip() {
+        let d = Dashboard {
+            id: 1,
+            created_at: DateTime::from_timestamp(1, 0).unwrap(),
+            updated_at: Some(DateTime::from_timestamp(2, 0)).unwrap(),
+            created_by: 1,
+            updated_by: Some(2),
+            project_id: 3,
+            tags: Some(vec!["tag1".to_string(), "tag2".to_string()]),
+            name: "test".to_string(),
+            description: Some("test description".to_string()),
+            panels: vec![
+                crate::dashboards::Panel {
+                    typ: crate::dashboards::Type::Report,
+                    report_id: 1,
+                    x: 1,
+                    y: 2,
+                    w: 3,
+                    h: 4,
+                },
+            ],
+        };
+
+        let data = serialize(&d).unwrap();
+        let d2 = deserialize(&data).unwrap();
+        assert_eq!(d, d2);
+    }
 }
