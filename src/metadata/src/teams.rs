@@ -1,9 +1,7 @@
 use std::sync::Arc;
-
-use bincode::deserialize;
-use bincode::serialize;
 use chrono::DateTime;
 use chrono::Utc;
+use prost::Message;
 use common::types::OptionalProperty;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
@@ -17,12 +15,13 @@ use crate::index::delete_index;
 use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
-use crate::list_data;
+use crate::{list_data, report, team};
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
 use crate::metadata::ListResponse;
 use crate::org_ns;
+use crate::reports::{Report, Type};
 use crate::Result;
 
 const NAMESPACE: &[u8] = b"teams";
@@ -39,7 +38,7 @@ fn index_name_key(organization_id: u64, name: &str) -> Option<Vec<u8>> {
             IDX_NAME,
             name,
         )
-        .to_vec(),
+            .to_vec(),
     )
 }
 
@@ -163,7 +162,7 @@ impl Teams {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Team {
     pub id: u64,
     pub created_at: DateTime<Utc>,
@@ -185,4 +184,57 @@ pub struct CreateTeamRequest {
 pub struct UpdateTeamRequest {
     pub updated_by: u64,
     pub name: OptionalProperty<String>,
+}
+
+// serialize team to protobuf
+fn serialize(team: &Team) -> Result<Vec<u8>> {
+    let v = team::Team {
+        id: team.id,
+        created_at: team.created_at.timestamp(),
+        updated_at: team.updated_at.map(|t| t.timestamp()),
+        created_by: team.created_by,
+        updated_by: team.updated_by,
+        organization_id: team.organization_id,
+        name: team.name.clone(),
+    };
+
+    Ok(v.encode_to_vec())
+}
+
+fn deserialize(data: &Vec<u8>) -> Result<Team> {
+    let from = team::Team::decode(data.as_ref())?;
+
+    Ok(Team {
+        id: from.id,
+        created_at: chrono::DateTime::from_timestamp(from.created_at, 0).unwrap(),
+        updated_at: from.updated_at.map(|t| chrono::DateTime::from_timestamp(t, 0).unwrap()),
+        created_by: from.created_by,
+        updated_by: from.updated_by,
+        organization_id: from.organization_id,
+        name: from.name,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_roundtrip() {
+        use chrono::{DateTime, Utc};
+        use crate::teams::{Team, deserialize, serialize};
+
+        let team = Team {
+            id: 1,
+            created_at: DateTime::from_timestamp(1, 0).unwrap(),
+            created_by: 1,
+            updated_at: Some(DateTime::from_timestamp(2, 0).unwrap()),
+            updated_by: Some(2),
+            organization_id: 1,
+            name: "test".to_string(),
+        };
+
+        let data = serialize(&team).unwrap();
+        let team2 = deserialize(&data).unwrap();
+
+        assert_eq!(team, team2);
+    }
 }
