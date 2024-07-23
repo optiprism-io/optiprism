@@ -11,6 +11,7 @@ fn main() {
             "src/pb/project.proto",
             "src/pb/property.proto",
             "src/pb/report.proto",
+            "src/pb/session.proto",
         ],
         &["src"],
     ).unwrap();

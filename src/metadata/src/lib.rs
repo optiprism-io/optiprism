@@ -72,6 +72,10 @@ pub mod report {
     include!(concat!(env!("OUT_DIR"), "/report.rs"));
 }
 
+pub mod session {
+    include!(concat!(env!("OUT_DIR"), "/session.rs"));
+}
+
 pub fn project_ns(project_id: u64, ns: &[u8]) -> Vec<u8> {
     [b"projects/", project_id.to_le_bytes().as_ref(), b"/", ns].concat()
 }

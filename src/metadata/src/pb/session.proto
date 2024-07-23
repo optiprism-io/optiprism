@@ -1,0 +1,7 @@
+syntax = "proto3";
+package session;
+
+message Session {
+  uint64 user_id = 1;
+  int64 created_at = 2;
+}

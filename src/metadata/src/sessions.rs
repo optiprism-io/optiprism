@@ -1,15 +1,14 @@
 use std::sync::Arc;
 
-use bincode::deserialize;
-use bincode::serialize;
 use chrono::DateTime;
 use chrono::Utc;
+use prost::Message;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
 
 use crate::error::MetadataError;
-use crate::list;
+use crate::{list, session};
 use crate::metadata::ListResponse;
 use crate::project_ns;
 use crate::Result;
@@ -22,7 +21,7 @@ fn make_data_key(project_id: u64, user_id: u64) -> Vec<u8> {
         b"/".as_slice(),
         user_id.to_le_bytes().as_ref(),
     ]
-    .concat()
+        .concat()
 }
 
 pub struct Sessions {
@@ -109,4 +108,42 @@ impl Sessions {
 pub struct Session {
     pub user_id: u64,
     pub created_at: DateTime<Utc>,
+}
+
+// serialize session to protobuf
+fn serialize(session: &Session) -> Result<Vec<u8>> {
+    let v = session::Session {
+        user_id: session.user_id,
+        created_at: session.created_at.timestamp(),
+    };
+
+    Ok(v.encode_to_vec())
+}
+
+// deserialize protobuf to session
+fn deserialize(data: &[u8]) -> Result<Session> {
+    let v = session::Session::decode(data)?;
+    Ok(Session {
+        user_id: v.user_id,
+        created_at: chrono::DateTime::from_timestamp(v.created_at, 0).unwrap(),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::DateTime;
+    use crate::sessions::{deserialize, serialize};
+
+    #[test]
+    fn test_roundtrip() {
+        let session = super::Session {
+            user_id: 1,
+            created_at: DateTime::from_timestamp(1, 0).unwrap(),
+        };
+
+        let data = serialize(&session).unwrap();
+        let session2 = deserialize(&data).unwrap();
+
+        assert_eq!(session, session2);
+    }
 }
