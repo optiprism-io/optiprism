@@ -1,0 +1,22 @@
+syntax = "proto3";
+package report;
+
+message Report {
+  uint64 id = 1;
+  int64  created_at = 2;
+  uint64  created_by = 3;
+  optional int64  updated_at = 4;
+  optional uint64 updated_by = 5;
+  uint64 project_id = 6;
+  repeated string tags = 7;
+  string name = 8;
+  optional string description = 9;
+  Type type = 10;
+  bytes query = 11;
+}
+
+enum Type {
+  NONE = 0;
+  EVENT_SEGMENTATION = 1;
+  FUNNEL = 2;
+}
