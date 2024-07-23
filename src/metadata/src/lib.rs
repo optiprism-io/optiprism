@@ -36,6 +36,10 @@ pub mod account {
     include!(concat!(env!("OUT_DIR"), "/account.rs"));
 }
 
+pub mod bookmark {
+    include!(concat!(env!("OUT_DIR"), "/bookmark.rs"));
+}
+
 pub fn project_ns(project_id: u64, ns: &[u8]) -> Vec<u8> {
     [b"projects/", project_id.to_le_bytes().as_ref(), b"/", ns].concat()
 }
