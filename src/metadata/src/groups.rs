@@ -1,10 +1,9 @@
 use std::str::pattern::Pattern;
 use std::sync::Arc;
-
-use bincode::deserialize;
-use bincode::serialize;
+use bincode::{deserialize, serialize};
 use byteorder::ByteOrder;
 use byteorder::LittleEndian;
+use prost::Message;
 use common::GROUPS_COUNT;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
@@ -15,7 +14,7 @@ use crate::error::MetadataError;
 use crate::events::Event;
 use crate::index::next_seq;
 use crate::index::next_zero_seq;
-use crate::list_data;
+use crate::{group, list_data};
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::metadata::ListResponse;
@@ -98,11 +97,11 @@ impl Groups {
                     id: anonymous_id,
                     values,
                 };
-                tx.put(user_key, serialize(&group)?)?;
+                tx.put(user_key, serialize_group_values(&group)?)?;
 
                 group
             }
-            Some(value) => deserialize(&value)?,
+            Some(value) => deserialize_group_values(&value)?,
         };
 
         tx.commit()?;
@@ -126,11 +125,11 @@ impl Groups {
                     make_id_seq_key(project_ns(project_id, group_key.as_bytes()).as_slice()),
                 )?;
                 let group = GroupValues { id, values };
-                tx.put(key.as_bytes(), serialize(&group)?)?;
+                tx.put(key.as_bytes(), serialize_group_values(&group)?)?;
 
                 group
             }
-            Some(value) => deserialize(&value)?,
+            Some(value) => deserialize_group_values(&value)?,
         };
 
         Ok(res)
@@ -167,11 +166,11 @@ impl Groups {
                     make_id_seq_key(project_ns(project_id, group_key.as_bytes()).as_slice()),
                 )?;
                 let group = GroupValues { id, values };
-                tx.put(key.as_bytes(), serialize(&group)?)?;
+                tx.put(key.as_bytes(), serialize_group_values(&group)?)?;
                 group
             }
             Some(value) => {
-                let group: GroupValues = deserialize(&value)?;
+                let group: GroupValues = deserialize_group_values(&value)?;
                 let mut vals = group.values.clone();
                 for value in values {
                     let mut found = false;
@@ -190,7 +189,7 @@ impl Groups {
                     id: group.id,
                     values: vals,
                 };
-                tx.put(key.as_bytes(), serialize(&group)?)?;
+                tx.put(key.as_bytes(), serialize_group_values(&group)?)?;
 
                 group
             }
@@ -308,4 +307,81 @@ pub struct Group {
     pub id: u64,
     pub name: String,
     pub display_name: String,
+}
+
+fn serialize_group_values(group: &GroupValues) -> Result<Vec<u8>> {
+    let v = group::GroupValues {
+        id: group.id,
+        values: group.values.iter().map(|v| {
+            group::PropertyValue {
+                property_id: v.property_id,
+                value: Some(match &v.value {
+                    Value::Null => group::Value { value: Some(group::value::Value::NullValue(true)) },
+                    Value::Int8(v) => group::Value { value: Some(group::value::Value::Int8Value(v.unwrap() as i64)) },
+                    Value::Int16(v) => group::Value { value: Some(group::value::Value::Int16Value(v.unwrap() as i64)) },
+                    Value::Int32(v) => group::Value { value: Some(group::value::Value::Int32Value(v.unwrap() as i64)) },
+                    Value::Int64(v) => group::Value { value: Some(group::value::Value::Int64Value(v.unwrap())) },
+                    Value::Boolean(v) => group::Value { value: Some(group::value::Value::BoolValue(v.unwrap())) },
+                    Value::Timestamp(v) => group::Value { value: Some(group::value::Value::TimestampValue(v.unwrap())) },
+                    Value::Decimal(v) => group::Value { value: Some(group::value::Value::DecimalValue(v.unwrap().to_le_bytes().to_vec())) },
+                    Value::String(v) => group::Value { value: Some(group::value::Value::StringValue(v.clone().unwrap())) },
+                    _ => unimplemented!()
+                }),
+            }
+        }).collect::<Vec<_>>(),
+    };
+
+    Ok(v.encode_to_vec())
+}
+
+fn deserialize_group_values(data: &[u8]) -> Result<GroupValues> {
+    let from = group::GroupValues::decode(data)?;
+
+    Ok(GroupValues {
+        id: from.id,
+        values: from.values.iter().map(|v| {
+            let value = match v.value.clone().unwrap().value.unwrap() {
+                group::value::Value::NullValue(_) => Value::Null,
+                group::value::Value::Int8Value(v) => Value::Int8(Some(v as i8)),
+                group::value::Value::Int16Value(v) => Value::Int16(Some(v as i16)),
+                group::value::Value::Int32Value(v) => Value::Int32(Some(v as i32)),
+                group::value::Value::Int64Value(v) => Value::Int64(Some(v)),
+                group::value::Value::BoolValue(v) => Value::Boolean(Some(v)),
+                group::value::Value::TimestampValue(v) => Value::Timestamp(Some(v)),
+                group::value::Value::DecimalValue(v) => Value::Decimal(Some(i128::from_le_bytes(v.as_slice().try_into().unwrap()))),
+                group::value::Value::StringValue(v) => Value::String(Some(v.clone())),
+            };
+
+            PropertyValue {
+                property_id: v.property_id,
+                value,
+            }
+        }).collect::<Vec<_>>(),
+    })
+}
+
+#[cfg(test)]
+
+mod tests {
+    #[test]
+    fn test_roundtrip() {
+        let group = super::GroupValues {
+            id: 1,
+            values: vec![
+                super::PropertyValue {
+                    property_id: 1,
+                    value: super::Value::Int64(Some(1)),
+                },
+                super::PropertyValue {
+                    property_id: 2,
+                    value: super::Value::String(Some("test".to_string())),
+                },
+            ],
+        };
+
+        let data = super::serialize_group_values(&group).unwrap();
+        let group2 = super::deserialize_group_values(&data).unwrap();
+
+        assert_eq!(group, group2);
+    }
 }

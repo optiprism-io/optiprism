@@ -1,7 +1,6 @@
 syntax = "proto3";
 package event;
 
-
 message Event {
   uint64 id = 1;
   int64  created_at = 2;

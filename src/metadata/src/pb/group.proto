@@ -1,0 +1,32 @@
+syntax = "proto3";
+package group;
+
+message GroupValues {
+  uint64 id = 1;
+  repeated PropertyValue values = 2;
+}
+
+message PropertyValue {
+  uint64 property_id = 1;
+  Value value = 2;
+}
+
+message Value {
+  oneof value {
+    bool null_value = 1;
+    int64 int8_value = 2;
+    int64 int16_value = 3;
+    int64 int32_value = 4;
+    int64 int64_value = 5;
+    bool bool_value = 6;
+    int64 timestamp_value = 7;
+    bytes decimal_value = 8;
+    string string_value = 9;
+  }
+}
+
+message Group {
+  uint64 id = 1;
+  string name = 2;
+  optional string display_name = 3;
+}
