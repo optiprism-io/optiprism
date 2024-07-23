@@ -1,16 +1,15 @@
 use std::sync::Arc;
 
-use bincode::deserialize;
-use bincode::serialize;
 use chrono::DateTime;
 use chrono::Utc;
+use prost::Message;
 use common::types::{OptionalProperty, TABLE_EVENTS};
 use common::types::COLUMN_EVENT;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
-
+use crate::dashboards::{Dashboard, Panel, Type};
 use crate::dictionaries::Dictionaries;
 use crate::error::MetadataError;
 use crate::index::check_insert_constraints;
@@ -20,7 +19,7 @@ use crate::index::get_index;
 use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
-use crate::list_data;
+use crate::{dashboard, event, list_data};
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
@@ -436,4 +435,89 @@ pub struct UpdateEventRequest {
     pub event_properties: OptionalProperty<Option<Vec<u64>>>,
     pub user_properties: OptionalProperty<Option<Vec<u64>>>,
     pub custom_properties: OptionalProperty<Option<Vec<u64>>>,
+}
+
+fn serialize(v: &Event) -> Result<Vec<u8>> {
+    let tags = if let Some(tags) = &v.tags {
+        tags.to_vec()
+    } else { vec![] };
+
+    let d = event::Event{
+        id: v.id,
+        created_at: v.created_at.timestamp(),
+        created_by: v.created_by,
+        updated_at: v.updated_at.map(|t| t.timestamp()),
+        updated_by: v.updated_by,
+        project_id: v.project_id,
+        tags,
+        name: v.name.clone(),
+        display_name: v.display_name.clone(),
+        description: v.description.clone(),
+        status: match v.status {
+            Status::Enabled => 1,
+            Status::Disabled => 2,
+        },
+        is_system: v.is_system,
+    };
+
+    Ok(d.encode_to_vec())
+}
+
+fn deserialize(data: &Vec<u8>) -> Result<Event> {
+    let from = event::Event::decode(data.as_ref())?;
+
+    Ok(
+        Event{
+            id: from.id,
+            created_at: chrono::DateTime::from_timestamp(from.created_at, 0).unwrap(),
+            created_by: from.created_by,
+            updated_at: from.updated_at.map(|t| chrono::DateTime::from_timestamp(t, 0).unwrap()),
+            updated_by: from.updated_by,
+            project_id: from.project_id,
+            tags: if from.tags.is_empty() { None } else { Some(from.tags) },
+            name: from.name,
+            display_name: from.display_name,
+            description: from.description,
+            status: match from.status {
+                1 => Status::Enabled,
+                2 => Status::Disabled,
+                _ => unreachable!(),
+            },
+            is_system: from.is_system,
+            event_properties: None,
+            user_properties: None,
+            custom_properties: None,
+        }
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::DateTime;
+
+    #[test]
+    fn test_roundtrip() {
+        let event = super::Event {
+            id: 1,
+            created_at: DateTime::from_timestamp(1, 0).unwrap(),
+            updated_at: Some(DateTime::from_timestamp(2, 0)).unwrap(),
+            created_by: 1,
+            updated_by: Some(1),
+            project_id: 1,
+            tags: Some(vec!["tag1".to_string(), "tag2".to_string()]),
+            name: "name".to_string(),
+            display_name: Some("display_name".to_string()),
+            description: Some("description".to_string()),
+            status: super::Status::Disabled,
+            is_system: true,
+            event_properties: None,
+            user_properties: None,
+            custom_properties: None,
+        };
+
+        let data = super::serialize(&event).unwrap();
+        let event2 = super::deserialize(&data).unwrap();
+
+        assert_eq!(event, event2);
+    }
 }
