@@ -1,9 +1,9 @@
+use std::io::BufReader;
 use std::sync::Arc;
 
-use bincode::deserialize;
-use bincode::serialize;
 use chrono::DateTime;
 use chrono::Utc;
+use prost::Message;
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::rbac::Role;
@@ -12,7 +12,6 @@ use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
-
 use crate::error::MetadataError;
 use crate::index::check_insert_constraints;
 use crate::index::check_update_constraints;
@@ -21,7 +20,7 @@ use crate::index::get_index;
 use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
-use crate::list_data;
+use crate::{account, list_data};
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
@@ -256,4 +255,163 @@ pub struct UpdateAccountRequest {
     pub organizations: OptionalProperty<Option<Vec<(u64, OrganizationRole)>>>,
     pub projects: OptionalProperty<Option<Vec<(u64, ProjectRole)>>>,
     pub teams: OptionalProperty<Option<Vec<(u64, Role)>>>,
+}
+
+fn serialize(acc: &Account) -> Result<Vec<u8>> {
+    let role = if let Some(role) = &acc.role {
+        match role {
+            Role::Admin => Some(account::Role::Admin as i32),
+        }
+    } else { None };
+
+    let orgs = if let Some(orgs) = &acc.organizations {
+        orgs.iter().map(|(id, role)| {
+            account::Organization {
+                id: *id,
+                role: match role {
+                    OrganizationRole::Owner => account::OrganizationRole::Owner as i32,
+                    OrganizationRole::Admin => account::OrganizationRole::Admin as i32,
+                    OrganizationRole::Member => account::OrganizationRole::Member as i32,
+                },
+            }
+        }).collect::<Vec<_>>()
+    } else {
+        vec![]
+    };
+
+    let proj = if let Some(proj) = &acc.projects {
+        proj.iter().map(|(id, role)| {
+            account::Project {
+                id: *id,
+                role: match role {
+                    ProjectRole::Owner => account::ProjectRole::Owner as i32,
+                    ProjectRole::Admin => account::ProjectRole::Admin as i32,
+                    ProjectRole::Member => account::ProjectRole::Member as i32,
+                    ProjectRole::Reader => account::ProjectRole::Reader as i32,
+                },
+            }
+        }).collect::<Vec<_>>()
+    } else {
+        vec![]
+    };
+
+    let teams = if let Some(teams) = &acc.teams {
+        teams.iter().map(|(id, role)| {
+            account::Team {
+                id: *id,
+                role: match role {
+                    Role::Admin => account::Role::Admin as i32,
+                },
+            }
+        }).collect::<Vec<_>>()
+    } else {
+        vec![]
+    };
+
+    let acc = account::Account {
+        id: acc.id,
+        created_at: acc.created_at.timestamp(),
+        created_by: acc.created_by,
+        updated_at: acc.updated_at.map(|t| t.timestamp()),
+        updated_by: acc.updated_by,
+        password_hash: acc.password_hash.clone(),
+        email: acc.email.clone(),
+        name: acc.name.clone(),
+        role,
+        force_update_password: acc.force_update_password,
+        force_update_email: acc.force_update_email,
+        organizations: orgs,
+        projects: proj,
+        teams,
+    };
+    Ok(acc.encode_to_vec())
+}
+
+fn deserialize(data: &Vec<u8>) -> Result<Account> {
+    let from = account::Account::decode(data.as_ref())?;
+    let role = if let Some(role) = &from.role {
+        match role {
+            1 => Some(Role::Admin),
+            _ => panic!("invalid role")
+        }
+    } else {
+        None
+    };
+
+
+    let orgs = from.organizations.iter().map(|org| {
+        (org.id, match org.role {
+            1 => OrganizationRole::Owner,
+            2 => OrganizationRole::Admin,
+            3 => OrganizationRole::Member,
+            _ => panic!("invalid role")
+        })
+    }).collect::<Vec<_>>();
+
+    let proj = from.projects.iter().map(|proj| {
+        (proj.id, match proj.role {
+            1 => ProjectRole::Owner,
+            2 => ProjectRole::Admin,
+            3 => ProjectRole::Member,
+            4 => ProjectRole::Reader,
+            _ => panic!("invalid role")
+        })
+    }).collect::<Vec<_>>();
+
+    let teams = from.teams.iter().map(|team| {
+        (team.id, match team.role {
+            1 => Role::Admin,
+            _ => panic!("invalid role")
+        })
+    }).collect::<Vec<_>>();
+    let to = Account {
+        id: from.id,
+        created_at: chrono::DateTime::from_timestamp(from.created_at, 0).unwrap(),
+        created_by: from.created_by,
+        updated_at: from.updated_at.map(|t| chrono::DateTime::from_timestamp(t, 0).unwrap()),
+        updated_by: from.updated_by,
+        password_hash: from.password_hash,
+        email: from.email,
+        name: from.name,
+        role,
+        force_update_password: from.force_update_password,
+        force_update_email: from.force_update_email,
+        organizations: if orgs.is_empty() { None } else { Some(orgs) },
+        projects: if proj.is_empty() { None } else { Some(proj) },
+        teams: if teams.is_empty() { None } else { Some(teams) },
+    };
+
+    Ok(to)
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::DateTime;
+    use common::rbac::{OrganizationRole, ProjectRole, Role};
+    use crate::accounts::{Account, deserialize, serialize};
+
+    #[test]
+    fn test_proto_roundtrip() {
+        let acc = Account {
+            id: 1,
+            created_at: DateTime::from_timestamp(1, 0).unwrap(),
+            created_by: 2,
+            updated_at: Some(DateTime::from_timestamp(2, 0).unwrap()),
+            updated_by: Some(3),
+            password_hash: "4".to_string(),
+            email: "5".to_string(),
+            name: Some("6".to_string()),
+            role: Some(Role::Admin),
+            force_update_password: true,
+            force_update_email: true,
+            organizations: Some(vec![(1, OrganizationRole::Admin)]),
+            projects: Some(vec![(1, ProjectRole::Admin)]),
+            teams: Some(vec![(1, Role::Admin)]),
+        };
+
+        let s = serialize(&acc).unwrap();
+        let d = deserialize(&s).unwrap();
+
+        assert_eq!(acc, d);
+    }
 }

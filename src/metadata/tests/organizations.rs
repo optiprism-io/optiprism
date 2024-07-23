@@ -38,17 +38,43 @@ fn test_organizations() {
     let req = CreateOrganizationRequest { created_by: 1, name: "org1".to_string() };
     let org = orgs.create(req).unwrap();
 
-    orgs.add_member(org.id, acc.id, OrganizationRole::Owner).unwrap();
-
     let org = orgs.get_by_id(org.id).unwrap();
     let acc = accs.get_by_id(org.id).unwrap();
 
-    assert_eq!(org.members, vec![(acc.id,OrganizationRole::Owner)]);
+    assert_eq!(org.members, vec![(acc.id, OrganizationRole::Owner)]);
     assert_eq!(acc.organizations, Some(vec![(org.id, OrganizationRole::Owner)]));
 
     orgs.change_member_role(org.id, acc.id, OrganizationRole::Admin).unwrap();
     let org = orgs.get_by_id(org.id).unwrap();
     let acc = accs.get_by_id(org.id).unwrap();
-    assert_eq!(org.members, vec![(acc.id,OrganizationRole::Admin)]);
+    assert_eq!(org.members, vec![(acc.id, OrganizationRole::Admin)]);
     assert_eq!(acc.organizations, Some(vec![(org.id, OrganizationRole::Admin)]));
+
+
+    let req = CreateAccountRequest {
+        created_by: 1,
+        password_hash: "".to_string(),
+        email: "e2@mail.com".to_string(),
+        name: None,
+        force_update_password: false,
+        force_update_email: false,
+        role: None,
+        organizations: None,
+        projects: None,
+        teams: None,
+    };
+
+    let acc2 = accs.create(req).unwrap();
+
+    orgs.add_member(org.id, 2, OrganizationRole::Admin).unwrap();
+
+    let org = orgs.get_by_id(org.id).unwrap();
+    let acc = accs.get_by_id(org.id).unwrap();
+
+    assert_eq!(org.members, vec![(acc.id, OrganizationRole::Admin),(acc2.id, OrganizationRole::Admin)]);
+
+    orgs.change_member_role(org.id, acc.id, OrganizationRole::Admin).unwrap();
+    let org = orgs.get_by_id(org.id).unwrap();
+    let acc = accs.get_by_id(org.id).unwrap();
+    assert_eq!(org.members, vec![(acc.id, OrganizationRole::Admin),(acc2.id, OrganizationRole::Admin)]);
 }

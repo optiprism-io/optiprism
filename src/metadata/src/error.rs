@@ -27,6 +27,8 @@ pub enum MetadataError {
     Bincode(#[from] bincode::Error),
     #[error("io {0}")]
     Io(#[from] std::io::Error),
+    #[error("prost decode {0}")]
+    ProstDecodeError(#[from] prost::DecodeError),
     #[error("{0:?}")]
     Other(#[from] anyhow::Error),
 }
