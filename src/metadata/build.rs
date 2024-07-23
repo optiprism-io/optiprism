@@ -12,6 +12,7 @@ fn main() {
             "src/pb/property.proto",
             "src/pb/report.proto",
             "src/pb/session.proto",
+            "src/pb/team.proto",
         ],
         &["src"],
     ).unwrap();
