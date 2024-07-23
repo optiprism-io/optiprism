@@ -1,0 +1,29 @@
+syntax = "proto3";
+package dashboard;
+
+message Dashboard {
+  uint64 id = 1;
+  int64  created_at = 2;
+  uint64  created_by = 3;
+  optional int64  updated_at = 4;
+  optional uint64 updated_by = 5;
+  uint64 project_id = 6;
+  repeated string tags = 7;
+  string name = 8;
+  optional string description = 9;
+  repeated Panel panels = 10;
+}
+
+message Panel {
+  Type type = 1;
+  uint64 report_id = 2;
+  uint32 x = 3;
+  uint32 y = 4;
+  uint32 w = 5;
+  uint32 h = 6;
+}
+
+enum Type {
+  None = 0;
+  Report = 1;
+}
