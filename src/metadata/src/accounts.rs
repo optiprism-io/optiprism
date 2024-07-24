@@ -20,11 +20,11 @@ use crate::index::get_index;
 use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
-use crate::{account, list_data};
+use crate::{account, list_data, make_data_key};
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
-use crate::metadata::ListResponse;
+use crate::metadata::{ListResponse, ResponseMetadata};
 use crate::Result;
 
 const NAMESPACE: &[u8] = b"accounts";
@@ -92,7 +92,23 @@ impl Accounts {
 
     pub fn list(&self) -> Result<ListResponse<Account>> {
         let tx = self.db.transaction();
-        list_data(&tx, NAMESPACE)
+        let prefix = make_data_key(NAMESPACE);
+
+        let iter = tx.prefix_iterator(prefix.clone());
+        let mut list = vec![];
+        for kv in iter {
+            let (key, value) = kv?;
+            // check if key contains the prefix
+            if !prefix.as_slice().cmp(&key[..prefix.len()]).is_eq() {
+                break;
+            }
+            list.push(deserialize(&value)?);
+        }
+
+        Ok(ListResponse {
+            data: list,
+            meta: ResponseMetadata { next: None },
+        })
     }
 
     pub fn update(&self, account_id: u64, req: UpdateAccountRequest) -> Result<Account> {
@@ -327,7 +343,7 @@ fn serialize(acc: &Account) -> Result<Vec<u8>> {
     Ok(acc.encode_to_vec())
 }
 
-fn deserialize(data: &Vec<u8>) -> Result<Account> {
+fn deserialize(data: &[u8]) -> Result<Account> {
     let from = account::Account::decode(data.as_ref())?;
     let role = if let Some(role) = &from.role {
         match role {

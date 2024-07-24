@@ -15,10 +15,10 @@ use common::funnel::Funnel;
 
 use crate::error::MetadataError;
 use crate::index::next_seq;
-use crate::{list_data, report, reports};
+use crate::{list_data, make_data_key, report, reports};
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
-use crate::metadata::ListResponse;
+use crate::metadata::{ListResponse, ResponseMetadata};
 use crate::project_ns;
 use crate::Result;
 
@@ -88,7 +88,24 @@ impl Reports {
 
     pub fn list(&self, project_id: u64) -> Result<ListResponse<Report>> {
         let tx = self.db.transaction();
-        list_data(&tx, project_ns(project_id, NAMESPACE).as_slice())
+
+        let prefix = make_data_key(project_ns(project_id, NAMESPACE).as_slice());
+
+        let iter = tx.prefix_iterator(prefix.clone());
+        let mut list = vec![];
+        for kv in iter {
+            let (key, value) = kv?;
+            // check if key contains the prefix
+            if !prefix.as_slice().cmp(&key[..prefix.len()]).is_eq() {
+                break;
+            }
+            list.push(deserialize(&value)?);
+        }
+
+        Ok(ListResponse {
+            data: list,
+            meta: ResponseMetadata { next: None },
+        })
     }
 
     pub fn update(
@@ -210,7 +227,7 @@ fn serialize_report(r: &Report) -> Result<Vec<u8>> {
 }
 
 // deserialize report from protobuf
-fn deserialize_report(data: &Vec<u8>) -> Result<Report> {
+fn deserialize_report(data: &[u8]) -> Result<Report> {
     let from = report::Report::decode(data.as_ref())?;
 
     Ok(Report {

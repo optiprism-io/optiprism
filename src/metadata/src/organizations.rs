@@ -17,11 +17,11 @@ use crate::index::delete_index;
 use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
-use crate::{list_data, organization};
+use crate::{list_data, make_data_key, organization};
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
-use crate::metadata::ListResponse;
+use crate::metadata::{ListResponse, ResponseMetadata};
 use crate::Result;
 
 const NAMESPACE: &[u8] = b"organizations";
@@ -94,7 +94,23 @@ impl Organizations {
     pub fn list(&self) -> Result<ListResponse<Organization>> {
         let tx = self.db.transaction();
 
-        list_data(&tx, NAMESPACE)
+        let prefix = make_data_key(NAMESPACE);
+
+        let iter = tx.prefix_iterator(prefix.clone());
+        let mut list = vec![];
+        for kv in iter {
+            let (key, value) = kv?;
+            // check if key contains the prefix
+            if !prefix.as_slice().cmp(&key[..prefix.len()]).is_eq() {
+                break;
+            }
+            list.push(deserialize(&value)?);
+        }
+
+        Ok(ListResponse {
+            data: list,
+            meta: ResponseMetadata { next: None },
+        })
     }
 
     pub fn update_(&self, tx: &Transaction<TransactionDB>, id: u64, req: UpdateOrganizationRequest) -> Result<Organization> {
@@ -244,7 +260,7 @@ fn serialize(org: &Organization) -> Result<Vec<u8>> {
 }
 
 // deserialize from protobuf
-fn deserialize(data: &Vec<u8>) -> Result<Organization> {
+fn deserialize(data: &[u8]) -> Result<Organization> {
     let from = organization::Organization::decode(data.as_ref())?;
 
     Ok(Organization {

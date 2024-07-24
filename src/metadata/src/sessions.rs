@@ -46,7 +46,26 @@ impl Sessions {
 
     pub fn clear_project(&self, project_id: u64) -> Result<()> {
         let tx = self.db.transaction();
-        let list: ListResponse<Session> = list(&tx, project_ns(project_id, NAMESPACE).as_ref())?;
+
+        let prefix = crate::make_data_key(project_ns(project_id, NAMESPACE).as_slice());
+
+        let iter = tx.prefix_iterator(prefix.clone());
+        let mut list = vec![];
+        for kv in iter {
+            let (key, value) = kv?;
+            // check if key contains the prefix
+            if key.len() < prefix.len() || !prefix.as_slice().cmp(&key[..prefix.len()]).is_eq() {
+                continue;
+            }
+            list.push(deserialize(&value)?);
+            break;
+        }
+
+        let list = ListResponse {
+            data: list,
+            meta: ResponseMetadata { next: None },
+        };
+
         let tx = self.db.transaction();
         for s in list.into_iter() {
             tx.delete(make_data_key(project_id, s.user_id).as_slice())?;
@@ -91,19 +110,20 @@ impl Sessions {
         callback: impl Fn(&Session) -> Result<bool>,
     ) -> Result<()> {
         let tx = self.db.transaction();
-        let prefix = NAMESPACE;
 
-        let list = tx
-            .prefix_iterator("")
-            .filter_map(|x| {
-                let x = x.unwrap();
-                if x.0.len() < prefix.len() || !prefix.cmp(&x.0[..prefix.len()]).is_eq() {
-                    return None;
-                }
+        let prefix = crate::make_data_key(project_ns(project_id, NAMESPACE).as_slice());
 
-                Some(deserialize(x.1.as_ref()))
-            })
-            .collect::<Result<_>>()?;
+        let iter = tx.prefix_iterator(prefix.clone());
+        let mut list = vec![];
+        for kv in iter {
+            let (key, value) = kv?;
+            // check if key contains the prefix
+            if key.len() < prefix.len() || !prefix.as_slice().cmp(&key[..prefix.len()]).is_eq() {
+                continue;
+            }
+            list.push(deserialize(&value)?);
+            break;
+        }
 
         let list = ListResponse {
             data: list,

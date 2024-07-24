@@ -11,10 +11,10 @@ use serde::Serialize;
 use crate::bookmarks::Bookmark;
 use crate::error::MetadataError;
 use crate::index::next_seq;
-use crate::{bookmark, dashboard, list_data};
+use crate::{bookmark, dashboard, list_data, make_data_key};
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
-use crate::metadata::ListResponse;
+use crate::metadata::{ListResponse, ResponseMetadata};
 use crate::project_ns;
 use crate::Result;
 
@@ -83,7 +83,24 @@ impl Dashboards {
 
     pub fn list(&self, project_id: u64) -> Result<ListResponse<Dashboard>> {
         let tx = self.db.transaction();
-        list_data(&tx, project_ns(project_id, NAMESPACE).as_slice())
+
+        let prefix = make_data_key(project_ns(project_id, NAMESPACE).as_slice());
+
+        let iter = tx.prefix_iterator(prefix.clone());
+        let mut list = vec![];
+        for kv in iter {
+            let (key, value) = kv?;
+            // check if key contains the prefix
+            if !prefix.as_slice().cmp(&key[..prefix.len()]).is_eq() {
+                break;
+            }
+            list.push(deserialize(&value)?);
+        }
+
+        Ok(ListResponse {
+            data: list,
+            meta: ResponseMetadata { next: None },
+        })
     }
 
     pub fn update(
@@ -217,7 +234,7 @@ fn serialize(v: &Dashboard) -> Result<Vec<u8>> {
     Ok(d.encode_to_vec())
 }
 
-fn deserialize(data: &Vec<u8>) -> Result<Dashboard> {
+fn deserialize(data: &[u8]) -> Result<Dashboard> {
     let from = dashboard::Dashboard::decode(data.as_ref())?;
 
     Ok(Dashboard {
@@ -276,5 +293,6 @@ mod tests {
         let data = serialize(&d).unwrap();
         let d2 = deserialize(&data).unwrap();
         assert_eq!(d, d2);
+
     }
 }

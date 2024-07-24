@@ -32,11 +32,11 @@ use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::next_zero_seq;
 use crate::index::update_index;
-use crate::{list_data, property};
+use crate::{list_data, make_data_key, property};
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
-use crate::metadata::ListResponse;
+use crate::metadata::{ListResponse, ResponseMetadata};
 use crate::project_ns;
 use crate::Result;
 
@@ -408,10 +408,24 @@ impl Properties {
     }
     pub fn list(&self, project_id: u64) -> Result<ListResponse<Property>> {
         let tx = self.db.transaction();
-        list_data(
-            &tx,
-            project_ns(project_id, self.typ.path().as_bytes()).as_slice(),
-        )
+
+        let prefix = make_data_key(project_ns(project_id, self.typ.path().as_bytes()).as_slice());
+
+        let iter = tx.prefix_iterator(prefix.clone());
+        let mut list = vec![];
+        for kv in iter {
+            let (key, value) = kv?;
+            // check if key contains the prefix
+            if !prefix.as_slice().cmp(&key[..prefix.len()]).is_eq() {
+                break;
+            }
+            list.push(deserialize(&value)?);
+        }
+
+        Ok(ListResponse {
+            data: list,
+            meta: ResponseMetadata { next: None },
+        })
     }
 
     pub fn update(
@@ -738,7 +752,7 @@ fn serialize(prop: &Property) -> Result<Vec<u8>> {
 }
 
 // deserialize property from protobuf
-fn deserialize(data: &Vec<u8>) -> Result<Property> {
+fn deserialize(data: &[u8]) -> Result<Property> {
     let from = property::Property::decode(data.as_ref())?;
 
     Ok(Property {

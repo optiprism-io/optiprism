@@ -66,7 +66,6 @@ impl Projects {
     pub fn create(&self, req: CreateProjectRequest) -> Result<Project> {
         let tx = self.db.transaction();
         let idx_keys = index_keys(&req.name, req.token.as_str());
-
         check_insert_constraints(&tx, idx_keys.as_ref())?;
 
         let created_at = Utc::now();
@@ -118,11 +117,10 @@ impl Projects {
         for kv in iter {
             let (key, value) = kv?;
             // check if key contains the prefix
-            if key.len() < prefix.len() || !prefix.as_slice().cmp(&key[..prefix.len()]).is_eq() {
-                continue;
+            if !prefix.as_slice().cmp(&key[..prefix.len()]).is_eq() {
+                break;
             }
             list.push(deserialize(&value)?);
-            break;
         }
 
         Ok(ListResponse {
