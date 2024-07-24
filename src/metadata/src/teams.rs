@@ -15,11 +15,11 @@ use crate::index::delete_index;
 use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
-use crate::{list_data, report, team};
+use crate::{list_data, project_ns, report, team};
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
-use crate::metadata::ListResponse;
+use crate::metadata::{ListResponse, ResponseMetadata};
 use crate::org_ns;
 use crate::reports::{Report, Type};
 use crate::Result;
@@ -109,7 +109,24 @@ impl Teams {
     pub fn list(&self, organization_id: u64) -> Result<ListResponse<Team>> {
         let tx = self.db.transaction();
 
-        list_data(&tx, org_ns(organization_id, NAMESPACE).as_slice())
+        let prefix = crate::make_data_key(org_ns(organization_id, NAMESPACE).as_slice());
+
+        let iter = tx.prefix_iterator(prefix.clone());
+        let mut list = vec![];
+        for kv in iter {
+            let (key, value) = kv?;
+            // check if key contains the prefix
+            if key.len() < prefix.len() || !prefix.as_slice().cmp(&key[..prefix.len()]).is_eq() {
+                continue;
+            }
+            list.push(deserialize(&value)?);
+            break;
+        }
+
+        Ok(ListResponse {
+            data: list,
+            meta: ResponseMetadata { next: None },
+        })
     }
 
     pub fn update(
@@ -201,7 +218,7 @@ fn serialize(team: &Team) -> Result<Vec<u8>> {
     Ok(v.encode_to_vec())
 }
 
-fn deserialize(data: &Vec<u8>) -> Result<Team> {
+fn deserialize(data: &[u8]) -> Result<Team> {
     let from = team::Team::decode(data.as_ref())?;
 
     Ok(Team {
