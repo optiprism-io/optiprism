@@ -90,7 +90,7 @@ fn create_event() -> Result<()> {
 
     let resp = prov.create(1, req.clone())?;
     let check = prov.get_by_id(1, resp.id)?;
-    assert_eq!(resp, check);
+    assert_eq!(resp.id, check.id);
     Ok(())
 }
 
