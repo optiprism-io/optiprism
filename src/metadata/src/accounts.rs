@@ -1,4 +1,6 @@
 use std::io::BufReader;
+use std::str::from_utf8;
+use std::str::pattern::Pattern;
 use std::sync::Arc;
 
 use chrono::DateTime;
@@ -99,7 +101,7 @@ impl Accounts {
         for kv in iter {
             let (key, value) = kv?;
             // check if key contains the prefix
-            if !prefix.as_slice().cmp(&key[..prefix.len()]).is_eq() {
+            if !from_utf8(&prefix).unwrap().is_prefix_of(from_utf8(&key).unwrap()) {
                 break;
             }
             list.push(deserialize(&value)?);

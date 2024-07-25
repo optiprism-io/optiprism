@@ -1,3 +1,5 @@
+use std::str::from_utf8;
+use std::str::pattern::Pattern;
 use std::sync::Arc;
 
 use chrono::DateTime;
@@ -22,11 +24,11 @@ use crate::index::get_index;
 use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
-use crate::{bookmark, custom_event, list_data};
+use crate::{bookmark, custom_event, list_data, make_data_key};
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
-use crate::metadata::ListResponse;
+use crate::metadata::{ListResponse, ResponseMetadata};
 use crate::project_ns;
 use crate::projects::Project;
 use crate::Result;
@@ -182,7 +184,25 @@ impl CustomEvents {
 
     pub fn list(&self, project_id: u64) -> Result<ListResponse<CustomEvent>> {
         let tx = self.db.transaction();
-        list_data(&tx, project_ns(project_id, NAMESPACE).as_slice())
+
+        let prefix = make_data_key(project_ns(project_id, NAMESPACE).as_slice());
+
+        let iter = tx.prefix_iterator(prefix.clone());
+        let mut list = vec![];
+        for kv in iter {
+            let (key, value) = kv?;
+            // check if key contains the prefix
+            if !from_utf8(&prefix).unwrap().is_prefix_of(from_utf8(&key).unwrap()) {
+                break;
+            }
+            list.push(deserialize(&value)?);
+        }
+
+
+        Ok(ListResponse {
+            data: list,
+            meta: ResponseMetadata { next: None },
+        })
     }
 
     pub fn update(
@@ -490,7 +510,7 @@ fn serialize(v: &CustomEvent) -> Result<Vec<u8>> {
     Ok(ce.encode_to_vec())
 }
 
-fn deserialize(data: &Vec<u8>) -> Result<CustomEvent> {
+fn deserialize(data: &[u8]) -> Result<CustomEvent> {
     let from = custom_event::CustomEvent::decode(data.as_ref())?;
 
     let mut events = vec![];

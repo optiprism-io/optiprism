@@ -1,8 +1,8 @@
+$(eval GIT_TAG := $(shell git rev-parse --short HEAD))
 SHELL = /bin/bash
 VERSION =$(shell cd src/cmd; cargo get package.version)
 DEMO_TAG = v$(VERSION)
 IMAGE = optiprismio/optiprism:$(DEMO_TAG)
-
 cargo-fix-fmt: cargo-fix cargo-fmt cargo-sort cargo-lint
 
 cargo-fix:
@@ -43,7 +43,7 @@ clean:
 	yarn cache clean
 
 docker-build:
-	docker buildx build  --ssh default --load --file docker/Dockerfile --platform=linux/amd64 --progress plain -t $(IMAGE) .
+	docker buildx build  --build-arg="GIT_SHA=$(GIT_TAG)" --ssh default --load --file docker/Dockerfile --platform=linux/amd64 --progress plain -t $(IMAGE) .
 
 docker-publish:
 	$(pushing pushing $(IMAGE) docker image...)
@@ -52,7 +52,7 @@ docker-publish:
 docker-release: docker-build docker-publish
 
 docker-local-build:
-	docker buildx build  --ssh default --load --file docker/local.Dockerfile --platform=linux/amd64 --progress plain -t $(IMAGE) .
+	docker buildx build  --build-arg="GIT_SHA=$(GIT_TAG)" --ssh default --load --file docker/local.Dockerfile --platform=linux/amd64 --progress plain -t $(IMAGE) .
 
 docker-local-publish:
 	$(pushing pushing $(IMAGE) docker image...)

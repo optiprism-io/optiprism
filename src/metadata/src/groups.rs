@@ -1,3 +1,4 @@
+use std::str::from_utf8;
 use std::str::pattern::Pattern;
 use std::sync::Arc;
 use byteorder::ByteOrder;
@@ -49,7 +50,7 @@ impl Groups {
                     &tx,
                     make_id_seq_key(project_ns(project_id, group_key.as_bytes()).as_slice()),
                 )?;
-                tx.put(key.as_bytes(), id.to_le_bytes().as_ref())?;
+                tx.put(key.as_bytes(), id.to_string().as_bytes())?;
 
                 Ok(id)
             }
@@ -91,7 +92,7 @@ impl Groups {
                 let group_key = format!("groups/{group_id}");
                 let seq_key =
                     make_id_seq_key(project_ns(project_id, group_key.as_bytes()).as_slice());
-                tx.put(&seq_key, anonymous_id.to_le_bytes().as_ref())?;
+                tx.put(&seq_key, anonymous_id.to_string().as_bytes())?;
                 let group = GroupValues {
                     id: anonymous_id,
                     values,
@@ -199,20 +200,20 @@ impl Groups {
 
     pub fn list_groups(&self, project_id: u64) -> Result<ListResponse<Group>> {
         let tx = self.db.transaction();
-        let mut res = vec![];
-        let key = format!("projects/{project_id}/groups/names");
-        for i in tx.prefix_iterator(key.as_str()) {
-            let i = i?;
-            let v = String::from_utf8(i.0.to_vec())?;
-            if !key.is_prefix_of(v.as_ref()) {
+        let prefix = format!("projects/{project_id}/groups/names");
+        let iter = tx.prefix_iterator(prefix.clone());
+        let mut list = vec![];
+        for kv in iter {
+            let (key, value) = kv?;
+            // check if key contains the prefix
+            if !prefix.is_prefix_of(from_utf8(&key).unwrap()) {
                 break;
             }
-            let group = deserialize_group(&i.1)?;
-            res.push(group);
+            list.push(deserialize_group(&value)?);
         }
 
         Ok(ListResponse {
-            data: res,
+            data: list,
             meta: ResponseMetadata { next: None },
         })
     }

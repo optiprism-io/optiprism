@@ -3,10 +3,11 @@ use std::sync::Arc;
 use uuid::Uuid;
 use common::event_segmentation::{Analysis, ChartType, EventSegmentationRequest};
 use common::group_col;
-use common::query::{QueryTime, TimeIntervalUnit};
+use common::query::{EventRef, QueryTime, TimeIntervalUnit};
 use metadata::events::CreateEventRequest;
 use metadata::{MetadataProvider, properties, reports};
 use metadata::accounts::CreateAccountRequest;
+use metadata::custom_events::{CreateCustomEventRequest, Event};
 use metadata::dashboards::CreateDashboardRequest;
 use metadata::groups::{PropertyValue, Value};
 use metadata::organizations::CreateOrganizationRequest;
@@ -56,7 +57,7 @@ fn test_list() {
     let proj1 = md.projects.create(CreateProjectRequest {
         created_by: 0,
         organization_id: 1,
-        name: "p1".to_string(),
+        name: "p11sdfsdfsdfsdfsdfsdfsdfsdfsdddfsdfsdfsdfsdfdsfdsfsdf".to_string(),
         description: None,
         tags: None,
         token: "t1".to_string(),
@@ -176,7 +177,7 @@ fn test_list() {
     let report1 = md.reports.create(1, CreateReportRequest {
         created_by: 0,
         tags: None,
-        name: "".to_string(),
+        name: "r1".to_string(),
         description: None,
         typ: reports::Type::EventSegmentation,
         query: reports::Query::EventSegmentation(EventSegmentationRequest {
@@ -196,7 +197,7 @@ fn test_list() {
     let report2 = md.reports.create(1, CreateReportRequest {
         created_by: 0,
         tags: None,
-        name: "".to_string(),
+        name: "r233".to_string(),
         description: None,
         typ: reports::Type::EventSegmentation,
         query: reports::Query::EventSegmentation(EventSegmentationRequest {
@@ -212,6 +213,25 @@ fn test_list() {
             segments: None,
         }),
     });
+
+    md.custom_events.create(1, CreateCustomEventRequest {
+        created_by: 0,
+        tags: None,
+        name: "1".to_string(),
+        description: None,
+        status: Default::default(),
+        is_system: false,
+        events: vec![Event{ event: EventRef::Regular(1), filters: None }],
+    }).unwrap();
+    md.custom_events.create(1, CreateCustomEventRequest {
+        created_by: 0,
+        tags: None,
+        name: "2".to_string(),
+        description: None,
+        status: Default::default(),
+        is_system: false,
+        events: vec![Event{ event: EventRef::Regular(1), filters: None }],
+    }).unwrap();
 
     let l = md.events.list(1).unwrap();
     assert_eq!(l.len(), 1);
@@ -242,5 +262,8 @@ fn test_list() {
     assert_eq!(l.len(), 2);
 
     let l = md.reports.list(1).unwrap();
+    assert_eq!(l.len(), 2);
+
+    let l = md.custom_events.list(1).unwrap();
     assert_eq!(l.len(), 2);
 }
