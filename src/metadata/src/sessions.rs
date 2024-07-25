@@ -1,4 +1,5 @@
 use std::str::from_utf8;
+use std::str::pattern::Pattern;
 use std::sync::Arc;
 
 use chrono::DateTime;
@@ -20,7 +21,7 @@ fn make_data_key(project_id: u64, user_id: u64) -> Vec<u8> {
     [
         project_ns(project_id, NAMESPACE).as_ref(),
         b"/data".as_slice(),
-        user_id.to_le_bytes().as_ref(),
+        user_id.to_string().as_bytes(),
     ]
         .concat()
 }
@@ -53,18 +54,12 @@ impl Sessions {
         let mut list = vec![];
         for kv in iter {
             let (key, value) = kv?;
-
             // check if key contains the prefix
-            if !prefix.as_slice().cmp(&key[..prefix.len()]).is_eq() {
+            if !from_utf8(&prefix).unwrap().is_prefix_of(from_utf8(&key).unwrap()) {
                 break;
             }
             list.push(deserialize(&value)?);
         }
-
-        let list = ListResponse {
-            data: list,
-            meta: ResponseMetadata { next: None },
-        };
 
         let tx = self.db.transaction();
         for s in list.into_iter() {
@@ -111,23 +106,17 @@ impl Sessions {
     ) -> Result<()> {
         let tx = self.db.transaction();
 
-        let prefix = crate::make_data_key(project_ns(project_id, NAMESPACE).as_slice());
-
+        let prefix = format!("projects/{project_id}/sessions/data");
         let iter = tx.prefix_iterator(prefix.clone());
         let mut list = vec![];
         for kv in iter {
             let (key, value) = kv?;
             // check if key contains the prefix
-            if !prefix.as_slice().cmp(&key[..prefix.len()]).is_eq() {
+            if !prefix.is_prefix_of(from_utf8(&key).unwrap()) {
                 break;
             }
             list.push(deserialize(&value)?);
         }
-
-        let list = ListResponse {
-            data: list,
-            meta: ResponseMetadata { next: None },
-        };
 
         let tx = self.db.transaction();
         for s in list.into_iter() {

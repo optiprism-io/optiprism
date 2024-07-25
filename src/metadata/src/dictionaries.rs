@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use byteorder::ByteOrder;
 use byteorder::LittleEndian;
+use datafusion::parquet::data_type::AsBytes;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 
@@ -25,7 +26,7 @@ fn make_key_key(project_id: u64, dict: &str, key: u64) -> Vec<u8> {
     [
         project_ns(project_id, dict_ns(dict).as_slice()).as_slice(),
         b"keys/",
-        key.to_le_bytes().as_ref(),
+        key.to_string().as_bytes(),
     ]
         .concat()
 }
@@ -77,7 +78,7 @@ impl Dictionaries {
                 tx.put(make_key_key(project_id, tbl_dict(table, dict).as_str(), id), value.as_bytes())?;
                 tx.put(
                     make_value_key(project_id, tbl_dict(table, dict).as_str(), value),
-                    id.to_le_bytes().as_ref(),
+                    id.to_string().as_bytes(),
                 )?;
 
                 Ok(id)
@@ -93,7 +94,7 @@ impl Dictionaries {
         tx.put(make_key_key(project_id, tbl_dict(table, dict).as_str(), key), value.as_bytes())?;
         tx.put(
             make_value_key(project_id, tbl_dict(table, dict).as_str(), value),
-            key.to_le_bytes().as_ref(),
+            key.to_string().as_bytes(),
         )?;
         tx.commit()?;
         Ok(())

@@ -26,6 +26,7 @@ use std::fmt::Debug;
 use ::rocksdb::Transaction;
 use ::rocksdb::TransactionDB;
 use bincode::deserialize;
+use datafusion::parquet::data_type::AsBytes;
 pub use error::Result;
 use serde::de::DeserializeOwned;
 use crate::metadata::ListResponse;
@@ -81,13 +82,13 @@ pub mod team {
 }
 
 pub fn project_ns(project_id: u64, ns: &[u8]) -> Vec<u8> {
-    [b"projects/", project_id.to_le_bytes().as_ref(), b"/", ns].concat()
+    [b"projects/", project_id.to_string().as_bytes(), b"/", ns].concat()
 }
 
 pub fn org_ns(organization_id: u64, ns: &[u8]) -> Vec<u8> {
     [
         b"organizations/",
-        organization_id.to_le_bytes().as_ref(),
+        organization_id.to_string().as_bytes(),
         b"/",
         ns,
     ]
@@ -95,7 +96,7 @@ pub fn org_ns(organization_id: u64, ns: &[u8]) -> Vec<u8> {
 }
 
 pub fn make_data_value_key(ns: &[u8], id: u64) -> Vec<u8> {
-    [ns, b"/data/", id.to_le_bytes().as_ref()].concat()
+    [ns, b"/data/", id.to_string().as_bytes()].concat()
 }
 
 pub fn make_data_key(ns: &[u8]) -> Vec<u8> {

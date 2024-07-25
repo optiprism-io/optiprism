@@ -20,6 +20,8 @@ RUN npm i --legacy-peer-deps
 RUN yarn build
 
 FROM rust:1.72.0 AS rust
+ARG GIT_SHA
+ENV GIT_SHA=${GIT_SHA}
 WORKDIR /app
 RUN apt-get update && apt-get install -y clang openssl
 COPY src ./src

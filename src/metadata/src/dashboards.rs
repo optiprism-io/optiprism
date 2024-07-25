@@ -1,3 +1,5 @@
+use std::str::from_utf8;
+use std::str::pattern::Pattern;
 use std::sync::Arc;
 
 use chrono::DateTime;
@@ -91,11 +93,12 @@ impl Dashboards {
         for kv in iter {
             let (key, value) = kv?;
             // check if key contains the prefix
-            if !prefix.as_slice().cmp(&key[..prefix.len()]).is_eq() {
+            if !from_utf8(&prefix).unwrap().is_prefix_of(from_utf8(&key).unwrap()) {
                 break;
             }
             list.push(deserialize(&value)?);
         }
+
 
         Ok(ListResponse {
             data: list,
@@ -257,7 +260,7 @@ fn deserialize(data: &[u8]) -> Result<Dashboard> {
             y: p.y as usize,
             w: p.w as usize,
             h: p.h as usize,
-        }).collect::<Vec<_>>()
+        }).collect::<Vec<_>>(),
     })
 }
 
@@ -293,6 +296,5 @@ mod tests {
         let data = serialize(&d).unwrap();
         let d2 = deserialize(&data).unwrap();
         assert_eq!(d, d2);
-
     }
 }

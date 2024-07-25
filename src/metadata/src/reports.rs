@@ -1,12 +1,15 @@
+use std::str::from_utf8;
+use std::str::pattern::Pattern;
 use std::sync::Arc;
 
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::DateTime;
 use chrono::Utc;
+use datafusion::parquet::data_type::AsBytes;
 use prost::Message;
 use common::types::OptionalProperty;
-use rocksdb::Transaction;
+use rocksdb::{Direction, IteratorMode, Transaction};
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
@@ -76,6 +79,7 @@ impl Reports {
             make_data_value_key(project_ns(project_id, NAMESPACE).as_slice(), report.id),
             data,
         )?;
+
         tx.commit()?;
         Ok(report)
     }
@@ -96,7 +100,7 @@ impl Reports {
         for kv in iter {
             let (key, value) = kv?;
             // check if key contains the prefix
-            if !prefix.as_slice().cmp(&key[..prefix.len()]).is_eq() {
+            if !from_utf8(&prefix).unwrap().is_prefix_of(from_utf8(&key).unwrap()) {
                 break;
             }
             list.push(deserialize(&value)?);
@@ -261,7 +265,7 @@ mod tests {
     use crate::reports::{deserialize_report, Query, Report, serialize_report, Type};
 
     #[test]
-    fn test_roundtrip(){
+    fn test_roundtrip() {
         let report = Report {
             id: 1,
             created_at: DateTime::from_timestamp(1, 0).unwrap(),
