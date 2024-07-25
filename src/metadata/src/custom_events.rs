@@ -3,13 +3,15 @@ use std::sync::Arc;
 use chrono::DateTime;
 use chrono::Utc;
 use datafusion_common::ScalarValue;
-use common::query::{EventRef, PropertyRef, PropValueOperation};
+use prost::Message;
+use common::query::{EventRef, Operator, PropertyRef, PropValueOperation};
 use common::query::PropValueFilter;
 use common::types::OptionalProperty;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
+use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
 use crate::bookmarks::Bookmark;
 use crate::error::MetadataError;
 use crate::events::Events;
@@ -26,6 +28,7 @@ use crate::make_id_seq_key;
 use crate::make_index_key;
 use crate::metadata::ListResponse;
 use crate::project_ns;
+use crate::projects::Project;
 use crate::Result;
 
 const NAMESPACE: &[u8] = b"custom_events";
@@ -305,13 +308,13 @@ pub struct UpdateCustomEventRequest {
     pub events: OptionalProperty<Vec<Event>>,
 }
 
-fn serialize(v: &CustomEvent) -> Result<Vec<u8>>{panic!()}
-/*fn serialize(v: &CustomEvent) -> Result<Vec<u8>> {
+fn serialize(v: &CustomEvent) -> Result<Vec<u8>> {
     let status = match v.status {
-        Status::Enabled => custom_event::Status::Enabled,
-        Status::Disabled => custom_event::Status::Disabled,
+        Status::Enabled => custom_event::Status::Enabled as i32,
+        Status::Disabled => custom_event::Status::Disabled as i32,
     };
 
+    let mut events = vec![];
     for e in &v.events {
         let mut ce = custom_event::Event {
             regular_name: None,
@@ -335,7 +338,7 @@ fn serialize(v: &CustomEvent) -> Result<Vec<u8>>{panic!()}
                             property_group: None,
                             property_custom_id: None,
                             operation: 0,
-                            values: vec![],
+                            value: vec![],
                         };
                         match property {
                             PropertyRef::Group(n, gid) => {
@@ -368,89 +371,279 @@ fn serialize(v: &CustomEvent) -> Result<Vec<u8>>{panic!()}
                         };
                         pvf.operation = op as i32;
 
-                        let v = if let Some(v)=value {
-                            v.iter().map(|v|{
+                        let v = if let Some(v) = value {
+                            v.iter().map(|v| {
                                 match v {
-                                    ScalarValue::Null => {}
-                                    ScalarValue::Boolean(_) => {}
-                                    ScalarValue::Float16(_) => {}
-                                    ScalarValue::Float32(_) => {}
-                                    ScalarValue::Float64(_) => {}
-                                    ScalarValue::Decimal128(_, _, _) => {}
-                                    ScalarValue::Decimal256(_, _, _) => {}
-                                    ScalarValue::Int8(_) => {}
-                                    ScalarValue::Int16(_) => {}
-                                    ScalarValue::Int32(_) => {}
-                                    ScalarValue::Int64(_) => {}
-                                    ScalarValue::UInt8(_) => {}
-                                    ScalarValue::UInt16(_) => {}
-                                    ScalarValue::UInt32(_) => {}
-                                    ScalarValue::UInt64(_) => {}
-                                    ScalarValue::Utf8(_) => {}
-                                    ScalarValue::LargeUtf8(_) => {}
-                                    ScalarValue::Binary(_) => {}
-                                    ScalarValue::FixedSizeBinary(_, _) => {}
-                                    ScalarValue::LargeBinary(_) => {}
-                                    ScalarValue::FixedSizeList(_) => {}
-                                    ScalarValue::List(_) => {}
-                                    ScalarValue::LargeList(_) => {}
-                                    ScalarValue::Struct(_) => {}
-                                    ScalarValue::Date32(_) => {}
-                                    ScalarValue::Date64(_) => {}
-                                    ScalarValue::Time32Second(_) => {}
-                                    ScalarValue::Time32Millisecond(_) => {}
-                                    ScalarValue::Time64Microsecond(_) => {}
-                                    ScalarValue::Time64Nanosecond(_) => {}
-                                    ScalarValue::TimestampSecond(_, _) => {}
-                                    ScalarValue::TimestampMillisecond(_, _) => {}
-                                    ScalarValue::TimestampMicrosecond(_, _) => {}
-                                    ScalarValue::TimestampNanosecond(_, _) => {}
-                                    ScalarValue::IntervalYearMonth(_) => {}
-                                    ScalarValue::IntervalDayTime(_) => {}
-                                    ScalarValue::IntervalMonthDayNano(_) => {}
-                                    ScalarValue::DurationSecond(_) => {}
-                                    ScalarValue::DurationMillisecond(_) => {}
-                                    ScalarValue::DurationMicrosecond(_) => {}
-                                    ScalarValue::DurationNanosecond(_) => {}
-                                    ScalarValue::Union(_, _, _) => {}
-                                    ScalarValue::Dictionary(_, _) => {}
+                                    ScalarValue::Boolean(v) => custom_event::Value {
+                                        string: None,
+                                        int8: None,
+                                        int16: None,
+                                        int32: None,
+                                        int64: None,
+                                        decimal: None,
+                                        bool: v.map(|v| v as u32),
+                                        timestamp: None,
+                                    },
+                                    ScalarValue::Decimal128(v, _, _) => custom_event::Value {
+                                        string: None,
+                                        int8: None,
+                                        int16: None,
+                                        int32: None,
+                                        int64: None,
+                                        decimal: v.map(|v| v.to_le_bytes().to_vec()),
+                                        bool: None,
+                                        timestamp: None,
+                                    },
+                                    ScalarValue::Int8(v) => custom_event::Value {
+                                        string: None,
+                                        int8: v.map(|v| v as i64),
+                                        int16: None,
+                                        int32: None,
+                                        int64: None,
+                                        decimal: None,
+                                        bool: None,
+                                        timestamp: None,
+                                    },
+                                    ScalarValue::Int16(v) => custom_event::Value {
+                                        string: None,
+                                        int8: None,
+                                        int16: v.map(|v| v as i64),
+                                        int32: None,
+                                        int64: None,
+                                        decimal: None,
+                                        bool: None,
+                                        timestamp: None,
+                                    },
+                                    ScalarValue::Int32(v) => custom_event::Value {
+                                        string: None,
+                                        int8: None,
+                                        int16: None,
+                                        int32: v.map(|v| v as i64),
+                                        int64: None,
+                                        decimal: None,
+                                        bool: None,
+                                        timestamp: None,
+                                    },
+                                    ScalarValue::Int64(v) => custom_event::Value {
+                                        string: None,
+                                        int8: None,
+                                        int16: None,
+                                        int32: None,
+                                        int64: v.to_owned(),
+                                        decimal: None,
+                                        bool: None,
+                                        timestamp: None,
+                                    },
+                                    ScalarValue::Utf8(v) => custom_event::Value {
+                                        string: v.to_owned(),
+                                        int8: None,
+                                        int16: None,
+                                        int32: None,
+                                        int64: None,
+                                        decimal: None,
+                                        bool: None,
+                                        timestamp: None,
+                                    },
+                                    ScalarValue::TimestampMillisecond(v, _) => custom_event::Value {
+                                        string: None,
+                                        int8: None,
+                                        int16: None,
+                                        int32: None,
+                                        int64: None,
+                                        decimal: None,
+                                        bool: None,
+                                        timestamp: v.to_owned(),
+                                    },
+                                    _ => unimplemented!()
                                 }
                             }).collect::<Vec<_>>()
-
+                        } else {
+                            vec![]
                         };
-                        pvf.values.push(v);
+                        pvf.value = v;
                         ce.filters.push(pvf);
                     }
                 }
             }
         }
+        events.push(ce);
     }
 
-    custom_event::CustomEvent {
+    let tags = if let Some(tags) = &v.tags {
+        tags.to_vec()
+    } else { vec![] };
+    let ce = custom_event::CustomEvent {
         id: v.id.clone(),
         created_at: v.created_at.timestamp(),
         created_by: v.created_by,
-        updated_at: None,
-        updated_by: None,
+        updated_at: v.updated_at.map(|t| t.timestamp()),
+        updated_by: v.updated_by,
         project_id: v.project_id,
-        tags: vec![],
+        tags,
         name: v.name.clone(),
         description: v.description.clone(),
         status,
         is_system: v.is_system,
-        events: None,
-    }
-}*/
+        events,
+    };
+
+    Ok(ce.encode_to_vec())
+}
 
 fn deserialize(data: &Vec<u8>) -> Result<CustomEvent> {
-    /*let from = bookmark::Bookmark::decode(data.as_ref())?;
+    let from = custom_event::CustomEvent::decode(data.as_ref())?;
 
-    Ok(Bookmark{
+    let mut events = vec![];
+
+
+    for event in from.events {
+        let er = if let Some(f) = event.regular {
+            EventRef::Regular(f)
+        } else if let Some(f) = event.regular_name {
+            EventRef::RegularName(f)
+        } else {
+            EventRef::Custom(event.custom.unwrap())
+        };
+        let mut filters = vec![];
+
+        for filter in &event.filters {
+            let prop_ref = if let Some(n) = &filter.property_name {
+                if let Some(g) = filter.property_group {
+                    PropertyRef::Group(n.to_owned(), g as usize)
+                } else {
+                    PropertyRef::Event(n.to_owned())
+                }
+            } else {
+                PropertyRef::Custom(filter.property_custom_id.unwrap())
+            };
+
+            let op = match filter.operation {
+                1 => PropValueOperation::Eq,
+                2 => PropValueOperation::Neq,
+                3 => PropValueOperation::Gt,
+                4 => PropValueOperation::Gte,
+                5 => PropValueOperation::Lt,
+                6 => PropValueOperation::Lte,
+                7 => PropValueOperation::True,
+                8 => PropValueOperation::False,
+                9 => PropValueOperation::Exists,
+                10 => PropValueOperation::Empty,
+                11 => PropValueOperation::Like,
+                12 => PropValueOperation::NotLike,
+                13 => PropValueOperation::Regex,
+                14 => PropValueOperation::NotRegex,
+                _ => unimplemented!()
+            };
+
+            let mut vals = vec![];
+            for value in filter.value.clone() {
+                let v = if let Some(v) = value.string {
+                    ScalarValue::Utf8(Some(v))
+                } else if let Some(v) = value.int8 {
+                    ScalarValue::Int8(Some(v as i8))
+                } else if let Some(v) = value.int16 {
+                    ScalarValue::Int16(Some(v as i16))
+                } else if let Some(v) = value.int32 {
+                    ScalarValue::Int32(Some(v as i32))
+                } else if let Some(v) = value.int64 {
+                    ScalarValue::Int64(Some(v))
+                } else if let Some(v) = value.decimal {
+                    ScalarValue::Decimal128(Some(i128::from_le_bytes(v.as_slice().try_into().unwrap())), DECIMAL_PRECISION, DECIMAL_SCALE)
+                } else if let Some(v) = value.bool {
+                    ScalarValue::Boolean(Some(v != 0))
+                } else if let Some(v) = value.timestamp {
+                    ScalarValue::TimestampMillisecond(Some(v), None)
+                } else {
+                    unimplemented!()
+                };
+                vals.push(v);
+            }
+
+            filters.push(PropValueFilter::Property {
+                property: prop_ref.clone(),
+                operation: op,
+                value: Some(vals),
+            });
+        }
+        let event = Event { event: er, filters: if filters.is_empty() { None } else { Some(filters) } };
+        events.push(event);
+    }
+
+    let e = CustomEvent {
         id: from.id,
         created_at: DateTime::from_timestamp(from.created_at, 0).unwrap(),
         created_by: from.created_by,
+        updated_at: from.updated_at.map(|t| DateTime::from_timestamp(t, 0).unwrap()),
+        updated_by: from.updated_by,
         project_id: from.project_id,
-        query: from.query.map(|q|bincode::deserialize(&q).unwrap()),
-    })*/
-    unimplemented!()
+        tags: if from.tags.is_empty() { None } else { Some(from.tags) },
+        name: from.name,
+        description: from.description,
+        status: match from.status {
+            1 => Status::Enabled,
+            2 => Status::Disabled,
+            _ => unimplemented!()
+        },
+        is_system: from.is_system,
+        events,
+    };
+
+    Ok(e)
 }
+
+#[cfg(test)]
+mod tests {
+    use chrono::DateTime;
+    use datafusion_common::ScalarValue;
+    use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
+    use common::query::{EventRef, PropertyRef, PropValueFilter, PropValueOperation};
+    use crate::custom_events::{CustomEvent, deserialize, Event, serialize, Status};
+
+    #[test]
+    fn test_roundtrip() {
+        let event = CustomEvent {
+            id: 1,
+            created_at: DateTime::from_timestamp(1, 0).unwrap(),
+            updated_at: Some(DateTime::from_timestamp(2, 0)).unwrap(),
+            created_by: 1,
+            updated_by: Some(2),
+            project_id: 3,
+            tags: Some(vec!["tag1".to_string(), "tag2".to_string()]),
+            name: "name".to_string(),
+            description: Some("description".to_string()),
+            status: Status::Enabled,
+            is_system: true,
+            events: vec![Event {
+                event: EventRef::Regular(1),
+                filters: Some(vec![PropValueFilter::Property {
+                    property: PropertyRef::Group("group".to_string(), 1),
+                    operation: PropValueOperation::Eq,
+                    value: Some(vec![ScalarValue::Utf8(Some("value".to_string()))]),
+                }]),
+            },
+                         Event {
+                             event: EventRef::Custom(1),
+                             filters: None,
+                         },
+                         Event {
+                             event: EventRef::RegularName("sdf".to_string()),
+                             filters: Some(vec![PropValueFilter::Property {
+                                 property: PropertyRef::Event("e".to_string()),
+                                 operation: PropValueOperation::Eq,
+                                 value: Some(vec![ScalarValue::Decimal128(Some(123), DECIMAL_PRECISION, DECIMAL_SCALE)]),
+                             },
+                                                PropValueFilter::Property {
+                                                    property: PropertyRef::Event("e".to_string()),
+                                                    operation: PropValueOperation::Eq,
+                                                    value: Some(vec![ScalarValue::Boolean(Some(true))]),
+                                                }]),
+                         },
+            ],
+        };
+
+        let data = serialize(&event).unwrap();
+        let event2 = deserialize(&data).unwrap();
+        assert_eq!(event, event2);
+    }
+}
+

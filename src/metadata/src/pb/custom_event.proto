@@ -13,7 +13,7 @@ message CustomEvent {
   optional string description = 9;
   Status status = 10;
   bool is_system = 11;
-  Event events = 12;
+  repeated Event events = 12;
 }
 
 enum Status {
@@ -38,14 +38,14 @@ message PropValueFilter {
 }
 
 message Value {
-  optional uint32 bool = 1;
-  optional float float = 2;
-  optional bytes decimal = 3;
-  optional int64 int = 4;
-  optional uint64 uint = 5;
-  optional string string = 6;
-  optional int64 timestamp = 7;
-
+  optional string string = 1;
+  optional int64 int8 = 2;
+  optional int64 int16 = 3;
+  optional int64 int32 = 4;
+  optional int64 int64 = 5;
+  optional bytes decimal = 6;
+  optional uint32 bool = 7;
+  optional int64 timestamp = 8;
 }
 
 enum PropValueOperation {
