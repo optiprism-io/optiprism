@@ -105,10 +105,10 @@ use query::properties::PropertiesProvider;
 use crate::error::Result;
 use crate::error::Error;
 pub mod error;
-pub mod server;
 pub mod store;
 pub mod test;
 pub mod config;
+pub mod server;
 
 pub fn init_metrics() {
     PrometheusBuilder::new()
@@ -469,7 +469,7 @@ fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<P
     }
 
 
-    info!("token: {}", token);
+    info!("project token: {}", token);
     let _user = match md.accounts.create(CreateAccountRequest {
         created_by: admin.id,
         password_hash: make_password_hash("test")?,

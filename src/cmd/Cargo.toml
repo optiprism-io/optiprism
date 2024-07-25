@@ -54,3 +54,6 @@ metrics-util = "0.16.0"
 metrics = "0.22.0"
 serde_derive = "1.0.189"
 hex = "0.4.3"
+
+[build-dependencies]
+vergen = "9.0.0"
