@@ -1,9 +1,6 @@
 use std::env::temp_dir;
 use std::sync::Arc;
 
-use common::query::event_segmentation::Analysis;
-use common::query::event_segmentation::ChartType;
-use common::query::event_segmentation::EventSegmentation;
 use common::query::QueryTime;
 use common::query::TimeIntervalUnit;
 use common::types::OptionalProperty;
