@@ -119,7 +119,6 @@ async fn track(
     body: String,
     // common::http::Json(request): common::http::Json<TrackRequest>,
 ) -> Result<StatusCode> {
-    let init_time = Instant::now();
     let request: TrackRequest = serde_json::from_str(&body)?;
     let ctx = RequestContext {
         project_id: None,
@@ -127,9 +126,6 @@ async fn track(
         token,
     };
     app.track(&ctx, request)?;
-
-    counter!(METRIC_INGESTER_TRACKED_TOTAL).increment(1);
-    histogram!(METRIC_INGESTER_TRACK_TIME_MS).record(init_time.elapsed());
 
     Ok(StatusCode::CREATED)
 }
@@ -270,8 +266,8 @@ pub fn attach_routes(
         .layer(cors)
         .layer(Extension(app))
         .layer(Extension(TraceLayer::new_for_http()))
-        .layer(middleware::from_fn(measure_request_response))
-        .layer(middleware::from_fn(print_request_response))
+        // .layer(middleware::from_fn(measure_request_response))
+        // .layer(middleware::from_fn(print_request_response))
 }
 
 #[cfg(test)]

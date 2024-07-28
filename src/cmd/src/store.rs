@@ -193,6 +193,7 @@ pub async fn start(args: &Store, mut cfg: crate::Config) -> Result<()> {
 
         let md_clone = md.clone();
         let args_clone = args.clone();
+        let db_clone = db.clone();
         thread::spawn(move || {
             let store_cfg = Config {
                 project_id: proj.id,
@@ -216,10 +217,8 @@ pub async fn start(args: &Store, mut cfg: crate::Config) -> Result<()> {
                 partitions: args_clone.partitions.unwrap_or_else(num_cpus::get),
             };
 
-            gen(md_clone, track_exec, identify_exec, store_cfg).unwrap();
+            gen(md_clone, db_clone, track_exec, identify_exec, store_cfg).unwrap();
         });
-
-        info!("successfully generated!");
     }
 
     let router = Router::new();
@@ -253,6 +252,7 @@ pub async fn start(args: &Store, mut cfg: crate::Config) -> Result<()> {
 
 pub fn gen<R>(
     md: Arc<MetadataProvider>,
+    db: Arc<OptiDBImpl>,
     track: Executor<Track>,
     identify: Executor<Identify>,
     cfg: Config<R>,
@@ -304,6 +304,10 @@ where
 
         let now = Utc::now();
         let res = scenario.run();
+        /*db.flush(TABLE_EVENTS).unwrap();
+        for i in 0..GROUPS_COUNT {
+            db.flush(group_col(i).as_str()).unwrap();
+        }*/
         match res {
             Ok(_) => {}
             Err(err) => println!("generation error: {:?}", err),

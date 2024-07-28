@@ -18,7 +18,7 @@ use common::group_col;
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::rbac::Role;
-use common::types::{DType, METRIC_HTTP_REQUEST_TIME_MS, METRIC_HTTP_REQUESTS_TOTAL, METRIC_INGESTER_TRACK_TIME_MS, METRIC_INGESTER_TRACKED_TOTAL, METRIC_QUERY_EXECUTION_TIME_MS, METRIC_STORE_COMPACTION_TIME_MS, METRIC_STORE_COMPACTIONS_TOTAL, METRIC_STORE_FLUSH_TIME_MS, METRIC_STORE_FLUSHES_TOTAL, METRIC_STORE_INSERT_TIME_MS, METRIC_STORE_INSERTS_TOTAL, METRIC_STORE_LEVEL_COMPACTION_TIME_MS, METRIC_STORE_MEMTABLE_ROWS, METRIC_STORE_MERGES_TOTAL, METRIC_STORE_PART_SIZE_BYTES, METRIC_STORE_PART_VALUES, METRIC_STORE_PARTS, METRIC_STORE_PARTS_SIZE_BYTES, METRIC_STORE_PARTS_VALUES, METRIC_STORE_RECOVERY_TIME_MS, METRIC_STORE_SCAN_MEMTABLE_MS, METRIC_STORE_SCAN_PARTS_TOTAL, METRIC_STORE_SCAN_TIME_MS, METRIC_STORE_SCANS_TOTAL, METRIC_STORE_SEQUENCE, METRIC_STORE_TABLE_FIELDS};
+use common::types::{DType, METRIC_HTTP_REQUEST_TIME_MS, METRIC_HTTP_REQUESTS_TOTAL, METRIC_INGESTER_IDENTIFIED_TOTAL, METRIC_INGESTER_IDENTIFY_TIME_MS, METRIC_INGESTER_TRACK_TIME_MS, METRIC_INGESTER_TRACKED_TOTAL, METRIC_QUERY_EXECUTION_TIME_MS, METRIC_QUERY_QUERIES_TOTAL, METRIC_STORE_COMPACTION_TIME_MS, METRIC_STORE_COMPACTIONS_TOTAL, METRIC_STORE_FLUSH_TIME_MS, METRIC_STORE_FLUSHES_TOTAL, METRIC_STORE_INSERT_TIME_MS, METRIC_STORE_INSERTS_TOTAL, METRIC_STORE_LEVEL_COMPACTION_TIME_MS, METRIC_STORE_MEMTABLE_ROWS, METRIC_STORE_MERGE_TIME_MS, METRIC_STORE_MERGES_TOTAL, METRIC_STORE_PART_SIZE_BYTES, METRIC_STORE_PART_VALUES, METRIC_STORE_PARTS, METRIC_STORE_PARTS_SIZE_BYTES, METRIC_STORE_PARTS_VALUES, METRIC_STORE_RECOVERY_TIME_MS, METRIC_STORE_SCAN_MEMTABLE_MS, METRIC_STORE_SCAN_PARTS, METRIC_STORE_SCAN_TIME_MS, METRIC_STORE_SCANS_TOTAL, METRIC_STORE_TABLE_FIELDS};
 use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_EVENT_ID;
@@ -119,24 +119,23 @@ pub fn init_metrics() {
         .with_http_listener(SocketAddr::new(
             IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
             9102,
-        ))
-        .install()
+        )).install()
         .expect("failed to install Prometheus recorder");
 
     describe_counter!(METRIC_STORE_INSERTS_TOTAL, "number of inserts processed");
     describe_histogram!(METRIC_STORE_INSERT_TIME_MS, Unit::Milliseconds, "insert time");
     describe_counter!(METRIC_STORE_SCANS_TOTAL, "number of scans processed");
-    describe_counter!(METRIC_STORE_SCAN_PARTS_TOTAL, "number of scans parts");
-    describe_counter!(METRIC_STORE_MERGES_TOTAL, "number of merges during scan");
     describe_histogram!(METRIC_STORE_SCAN_TIME_MS, Unit::Milliseconds, "scan time");
+    describe_gauge!(METRIC_STORE_SCAN_PARTS, "number of scans parts");
+    describe_counter!(METRIC_STORE_MERGES_TOTAL, "number of merges during scan");
+    describe_histogram!(METRIC_STORE_MERGE_TIME_MS, Unit::Milliseconds, "merge time");
     describe_gauge!(METRIC_STORE_TABLE_FIELDS, "number of table fields");
-    describe_gauge!(METRIC_STORE_SEQUENCE, "store sequence");
     describe_gauge!(METRIC_STORE_PARTS_SIZE_BYTES, "parts size in bytes");
-    describe_histogram!(METRIC_STORE_PART_SIZE_BYTES, "part size in bytes");
+    describe_gauge!(METRIC_STORE_PART_SIZE_BYTES, "part size in bytes");
     describe_gauge!(METRIC_STORE_PARTS, "parts");
-    describe_histogram!(METRIC_STORE_PART_VALUES, "part values");
+    describe_gauge!(METRIC_STORE_PART_VALUES, "part values");
     describe_gauge!(METRIC_STORE_PARTS_VALUES, "parts values");
-    describe_histogram!(METRIC_STORE_MEMTABLE_ROWS, "number of memtable rows");
+    describe_gauge!(METRIC_STORE_MEMTABLE_ROWS, "number of memtable rows");
     describe_histogram!(
         METRIC_STORE_SCAN_MEMTABLE_MS,
         Unit::Milliseconds,
@@ -164,7 +163,10 @@ pub fn init_metrics() {
 
     describe_counter!(METRIC_INGESTER_TRACKED_TOTAL, "total number of tracks");
     describe_histogram!(METRIC_INGESTER_TRACK_TIME_MS, Unit::Milliseconds, "ingester track time");
+    describe_counter!(METRIC_INGESTER_IDENTIFIED_TOTAL, "total number of identifies");
+    describe_histogram!(METRIC_INGESTER_IDENTIFY_TIME_MS, Unit::Milliseconds, "ingester identify time");
 
+    describe_counter!(METRIC_QUERY_QUERIES_TOTAL, "total number of queries");
     describe_histogram!(
         METRIC_QUERY_EXECUTION_TIME_MS,
         Unit::Milliseconds,

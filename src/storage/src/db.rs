@@ -41,7 +41,7 @@ use arrow_array::StringArray;
 use arrow_array::TimestampNanosecondArray;
 use bincode::deserialize;
 use bincode::serialize;
-use common::types::{DType, METRIC_STORE_FLUSH_TIME_MS, METRIC_STORE_FLUSHES_TOTAL, METRIC_STORE_INSERT_TIME_MS, METRIC_STORE_INSERTS_TOTAL, METRIC_STORE_MEMTABLE_ROWS, METRIC_STORE_PART_SIZE_BYTES, METRIC_STORE_PART_VALUES, METRIC_STORE_PARTS, METRIC_STORE_PARTS_SIZE_BYTES, METRIC_STORE_PARTS_VALUES, METRIC_STORE_RECOVERY_TIME_MS, METRIC_STORE_SCAN_MEMTABLE_MS, METRIC_STORE_SCAN_PARTS_TOTAL, METRIC_STORE_SCAN_TIME_MS, METRIC_STORE_SCANS_TOTAL, METRIC_STORE_SEQUENCE, METRIC_STORE_TABLE_FIELDS};
+use common::types::{DType, METRIC_STORE_FLUSH_TIME_MS, METRIC_STORE_FLUSHES_TOTAL, METRIC_STORE_INSERT_TIME_MS, METRIC_STORE_INSERTS_TOTAL, METRIC_STORE_MEMTABLE_ROWS, METRIC_STORE_PART_SIZE_BYTES, METRIC_STORE_PART_VALUES, METRIC_STORE_PARTS, METRIC_STORE_PARTS_SIZE_BYTES, METRIC_STORE_PARTS_VALUES, METRIC_STORE_RECOVERY_TIME_MS, METRIC_STORE_SCAN_MEMTABLE_MS, METRIC_STORE_SCAN_PARTS, METRIC_STORE_SCAN_TIME_MS, METRIC_STORE_SCANS_TOTAL, METRIC_STORE_TABLE_FIELDS};
 use futures::Stream;
 use lru::LruCache;
 use metrics::counter;
@@ -54,7 +54,6 @@ use serde::Deserialize;
 use serde::Serialize;
 use siphasher::sip::SipHasher13;
 use tracing::trace;
-
 use crate::arrow_conversion::schema2_to_schema1;
 use crate::compaction::Compactor;
 use crate::compaction::CompactorMessage;
@@ -90,21 +89,20 @@ fn collect_metrics(tables: Arc<RwLock<Vec<Table>>>) {
             drop(md_mx);
 
             let mem_mx = t.memtable.lock();
-            histogram!(METRIC_STORE_MEMTABLE_ROWS,"table"=>t.name.to_string())
-                .record(mem_mx.len().to_f64().unwrap());
+            gauge!(METRIC_STORE_MEMTABLE_ROWS,"table"=>t.name.to_string())
+                .set(mem_mx.len().to_f64().unwrap());
             drop(mem_mx);
 
             gauge!(METRIC_STORE_TABLE_FIELDS, "table"=>t.name.to_string())
                 .set(md.schema.fields.len().to_f64().unwrap());
-            gauge!(METRIC_STORE_SEQUENCE,"table"=>t.name.to_string()).set(md.seq_id.to_f64().unwrap());
             for (lvlid, lvl) in md.levels.iter().enumerate() {
                 let sz = lvl.parts.iter().map(|v| v.size_bytes).sum::<u64>();
                 let values = lvl.parts.iter().map(|v| v.values).sum::<usize>();
                 gauge!(METRIC_STORE_PARTS_SIZE_BYTES,"table"=>t.name.to_string(),"level"=>lvlid.to_string()).set(sz.to_f64().unwrap());
                 for part in lvl.parts.iter() {
                     // trace
-                    histogram!(METRIC_STORE_PART_SIZE_BYTES,"table"=>t.name.to_string(),"level"=>lvlid.to_string()).record(part.size_bytes.to_f64().unwrap());
-                    histogram!(METRIC_STORE_PART_VALUES,"table"=>t.name.to_string(),"level"=>lvlid.to_string()).record(part.values.to_f64().unwrap());
+                    gauge!(METRIC_STORE_PART_SIZE_BYTES,"table"=>t.name.to_string(),"level"=>lvlid.to_string()).set(part.size_bytes.to_f64().unwrap());
+                    gauge!(METRIC_STORE_PART_VALUES,"table"=>t.name.to_string(),"level"=>lvlid.to_string()).set(part.values.to_f64().unwrap());
                 }
                 gauge!(METRIC_STORE_PARTS,"table"=>t.name.to_string(),"level"=>lvlid.to_string())
                     .set(lvl.parts.len().to_f64().unwrap());
@@ -325,11 +323,11 @@ fn recover(path: PathBuf, opts: Options) -> Result<OptiDBImpl> {
         )?);
     }
     // let trigger_compact = if metadata.partitions[0].parts.len() > 0
-    // && metadata.partitions[0].parts.len() > opts.l0_max_parts
+    //     && metadata.partitions[0].parts.len() > opts.l0_max_parts
     // {
-    // true
+    //     true
     // } else {
-    // false
+    //     false
     // };
     let (compactor_outbox, rx) = std::sync::mpsc::channel();
     let tables = Arc::new(RwLock::new(tables));
@@ -399,7 +397,7 @@ fn write_level0(metadata: &Metadata, memtable: &Memtable, path: PathBuf) -> Resu
     Ok(part)
 }
 
-fn flush(
+fn flush_(
     log: &mut File,
     memtable: &mut Memtable,
     metadata: &mut Metadata,
@@ -465,14 +463,14 @@ fn flush(
 }
 
 pub struct ScanStream {
-    iter: Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>,
+    iter: Box<dyn Iterator<Item=Result<Chunk<Box<dyn Array>>>> + Send>,
     start_time: Instant,
     table_name: String, // for metrics
 }
 
 impl ScanStream {
     pub fn new(
-        iter: Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>,
+        iter: Box<dyn Iterator<Item=Result<Chunk<Box<dyn Array>>>> + Send>,
         table_name: String,
     ) -> Self {
         Self {
@@ -556,11 +554,11 @@ impl OptiDBImpl {
                 rdrs.push(rdr);
             }
         }
-        counter!(METRIC_STORE_SCAN_PARTS_TOTAL, "table"=>tbl_name.to_string())
-            .increment(rdrs.len() as u64);
+        gauge!(METRIC_STORE_SCAN_PARTS, "table"=>tbl_name.to_string())
+            .set(rdrs.len() as f64);
         let iter = if rdrs.is_empty() {
             Box::new(MemChunkIterator::new(maybe_chunk))
-                as Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>
+                as Box<dyn Iterator<Item=Result<Chunk<Box<dyn Array>>>> + Send>
         } else {
             let opts = arrow_merger::Options {
                 index_cols: metadata.opts.index_cols,
@@ -578,7 +576,7 @@ impl OptiDBImpl {
                 maybe_chunk,
                 Schema::from(projected_fields),
                 opts,
-            )?) as Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>
+            )?) as Box<dyn Iterator<Item=Result<Chunk<Box<dyn Array>>>> + Send>
         };
 
         counter!(METRIC_STORE_SCANS_TOTAL, "table"=>tbl_name.to_string()).increment(1);
@@ -665,7 +663,7 @@ impl OptiDBImpl {
         if memtable.len() > 0
             && metadata.stats.logged_bytes as usize > metadata.opts.max_log_length_bytes
         {
-            let l = flush(log.get_mut(), &mut memtable, &mut metadata, &self.path)?;
+            let l = flush_(log.get_mut(), &mut memtable, &mut metadata, &self.path)?;
             *log = BufWriter::new(l);
 
             // if md.levels[0].parts.len() > 0 && md.levels[0].parts.len() > self.opts.l0_max_parts {
@@ -1072,8 +1070,12 @@ impl OptiDBImpl {
 
         let mut log = tbl.log.lock();
         let mut memtable = tbl.memtable.lock();
+        if memtable.len() == 0 {
+            return Ok(());
+        }
+
         let mut metadata = tbl.metadata.lock();
-        flush(log.get_mut(), &mut memtable, &mut metadata, &self.path)?;
+        flush_(log.get_mut(), &mut memtable, &mut metadata, &self.path)?;
 
         Ok(())
     }
@@ -1211,7 +1213,6 @@ impl Drop for OptiDBImpl {
 
 #[cfg(test)]
 mod tests {
-
     use std::fs;
     use std::path::PathBuf;
     use std::sync::Arc;
@@ -1263,7 +1264,7 @@ mod tests {
             NamedValue::new("f2".to_string(), Value::Int64(Some(1))),
             NamedValue::new("f3".to_string(), Value::Int64(Some(1))),
         ])
-        .unwrap();
+            .unwrap();
 
         let res = db
             .get_cas("t1", vec![KeyValue::Int64(1), KeyValue::Int64(1)])
@@ -1274,7 +1275,7 @@ mod tests {
             NamedValue::new("f2".to_string(), Value::Int64(Some(1))),
             NamedValue::new("f3".to_string(), Value::Int64(Some(2))),
         ])
-        .unwrap();
+            .unwrap();
 
         let res = db
             .get_cas("t1", vec![KeyValue::Int64(1), KeyValue::Int64(2)])
@@ -1285,7 +1286,7 @@ mod tests {
             NamedValue::new("f2".to_string(), Value::Int64(Some(2))),
             NamedValue::new("f3".to_string(), Value::Int64(Some(3))),
         ])
-        .unwrap();
+            .unwrap();
 
         let res = db
             .get_cas("t1", vec![KeyValue::Int64(1), KeyValue::Int64(2)])
@@ -1333,21 +1334,21 @@ mod tests {
             NamedValue::new("f2".to_string(), Value::Int64(Some(1))),
             NamedValue::new("f3".to_string(), Value::Int64(Some(1))),
         ])
-        .unwrap();
+            .unwrap();
 
         db.insert("t1", vec![
             NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
             NamedValue::new("f2".to_string(), Value::Int64(Some(2))),
             NamedValue::new("f3".to_string(), Value::Int64(Some(2))),
         ])
-        .unwrap();
+            .unwrap();
 
         db.insert("t1", vec![
             NamedValue::new("f1".to_string(), Value::Int64(Some(2))),
             NamedValue::new("f2".to_string(), Value::Int64(Some(1))),
             NamedValue::new("f3".to_string(), Value::Int64(Some(3))),
         ])
-        .unwrap();
+            .unwrap();
 
         // get from memtable
         let res = db.get_cas("t1", vec![KeyValue::Int64(1)]).unwrap();
@@ -1357,7 +1358,7 @@ mod tests {
             Some(vec![
                 Value::Int64(Some(1)),
                 Value::Int64(Some(2)),
-                Value::Int64(Some(2))
+                Value::Int64(Some(2)),
             ])
         );
     }
@@ -1395,7 +1396,7 @@ mod tests {
                 NamedValue::new("f1".to_string(), Value::Int64(Some(i))),
                 NamedValue::new("f2".to_string(), Value::Int64(Some(i))),
             ])
-            .unwrap();
+                .unwrap();
 
             if i % 150 == 0 {
                 db.flush("t1").unwrap();
@@ -1411,7 +1412,6 @@ mod tests {
             .unwrap();
 
         dbg!(res);
-
     }
 
     #[test]
@@ -1447,25 +1447,25 @@ mod tests {
             NamedValue::new("f2".to_string(), Value::Int64(Some(1))), // version
             NamedValue::new("f3".to_string(), Value::Int64(Some(1))), // counter
         ])
-        .unwrap();
+            .unwrap();
         db.insert("t1", vec![
             NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
             NamedValue::new("f2".to_string(), Value::Int64(Some(2))),
             NamedValue::new("f3".to_string(), Value::Int64(Some(2))),
         ])
-        .unwrap();
+            .unwrap();
         db.insert("t1", vec![
             NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
             NamedValue::new("f2".to_string(), Value::Int64(Some(3))),
             NamedValue::new("f3".to_string(), Value::Int64(Some(3))),
         ])
-        .unwrap();
+            .unwrap();
         db.insert("t1", vec![
             NamedValue::new("f1".to_string(), Value::Int64(Some(2))),
             NamedValue::new("f2".to_string(), Value::Int64(Some(1))),
             NamedValue::new("f3".to_string(), Value::Int64(Some(1))),
         ])
-        .unwrap();
+            .unwrap();
 
         let r = db.get("t1", vec![KeyValue::Int64(1)]).unwrap();
         assert!(r.is_some());
@@ -1491,7 +1491,7 @@ mod tests {
             Some(vec![
                 Value::Int64(Some(1)),
                 Value::Int64(Some(3)),
-                Value::Int64(Some(3))
+                Value::Int64(Some(3)),
             ])
         );
 
@@ -1506,7 +1506,7 @@ mod tests {
             NamedValue::new("f2".to_string(), Value::Int64(Some(4))),
             NamedValue::new("f3".to_string(), Value::Int64(Some(4))),
         ])
-        .unwrap();
+            .unwrap();
 
         db.flush("t1").unwrap();
 
@@ -1515,7 +1515,7 @@ mod tests {
             NamedValue::new("f2".to_string(), Value::Int64(Some(5))),
             NamedValue::new("f3".to_string(), Value::Int64(Some(5))),
         ])
-        .unwrap();
+            .unwrap();
         db.flush("t1").unwrap();
 
         db.insert("t1", vec![
@@ -1523,7 +1523,7 @@ mod tests {
             NamedValue::new("f2".to_string(), Value::Int64(Some(2))),
             NamedValue::new("f3".to_string(), Value::Int64(Some(2))),
         ])
-        .unwrap();
+            .unwrap();
 
         db.flush("t1").unwrap();
 
@@ -1532,7 +1532,7 @@ mod tests {
             NamedValue::new("f2".to_string(), Value::Int64(Some(3))),
             NamedValue::new("f3".to_string(), Value::Int64(Some(3))),
         ])
-        .unwrap();
+            .unwrap();
 
         db.flush("t1").unwrap();
         db.compact();
@@ -1543,7 +1543,7 @@ mod tests {
             Some(vec![
                 Value::Int64(Some(1)),
                 Value::Int64(Some(5)),
-                Value::Int64(Some(5))
+                Value::Int64(Some(5)),
             ])
         );
     }
@@ -1579,7 +1579,7 @@ mod tests {
             NamedValue::new("f1".to_string(), Value::Int64(Some(1))), // pk
             NamedValue::new("f2".to_string(), Value::Int64(Some(1))), // version
         ])
-        .unwrap();
+            .unwrap();
 
         db.flush("t1").unwrap();
 
@@ -1587,7 +1587,7 @@ mod tests {
             NamedValue::new("f1".to_string(), Value::Int64(Some(1))), // pk
             NamedValue::new("f2".to_string(), Value::Int64(Some(2))), // version
         ])
-        .unwrap();
+            .unwrap();
 
         db.flush("t1").unwrap();
 
@@ -1595,12 +1595,12 @@ mod tests {
             NamedValue::new("f1".to_string(), Value::Int64(Some(1))), // pk
             NamedValue::new("f2".to_string(), Value::Int64(Some(3))), // version
         ])
-        .unwrap();
+            .unwrap();
         db.insert("t1", vec![
             NamedValue::new("f1".to_string(), Value::Int64(Some(1))), // pk
             NamedValue::new("f2".to_string(), Value::Int64(Some(4))), // version
         ])
-        .unwrap();
+            .unwrap();
 
         let mut stream = db.scan("t1", vec![0, 1]).unwrap();
 
@@ -1643,7 +1643,7 @@ mod tests {
             NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
             NamedValue::new("f2".to_string(), Value::Int64(Some(1))),
         ])
-        .unwrap();
+            .unwrap();
         db.add_field("t1", "f3", DType::Int64, false).unwrap();
 
         db.insert("t1", vec![
@@ -1651,7 +1651,7 @@ mod tests {
             NamedValue::new("f2".to_string(), Value::Int64(Some(2))),
             NamedValue::new("f3".to_string(), Value::Int64(Some(2))),
         ])
-        .unwrap();
+            .unwrap();
 
         db.flush("t1").unwrap();
     }
