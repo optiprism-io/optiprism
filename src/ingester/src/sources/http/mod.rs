@@ -266,8 +266,6 @@ pub fn attach_routes(
         .layer(cors)
         .layer(Extension(app))
         .layer(Extension(TraceLayer::new_for_http()))
-        // .layer(middleware::from_fn(measure_request_response))
-        // .layer(middleware::from_fn(print_request_response))
 }
 
 #[cfg(test)]
