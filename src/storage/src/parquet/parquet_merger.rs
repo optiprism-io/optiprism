@@ -900,8 +900,8 @@ where R: Read + Seek
                         for page in chunk.0.cols[col_id].iter() {
                             // write index pages
                             if let CompressedPage::Data(dp) = page {
-                                histogram!("store.merger.uncompressed_index_page_size_bytes","table"=>tbl_name.to_string(),"level"=>level_id.to_string()).record(dp.uncompressed_size().to_f64().unwrap());
-                                histogram!("store.merger.compressed_index_page_size_bytes","table"=>tbl_name.to_string(),"level"=>level_id.to_string()).record(dp.compressed_size().to_f64().unwrap());
+                                histogram!("store_merger_uncompressed_index_page_size_bytes","table"=>tbl_name.to_string(),"level"=>level_id.to_string()).record(dp.uncompressed_size().to_f64().unwrap());
+                                histogram!("store_merger_compressed_index_page_size_bytes","table"=>tbl_name.to_string(),"level"=>level_id.to_string()).record(dp.compressed_size().to_f64().unwrap());
                             }
                             seq_writer.write_page(page)?;
                         }
@@ -958,8 +958,8 @@ where R: Read + Seek
                         // Write pages for column
                         for page in &pages {
                             if let CompressedPage::Data(dp) = page {
-                                histogram!("store.merger.uncompressed_data_page_size_bytes","table"=>tbl_name.to_string(),"level"=>level_id.to_string()).record(dp.uncompressed_size().to_f64().unwrap());
-                                histogram!("store.merger.compressed_data_page_size_bytes","table"=>tbl_name.to_string(),"level"=>level_id.to_string()).record(dp.compressed_size().to_f64().unwrap());
+                                histogram!("store_merger_uncompressed_index_page_size_bytes","table"=>tbl_name.to_string(),"level"=>level_id.to_string()).record(dp.uncompressed_size().to_f64().unwrap());
+                                histogram!("store_merger_compressed_index_page_size_bytes","table"=>tbl_name.to_string(),"level"=>level_id.to_string()).record(dp.compressed_size().to_f64().unwrap());
                             }
                             seq_writer.write_page(page)?;
                         }

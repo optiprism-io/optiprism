@@ -8,7 +8,7 @@ use axum::body::HttpBody;
 use axum::extract::rejection::JsonRejection;
 use axum::extract::FromRequest;
 use axum::http;
-use axum::http::HeaderMap;
+use axum::http::{HeaderMap, Method};
 use axum::http::HeaderValue;
 use axum::http::StatusCode;
 use axum::middleware::Next;
@@ -210,9 +210,12 @@ pub async fn measure_request_response(
 ) -> std::result::Result<impl IntoResponse, (StatusCode, String)> {
     let start = Instant::now();
     let path = req.uri().path().to_string();
+    let metrics = req.method() != Method::OPTIONS;
     let res = next.run(req).await;
-    histogram!(METRIC_HTTP_REQUEST_TIME_MS,"path"=>path.to_owned()).record(start.elapsed());
-    counter!(METRIC_HTTP_REQUESTS_TOTAL,"path"=>path).increment(1);
+    if metrics {
+        histogram!(METRIC_HTTP_REQUEST_TIME_MS,"path"=>path.to_owned(),"status"=>res.status().as_u16().to_string()).record(start.elapsed().as_millis() as f64);
+        counter!(METRIC_HTTP_REQUESTS_TOTAL,"path"=>path,"status"=>res.status().as_u16().to_string()).increment(1);
+    }
     Ok(res)
 }
 

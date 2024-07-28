@@ -17,7 +17,7 @@ use log::trace;
 use metrics::counter;
 use metrics::histogram;
 use parking_lot::RwLock;
-use common::types::{METRIC_STORE_COMPACTION_TIME_MS, METRIC_STORE_COMPACTIONS_TOTAL, METRIC_STORE_LEVEL_COMPACTION_TIME_MS};
+use common::types::{METRIC_STORE_COMPACTION_TIME_MS, METRIC_STORE_COMPACTIONS_TOTAL, METRIC_STORE_LEVEL_COMPACTION_TIME_MS, METRIC_STORE_MERGE_TIME_MS, METRIC_STORE_MERGES_TOTAL};
 use crate::db::log_metadata;
 use crate::error::Result;
 use crate::parquet::parquet_merger;
@@ -306,8 +306,11 @@ fn compact(
                     merge_max_page_size: opts.merge_max_page_size,
                     max_part_size_bytes: Some(max_part_size_bytes),
                 };
+                let ms=Instant::now();
                 let merge_result =
                     merge(rdrs, out_path, out_part_id, tbl_name, level_id, merger_opts)?;
+                counter!(METRIC_STORE_MERGES_TOTAL,"table"=>tbl_name.to_string()).increment(1);
+                histogram!(METRIC_STORE_MERGE_TIME_MS,"table"=>tbl_name.to_string(),"level"=>level_id.to_string()).record(start_time.elapsed());
                 for f in merge_result {
                     let final_part = {
                         Part {

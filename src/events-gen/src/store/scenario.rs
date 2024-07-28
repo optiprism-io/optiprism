@@ -10,7 +10,7 @@ use chrono::DateTime;
 use chrono::Duration;
 use chrono::TimeZone;
 use chrono::Utc;
-use common::types;
+use common::{ types};
 use common::types::EVENT_SESSION_BEGIN;
 use common::DECIMAL_SCALE;
 use common::GROUP_USER;

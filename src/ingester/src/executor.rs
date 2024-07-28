@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-
+use std::time::Instant;
+use metrics::{counter, histogram};
 use common::group_col;
-use common::types::{DType, GROUP_COLUMN_ID, TABLE_EVENTS};
+use common::types::{DType, GROUP_COLUMN_ID, METRIC_INGESTER_IDENTIFIED_TOTAL, METRIC_INGESTER_IDENTIFY_TIME_MS, METRIC_INGESTER_TRACK_TIME_MS, METRIC_INGESTER_TRACKED_TOTAL, TABLE_EVENTS};
 use common::GROUP_USER_ID;
 use metadata::events;
 use metadata::events::CreateEventRequest;
@@ -109,6 +110,8 @@ impl Executor<Track> {
     }
 
     pub fn execute(&self, ctx: &RequestContext, mut req: Track) -> Result<()> {
+        let init_time = Instant::now();
+
         let project = self.md.projects.get_by_token(ctx.token.as_str())?;
         let mut ctx = ctx.to_owned();
         ctx.project_id = Some(project.id);
@@ -239,6 +242,10 @@ impl Executor<Track> {
         self.md
             .projects
             .increment_events_counter(ctx.project_id.unwrap())?;
+
+        counter!(METRIC_INGESTER_TRACKED_TOTAL).increment(1);
+        histogram!(METRIC_INGESTER_TRACK_TIME_MS).record(init_time.elapsed());
+
         Ok(())
     }
 }
@@ -260,6 +267,7 @@ impl Executor<Identify> {
     }
 
     pub fn execute(&self, ctx: &RequestContext, mut req: Identify) -> Result<()> {
+        let init_time = Instant::now();
         let ctx = ctx.to_owned();
         let project = self.md.projects.get_by_token(ctx.token.as_str())?;
         let mut ctx = ctx.to_owned();
@@ -359,6 +367,10 @@ impl Executor<Identify> {
         for dest in &self.destinations {
             dest.send(&ctx, req.clone())?;
         }
+
+        counter!(METRIC_INGESTER_IDENTIFIED_TOTAL).increment(1);
+        histogram!(METRIC_INGESTER_IDENTIFY_TIME_MS).record(init_time.elapsed());
+
         Ok(())
     }
 }

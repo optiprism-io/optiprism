@@ -50,11 +50,11 @@ impl Groups {
                     &tx,
                     make_id_seq_key(project_ns(project_id, group_key.as_bytes()).as_slice()),
                 )?;
-                tx.put(key.as_bytes(), id.to_string().as_bytes())?;
+                tx.put(key.as_bytes(), id.to_le_bytes())?;
 
                 Ok(id)
             }
-            Some(key) => Ok(LittleEndian::read_u64(key.as_slice())),
+            Some(key) => Ok(u64::from_le_bytes(key.try_into().unwrap()))
         };
         res
     }
@@ -362,7 +362,7 @@ fn deserialize_group_values(data: &[u8]) -> Result<GroupValues> {
 
 // serialize group into protobuf
 fn serialize_group(group: &Group) -> Result<Vec<u8>> {
-    let v = group::Group{
+    let v = group::Group {
         id: group.id,
         name: group.name.clone(),
         display_name: Some(group.display_name.clone()),

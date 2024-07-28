@@ -6,7 +6,6 @@ use std::sync::Arc;
 
 use byteorder::ByteOrder;
 use byteorder::LittleEndian;
-use datafusion::parquet::data_type::AsBytes;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 
@@ -78,12 +77,12 @@ impl Dictionaries {
                 tx.put(make_key_key(project_id, tbl_dict(table, dict).as_str(), id), value.as_bytes())?;
                 tx.put(
                     make_value_key(project_id, tbl_dict(table, dict).as_str(), value),
-                    id.to_string().as_bytes(),
+                    id.to_le_bytes(),
                 )?;
 
                 Ok(id)
             }
-            Some(key) => Ok(LittleEndian::read_u64(key.as_slice())),
+            Some(key) => Ok(u64::from_le_bytes(key.try_into().unwrap())),
         };
 
         res
@@ -126,7 +125,7 @@ impl Dictionaries {
                 "table {table}, project {project_id}, dict {dict}: dictionary key by value {} not found",
                 value
             ))),
-            Some(key) => Ok(LittleEndian::read_u64(key.as_slice())),
+            Some(key) => Ok(u64::from_le_bytes(key.try_into().unwrap())),
         }
     }
 }

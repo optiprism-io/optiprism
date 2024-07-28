@@ -15,7 +15,7 @@ use common::query::EventRef;
 use common::query::PropValueFilter;
 use common::query::PropertyRef;
 use common::query::QueryTime;
-use common::types::{COLUMN_CREATED_AT, COLUMN_EVENT, ROUND_DIGITS, TABLE_EVENTS};
+use common::types::{COLUMN_CREATED_AT, COLUMN_EVENT, METRIC_QUERY_EXECUTION_TIME_MS, METRIC_QUERY_QUERIES_TOTAL, ROUND_DIGITS, TABLE_EVENTS};
 use common::types::COLUMN_PROJECT_ID;
 use datafusion_common::Column;
 use datafusion_common::ScalarValue;
@@ -32,6 +32,7 @@ use datafusion_expr::LogicalPlan;
 use datafusion_expr::Operator;
 use datafusion_expr::Projection;
 use datafusion_expr::Sort;
+use metrics::{counter, histogram};
 use num_traits::ToPrimitive;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
@@ -79,8 +80,12 @@ impl FunnelProvider {
         let (session_ctx, state, plan) = initial_plan(&self.db, TABLE_EVENTS.to_string(), projection)?;
         let plan = build(ctx.clone(), self.metadata.clone(), plan, req.clone())?;
 
+        println!("{plan:?}");
         let result = execute(session_ctx, state, plan).await?;
         let duration = start.elapsed();
+        let elapsed = start.elapsed();
+        histogram!(METRIC_QUERY_EXECUTION_TIME_MS, "query"=>"funnel").record(elapsed);
+        counter!(METRIC_QUERY_QUERIES_TOTAL,"query"=>"funnel").increment(1);
         debug!("elapsed: {:?}", duration);
         let mut group_cols: Vec<StringArray> = vec![];
         let mut ts_col = {

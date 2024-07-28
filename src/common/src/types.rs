@@ -86,16 +86,16 @@ pub const RESERVED_COLUMN_COUNT: &str = "count";
 pub const METRIC_STORE_INSERTS_TOTAL: &str = "optiprism_store_inserts_total";
 pub const METRIC_STORE_INSERT_TIME_MS: &str = "optiprism_store_insert_time_ms";
 pub const METRIC_STORE_SCANS_TOTAL: &str = "optiprism_store_scans_total";
-pub const METRIC_STORE_SCAN_PARTS_TOTAL: &str = "optiprism_store_scan_parts_total";
-pub const METRIC_STORE_MERGES_TOTAL: &str = "optiprism_store_merges_total";
 pub const METRIC_STORE_SCAN_TIME_MS: &str = "optiprism_store_scan_time_ms";
-pub const METRIC_STORE_TABLE_FIELDS: &str = "optiprism_store_table_fields";
-pub const METRIC_STORE_SEQUENCE: &str = "optiprism_store_sequence";
+pub const METRIC_STORE_SCAN_PARTS: &str = "optiprism_store_scan_parts";
+pub const METRIC_STORE_PARTS: &str = "optiprism_store_parts";
 pub const METRIC_STORE_PARTS_SIZE_BYTES: &str = "optiprism_store_parts_size_bytes";
 pub const METRIC_STORE_PART_SIZE_BYTES: &str = "optiprism_store_part_size_bytes";
 pub const METRIC_STORE_PART_VALUES: &str = "optiprism_store_part_values";
-pub const METRIC_STORE_PARTS: &str = "optiprism_store_parts";
 pub const METRIC_STORE_PARTS_VALUES: &str = "optiprism_store_parts_values";
+pub const METRIC_STORE_MERGES_TOTAL: &str = "optiprism_store_merges_total";
+pub const METRIC_STORE_MERGE_TIME_MS: &str = "optiprism_store_merge_time_ms";
+pub const METRIC_STORE_TABLE_FIELDS: &str = "optiprism_store_table_fields";
 pub const METRIC_STORE_MEMTABLE_ROWS: &str = "optiprism_store_memtable_rows";
 pub const METRIC_STORE_SCAN_MEMTABLE_MS: &str = "optiprism_store_scan_memtable_ms";
 pub const METRIC_STORE_COMPACTIONS_TOTAL: &str = "optiprism_store_compactions_total";
@@ -107,7 +107,10 @@ pub const METRIC_STORE_FLUSHES_TOTAL: &str = "optiprism_store_flushes_total";
 
 pub const METRIC_INGESTER_TRACKED_TOTAL: &str = "optiprism_ingester_tracked_total";
 pub const METRIC_INGESTER_TRACK_TIME_MS: &str = "optiprism_ingester_track_time_ms";
+pub const METRIC_INGESTER_IDENTIFIED_TOTAL: &str = "optiprism_ingester_identified_total";
+pub const METRIC_INGESTER_IDENTIFY_TIME_MS: &str = "optiprism_ingester_identify_time_ms";
 
+pub const METRIC_QUERY_QUERIES_TOTAL: &str = "optiprism_query_queries_total";
 pub const METRIC_QUERY_EXECUTION_TIME_MS: &str = "optiprism_query_execution_time_ms";
 
 pub const METRIC_HTTP_REQUEST_TIME_MS: &str = "optiprism_http_request_time_ms";
