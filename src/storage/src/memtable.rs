@@ -178,12 +178,12 @@ impl Memtable {
                 let mut last = None;
                 for row_id in 0..arrs[0].len() {
                     if last.is_none() {
-                        last = Some(vec![a.value(row_id), b.value(row_id)]);
+                        last = Some(vec![a.value(row_id)]);
                         continue;
                     }
-                    if last != Some(vec![a.value(row_id), b.value(row_id)]) {
+                    if last != Some(vec![a.value(row_id)]) {
                         indices.push(Some(row_id as i64 - 1));
-                        last = Some(vec![a.value(row_id), b.value(row_id)]);
+                        last = Some(vec![a.value(row_id)]);
                     }
                 }
                 indices.push(Some(arrs[0].len() as i64 - 1));
