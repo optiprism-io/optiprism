@@ -139,6 +139,7 @@ impl Into<Profile> for Account {
             email: self.email,
             name: self.name,
             force_update_password: self.force_update_password,
+            force_update_email: self.force_update_email,
         }
     }
 }

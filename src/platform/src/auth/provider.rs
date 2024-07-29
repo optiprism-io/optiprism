@@ -407,4 +407,5 @@ pub struct Profile {
     pub name: Option<String>,
     pub email: String,
     pub force_update_password: bool,
+    pub force_update_email: bool,
 }
