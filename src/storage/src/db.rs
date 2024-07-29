@@ -447,7 +447,6 @@ fn flush_log_(
     );
 
     let mut manifest = OpenOptions::new()
-        .create_new(true)
         .write(true)
         .read(true)
         .open(path.join(format!("tables/{}/metadata", metadata.table_name)))?;
