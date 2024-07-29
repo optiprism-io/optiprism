@@ -31,6 +31,8 @@ pub enum StoreError {
     Io(#[from] std::io::Error),
     #[error("bincode {0:?}")]
     Bincode(#[from] bincode::Error),
+    #[error("prost decode {0}")]
+    ProstDecodeError(#[from] prost::DecodeError),
 }
 
 impl StoreError {

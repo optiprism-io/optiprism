@@ -28,7 +28,12 @@ use serde::Serialize;
 
 use crate::error::StoreError;
 
-#[derive(Eq, PartialEq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize, Hash, GetSize)]
+pub mod metadata {
+    include!(concat!(env!("OUT_DIR"), "/metadata.rs"));
+}
+
+
+#[derive(Serialize, Deserialize, Eq, PartialEq, PartialOrd, Ord, Debug, Clone, Hash, GetSize)]
 pub enum KeyValue {
     Int8(i8),
     Int16(i16),
@@ -110,15 +115,15 @@ impl From<&Value> for KeyValue {
     }
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Stats {
     pub(crate) resident_bytes: u64,
     pub(crate) on_disk_bytes: u64,
     pub(crate) logged_bytes: u64,
     pub(crate) written_bytes: u64,
     pub(crate) read_bytes: u64,
-    pub(crate) space_amp: f64,
-    pub(crate) write_amp: f64,
+    pub(crate) space_amp: u64,
+    pub(crate) write_amp: u64,
 }
 
 #[derive(Debug)]
