@@ -18,7 +18,7 @@ use metrics::counter;
 use metrics::histogram;
 use parking_lot::RwLock;
 use common::types::{METRIC_STORE_COMPACTION_TIME_MS, METRIC_STORE_COMPACTIONS_TOTAL, METRIC_STORE_LEVEL_COMPACTION_TIME_MS, METRIC_STORE_MERGE_TIME_MS, METRIC_STORE_MERGES_TOTAL};
-use crate::db::log_metadata;
+use crate::db::write_metadata;
 use crate::error::Result;
 use crate::parquet::parquet_merger;
 use crate::parquet::parquet_merger::merge;
@@ -139,7 +139,7 @@ impl Compactor {
                                 metadata.levels[idx] = l.clone();
                             }
                             let mut log = table.log.lock();
-                            log_metadata(log.get_mut(), &mut metadata).unwrap();
+                            write_metadata(log.get_mut(), &mut metadata).unwrap();
                             drop(metadata);
                             // drop because next fs operation is with locking
                             for op in res.fs_ops {

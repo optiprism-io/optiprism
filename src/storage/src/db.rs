@@ -67,7 +67,7 @@ use crate::parquet::arrow_merger::MemChunkIterator;
 use crate::parquet::arrow_merger::MergingIterator;
 use crate::parquet::chunk_min_max;
 use crate::table;
-use crate::table::part_path;
+use crate::table::{serialize_md, part_path, deserialize_md};
 use crate::table::Level;
 use crate::table::Metadata;
 use crate::table::Part;
@@ -117,8 +117,6 @@ fn collect_metrics(tables: Arc<RwLock<Vec<Table>>>) {
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) enum LogOp {
     Insert(Vec<KeyValue>, Vec<Value>),
-    Metadata(Metadata),
-    AddField(Field),
 }
 
 fn hash_crc32(v: &[u8]) -> u32 {
@@ -166,19 +164,11 @@ fn log_op(op: LogOp, log: &mut File) -> Result<usize> {
 fn recover_op(op: LogOp, memtable: &mut Memtable, metadata: &mut Metadata) -> Result<()> {
     match op {
         LogOp::Insert(k, v) => {
-            let phash = siphash(&k);
             let kv: Vec<Value> = k.iter().map(|k| k.into()).collect::<Vec<_>>();
             let vv = [kv, v].concat();
             for (idx, val) in vv.into_iter().enumerate() {
                 memtable.push_value(idx, val);
             }
-        }
-        LogOp::AddField(f) => {
-            metadata.schema.fields.push(f.clone());
-            memtable.add_column(f.data_type.try_into()?);
-        }
-        LogOp::Metadata(md) => {
-            *metadata = md;
         }
     }
 
@@ -187,17 +177,46 @@ fn recover_op(op: LogOp, memtable: &mut Memtable, metadata: &mut Metadata) -> Re
     Ok(())
 }
 
-pub(crate) fn log_metadata(log: &mut File, metadata: &mut Metadata) -> Result<()> {
-    // !@#trace!("log metadata");
-    log_op(LogOp::Metadata(metadata.clone()), log)?;
-    metadata.seq_id += 1;
-
-    Ok(())
+pub(crate) fn write_metadata(manifest: &mut File, metadata: &mut Metadata) -> Result<usize> {
+    let data = serialize_md(metadata)?;
+    let mut a = Vec::with_capacity(1024 * 10);
+    let crc = hash_crc32(&data);
+    let vv = crc.to_le_bytes();
+    a.push(vv.as_slice());
+    let vv = (data.len() as u64).to_le_bytes();
+    a.push(vv.as_slice());
+    a.push(&data);
+    manifest.write_all(a.concat().as_slice())?;
+    let logged_size = 8 + 4 + data.len();
+    // !@#trace!("logged size: {}", logged_size);
+    // log.flush()?;
+    Ok(logged_size)
 }
 
 fn try_recover_table(path: PathBuf, name: String) -> Result<Table> {
     let start_time = Instant::now();
-    // !@#trace!("starting recovery");
+    let mut mdf = OpenOptions::new().read(true).write(true).open(path.join("metadata"))?;
+    let mut crc_b = [0u8; mem::size_of::<u32>()];
+    let read_bytes = mdf.read(&mut crc_b)?;
+    if read_bytes == 0 {
+        return Err(StoreError::Internal("empty metadata file".to_string()));
+    }
+    let crc32 = u32::from_le_bytes(crc_b);
+    let mut len_b = [0u8; mem::size_of::<u64>()];
+    _ = mdf.read(&mut len_b)?;
+    let len = u64::from_le_bytes(len_b);
+    let mut data_b = vec![0u8; len as usize];
+    _ = mdf.read(&mut data_b)?;
+    let cur_crc32 = hash_crc32(&data_b);
+    if crc32 != cur_crc32 {
+        return Err(StoreError::Internal(format!(
+            "corrupted metadata. crc32 is: {}, need: {}",
+            cur_crc32, crc32
+        )));
+    }
+
+    let mut md = deserialize_md(&data_b)?;
+
     let dir = fs::read_dir(path.clone())?;
     let mut logs = BinaryHeap::new();
 
@@ -248,18 +267,10 @@ fn try_recover_table(path: PathBuf, name: String) -> Result<Table> {
         )));
     }
     let op = deserialize::<LogOp>(&data_b)?;
-    let mut metadata = match op {
-        LogOp::Metadata(md) => md,
-        _ => {
-            return Err(StoreError::Internal(
-                "first record in log must be metadata".to_string(),
-            ));
-        }
-    };
 
     let mut memtable = Memtable::new();
 
-    for f in &metadata.schema.fields {
+    for f in &md.schema.fields {
         memtable.add_column(f.data_type.clone().try_into()?);
     }
     loop {
@@ -287,13 +298,13 @@ fn try_recover_table(path: PathBuf, name: String) -> Result<Table> {
         }
         let op = deserialize::<LogOp>(&data_b)?;
 
-        recover_op(op, &mut memtable, &mut metadata)?;
+        recover_op(op, &mut memtable, &mut md)?;
 
-        metadata.seq_id += 1;
+        md.seq_id += 1;
     }
     // !@#trace!("operations recovered: {}", ops);
 
-    metadata.stats.logged_bytes = log_path.metadata().unwrap().len();
+    md.stats.logged_bytes = log_path.metadata().unwrap().len();
 
     let log = BufWriter::new(log);
     // if trigger_compact {
@@ -303,7 +314,8 @@ fn try_recover_table(path: PathBuf, name: String) -> Result<Table> {
     Ok(Table {
         name,
         memtable: Arc::new(Mutex::new(memtable)),
-        metadata: Arc::new(Mutex::new(metadata)),
+        metadata: Arc::new(Mutex::new(md)),
+        metadata_f: Arc::new(Mutex::new(BufWriter::new(mdf))),
         vfs: Arc::new(Fs::new()),
         log: Arc::new(Mutex::new(log)),
         cas: Arc::new(RwLock::new(LruCache::new(NonZeroUsize::new(10).unwrap()))),
@@ -397,7 +409,7 @@ fn write_level0(metadata: &Metadata, memtable: &Memtable, path: PathBuf) -> Resu
     Ok(part)
 }
 
-fn flush_(
+fn flush_log_(
     log: &mut File,
     memtable: &mut Memtable,
     metadata: &mut Metadata,
@@ -434,17 +446,13 @@ fn flush_(
         format!("{:016}.log", metadata.log_id)
     );
 
-    let mut log = OpenOptions::new()
+    let mut manifest = OpenOptions::new()
         .create_new(true)
         .write(true)
         .read(true)
-        .open(path.join(format!(
-            "tables/{}/{:016}.log",
-            metadata.table_name, metadata.log_id
-        )))?;
+        .open(path.join(format!("tables/{}/metadata", metadata.table_name)))?;
 
-    // write metadata to log as first record
-    log_metadata(&mut log, metadata)?;
+    write_metadata(&mut manifest, metadata)?;
 
     trace!(
         "removing previous log file {:?}",
@@ -455,6 +463,15 @@ fn flush_(
         metadata.table_name,
         metadata.log_id - 1
     )))?;
+
+    let log = OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .read(true)
+        .open(path.join(format!(
+            "tables/{}/{:016}.log",
+            metadata.table_name, metadata.log_id
+        )))?;
 
     histogram!(METRIC_STORE_FLUSH_TIME_MS).record(start_time.elapsed());
     counter!(METRIC_STORE_FLUSHES_TOTAL).increment(1);
@@ -663,7 +680,7 @@ impl OptiDBImpl {
         if memtable.len() > 0
             && metadata.stats.logged_bytes as usize > metadata.opts.max_log_length_bytes
         {
-            let l = flush_(log.get_mut(), &mut memtable, &mut metadata, &self.path)?;
+            let l = flush_log_(log.get_mut(), &mut memtable, &mut metadata, &self.path)?;
             *log = BufWriter::new(l);
 
             // if md.levels[0].parts.len() > 0 && md.levels[0].parts.len() > self.opts.l0_max_parts {
@@ -1075,7 +1092,7 @@ impl OptiDBImpl {
         }
 
         let mut metadata = tbl.metadata.lock();
-        flush_(log.get_mut(), &mut memtable, &mut metadata, &self.path)?;
+        flush_log_(log.get_mut(), &mut memtable, &mut metadata, &self.path)?;
 
         Ok(())
     }
@@ -1125,8 +1142,8 @@ impl OptiDBImpl {
 
         let field = Field::new(field_name.to_string(), dt.clone().try_into()?, is_nullable);
         metadata.schema.fields.push(field.clone());
-        let mut log = tbl.log.lock();
-        log_op(LogOp::AddField(field.clone()), log.get_mut())?;
+        let mut mdf = tbl.metadata_f.lock();
+        write_metadata(mdf.get_mut(), &mut metadata)?;
 
         let mut memtable = tbl.memtable.lock();
         if memtable.cols_len() < metadata.schema.fields.len() {
@@ -1171,11 +1188,17 @@ impl OptiDBImpl {
             .write(true)
             .read(true)
             .open(path.join(format!("{:016}.log", 0)))?;
-        log_metadata(&mut log, &mut metadata)?;
+        let mut mdf = OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .read(true)
+            .open(path.join("metadata"))?;
+        write_metadata(&mut mdf, &mut metadata)?;
         let tbl = Table {
             name: table_name.clone(),
             memtable: Arc::new(Mutex::new(memtable)),
             metadata: Arc::new(Mutex::new(metadata)),
+            metadata_f: Arc::new(Mutex::new(BufWriter::new(mdf))),
             vfs: Arc::new(Fs::new()),
             log: Arc::new(Mutex::new(BufWriter::new(log))),
             cas: Arc::new(RwLock::new(LruCache::new(NonZeroUsize::new(10).unwrap()))),
