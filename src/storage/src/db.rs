@@ -5,7 +5,7 @@ use std::fs::File;
 use std::fs::OpenOptions;
 use std::hash::Hash;
 use std::hash::Hasher;
-use std::io::BufReader;
+use std::io::{BufReader, Seek};
 use std::io::BufWriter;
 use std::io::Read;
 use std::io::Write;
@@ -41,7 +41,23 @@ use arrow_array::StringArray;
 use arrow_array::TimestampNanosecondArray;
 use bincode::deserialize;
 use bincode::serialize;
-use common::types::{DType, METRIC_STORE_FLUSH_TIME_MS, METRIC_STORE_FLUSHES_TOTAL, METRIC_STORE_INSERT_TIME_MS, METRIC_STORE_INSERTS_TOTAL, METRIC_STORE_MEMTABLE_ROWS, METRIC_STORE_PART_SIZE_BYTES, METRIC_STORE_PART_VALUES, METRIC_STORE_PARTS, METRIC_STORE_PARTS_SIZE_BYTES, METRIC_STORE_PARTS_VALUES, METRIC_STORE_RECOVERY_TIME_MS, METRIC_STORE_SCAN_MEMTABLE_MS, METRIC_STORE_SCAN_PARTS, METRIC_STORE_SCAN_TIME_MS, METRIC_STORE_SCANS_TOTAL, METRIC_STORE_TABLE_FIELDS};
+use common::types::METRIC_STORE_FLUSH_TIME_MS;
+use common::types::DType;
+use common::types::METRIC_STORE_FLUSHES_TOTAL;
+use common::types::METRIC_STORE_INSERT_TIME_MS;
+use common::types::METRIC_STORE_INSERTS_TOTAL;
+use common::types::METRIC_STORE_MEMTABLE_ROWS;
+use common::types::METRIC_STORE_PART_SIZE_BYTES;
+use common::types::METRIC_STORE_PART_VALUES;
+use common::types::METRIC_STORE_PARTS;
+use common::types::METRIC_STORE_PARTS_SIZE_BYTES;
+use common::types::METRIC_STORE_PARTS_VALUES;
+use common::types::METRIC_STORE_RECOVERY_TIME_MS;
+use common::types::METRIC_STORE_SCAN_MEMTABLE_MS;
+use common::types::METRIC_STORE_SCAN_PARTS;
+use common::types::METRIC_STORE_SCAN_TIME_MS;
+use common::types::METRIC_STORE_SCANS_TOTAL;
+use common::types::METRIC_STORE_TABLE_FIELDS;
 use futures::Stream;
 use lru::LruCache;
 use metrics::counter;
@@ -53,7 +69,7 @@ use parking_lot::RwLock;
 use serde::Deserialize;
 use serde::Serialize;
 use siphasher::sip::SipHasher13;
-use tracing::trace;
+use tracing::{error, info, trace};
 use crate::arrow_conversion::schema2_to_schema1;
 use crate::compaction::Compactor;
 use crate::compaction::CompactorMessage;
@@ -67,7 +83,9 @@ use crate::parquet::arrow_merger::MemChunkIterator;
 use crate::parquet::arrow_merger::MergingIterator;
 use crate::parquet::chunk_min_max;
 use crate::table;
-use crate::table::{serialize_md, part_path, deserialize_md};
+use crate::table::part_path;
+use crate::table::serialize_md;
+use crate::table::deserialize_md;
 use crate::table::Level;
 use crate::table::Metadata;
 use crate::table::Part;
@@ -172,7 +190,6 @@ fn recover_op(op: LogOp, memtable: &mut Memtable, metadata: &mut Metadata) -> Re
         }
     }
 
-    metadata.seq_id += 1;
 
     Ok(())
 }
@@ -186,6 +203,7 @@ pub(crate) fn write_metadata(manifest: &mut File, metadata: &mut Metadata) -> Re
     let vv = (data.len() as u64).to_le_bytes();
     a.push(vv.as_slice());
     a.push(&data);
+    manifest.rewind()?;
     manifest.write_all(a.concat().as_slice())?;
     let logged_size = 8 + 4 + data.len();
     // !@#trace!("logged size: {}", logged_size);
@@ -216,7 +234,6 @@ fn try_recover_table(path: PathBuf, name: String) -> Result<Table> {
     }
 
     let mut md = deserialize_md(&data_b)?;
-
     let dir = fs::read_dir(path.clone())?;
     let mut logs = BinaryHeap::new();
 
@@ -242,31 +259,6 @@ fn try_recover_table(path: PathBuf, name: String) -> Result<Table> {
     // !@#trace!("last log: {:?}", log_path);
     // todo make a buffered read. Currently something odd happens with reading the length of the record
     let mut log = OpenOptions::new().read(true).write(true).open(&log_path)?;
-    // get metadata (first record of the log)
-
-    let mut crc_b = [0u8; mem::size_of::<u32>()];
-    let read_bytes = log.read(&mut crc_b)?;
-    if read_bytes == 0 {
-        return Err(StoreError::Internal("empty log file".to_string()));
-    }
-    let crc32 = u32::from_le_bytes(crc_b);
-    // !@#trace!("crc32: {}", crc32);
-
-    let mut len_b = [0u8; mem::size_of::<u64>()];
-    _ = log.read(&mut len_b)?;
-    let len = u64::from_le_bytes(len_b);
-    // !@#trace!("len: {}", len);
-    let mut data_b = vec![0u8; len as usize];
-    _ = log.read(&mut data_b)?;
-    // todo recover from this case
-    let cur_crc32 = hash_crc32(&data_b);
-    if crc32 != cur_crc32 {
-        return Err(StoreError::Internal(format!(
-            "corrupted log. crc32 is: {}, need: {}",
-            cur_crc32, crc32
-        )));
-    }
-    let op = deserialize::<LogOp>(&data_b)?;
 
     let mut memtable = Memtable::new();
 
@@ -299,8 +291,6 @@ fn try_recover_table(path: PathBuf, name: String) -> Result<Table> {
         let op = deserialize::<LogOp>(&data_b)?;
 
         recover_op(op, &mut memtable, &mut md)?;
-
-        md.seq_id += 1;
     }
     // !@#trace!("operations recovered: {}", ops);
 
@@ -665,7 +655,6 @@ impl OptiDBImpl {
             log.get_mut(),
         )?;
         metadata.stats.logged_bytes += logged as u64;
-        metadata.seq_id += 1;
 
         let mut memtable = tbl.memtable.lock();
 
@@ -1172,7 +1161,6 @@ impl OptiDBImpl {
 
         let mut metadata = Metadata {
             version: 0,
-            seq_id: 0,
             log_id: 0,
             table_name: table_name.clone(),
             schema: Schema::from(vec![]),
@@ -1225,11 +1213,11 @@ impl Drop for OptiDBImpl {
             .send(CompactorMessage::Stop(tx))
             .is_err()
         {
-            println!("[ERROR] failed to shut down compaction worker on store drop");
+            error!("failed to shut down compaction worker on store drop");
             return;
         }
         for _ in rx {}
-        println!("[INFO] store successfully stopped");
+        info!("store successfully stopped");
     }
 }
 
@@ -1251,6 +1239,38 @@ mod tests {
     use crate::KeyValue;
     use crate::NamedValue;
     use crate::Value;
+
+    fn open_db(p: &str, create: bool) -> OptiDBImpl {
+        let path = PathBuf::from("/tmp").join(p);
+        if create {
+            fs::remove_dir_all(&path).unwrap();
+        }
+        let opts = Options {};
+        let db = OptiDBImpl::open(path, opts).unwrap();
+        if create {
+            let topts = table::Options {
+                levels: 7,
+                merge_array_size: 10000,
+                index_cols: 1,
+                l1_max_size_bytes: 1024 * 1024 * 10,
+                level_size_multiplier: 10,
+                l0_max_parts: 4,
+                max_log_length_bytes: 1024 * 1024 * 100,
+                merge_array_page_size: 10000,
+                merge_data_page_size_limit_bytes: Some(1024 * 1024),
+                merge_max_l1_part_size_bytes: 1024 * 1024,
+                merge_part_size_multiplier: 10,
+                merge_row_group_values_limit: 1000,
+                merge_chunk_size: 1024 * 8 * 8,
+                merge_max_page_size: 1024 * 1024,
+                is_replacing: false,
+            };
+
+            db.create_table("t1".to_string(), topts).unwrap();
+        }
+
+        db
+    }
 
     #[test]
     fn test_cas() {
@@ -1676,6 +1696,64 @@ mod tests {
             .unwrap();
 
         db.flush("t1").unwrap();
+    }
+
+    #[test]
+    fn test_recovery() {
+        // check if md saves properly during table creation
+        let db = open_db("recovery", true);
+        let md = db.tables.read()[0].metadata.lock().clone();
+        let db2 = open_db("recovery", false);
+        let md2 = db2.tables.read()[0].metadata.lock().clone();
+        assert_eq!(md, md2);
+
+        // check if md saves properly after field adding
+        let db = open_db("recovery", true);
+        db.add_field("t1", "f1", DType::Int64, false).unwrap();
+        let md = db.tables.read()[0].metadata.lock().clone();
+        let db2 = open_db("recovery", false);
+        let md2 = db2.tables.read()[0].metadata.lock().clone();
+        assert_eq!(md, md2);
+        assert_eq!(md2.schema.fields.len(), 1);
+
+        // add two fields (write md two times)
+        // check if md saves properly after field adding
+        let db = open_db("recovery", true);
+        db.add_field("t1", "f1", DType::Int64, false).unwrap();
+        db.add_field("t1", "f2", DType::Int64, false).unwrap();
+        let md = db.tables.read()[0].metadata.lock().clone();
+        let db2 = open_db("recovery", false);
+        let md2 = db2.tables.read()[0].metadata.lock().clone();
+        assert_eq!(md, md2);
+        assert_eq!(md2.schema.fields.len(), 2);
+
+        // check if log saves properly after record adding
+        let db = open_db("recovery", true);
+        db.add_field("t1", "f1", DType::Int64, false).unwrap();
+        db.insert("t1", vec![
+            NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
+        ])
+            .unwrap();
+        let db2 = open_db("recovery", false);
+        let r = db2.get("t1", vec![KeyValue::Int64(1)]).unwrap();
+        assert_eq!(r, Some(vec![Value::Int64(Some(1))]));
+
+        // check if log saves properly after record adding
+        let db = open_db("recovery", true);
+        db.add_field("t1", "f1", DType::Int64, false).unwrap();
+        db.insert("t1", vec![
+            NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
+        ])
+            .unwrap();
+        let db2 = open_db("recovery", false);
+        db2.flush("t1").unwrap();
+        let r = db2.get("t1", vec![KeyValue::Int64(1)]).unwrap();
+        assert_eq!(r, Some(vec![Value::Int64(Some(1))]));
+    }
+
+
+    fn test_fails() {
+
     }
     // integration test is placed here and not in separate crate because conditional #[cfg(test)] is used
     // #[tokio::test]

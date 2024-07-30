@@ -3,13 +3,12 @@ package metadata;
 
 message Metadata {
   uint32 version = 1;
-  uint64 seq_id = 2;
-  uint64 log_id = 3;
-  string table_name = 4;
-  Schema schema = 5;
-  repeated Level levels = 6;
-  Stats stats = 7;
-  Options options = 8;
+  uint64 log_id = 2;
+  string table_name = 3;
+  Schema schema = 4;
+  repeated Level levels = 5;
+  Stats stats = 6;
+  Options options = 7;
 }
 
 message Schema {

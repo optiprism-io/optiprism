@@ -129,7 +129,6 @@ pub(crate) struct Table {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Metadata {
     pub(crate) version: u64,
-    pub(crate) seq_id: u64,
     pub(crate) log_id: u64,
     pub(crate) table_name: String,
     pub(crate) schema: Schema,
@@ -212,7 +211,6 @@ pub fn serialize_md(md: &Metadata) -> Result<Vec<u8>> {
     }).collect::<Vec<_>>();
     let md = crate::metadata::Metadata {
         version: md.version as u32,
-        seq_id: md.seq_id,
         log_id: md.log_id,
         table_name: md.table_name.clone(),
         schema: Some(schema),
@@ -253,7 +251,6 @@ pub fn deserialize_md(data: &[u8]) -> Result<Metadata> {
 
     let md = Metadata {
         version: from.version as u64,
-        seq_id: from.seq_id,
         log_id: from.log_id,
         table_name: from.table_name.clone(),
         schema: Schema {
@@ -352,7 +349,6 @@ mod tests {
     fn test_roundtrip() {
         let md = Metadata {
             version: 1,
-            seq_id: 1,
             log_id: 1,
             table_name: "test".to_string(),
             schema: arrow2::datatypes::Schema {
