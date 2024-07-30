@@ -170,10 +170,6 @@ impl Memtable {
                     .as_any()
                     .downcast_ref::<arrow2::array::Int64Array>()
                     .unwrap();
-                let b = arrs[1]
-                    .as_any()
-                    .downcast_ref::<arrow2::array::Int64Array>()
-                    .unwrap();
 
                 let mut last = None;
                 for row_id in 0..arrs[0].len() {
@@ -276,6 +272,9 @@ pub(crate) struct Memtable {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+    use arrow2::array::{Array, Int64Array};
+    use arrow2::chunk::Chunk;
     use common::types::DType;
 
     use crate::memtable::Memtable;
@@ -320,8 +319,8 @@ mod tests {
             ])
         );
 
-        let a = mt.chunk(None, 2, true).unwrap();
-        dbg!(a);
+        let res = mt.chunk(None, 2, true).unwrap();
+        assert_eq!(res.unwrap(), Chunk::new(vec![Int64Array::from(vec![Some(1), Some(2)]).boxed(), Int64Array::from(vec![Some(2), Some(2)]).boxed(), Int64Array::from(vec![Some(2), Some(4)]).boxed()]));
     }
 
     #[test]
@@ -348,6 +347,6 @@ mod tests {
 
         let res = mt.chunk(None, 2, true).unwrap();
 
-        dbg!(res);
+        assert_eq!(res.unwrap(), Chunk::new(vec![Int64Array::from(vec![Some(1), Some(2), Some(1)]).boxed()]));
     }
 }

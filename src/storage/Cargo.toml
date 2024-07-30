@@ -65,6 +65,7 @@ prost-build = "0.13.1"
 
 [dev-dependencies]
 rstest = "0.18.1"
+failpoints = "0.2.0"
 
 [build-dependencies]
 prost-build = { version = "0.13.1" }
