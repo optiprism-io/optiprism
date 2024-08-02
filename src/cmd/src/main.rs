@@ -13,7 +13,8 @@ extern crate parse_duration;
 
 use cmd::error::Error;
 use cmd::error::Result;
-use cmd::test;
+use cmd::{db_test, test};
+use cmd::db_test::DbTest;
 
 #[derive(Parser, Clone)]
 pub struct Cfg {
@@ -29,6 +30,7 @@ enum Commands {
     Store(Store),
     /// Run test suite
     Test(Test),
+    DbTest(DbTest),
 }
 
 #[derive(Parser)]
@@ -68,6 +70,13 @@ async fn main() -> Result<()> {
 
                 config.try_deserialize()?
             }
+            Commands::DbTest(args) => {
+                let config = config::Config::builder()
+                    .add_source(config::File::from(args.config.clone()))
+                    .build()?;
+
+                config.try_deserialize()?
+            }
         },
         _ => unreachable!(),
     };
@@ -92,6 +101,17 @@ async fn main() -> Result<()> {
             }
             Commands::Test(args) => {
                 test::gen(args, cfg.try_into()?).await?;
+            }
+            Commands::DbTest(args) => {
+                match &args.cmd {
+                    db_test::Commands::Gen(gen) => {
+                        db_test::gen(args,gen)?;
+
+                    }
+                    db_test::Commands::Query(query) => {
+                        db_test::query(args,query).await?;
+                    }
+                }
             }
         },
         _ => unreachable!(),

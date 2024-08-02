@@ -59,18 +59,14 @@ impl Options {
         }
     }
 }
-#[allow(dead_code)]
-fn print_partitions(partitions: &[Partition]) {
-    for (pid, p) in partitions.iter().enumerate() {
-        println!("+-- {}", pid);
-        for (lid, l) in p.levels.iter().enumerate() {
-            println!("|  +-- {}", lid);
-            for part in &l.parts {
-                println!(
-                    "|     +-- id {} min {:?},max {:?}, size {}",
-                    part.id, part.min, part.max, part.size_bytes
-                );
-            }
+pub fn print_partitions(levels: &[Level]) {
+    for (lid, l) in levels.iter().enumerate() {
+        println!("|  +-- {}", lid);
+        for part in &l.parts {
+            println!(
+                "|     +-- id {} min {:?},max {:?}, size {}",
+                part.id, part.min, part.max, part.size_bytes
+            );
         }
     }
 }
@@ -139,7 +135,7 @@ pub(crate) struct Metadata {
 
 pub(crate) fn part_path(path: &Path, table_name: &str, level_id: usize, part_id: usize) -> PathBuf {
     path.join(format!(
-        "tables/{}/{}/{}.parquet",
+        "tables/{}/levels/{}/{}.parquet",
         table_name, level_id, part_id
     ))
 }

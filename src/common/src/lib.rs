@@ -22,4 +22,4 @@ pub fn group_col(group_id: usize) -> String {
 }
 
 pub const DATA_PATH_METADATA: &str = "md/data";
-pub const DATA_PATH_STORAGE: &str = "data/storage";
+pub const DATA_PATH_STORAGE: &str = "data";

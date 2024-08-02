@@ -169,7 +169,7 @@ fn profile(tc: TestCase, case_id: usize, step: ProfileStep) {
                         &mut w,
                         tc.gen_data_page_limit,
                     )
-                    .unwrap();
+                        .unwrap();
                 });
             println!("create parquets {:?}", start.elapsed());
         }
@@ -548,7 +548,7 @@ fn test_different_row_group_sizes() -> anyhow::Result<()> {
                 Some(2),
                 (stream_id + 1) * (stream_id + 1),
             )
-            .unwrap();
+                .unwrap();
 
             w
         })
@@ -575,7 +575,7 @@ fn test_different_row_group_sizes() -> anyhow::Result<()> {
         0,
         opts,
     )
-    .unwrap();
+        .unwrap();
 
     let mut pfile = File::open("/tmp/merge_different_row_group_sizes/1.parquet").unwrap();
     let final_chunk = read_parquet_as_one_chunk(&mut pfile);
@@ -684,7 +684,7 @@ fn test_merge_with_missing_columns() -> anyhow::Result<()> {
             Some(8),
             None,
         ])
-        .boxed(),
+            .boxed(),
         PrimitiveArray::<i64>::from(vec![
             Some(1),
             None,
@@ -696,7 +696,7 @@ fn test_merge_with_missing_columns() -> anyhow::Result<()> {
             None,
             Some(9),
         ])
-        .boxed(),
+            .boxed(),
     ];
 
     let exp = Chunk::new(exp);
