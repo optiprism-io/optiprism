@@ -715,7 +715,8 @@ pub struct Options {
 }
 
 pub struct Merger<R>
-where R: Read
+where
+    R: Read,
 {
     // list of index cols (partitions) in parquet file
     index_cols: Vec<ColumnDescriptor>,
@@ -821,7 +822,8 @@ pub fn merge<R: Read + Seek>(
 }
 
 impl<R> Merger<R>
-where R: Read + Seek
+where
+    R: Read + Seek,
 {
     // Create new merger
 
@@ -978,12 +980,10 @@ where R: Read + Seek
                         seq_writer.end(key_value_metadata)?;
 
                         let mf = MergedFile {
-                            size_bytes: File::open(
-                                &self.to_path.join(format!("{}.parquet", part_id)),
-                            )?
-                            .metadata()
-                            .unwrap()
-                            .size(),
+                            size_bytes: f
+                                .metadata()
+                                .unwrap()
+                                .size(),
                             values: num_values,
                             id: part_id,
                             min,
@@ -1364,25 +1364,22 @@ where R: Read + Seek
 
     // check result length and drain if needed
     fn try_drain_result(&mut self, values_limit: usize) -> Option<Vec<MergedPagesChunk>> {
-        if self.result_buffer.is_empty() {
-            return None;
-        }
-        let mut res = vec![];
-        let first = self.result_buffer.pop_front().unwrap();
-        let mut values_limit = values_limit as i64;
-        values_limit -= first.num_values() as i64;
-        res.push(first);
-        while values_limit > 0 && !self.result_buffer.is_empty() {
-            let next_values = self.result_buffer.front().unwrap().num_values() as i64;
-            if values_limit - next_values < 0 {
+        let mut n = 0;
+        for v in &self.result_buffer {
+            n += v.num_values();
+            if n >= values_limit {
                 break;
             }
-
-            values_limit -= next_values;
-            let chunk = self.result_buffer.pop_front().unwrap();
-            res.push(chunk)
         }
 
-        Some(res)
+        if n < values_limit {
+            return None;
+        }
+
+        if self.result_buffer.is_empty() {
+            None
+        } else {
+            Some(self.result_buffer.drain(..).collect::<Vec<_>>())
+        }
     }
 }

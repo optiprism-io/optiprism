@@ -83,7 +83,7 @@ use crate::parquet::arrow_merger::MemChunkIterator;
 use crate::parquet::arrow_merger::MergingIterator;
 use crate::parquet::chunk_min_max;
 use crate::table;
-use crate::table::part_path;
+use crate::table::{part_path, print_partitions};
 use crate::table::serialize_md;
 use crate::table::deserialize_md;
 use crate::table::Level;
@@ -462,14 +462,14 @@ fn flush_log_(
             metadata.table_name, metadata.log_id
         )))?;
 
-    histogram!(METRIC_STORE_FLUSH_TIME_MS).record(start_time.elapsed());
-    counter!(METRIC_STORE_FLUSHES_TOTAL).increment(1);
+    histogram!(METRIC_STORE_FLUSH_TIME_MS,"table"=>metadata.table_name.clone()).record(start_time.elapsed());
+    counter!(METRIC_STORE_FLUSHES_TOTAL,"table"=>metadata.table_name.clone()).increment(1);
 
     Ok(log)
 }
 
 pub struct ScanStream {
-    iter: Box<dyn Iterator<Item=Result<Chunk<Box<dyn Array>>>> + Send>,
+    pub iter: Box<dyn Iterator<Item=Result<Chunk<Box<dyn Array>>>> + Send>,
     start_time: Instant,
     table_name: String, // for metrics
 }
@@ -584,7 +584,6 @@ impl OptiDBImpl {
                 opts,
             )?) as Box<dyn Iterator<Item=Result<Chunk<Box<dyn Array>>>> + Send>
         };
-
         counter!(METRIC_STORE_SCANS_TOTAL, "table"=>tbl_name.to_string()).increment(1);
         Ok(ScanStream::new(iter, tbl_name.to_string()))
     }
@@ -1156,7 +1155,7 @@ impl OptiDBImpl {
         let path = self.path.join("tables").join(table_name.clone());
         fs::create_dir_all(&path)?;
         for lid in 0..opts.levels {
-            fs::create_dir_all(path.join(lid.to_string()))?;
+            fs::create_dir_all(path.join("levels").join(lid.to_string()))?;
         }
 
         let mut metadata = Metadata {

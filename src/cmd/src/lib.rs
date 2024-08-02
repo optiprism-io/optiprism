@@ -109,6 +109,7 @@ pub mod store;
 pub mod test;
 pub mod config;
 pub mod server;
+pub mod db_test;
 
 pub fn init_metrics() {
     PrometheusBuilder::new()

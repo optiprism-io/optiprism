@@ -149,6 +149,7 @@ impl Fs {
     }
 }
 
+#[derive(Debug, Clone)]
 pub(crate) enum FsOp {
     Rename(PathBuf, PathBuf),
     Delete(PathBuf),

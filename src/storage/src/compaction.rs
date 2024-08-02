@@ -47,6 +47,7 @@ impl ToCompact {
     }
 }
 
+#[derive(Debug, Clone)]
 struct CompactResult {
     l0_remove: Vec<usize>,
     levels: Vec<Level>,
@@ -90,7 +91,7 @@ impl Compactor {
                 }
             }
             #[cfg(not(test))]
-            thread::sleep(Duration::from_micros(20)); // todo make configurable
+            thread::sleep(Duration::from_secs(1)); // todo make configurable
 
             #[cfg(test)]
             {
@@ -138,19 +139,19 @@ impl Compactor {
                             for (idx, l) in res.levels.iter().enumerate().skip(1) {
                                 metadata.levels[idx] = l.clone();
                             }
-                            let mut log = table.log.lock();
+                            let mut log = table.metadata_f.lock();
                             write_metadata(log.get_mut(), &mut metadata).unwrap();
                             drop(metadata);
                             // drop because next fs operation is with locking
                             for op in res.fs_ops {
                                 match op {
                                     FsOp::Rename(from, to) => {
-                                        trace!("renaming");
+                                        trace!("renaming {from:?} to {to:?}");
                                         // todo handle error
                                         table.vfs.rename(from, to).unwrap();
                                     }
                                     FsOp::Delete(path) => {
-                                        trace!("deleting {:?}", path);
+                                        trace!("deleting {:?}", &path);
                                         table.vfs.remove_file(path).unwrap();
                                     }
                                 }
@@ -176,7 +177,7 @@ impl Compactor {
     }
 }
 
-fn determine_compaction(
+pub(crate) fn determine_compaction(
     level_id: usize,
     level: &Level,
     next_level: &Level,
@@ -189,13 +190,24 @@ fn determine_compaction(
         for part in level_parts {
             to_compact.push(ToCompact::new(0, part.id));
         }
+        // return Ok(Some(to_compact));
     } else if level_id > 0 && !level_parts.is_empty() {
+        let max_part_size_bytes = opts.merge_max_l1_part_size_bytes
+            * opts.merge_part_size_multiplier.pow(level_id as u32);
+        let level_threshold =
+            opts.l1_max_size_bytes * opts.level_size_multiplier.pow(level_id as u32 - 1);
         let mut size = 0;
         for part in level_parts {
             size += part.size_bytes;
-            let level_threshold =
-                opts.l1_max_size_bytes * opts.level_size_multiplier.pow(level_id as u32 - 1);
             if size > level_threshold as u64 {
+                let mut size = 0;
+                for part in level_parts {
+                    size += part.size_bytes;
+                    if size > max_part_size_bytes as u64 {
+                        to_compact.push(ToCompact::new(level_id, part.id));
+                    }
+                }
+                break;
                 to_compact.push(ToCompact::new(level_id, part.id));
             }
         }
@@ -220,7 +232,6 @@ fn determine_compaction(
             to_compact.push(ToCompact::new(level_id + 1, part.id));
         }
     }
-
     Ok(Some(to_compact))
 }
 
@@ -288,7 +299,7 @@ fn compact(
                 }
 
                 let out_part_id = tmp_levels[level_id + 1].part_id + 1;
-                let out_path = path.join(format!("tables/{}/{}", tbl_name, level_id + 1));
+                let out_path = path.join(format!("tables/{}/levels/{}", tbl_name, level_id + 1));
                 let rdrs = tomerge
                     .iter()
                     .map(File::open)
@@ -306,7 +317,7 @@ fn compact(
                     merge_max_page_size: opts.merge_max_page_size,
                     max_part_size_bytes: Some(max_part_size_bytes),
                 };
-                let ms=Instant::now();
+                let ms = Instant::now();
                 let merge_result =
                     merge(rdrs, out_path, out_part_id, tbl_name, level_id, merger_opts)?;
                 counter!(METRIC_STORE_MERGES_TOTAL,"table"=>tbl_name.to_string()).increment(1);
@@ -353,4 +364,61 @@ fn compact(
         levels: tmp_levels,
         fs_ops,
     }))
+}
+
+#[cfg(test)]
+mod test {
+    use crate::compaction::determine_compaction;
+    use crate::KeyValue;
+    use crate::table::{Level, Part};
+
+    #[test]
+    fn test_compaction() {
+        let l0 = Level {
+            part_id: 1,
+            parts: vec![Part {
+                id: 1,
+                size_bytes: 100,
+                values: 100,
+                min: vec![KeyValue::Int64(1)],
+                max: vec![KeyValue::Int64(10)],
+            }],
+        };
+
+        let l1 = Level {
+            part_id: 2,
+            parts: vec![Part {
+                id: 2,
+                size_bytes: 100,
+                values: 100,
+                min: vec![KeyValue::Int64(1)],
+                max: vec![KeyValue::Int64(10)],
+            }],
+        };
+
+
+        let l2 = Level {
+            part_id: 2,
+            parts: vec![],
+        };
+        let opts = crate::table::Options {
+            levels: 7,
+            merge_array_size: 10000,
+            index_cols: 1,
+            l1_max_size_bytes: 1,
+            level_size_multiplier: 10,
+            l0_max_parts: 0,
+            max_log_length_bytes: 1024 * 1024 * 5,
+            merge_array_page_size: 10000,
+            merge_data_page_size_limit_bytes: Some(1024 * 1024),
+            merge_max_l1_part_size_bytes: 1024 * 1024,
+            merge_part_size_multiplier: 5,
+            merge_row_group_values_limit: 1000000,
+            merge_chunk_size: 1024 * 8 * 8,
+            merge_max_page_size: 1024 * 1024 * 10,
+            is_replacing: false,
+        };
+        let dt = determine_compaction(1, &l1, &l2, &opts).unwrap();
+        dbg!(&dt);
+    }
 }
