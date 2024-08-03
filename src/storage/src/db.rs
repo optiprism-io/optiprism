@@ -1,16 +1,17 @@
 use std::collections::BinaryHeap;
 use std::ffi::OsStr;
-use std::fs;
+use std::{fs, io};
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::hash::Hash;
 use std::hash::Hasher;
-use std::io::{BufReader, Seek};
+use std::io::{BufReader, copy, Seek};
 use std::io::BufWriter;
 use std::io::Read;
 use std::io::Write;
 use std::mem;
 use std::num::NonZeroUsize;
+use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::mpsc;
@@ -36,7 +37,7 @@ use arrow2::datatypes::Field;
 use arrow2::datatypes::Schema;
 use arrow2::io::parquet;
 use arrow2::io::parquet::read;
-use arrow2::io::parquet::write::transverse;
+use arrow2::io::parquet::write::{FileSink, transverse};
 use arrow_array::StringArray;
 use arrow_array::TimestampNanosecondArray;
 use bincode::deserialize;
@@ -66,6 +67,9 @@ use metrics::histogram;
 use num_traits::ToPrimitive;
 use parking_lot::Mutex;
 use parking_lot::RwLock;
+use parquet2::compression::CompressionOptions;
+use parquet2::encoding::Encoding;
+use parquet2::write::Version;
 use serde::Deserialize;
 use serde::Serialize;
 use siphasher::sip::SipHasher13;
@@ -94,6 +98,8 @@ use crate::Fs;
 use crate::KeyValue;
 use crate::NamedValue;
 use crate::Value;
+
+const VERSION: usize = 1;
 
 fn collect_metrics(tables: Arc<RwLock<Vec<Table>>>) {
     loop {
@@ -159,8 +165,10 @@ pub struct Options {}
 pub struct OptiDBImpl {
     pub opts: Options,
     tables: Arc<RwLock<Vec<Table>>>,
+    lock: Arc<RwLock<()>>,
     compactor_outbox: Sender<CompactorMessage>,
     path: PathBuf,
+    fs: Arc<Fs>,
 }
 
 fn log_op(op: LogOp, log: &mut File) -> Result<usize> {
@@ -306,7 +314,6 @@ fn try_recover_table(path: PathBuf, name: String) -> Result<Table> {
         memtable: Arc::new(Mutex::new(memtable)),
         metadata: Arc::new(Mutex::new(md)),
         metadata_f: Arc::new(Mutex::new(BufWriter::new(mdf))),
-        vfs: Arc::new(Fs::new()),
         log: Arc::new(Mutex::new(log)),
         cas: Arc::new(RwLock::new(LruCache::new(NonZeroUsize::new(10).unwrap()))),
     })
@@ -334,15 +341,19 @@ fn recover(path: PathBuf, opts: Options) -> Result<OptiDBImpl> {
     let (compactor_outbox, rx) = std::sync::mpsc::channel();
     let tables = Arc::new(RwLock::new(tables));
 
-    let compactor = Compactor::new(tables.clone(), path.clone(), rx);
+    let lock = Arc::new(RwLock::new(()));
+    let fs = Arc::new(Fs::new());
+    let compactor = Compactor::new(tables.clone(), path.clone(), fs.clone(), rx, lock.clone());
     thread::spawn(move || compactor.run());
     let tables_cloned = tables.clone();
     thread::spawn(move || collect_metrics(tables_cloned));
     Ok(OptiDBImpl {
         opts,
         tables,
+        lock,
         compactor_outbox,
         path,
+        fs,
     })
 }
 
@@ -471,18 +482,27 @@ fn flush_log_(
 pub struct ScanStream {
     pub iter: Box<dyn Iterator<Item=Result<Chunk<Box<dyn Array>>>> + Send>,
     start_time: Instant,
+    path: PathBuf,
+    md: Metadata,
     table_name: String, // for metrics
+    fs: Arc<Fs>,
 }
 
 impl ScanStream {
     pub fn new(
         iter: Box<dyn Iterator<Item=Result<Chunk<Box<dyn Array>>>> + Send>,
+        path: PathBuf,
+        md: Metadata,
+        fs: Arc<Fs>,
         table_name: String,
     ) -> Self {
         Self {
             iter,
             start_time: Instant::now(),
+            path,
+            md,
             table_name,
+            fs,
         }
     }
 }
@@ -493,6 +513,13 @@ impl Stream for ScanStream {
     fn poll_next(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         match self.iter.next() {
             None => {
+                for (level_id, level) in self.md.levels.iter().enumerate() {
+                    for part in &level.parts {
+                        let path = part_path(&self.path, &self.table_name, level_id, part.id);
+                        self.fs.close(&path)?;
+                    }
+                }
+
                 histogram!(METRIC_STORE_SCAN_TIME_MS,"table"=>self.table_name.to_string())
                     .record(self.start_time.elapsed());
                 Poll::Ready(None)
@@ -520,8 +547,6 @@ impl OptiDBImpl {
         };
 
         drop(tables);
-        // locking compactor file operations (deleting/moving) to prevent parts deletion during scanning
-        let _vfs = tbl.vfs.lock.lock();
         let md = tbl.metadata.lock();
         let metadata = md.clone();
         drop(md);
@@ -553,9 +578,10 @@ impl OptiDBImpl {
         let mut rdrs = vec![];
         // todo remove?
 
-        for (level_id, level) in metadata.levels.into_iter().enumerate() {
-            for part in level.parts {
+        for (level_id, level) in metadata.levels.iter().enumerate() {
+            for part in &level.parts {
                 let path = part_path(&self.path, tbl_name, level_id, part.id);
+                self.fs.open(&path)?;
                 let rdr = BufReader::new(File::open(path)?);
                 rdrs.push(rdr);
             }
@@ -585,11 +611,12 @@ impl OptiDBImpl {
             )?) as Box<dyn Iterator<Item=Result<Chunk<Box<dyn Array>>>> + Send>
         };
         counter!(METRIC_STORE_SCANS_TOTAL, "table"=>tbl_name.to_string()).increment(1);
-        Ok(ScanStream::new(iter, tbl_name.to_string()))
+        Ok(ScanStream::new(iter, self.path.clone(), metadata.clone(), self.fs.clone(), tbl_name.to_string()))
     }
 
     // #[instrument(level = "trace", skip(self))]
     pub fn insert(&self, tbl_name: &str, mut values: Vec<NamedValue>) -> Result<()> {
+        _ = self.lock.read();
         let start_time = Instant::now();
         let tables = self.tables.read();
         let tbl = tables.iter().find(|t| t.name == tbl_name).cloned().unwrap();
@@ -715,6 +742,7 @@ impl OptiDBImpl {
     }
 
     pub fn replace(&self, tbl_name: &str, values: Vec<NamedValue>) -> Result<()> {
+        _ = self.lock.read();
         let tables = self.tables.read();
         let tbl = tables.iter().find(|t| t.name == tbl_name);
         let tbl = match tbl {
@@ -1085,6 +1113,7 @@ impl OptiDBImpl {
     }
 
     pub fn schema(&self, tbl_name: &str) -> Result<Schema> {
+        _ = self.lock.read();
         let tables = self.tables.read();
         let tbl = tables.iter().find(|t| t.name == tbl_name);
         let tbl = match tbl {
@@ -1102,6 +1131,7 @@ impl OptiDBImpl {
     }
 
     pub fn delete(&self, _opts: WriteOptions, _key: Vec<KeyValue>) -> Result<()> {
+        _ = self.lock.read();
         unimplemented!()
     }
 
@@ -1113,6 +1143,7 @@ impl OptiDBImpl {
         dt: DType,
         is_nullable: bool,
     ) -> Result<()> {
+        _ = self.lock.read();
         let tables = self.tables.read();
         let tbl = tables.iter().find(|t| t.name == tbl_name).cloned().unwrap();
         drop(tables);
@@ -1144,6 +1175,7 @@ impl OptiDBImpl {
     }
 
     pub fn create_table(&self, table_name: String, opts: table::Options) -> Result<()> {
+        _ = self.lock.read();
         let tbl = self.tables.read();
         if tbl.iter().any(|t| t.name == table_name) {
             return Err(StoreError::AlreadyExists(format!(
@@ -1185,7 +1217,6 @@ impl OptiDBImpl {
             memtable: Arc::new(Mutex::new(memtable)),
             metadata: Arc::new(Mutex::new(metadata)),
             metadata_f: Arc::new(Mutex::new(BufWriter::new(mdf))),
-            vfs: Arc::new(Fs::new()),
             log: Arc::new(Mutex::new(BufWriter::new(log))),
             cas: Arc::new(RwLock::new(LruCache::new(NonZeroUsize::new(10).unwrap()))),
         };
@@ -1201,6 +1232,66 @@ impl OptiDBImpl {
         drop(tables);
         let metadata = tbl.metadata.lock();
         Ok(metadata.opts.clone())
+    }
+
+    pub fn full_backup<W: Write>(&self, writer: &mut W) -> Result<()> {
+        let lock = self.lock.write();
+        let tables = self.tables.read();
+        for tbl in tables.iter() {
+            let md = tbl.metadata.lock();
+            for (lid, lvl) in md.levels.iter().enumerate() {
+                for part in &lvl.parts {
+                    let path = part_path(&self.path, &md.table_name, lid, part.id);
+                    // prevent file deletion
+                    self.fs.open(&path)?;
+                }
+            }
+        }
+        drop(lock);
+
+        writer.write(VERSION.to_le_bytes().as_slice())?;
+        for tbl in tables.iter() {
+            let tbl = table::serialize(tbl);
+            let data = serialize(&tbl)?;
+            writer.write((data.len() as u64).to_le_bytes().as_slice())?;
+            writer.write(data.as_slice())?;
+
+            let _g = self.lock.write();
+            let log_path = self.path.join(format!("tables/{}/{}", tbl.name, format!("{:016}.log", tbl.metadata.log_id)));
+            fs::copy(log_path.clone(), format!("{}.bak",log_path.into_os_string().into_string().unwrap()))?;
+            drop(_g);
+            let mut log = OpenOptions::new()
+                .read(true)
+                .open(self.path.join(format!("tables/{}/{}", tbl.name, format!("{:016}.log.bak", tbl.metadata.log_id))))?;
+            writer.write(log.metadata()?.size().to_le_bytes().as_slice())?;
+            io::copy(&mut log, writer)?;
+
+            for (lid, level) in tbl.metadata.levels.iter().enumerate() {
+                for part in &level.parts {
+                    let path = part_path(&self.path, &tbl.name, lid, part.id);
+                    let mut part = OpenOptions::new().read(true).open(path)?;
+                    io::copy(&mut part, writer)?;
+                }
+            }
+        }
+        writer.write(b"footer")?;
+        for tbl in tables.iter() {
+            let md = tbl.metadata.lock();
+            for (lid, lvl) in md.levels.iter().enumerate() {
+                for part in &lvl.parts {
+                    let path = part_path(&self.path, &md.table_name, lid, part.id);
+                    self.fs.close(&path)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn full_backup_local(&self, path: &str) -> Result<()> {
+        let mut writer = BufWriter::new(File::create(path)?);
+        self.full_backup(&mut writer)?;
+
+        Ok(())
     }
 }
 
@@ -1751,9 +1842,7 @@ mod tests {
     }
 
 
-    fn test_fails() {
-
-    }
+    fn test_fails() {}
     // integration test is placed here and not in separate crate because conditional #[cfg(test)] is used
     // #[tokio::test]
     // async fn test_scenario() {

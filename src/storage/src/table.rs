@@ -19,7 +19,7 @@ use crate::Stats;
 use crate::Value;
 use crate::error::Result;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Options {
     pub index_cols: usize,
     pub is_replacing: bool,
@@ -71,7 +71,7 @@ pub fn print_partitions(levels: &[Level]) {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Part {
     pub(crate) id: usize,
     pub(crate) size_bytes: u64,
@@ -80,7 +80,7 @@ pub struct Part {
     pub(crate) max: Vec<KeyValue>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord, Serialize, Deserialize)]
 pub(crate) struct Level {
     pub(crate) part_id: usize,
     pub(crate) parts: Vec<Part>,
@@ -117,12 +117,10 @@ pub(crate) struct Table {
     pub(crate) memtable: Arc<Mutex<Memtable>>,
     pub(crate) metadata: Arc<Mutex<Metadata>>,
     pub(crate) metadata_f: Arc<Mutex<BufWriter<File>>>,
-    pub(crate) vfs: Arc<Fs>,
     pub(crate) log: Arc<Mutex<BufWriter<File>>>,
     pub(crate) cas: Arc<RwLock<LruCache<Vec<Value>, i64>>>,
 }
-
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct Metadata {
     pub(crate) version: u64,
     pub(crate) log_id: u64,
@@ -131,6 +129,19 @@ pub(crate) struct Metadata {
     pub(crate) levels: Vec<Level>,
     pub(crate) stats: Stats,
     pub(crate) opts: Options,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct SerializableTable {
+    pub(crate) name: String,
+    pub(crate) metadata: Metadata,
+}
+
+pub(crate) fn serialize(tbl: &Table) -> SerializableTable {
+    SerializableTable {
+        name: tbl.name.clone(),
+        metadata:tbl.metadata.lock().clone(),
+    }
 }
 
 pub(crate) fn part_path(path: &Path, table_name: &str, level_id: usize, part_id: usize) -> PathBuf {

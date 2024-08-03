@@ -22,7 +22,7 @@ use crate::db::write_metadata;
 use crate::error::Result;
 use crate::parquet::parquet_merger;
 use crate::parquet::parquet_merger::merge;
-use crate::table;
+use crate::{Fs, table};
 use crate::table::part_path;
 use crate::table::Level;
 use crate::table::Part;
@@ -57,23 +57,30 @@ struct CompactResult {
 pub struct Compactor {
     tables: Arc<RwLock<Vec<Table>>>,
     path: PathBuf,
+    fs: Arc<Fs>,
     inbox: Receiver<CompactorMessage>,
+    lock: Arc<RwLock<()>>,
 }
 
 impl Compactor {
     pub fn new(
         tables: Arc<RwLock<Vec<Table>>>,
         path: PathBuf,
+        fs: Arc<Fs>,
         inbox: Receiver<CompactorMessage>,
+        lock: Arc<RwLock<()>>,
     ) -> Self {
         Compactor {
             tables,
             path,
+            fs,
             inbox,
+            lock,
         }
     }
     pub fn run(self) {
         loop {
+            _ = self.lock.read();
             #[cfg(not(test))]
             {
                 match self.inbox.try_recv() {
@@ -148,11 +155,11 @@ impl Compactor {
                                     FsOp::Rename(from, to) => {
                                         trace!("renaming {from:?} to {to:?}");
                                         // todo handle error
-                                        table.vfs.rename(from, to).unwrap();
+                                        self.fs.try_rename(from, to).unwrap();
                                     }
                                     FsOp::Delete(path) => {
                                         trace!("deleting {:?}", &path);
-                                        table.vfs.remove_file(path).unwrap();
+                                        self.fs.try_remove_file(path).unwrap();
                                     }
                                 }
                             }

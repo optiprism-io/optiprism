@@ -1,5 +1,5 @@
 use std::fmt::Write;
-use std::fs;
+use std::{fs, thread};
 use std::io::BufReader;
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -86,6 +86,12 @@ pub fn gen(args: &DbTest, gen: &Gen) -> crate::error::Result<()> {
     );
     let mut rng = rand::thread_rng();
     for i in 0..gen.records {
+        if i % 100000 == 0 {
+            let db_cloned = db.clone();
+            thread::spawn(move || {
+                db_cloned.full_backup_local("/tmp/bak").unwrap();
+            });
+        }
         db.insert(
             "t1",
             vec![
@@ -127,7 +133,7 @@ pub async fn query(args: &DbTest, q: &Query) -> crate::error::Result<()> {
 
     let s = Instant::now();
     let mut v = 0;
-    let mut scan = db.scan("t1", vec![0,1,2,3,4,5,6,7])?;
+    let mut scan = db.scan("t1", vec![0, 1, 2, 3, 4, 5, 6, 7])?;
     for i in scan.iter {
         v += i.unwrap().len();
     }
