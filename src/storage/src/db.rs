@@ -42,6 +42,7 @@ use arrow_array::StringArray;
 use arrow_array::TimestampNanosecondArray;
 use bincode::deserialize;
 use bincode::serialize;
+use flate2::Compression;
 use common::types::{METRIC_BACKUP_TIME_MS, METRIC_BACKUPS_TOTAL, METRIC_STORE_FLUSH_TIME_MS};
 use common::types::DType;
 use common::types::METRIC_STORE_FLUSHES_TOTAL;
@@ -98,6 +99,8 @@ use crate::Fs;
 use crate::KeyValue;
 use crate::NamedValue;
 use crate::Value;
+use std::io::prelude::*;
+use flate2::write::ZlibEncoder;
 
 const VERSION: usize = 1;
 
@@ -1237,9 +1240,11 @@ impl OptiDBImpl {
     pub fn full_backup<W: Write>(&self, writer: &mut W) -> Result<()> {
         let start_time = Instant::now();
         let lock = self.lock.write();
-        let tables = self.tables.read();
+        let tables = self.tables.read().clone();
+        let mut mds = vec![];
         for tbl in tables.iter() {
-            let md = tbl.metadata.lock();
+            // md snapshot here prevents metadata changes during backup
+            let md = tbl.metadata.lock().clone();
             for (lid, lvl) in md.levels.iter().enumerate() {
                 for part in &lvl.parts {
                     let path = part_path(&self.path, &md.table_name, lid, part.id);
@@ -1247,6 +1252,7 @@ impl OptiDBImpl {
                     self.fs.open(&path)?;
                 }
             }
+            mds.push(md);
         }
         drop(lock);
 
@@ -1266,7 +1272,6 @@ impl OptiDBImpl {
                 .open(self.path.join(format!("tables/{}/{}", tbl.name, format!("{:016}.log.bak", tbl.metadata.log_id))))?;
             writer.write(log.metadata()?.size().to_le_bytes().as_slice())?;
             io::copy(&mut log, writer)?;
-
             for (lid, level) in tbl.metadata.levels.iter().enumerate() {
                 for part in &level.parts {
                     let path = part_path(&self.path, &tbl.name, lid, part.id);
@@ -1276,8 +1281,7 @@ impl OptiDBImpl {
             }
         }
         writer.write(b"footer")?;
-        for tbl in tables.iter() {
-            let md = tbl.metadata.lock();
+        for md in mds.iter() {
             for (lid, lvl) in md.levels.iter().enumerate() {
                 for part in &lvl.parts {
                     let path = part_path(&self.path, &md.table_name, lid, part.id);
@@ -1293,9 +1297,10 @@ impl OptiDBImpl {
     }
 
     pub fn full_backup_local(&self, path: &str) -> Result<()> {
-        let mut writer = BufWriter::new(File::create(path)?);
-        self.full_backup(&mut writer)?;
-
+        let writer = BufWriter::new(File::create(path)?);
+        let mut e = ZlibEncoder::new(writer, Compression::default());
+        self.full_backup(&mut e)?;
+        e.finish()?;
         Ok(())
     }
 }
