@@ -624,7 +624,11 @@ impl OptiDBImpl {
         let _g = self.global_lock.read();
         let start_time = Instant::now();
         let tables = self.tables.read();
-        let tbl = tables.iter().find(|t| t.name == tbl_name).cloned().unwrap();
+        let tbl = tables.iter().find(|t| t.name == tbl_name);
+        let tbl = match tbl {
+            None => return Err(StoreError::Internal("table not found".to_string())),
+            Some(tbl) => tbl.to_owned(),
+        };
 
         drop(tables);
 
@@ -1080,7 +1084,11 @@ impl OptiDBImpl {
     }
     pub fn parts_path(&self, tbl_name: &str) -> Result<Vec<String>> {
         let tables = self.tables.read();
-        let tbl = tables.iter().find(|t| t.name == tbl_name).cloned().unwrap();
+        let tbl = tables.iter().find(|t| t.name == tbl_name);
+        let tbl = match tbl {
+            None => return Err(StoreError::Internal("table not found".to_string())),
+            Some(tbl) => tbl.to_owned(),
+        };
         drop(tables);
 
         let mut ret = vec![];
@@ -1102,7 +1110,11 @@ impl OptiDBImpl {
 
     pub fn flush(&self, tbl_name: &str) -> Result<()> {
         let tables = self.tables.read();
-        let tbl = tables.iter().find(|t| t.name == tbl_name).cloned().unwrap();
+        let tbl = tables.iter().find(|t| t.name == tbl_name);
+        let tbl = match tbl {
+            None => return Err(StoreError::Internal("table not found".to_string())),
+            Some(tbl) => tbl.to_owned(),
+        };
         drop(tables);
 
         let mut log = tbl.log.lock();
@@ -1150,7 +1162,11 @@ impl OptiDBImpl {
     ) -> Result<()> {
         let _g = self.global_lock.read();
         let tables = self.tables.read();
-        let tbl = tables.iter().find(|t| t.name == tbl_name).cloned().unwrap();
+        let tbl = tables.iter().find(|t| t.name == tbl_name);
+        let tbl = match tbl {
+            None => return Err(StoreError::Internal("table not found".to_string())),
+            Some(tbl) => tbl.to_owned(),
+        };
         drop(tables);
 
         let mut metadata = tbl.metadata.lock();
@@ -1233,10 +1249,24 @@ impl OptiDBImpl {
 
     pub fn table_options(&self, tbl_name: &str) -> Result<table::Options> {
         let tables = self.tables.read();
-        let tbl = tables.iter().find(|t| t.name == tbl_name).cloned().unwrap();
+        let tbl = tables.iter().find(|t| t.name == tbl_name);
+        let tbl = match tbl {
+            None => return Err(StoreError::Internal("table not found".to_string())),
+            Some(tbl) => tbl.to_owned(),
+        };
         drop(tables);
         let metadata = tbl.metadata.lock();
         Ok(metadata.opts.clone())
+    }
+
+    pub fn truncate_all(&self) -> Result<()> {
+        let _g = self.global_lock.write();
+        let mut tables = self.tables.write();
+        for tbl in tables.iter() {
+            fs::remove_dir_all(self.path.join(format!("tables/{}", tbl.name)))?;
+        }
+        *tables = vec![];
+        Ok(())
     }
 
     pub fn full_backup<W: Write>(&self, writer: &mut W) -> Result<()> {
