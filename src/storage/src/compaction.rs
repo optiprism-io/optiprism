@@ -80,7 +80,7 @@ impl Compactor {
     }
     pub fn run(self) {
         loop {
-            _ = self.lock.read();
+            let _g= self.lock.read();
             #[cfg(not(test))]
             {
                 match self.inbox.try_recv() {

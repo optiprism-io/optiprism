@@ -168,7 +168,8 @@ pub struct Options {}
 pub struct OptiDBImpl {
     pub opts: Options,
     tables: Arc<RwLock<Vec<Table>>>,
-    lock: Arc<RwLock<()>>,
+    global_lock: Arc<RwLock<()>>,
+    backup_lock: Arc<Mutex<()>>,
     compactor_outbox: Sender<CompactorMessage>,
     path: PathBuf,
     fs: Arc<Fs>,
@@ -353,7 +354,8 @@ fn recover(path: PathBuf, opts: Options) -> Result<OptiDBImpl> {
     Ok(OptiDBImpl {
         opts,
         tables,
-        lock,
+        global_lock: lock,
+        backup_lock: Arc::new(Default::default()),
         compactor_outbox,
         path,
         fs,
@@ -619,7 +621,7 @@ impl OptiDBImpl {
 
     // #[instrument(level = "trace", skip(self))]
     pub fn insert(&self, tbl_name: &str, mut values: Vec<NamedValue>) -> Result<()> {
-        _ = self.lock.read();
+        let _g = self.global_lock.read();
         let start_time = Instant::now();
         let tables = self.tables.read();
         let tbl = tables.iter().find(|t| t.name == tbl_name).cloned().unwrap();
@@ -745,7 +747,7 @@ impl OptiDBImpl {
     }
 
     pub fn replace(&self, tbl_name: &str, values: Vec<NamedValue>) -> Result<()> {
-        _ = self.lock.read();
+        let _g = self.global_lock.read();
         let tables = self.tables.read();
         let tbl = tables.iter().find(|t| t.name == tbl_name);
         let tbl = match tbl {
@@ -1116,7 +1118,7 @@ impl OptiDBImpl {
     }
 
     pub fn schema(&self, tbl_name: &str) -> Result<Schema> {
-        _ = self.lock.read();
+        let _g = self.global_lock.read();
         let tables = self.tables.read();
         let tbl = tables.iter().find(|t| t.name == tbl_name);
         let tbl = match tbl {
@@ -1134,7 +1136,7 @@ impl OptiDBImpl {
     }
 
     pub fn delete(&self, _opts: WriteOptions, _key: Vec<KeyValue>) -> Result<()> {
-        _ = self.lock.read();
+        let _g = self.global_lock.read();
         unimplemented!()
     }
 
@@ -1146,7 +1148,7 @@ impl OptiDBImpl {
         dt: DType,
         is_nullable: bool,
     ) -> Result<()> {
-        _ = self.lock.read();
+        let _g = self.global_lock.read();
         let tables = self.tables.read();
         let tbl = tables.iter().find(|t| t.name == tbl_name).cloned().unwrap();
         drop(tables);
@@ -1178,7 +1180,7 @@ impl OptiDBImpl {
     }
 
     pub fn create_table(&self, table_name: String, opts: table::Options) -> Result<()> {
-        _ = self.lock.read();
+        let _g = self.global_lock.read();
         let tbl = self.tables.read();
         if tbl.iter().any(|t| t.name == table_name) {
             return Err(StoreError::AlreadyExists(format!(
@@ -1239,7 +1241,7 @@ impl OptiDBImpl {
 
     pub fn full_backup<W: Write>(&self, writer: &mut W) -> Result<()> {
         let start_time = Instant::now();
-        let lock = self.lock.write();
+        let lock = self.global_lock.write();
         let tables = self.tables.read().clone();
         let mut mds = vec![];
         for tbl in tables.iter() {
@@ -1263,15 +1265,18 @@ impl OptiDBImpl {
             writer.write((data.len() as u64).to_le_bytes().as_slice())?;
             writer.write(data.as_slice())?;
 
-            let _g = self.lock.write();
+            let _g = self.global_lock.write();
             let log_path = self.path.join(format!("tables/{}/{}", tbl.name, format!("{:016}.log", tbl.metadata.log_id)));
-            fs::copy(log_path.clone(), format!("{}.bak", log_path.into_os_string().into_string().unwrap()))?;
+            let log_bak_path = format!("{}.bak", log_path.clone().into_os_string().into_string().unwrap());
+            fs::copy(&log_path, &log_bak_path)?;
             drop(_g);
             let mut log = OpenOptions::new()
                 .read(true)
-                .open(self.path.join(format!("tables/{}/{}", tbl.name, format!("{:016}.log.bak", tbl.metadata.log_id))))?;
+                .open(&log_bak_path)?;
             writer.write(log.metadata()?.size().to_le_bytes().as_slice())?;
             io::copy(&mut log, writer)?;
+            drop(log);
+            fs::remove_file(&log_bak_path)?;
             for (lid, level) in tbl.metadata.levels.iter().enumerate() {
                 for part in &level.parts {
                     let path = part_path(&self.path, &tbl.name, lid, part.id);
@@ -1297,6 +1302,7 @@ impl OptiDBImpl {
     }
 
     pub fn full_backup_local(&self, path: &str) -> Result<()> {
+        let _g = self.backup_lock.lock();
         let writer = BufWriter::new(File::create(path)?);
         let mut e = ZlibEncoder::new(writer, Compression::default());
         self.full_backup(&mut e)?;
