@@ -181,6 +181,12 @@ pub fn init_metrics() {
     );
 
     describe_counter!(METRIC_HTTP_REQUESTS_TOTAL, "total number of http requests");
+    describe_counter!(METRIC_QUERY_QUERIES_TOTAL, "total number of queries");
+    describe_histogram!(
+        METRIC_QUERY_EXECUTION_TIME_MS,
+        Unit::Milliseconds,
+        "query execution time"
+    );
 }
 
 pub fn init_system(

@@ -42,7 +42,7 @@ use arrow_array::StringArray;
 use arrow_array::TimestampNanosecondArray;
 use bincode::deserialize;
 use bincode::serialize;
-use common::types::METRIC_STORE_FLUSH_TIME_MS;
+use common::types::{METRIC_BACKUP_TIME_MS, METRIC_BACKUPS_TOTAL, METRIC_STORE_FLUSH_TIME_MS};
 use common::types::DType;
 use common::types::METRIC_STORE_FLUSHES_TOTAL;
 use common::types::METRIC_STORE_INSERT_TIME_MS;
@@ -1235,6 +1235,7 @@ impl OptiDBImpl {
     }
 
     pub fn full_backup<W: Write>(&self, writer: &mut W) -> Result<()> {
+        let start_time = Instant::now();
         let lock = self.lock.write();
         let tables = self.tables.read();
         for tbl in tables.iter() {
@@ -1258,7 +1259,7 @@ impl OptiDBImpl {
 
             let _g = self.lock.write();
             let log_path = self.path.join(format!("tables/{}/{}", tbl.name, format!("{:016}.log", tbl.metadata.log_id)));
-            fs::copy(log_path.clone(), format!("{}.bak",log_path.into_os_string().into_string().unwrap()))?;
+            fs::copy(log_path.clone(), format!("{}.bak", log_path.into_os_string().into_string().unwrap()))?;
             drop(_g);
             let mut log = OpenOptions::new()
                 .read(true)
@@ -1284,6 +1285,10 @@ impl OptiDBImpl {
                 }
             }
         }
+
+        histogram!(METRIC_BACKUP_TIME_MS).record(start_time.elapsed());
+        counter!(METRIC_BACKUPS_TOTAL).increment(1);
+
         Ok(())
     }
 

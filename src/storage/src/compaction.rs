@@ -199,6 +199,7 @@ pub(crate) fn determine_compaction(
         }
         // return Ok(Some(to_compact));
     } else if level_id > 0 && !level_parts.is_empty() {
+        // todo check logic
         let max_part_size_bytes = opts.merge_max_l1_part_size_bytes
             * opts.merge_part_size_multiplier.pow(level_id as u32);
         let level_threshold =
