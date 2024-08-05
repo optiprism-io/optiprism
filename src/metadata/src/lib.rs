@@ -21,6 +21,7 @@ pub mod teams;
 pub mod util;
 pub mod bookmarks;
 pub mod config;
+mod backups;
 
 use std::fmt::Debug;
 use ::rocksdb::Transaction;
@@ -79,6 +80,10 @@ pub mod session {
 
 pub mod team {
     include!(concat!(env!("OUT_DIR"), "/team.rs"));
+}
+
+pub mod backup {
+    include!(concat!(env!("OUT_DIR"), "/backup.rs"));
 }
 
 pub fn project_ns(project_id: u64, ns: &[u8]) -> Vec<u8> {

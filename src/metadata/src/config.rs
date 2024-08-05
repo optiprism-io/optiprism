@@ -10,32 +10,59 @@ use crate::Result;
 pub enum StringKey {
     AuthAccessToken,
     AuthRefreshToken,
-    AdminDefaultPassword,
+    AuthAdminDefaultPassword,
+    BackupS3Bucket,
+    BackupS3Region,
+    BackupS3AccessKey,
+    BackupS3SecretKey,
 }
 
 impl StringKey {
     fn as_str(&self) -> &'static str {
         match self {
-            StringKey::AuthAccessToken => "auth_access_token",
-            StringKey::AuthRefreshToken => "auth_refresh_token",
-            StringKey::AdminDefaultPassword => "admin_default_password"
+            StringKey::AuthAccessToken => "auth.access_token",
+            StringKey::AuthRefreshToken => "auth.refresh_token",
+            StringKey::AuthAdminDefaultPassword => "auth.admin_default_password",
+            StringKey::BackupS3Bucket => "backup.s3.bucket",
+            StringKey::BackupS3Region => "backup.s3.region",
+            StringKey::BackupS3AccessKey => "backup.s3.access_key",
+            StringKey::BackupS3SecretKey => "backup.s3.secret_key",
         }
     }
 }
 
-pub enum IntKey {}
+pub enum IntKey {
+    BackupFrequency,
+    BackupFrequencyUnit,
+    BackupStartHour,
+}
+
+pub enum BackupUnit {
+    Hour = 1,
+    Day = 2,
+    Week = 3,
+    Month = 4,
+}
 
 impl IntKey {
     fn as_str(&self) -> &'static str {
-        unimplemented!()
+        match self {
+            IntKey::BackupFrequency => "backup.frequency",
+            IntKey::BackupFrequencyUnit => "backup.frequency_unit",
+            IntKey::BackupStartHour => "backup.start_hour",
+        }
     }
 }
 
-pub enum BoolKey {}
+pub enum BoolKey {
+    BackupS3Enabled,
+}
 
 impl crate::config::BoolKey {
     fn as_str(&self) -> &'static str {
-        unimplemented!()
+        match self {
+            BoolKey::BackupS3Enabled => "backup.s3.enabled",
+        }
     }
 }
 
