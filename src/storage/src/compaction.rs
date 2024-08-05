@@ -18,12 +18,11 @@ use metrics::counter;
 use metrics::histogram;
 use parking_lot::RwLock;
 use common::types::{METRIC_STORE_COMPACTION_TIME_MS, METRIC_STORE_COMPACTIONS_TOTAL, METRIC_STORE_LEVEL_COMPACTION_TIME_MS, METRIC_STORE_MERGE_TIME_MS, METRIC_STORE_MERGES_TOTAL};
-use crate::db::write_metadata;
+use crate::db::{part_path, write_metadata};
 use crate::error::Result;
 use crate::parquet::parquet_merger;
 use crate::parquet::parquet_merger::merge;
 use crate::{Fs, table};
-use crate::table::part_path;
 use crate::table::Level;
 use crate::table::Part;
 use crate::table::Table;
@@ -63,16 +62,16 @@ pub struct Compactor {
 }
 
 impl Compactor {
-    pub fn new(
+    pub fn new<P:AsRef<Path>>(
         tables: Arc<RwLock<Vec<Table>>>,
-        path: PathBuf,
+        path: P,
         fs: Arc<Fs>,
         inbox: Receiver<CompactorMessage>,
         lock: Arc<RwLock<()>>,
     ) -> Self {
         Compactor {
             tables,
-            path,
+            path: path.as_ref().to_path_buf(),
             fs,
             inbox,
             lock,
@@ -80,7 +79,6 @@ impl Compactor {
     }
     pub fn run(self) {
         loop {
-            let _g= self.lock.read();
             #[cfg(not(test))]
             {
                 match self.inbox.try_recv() {
@@ -113,6 +111,7 @@ impl Compactor {
                     Err(err) => panic!("{:?}", err),
                 }
             }
+            let _g= self.lock.read();
             // !@#debug!("compaction started");
             let tables = {
                 let tbls = self.tables.read();

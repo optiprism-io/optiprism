@@ -137,22 +137,14 @@ pub(crate) struct SerializableTable {
     pub(crate) metadata: Metadata,
 }
 
-pub(crate) fn serialize(tbl: &Table) -> SerializableTable {
+pub(crate) fn serialize_table(tbl: &Table) -> SerializableTable {
     SerializableTable {
-        name: tbl.name.clone(),
+        name: tbl.name. clone(),
         metadata:tbl.metadata.lock().clone(),
     }
 }
 
-pub(crate) fn part_path(path: &Path, table_name: &str, level_id: usize, part_id: usize) -> PathBuf {
-    path.join(format!(
-        "tables/{}/levels/{}/{}.parquet",
-        table_name, level_id, part_id
-    ))
-}
-
 pub fn serialize_md(md: &Metadata) -> Result<Vec<u8>> {
-    // unimplemented!()
     let schema = metadata::Schema {
         fields: md.schema.fields.iter().map(|f| {
             metadata::Field {
@@ -172,7 +164,6 @@ pub fn serialize_md(md: &Metadata) -> Result<Vec<u8>> {
             }
         }).collect::<Vec<_>>()
     };
-
     let levels = md.levels.iter().map(|l| {
         metadata::Level {
             part_id: l.part_id as u64,

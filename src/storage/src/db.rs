@@ -12,7 +12,7 @@ use std::io::Write;
 use std::mem;
 use std::num::NonZeroUsize;
 use std::os::unix::fs::MetadataExt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::mpsc;
 use std::sync::mpsc::Sender;
@@ -88,7 +88,7 @@ use crate::parquet::arrow_merger::MemChunkIterator;
 use crate::parquet::arrow_merger::MergingIterator;
 use crate::parquet::chunk_min_max;
 use crate::table;
-use crate::table::{part_path, print_partitions};
+use crate::table::{print_partitions, SerializableTable};
 use crate::table::serialize_md;
 use crate::table::deserialize_md;
 use crate::table::Level;
@@ -100,10 +100,33 @@ use crate::KeyValue;
 use crate::NamedValue;
 use crate::Value;
 use std::io::prelude::*;
+use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
+use binread::{BinReaderExt, io::Cursor};
 
-const VERSION: usize = 1;
+// todo make semver
+const VERSION: u64 = 1;
+const BACKUP_MAGIC: [u8; 8] = [0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8];
 
+pub(crate) fn part_path(path: &Path, table_name: &str, level_id: usize, part_id: usize) -> PathBuf {
+    path.join(format!(
+        "tables/{}/levels/{}/{}.parquet",
+        table_name, level_id, part_id
+    ))
+}
+
+pub(crate) fn log_name(log_id: u64) -> String {
+    format!("{:016}.log", log_id)
+}
+
+pub(crate) fn log_path(path: &Path, tbl_name: &str, log_id: u64) -> PathBuf {
+    path.join(
+        format!(
+            "tables/{}/{:016}.log",
+            tbl_name,
+            log_id
+        ))
+}
 fn collect_metrics(tables: Arc<RwLock<Vec<Table>>>) {
     loop {
         let tables = tables.read();
@@ -268,7 +291,6 @@ fn try_recover_table(path: PathBuf, name: String) -> Result<Table> {
     // !@#trace!("found {} logs", logs.len());
 
     let log_path = logs.pop().unwrap();
-    // !@#trace!("last log: {:?}", log_path);
     // todo make a buffered read. Currently something odd happens with reading the length of the record
     let mut log = OpenOptions::new().read(true).write(true).open(&log_path)?;
 
@@ -324,7 +346,8 @@ fn try_recover_table(path: PathBuf, name: String) -> Result<Table> {
 }
 
 // #[instrument(level = "trace")]
-fn recover(path: PathBuf, opts: Options) -> Result<OptiDBImpl> {
+fn recover<P: AsRef<Path>>(path: P, opts: Options) -> Result<OptiDBImpl> {
+    let path = path.as_ref();
     fs::create_dir_all(path.join("tables"))?;
     let mut tables = vec![];
     let dir = fs::read_dir(path.join("tables"))?;
@@ -357,7 +380,7 @@ fn recover(path: PathBuf, opts: Options) -> Result<OptiDBImpl> {
         global_lock: lock,
         backup_lock: Arc::new(Default::default()),
         compactor_outbox,
-        path,
+        path: path.to_owned(),
         fs,
     })
 }
@@ -449,7 +472,7 @@ fn flush_log_(
     // create new log
     trace!(
         "creating new log file {:?}",
-        format!("{:016}.log", metadata.log_id)
+        log_name(metadata.log_id)
     );
 
     let mut manifest = OpenOptions::new()
@@ -461,23 +484,15 @@ fn flush_log_(
 
     trace!(
         "removing previous log file {:?}",
-        format!("{:016}.log", metadata.log_id - 1)
+        log_name(metadata.log_id-1)
     );
-    fs::remove_file(path.join(format!(
-        "tables/{}/{:016}.log",
-        metadata.table_name,
-        metadata.log_id - 1
-    )))?;
+    fs::remove_file(log_path(&path, &metadata.table_name, metadata.log_id - 1))?;
 
     let log = OpenOptions::new()
         .create_new(true)
         .write(true)
         .read(true)
-        .open(path.join(format!(
-            "tables/{}/{:016}.log",
-            metadata.table_name, metadata.log_id
-        )))?;
-
+        .open(log_path(&path, &metadata.table_name, metadata.log_id))?;
     histogram!(METRIC_STORE_FLUSH_TIME_MS,"table"=>metadata.table_name.clone()).record(start_time.elapsed());
     counter!(METRIC_STORE_FLUSHES_TOTAL,"table"=>metadata.table_name.clone()).increment(1);
 
@@ -1124,7 +1139,8 @@ impl OptiDBImpl {
         }
 
         let mut metadata = tbl.metadata.lock();
-        flush_log_(log.get_mut(), &mut memtable, &mut metadata, &self.path)?;
+        let new_log = flush_log_(log.get_mut(), &mut memtable, &mut metadata, &self.path)?;
+        *log = BufWriter::new(new_log);
 
         Ok(())
     }
@@ -1222,11 +1238,11 @@ impl OptiDBImpl {
         };
 
         let memtable = Memtable::new();
-        let mut log = OpenOptions::new()
+        let log = OpenOptions::new()
             .create_new(true)
             .write(true)
             .read(true)
-            .open(path.join(format!("{:016}.log", 0)))?;
+            .open(path.join(log_name(0)))?;
         let mut mdf = OpenOptions::new()
             .create_new(true)
             .write(true)
@@ -1260,6 +1276,7 @@ impl OptiDBImpl {
     }
 
     pub fn truncate_all(&self) -> Result<()> {
+        let _b = self.backup_lock.lock();
         let _g = self.global_lock.write();
         let mut tables = self.tables.write();
         for tbl in tables.iter() {
@@ -1288,15 +1305,20 @@ impl OptiDBImpl {
         }
         drop(lock);
 
+        // version
         writer.write(VERSION.to_le_bytes().as_slice())?;
-        for tbl in tables.iter() {
-            let tbl = table::serialize(tbl);
-            let data = serialize(&tbl)?;
-            writer.write((data.len() as u64).to_le_bytes().as_slice())?;
-            writer.write(data.as_slice())?;
 
+        // tables
+        let tbls = tables.iter().map(table::serialize_table).collect::<Vec<_>>();
+        let data = serialize(&tbls)?;
+        writer.write((data.len() as u64).to_le_bytes().as_slice())?;
+        writer.write(data.as_slice())?;
+
+        // table
+        for tbl in tbls {
             let _g = self.global_lock.write();
-            let log_path = self.path.join(format!("tables/{}/{}", tbl.name, format!("{:016}.log", tbl.metadata.log_id)));
+            // log
+            let log_path = log_path(&self.path, &tbl.name, tbl.metadata.log_id);
             let log_bak_path = format!("{}.bak", log_path.clone().into_os_string().into_string().unwrap());
             fs::copy(&log_path, &log_bak_path)?;
             drop(_g);
@@ -1307,6 +1329,8 @@ impl OptiDBImpl {
             io::copy(&mut log, writer)?;
             drop(log);
             fs::remove_file(&log_bak_path)?;
+
+            // parts
             for (lid, level) in tbl.metadata.levels.iter().enumerate() {
                 for part in &level.parts {
                     let path = part_path(&self.path, &tbl.name, lid, part.id);
@@ -1315,7 +1339,7 @@ impl OptiDBImpl {
                 }
             }
         }
-        writer.write(b"footer")?;
+        writer.write(&BACKUP_MAGIC)?;
         for md in mds.iter() {
             for (lid, lvl) in md.levels.iter().enumerate() {
                 for part in &lvl.parts {
@@ -1331,12 +1355,84 @@ impl OptiDBImpl {
         Ok(())
     }
 
-    pub fn full_backup_local(&self, path: &str) -> Result<()> {
+    pub fn full_backup_local<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let _g = self.backup_lock.lock();
         let writer = BufWriter::new(File::create(path)?);
         let mut e = ZlibEncoder::new(writer, Compression::default());
         self.full_backup(&mut e)?;
         e.finish()?;
+        Ok(())
+    }
+
+    pub fn full_restore<R: Read>(&self, reader: &mut R) -> Result<()> {
+        let _g = self.global_lock.write();
+
+        let path = self.path.clone();
+        // version
+        let mut version_b = [0u8; mem::size_of::<u64>()];
+        reader.read(&mut version_b)?;
+        let version = u64::from_le_bytes(version_b);
+        // tables len
+        let mut tbl_len_b = [0u8; mem::size_of::<u64>()];
+        reader.read(&mut tbl_len_b)?;
+        let tbl_len = u64::from_le_bytes(tbl_len_b);
+        let mut tbl_buf = vec![0; tbl_len as usize];
+        reader.read(&mut tbl_buf)?;
+        let mut tables: Vec<SerializableTable> = deserialize(&tbl_buf)?;
+        for tbl in tables {
+            fs::create_dir_all(path.join(format!("tables/{}", tbl.name)))?;
+            // md
+            let md_path = path.join(format!("tables/{}/metadata", tbl.name));
+            let mut md_w = File::create(md_path)?;
+            let mut md = tbl.metadata.clone();
+            md.log_id = 0;
+            write_metadata(&mut md_w, &mut md)?;
+
+            // log
+            let mut log_len_b = [0u8; mem::size_of::<u64>()];
+            reader.read(&mut log_len_b)?;
+            let log_len = u64::from_le_bytes(log_len_b);
+
+            let mut log_rdr = reader.take(log_len);
+            let mut log = File::create(log_path(path.as_ref(), &tbl.name, 0))?;
+            io::copy(&mut log_rdr, &mut &mut log)?;
+
+            fs::create_dir(path.join(format!(
+                "tables/{}/levels",
+                tbl.name
+            )))?;
+            for (lvl_id, lvl) in tbl.metadata.levels.iter().enumerate() {
+                fs::create_dir(path.join(format!(
+                    "tables/{}/levels/{}",
+                    tbl.name, lvl_id
+                )))?;
+
+                for part in lvl.parts.iter() {
+                    let mut part_w = File::create(part_path(path.as_ref(), &tbl.name, lvl_id, part.id))?;
+                    let mut part_rdr = reader.take(part.size_bytes);
+                    io::copy(&mut part_rdr, &mut part_w)?;
+                }
+            }
+        }
+
+        let mut footer = [0; 8];
+        reader.read(&mut footer)?;
+        if footer != BACKUP_MAGIC {
+            return Err(StoreError::InvalidBackupMagicNumber);
+        }
+
+        let db = recover(path, Options {})?;
+        let from = db.tables.read().clone();
+        let mut to = self.tables.write();
+        *to = from;
+        Ok(())
+    }
+
+    pub fn full_restore_local<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        let _g = self.backup_lock.lock();
+        let reader = BufReader::new(File::open(&path)?);
+        let mut e = ZlibDecoder::new(reader);
+        self.full_restore(&mut e)?;
         Ok(())
     }
 }
@@ -1359,10 +1455,10 @@ impl Drop for OptiDBImpl {
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
+    use std::{fs, thread};
     use std::path::PathBuf;
     use std::sync::Arc;
-
+    use std::time::Instant;
     use arrow2::array::Array;
     use arrow2::array::Int64Array;
     use arrow2::chunk::Chunk;
@@ -1376,7 +1472,7 @@ mod tests {
     use crate::NamedValue;
     use crate::Value;
 
-    fn open_db(p: &str, create: bool) -> OptiDBImpl {
+    pub fn open_db(p: &str, create: bool) -> OptiDBImpl {
         let path = PathBuf::from("/tmp").join(p);
         if create {
             fs::remove_dir_all(&path).unwrap();
@@ -1887,8 +1983,78 @@ mod tests {
         assert_eq!(r, Some(vec![Value::Int64(Some(1))]));
     }
 
+    #[test]
+    fn test_backup_restore() {
+        let s = Instant::now();
+        let path = PathBuf::from("/tmp").join("recovery");
+        fs::remove_dir_all(&path).unwrap();
+        let opts = Options {};
+        let db = OptiDBImpl::open(path, opts).unwrap();
+        for i in 0..2 {
+            let topts = table::Options {
+                levels: 7,
+                merge_array_size: 10000,
+                index_cols: 1,
+                l1_max_size_bytes: 1024 * 1024 * 10,
+                level_size_multiplier: 10,
+                l0_max_parts: 1,
+                max_log_length_bytes: 1024 * 1024 * 100,
+                merge_array_page_size: 10000,
+                merge_data_page_size_limit_bytes: Some(1024 * 1024),
+                merge_max_l1_part_size_bytes: 1024 * 1024,
+                merge_part_size_multiplier: 10,
+                merge_row_group_values_limit: 1000,
+                merge_chunk_size: 1024 * 8 * 8,
+                merge_max_page_size: 1024 * 1024,
+                is_replacing: false,
+            };
 
-    fn test_fails() {}
+            let tn = i.to_string();
+            db.create_table(tn.clone(), topts).unwrap();
+            db.add_field(&tn, "f1", DType::Int64, false).unwrap();
+
+            db.insert(&tn, vec![
+                NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
+            ])
+                .unwrap();
+            // write first part
+            db.flush(&tn).unwrap();
+
+            db.insert(&tn, vec![
+                NamedValue::new("f1".to_string(), Value::Int64(Some(2))),
+            ])
+                .unwrap();
+            // write second part. this way we got part in l1
+            db.flush(&tn).unwrap();
+            db.compact();
+            db.insert(&tn, vec![
+                NamedValue::new("f1".to_string(), Value::Int64(Some(3))),
+            ])
+                .unwrap();
+            // write third part. this will go to l0
+            db.flush(&tn).unwrap();
+
+            // insert into binlog
+            db.insert(&tn, vec![
+                NamedValue::new("f1".to_string(), Value::Int64(Some(4))),
+            ])
+                .unwrap();
+        }
+        db.full_backup_local("/tmp/db.bak").unwrap();
+        db.truncate_all().unwrap();
+        db.full_restore_local("/tmp/db.bak").unwrap();
+
+        let mut scan = db.scan("0", vec![0]).unwrap();
+        let mut res = vec![];
+        for i in scan.iter {
+            res.push(i.unwrap());
+        }
+
+        let exp1 = Chunk::new(vec![Int64Array::from_vec(vec![1, 2, 3]).boxed()]);
+        let exp2 = Chunk::new(vec![Int64Array::from_vec(vec![4]).boxed()]);
+        assert_eq!(res,vec![exp1,exp2]);
+    }
+
     // integration test is placed here and not in separate crate because conditional #[cfg(test)] is used
     // #[tokio::test]
     // async fn test_scenario() {
