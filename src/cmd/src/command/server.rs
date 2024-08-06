@@ -25,7 +25,7 @@ use tracing::info;
 use metadata::config::StringKey::AuthAdminDefaultPassword;
 use crate::error::Error;
 use crate::error::Result;
-use crate::{init_config, init_ingester};
+use crate::{backup, init_config, init_ingester};
 use crate::init_metrics;
 use crate::init_platform;
 use crate::init_session_cleaner;
@@ -40,14 +40,9 @@ pub async fn start(mut cfg: Config) -> Result<()> {
     let db = Arc::new(OptiDBImpl::open(cfg.data.path.join(DATA_PATH_STORAGE), Options {})?);
     let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
     init_config(&md, &mut cfg)?;
-    info!("metrics initialization...");
-    init_metrics();
+
     info!("system initialization...");
-    init_system(&md, &db, &cfg)?;
-    info!("initializing session cleaner...");
-    init_session_cleaner(md.clone(), db.clone(), cfg.clone())?;
-    info!("initializing backup...");
-    init_backup(md.clone(), db.clone(), cfg.clone())?;
+    init_system(&md, &db, &cfg).await?;
     if !cfg.data.ui_path.try_exists()? {
         return Err(Error::FileNotFound(format!(
             "ui path {:?} doesn't exist", cfg.data.ui_path

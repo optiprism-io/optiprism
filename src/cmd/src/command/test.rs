@@ -65,8 +65,6 @@ pub async fn gen(args: &Test, cfg: Config) -> Result<(), anyhow::Error> {
     let rocks = Arc::new(metadata::rocksdb::new(args.path.join("md"))?);
     let db = Arc::new(OptiDBImpl::open(args.path.join("store"), Options {})?);
     let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
-    info!("metrics initialization...");
-    init_metrics();
     info!("system initialization...");
     init_system(&md, &db, &cfg)?;
 

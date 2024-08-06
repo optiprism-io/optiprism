@@ -55,5 +55,10 @@ metrics = "0.22.0"
 serde_derive = "1.0.189"
 hex = "0.4.3"
 arrow2 = { git = "ssh://git@github.com/optiprism-io/arrow2.git", features = ["compute_cast", "io_print", "io_parquet", "io_csv", "io_json", "compute_arithmetics", "compute_merge_sort", "compute_sort", "compute_concatenate", "serde_types"] }
+tokio-cron-scheduler = "*"
+flate2 = "1.0.31"
+cryptostream = "0.3.2"
+openssl = "0.10.66"
+
 [build-dependencies]
 vergen = "9.0.0"

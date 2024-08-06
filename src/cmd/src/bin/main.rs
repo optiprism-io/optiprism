@@ -5,8 +5,11 @@ use clap::Subcommand;
 use metrics::Level;
 use tracing::info;
 use tracing_subscriber::FmtSubscriber;
+use cmd::command::db_test::DbTest;
+use cmd::command::{db_test, server, store, test};
+use cmd::command::store::Store;
+use cmd::command::test::Test;
 use cmd::config::{Config, LogLevel};
-use cmd::test::Test;
 
 extern crate parse_duration;
 
@@ -94,7 +97,7 @@ async fn main() -> Result<()> {
                 server::start(cfg.try_into()?).await?;
             }
             Commands::Store(store) => {
-                cmd::store::start(store, cfg.try_into()?).await?;
+                store::start(store, cfg.try_into()?).await?;
             }
             Commands::Test(args) => {
                 test::gen(args, cfg.try_into()?).await?;

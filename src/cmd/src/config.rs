@@ -122,7 +122,7 @@ impl TryInto<common::config::Config> for Config {
                 merge_chunk_size: self.group_table.merge_chunk_size,
                 merge_array_page_size: self.group_table.merge_array_page_size,
                 merge_max_page_size: self.group_table.merge_max_page_size,
-            }
+            },
         })
     }
 }

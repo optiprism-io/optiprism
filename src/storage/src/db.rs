@@ -1275,9 +1275,7 @@ impl OptiDBImpl {
         Ok(metadata.opts.clone())
     }
 
-    pub fn truncate_all(&self) -> Result<()> {
-        let _b = self.backup_lock.lock();
-        let _g = self.global_lock.write();
+    fn truncate_all(&self) -> Result<()> {
         let mut tables = self.tables.write();
         for tbl in tables.iter() {
             fs::remove_dir_all(self.path.join(format!("tables/{}", tbl.name)))?;
@@ -1287,6 +1285,7 @@ impl OptiDBImpl {
     }
 
     pub fn full_backup<W: Write>(&self, writer: &mut W) -> Result<()> {
+        let _g = self.backup_lock.lock();
         let start_time = Instant::now();
         let lock = self.global_lock.write();
         let tables = self.tables.read().clone();
@@ -1356,7 +1355,6 @@ impl OptiDBImpl {
     }
 
     pub fn full_backup_local<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let _g = self.backup_lock.lock();
         let writer = BufWriter::new(File::create(path)?);
         let mut e = ZlibEncoder::new(writer, Compression::default());
         self.full_backup(&mut e)?;
@@ -1366,7 +1364,7 @@ impl OptiDBImpl {
 
     pub fn full_restore<R: Read>(&self, reader: &mut R) -> Result<()> {
         let _g = self.global_lock.write();
-
+        self.truncate_all().unwrap();
         let path = self.path.clone();
         // version
         let mut version_b = [0u8; mem::size_of::<u64>()];
@@ -2041,7 +2039,6 @@ mod tests {
                 .unwrap();
         }
         db.full_backup_local("/tmp/db.bak").unwrap();
-        db.truncate_all().unwrap();
         db.full_restore_local("/tmp/db.bak").unwrap();
 
         let mut scan = db.scan("0", vec![0]).unwrap();
@@ -2052,7 +2049,7 @@ mod tests {
 
         let exp1 = Chunk::new(vec![Int64Array::from_vec(vec![1, 2, 3]).boxed()]);
         let exp2 = Chunk::new(vec![Int64Array::from_vec(vec![4]).boxed()]);
-        assert_eq!(res,vec![exp1,exp2]);
+        assert_eq!(res, vec![exp1, exp2]);
     }
 
     // integration test is placed here and not in separate crate because conditional #[cfg(test)] is used

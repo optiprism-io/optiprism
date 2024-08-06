@@ -92,10 +92,11 @@ use platform::auth::password::make_password_hash;
 use platform::PlatformProvider;
 use rand::distributions::Alphanumeric;
 use rand::distributions::DistString;
-use rand::{Rng, thread_rng};
+use rand::{Rng, SeedableRng, thread_rng};
+use rand::rngs::StdRng;
 use tracing::info;
 use uaparser::UserAgentParser;
-use metadata::config::StringKey;
+use metadata::config::{BackupUnit, BoolKey, IntKey, StringKey};
 use metadata::error::MetadataError;
 use query::event_records::EventRecordsProvider;
 use query::event_segmentation::EventSegmentationProvider;
@@ -105,11 +106,9 @@ use query::properties::PropertiesProvider;
 use crate::error::Result;
 use crate::error::Error;
 pub mod error;
-pub mod store;
-pub mod test;
 pub mod config;
-pub mod server;
-pub mod db_test;
+pub mod command;
+pub mod backup;
 
 pub fn init_metrics() {
     PrometheusBuilder::new()
@@ -189,7 +188,7 @@ pub fn init_metrics() {
     );
 }
 
-pub fn init_system(
+pub async fn init_system(
     md: &Arc<MetadataProvider>,
     db: &Arc<OptiDBImpl>,
     cfg: &Config,
@@ -247,6 +246,13 @@ pub fn init_system(
             },
         }
     }
+
+    info!("metrics initialization...");
+    init_metrics();
+    info!("initializing session cleaner...");
+    init_session_cleaner(md.clone(), db.clone(), cfg.clone())?;
+    info!("initializing backup...");
+    backup::init(md.clone(), db.clone(), cfg.clone())?.await;
 
     Ok(())
 }
@@ -404,15 +410,17 @@ fn init_session_cleaner(
     Ok(())
 }
 
-fn get_random_key64() -> [u8; 64] {
+// not for high load
+fn get_random_key64(rng: &mut StdRng) -> [u8; 64] {
     let mut arr = [0u8; 64];
-    thread_rng().try_fill(&mut arr[..]).unwrap();
+    rng.try_fill(&mut arr[..]).unwrap();
     return arr;
 }
 fn init_config(md: &Arc<MetadataProvider>, cfg: &mut Config) -> Result<()> {
+    let mut rng = StdRng::from_rng(rand::thread_rng())?;
     match md.config.get_string(StringKey::AuthAccessToken) {
         Err(MetadataError::NotFound(_)) => {
-            let key = hex::encode(get_random_key64());
+            let key = hex::encode(get_random_key64(&mut rng));
             md.config.set_string(StringKey::AuthAccessToken, Some(key.to_owned()))?;
             cfg.auth.access_token_key = key;
         }
@@ -423,7 +431,7 @@ fn init_config(md: &Arc<MetadataProvider>, cfg: &mut Config) -> Result<()> {
 
     match md.config.get_string(StringKey::AuthRefreshToken) {
         Err(MetadataError::NotFound(_)) => {
-            let key = hex::encode(get_random_key64());
+            let key = hex::encode(get_random_key64(&mut rng));
             md.config.set_string(StringKey::AuthRefreshToken, Some(key.to_owned()))?;
             cfg.auth.refresh_token_key = key;
         }
@@ -432,8 +440,28 @@ fn init_config(md: &Arc<MetadataProvider>, cfg: &mut Config) -> Result<()> {
         }
     }
 
+    match md.config.get_bool(BoolKey::BackupEnabled) {
+        Err(MetadataError::NotFound(_)) => {
+            md.config.set_bool(BoolKey::BackupEnabled, Some(false))?;
+        }
+        other => {
+            other?;
+        }
+    }
+
+    match md.config.get_bool(BoolKey::BackupEncryptionEnabled) {
+        Err(MetadataError::NotFound(_)) => {
+            md.config.set_bool(BoolKey::BackupEncryptionEnabled, Some(false))?;
+        }
+        other => {
+            other?;
+        }
+    }
+
+    md.config.set_string(StringKey::BackupScheduler, Some("0 0 * * *".to_string()))?;
     Ok(())
 }
+
 fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<Project> {
     let admin = match md.accounts.create(CreateAccountRequest {
         created_by: ADMIN_ID,

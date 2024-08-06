@@ -120,14 +120,8 @@ pub async fn start(args: &Store, mut cfg: crate::Config) -> Result<()> {
     )?);
     let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
     init_config(&md, &mut cfg)?;
-    info!("metrics initialization...");
-    init_metrics();
     info!("system initialization...");
-    init_system(&md, &db, &cfg)?;
-    info!("initializing session cleaner...");
-    init_session_cleaner(md.clone(), db.clone(), cfg.clone())?;
-    info!("initializing backup...");
-    init_backup(md.clone(), db.clone(), cfg.clone())?;
+    init_system(&md, &db, &cfg).await?;
     if !cfg.data.ui_path.try_exists()? {
         return Err(Error::FileNotFound(format!(
             "ui path {:?} doesn't exist", cfg.data.ui_path

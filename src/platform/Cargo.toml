@@ -48,7 +48,7 @@ url = "2.3.1"
 uuid = { version = "1.2.2", features = ["serde", "v4"] }
 validator = { version = "0.16", features = ["derive"] }
 zxcvbn = "2.2.1"
-
+openssl = "0.10.66"
 [dev-dependencies]
 #criterion = "0.3.5"
 

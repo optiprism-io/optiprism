@@ -13,6 +13,7 @@ use platform::PlatformError;
 use query::error::QueryError;
 use storage::error::StoreError;
 use thiserror::Error;
+use tokio_cron_scheduler::JobSchedulerError;
 use tracing::dispatcher::SetGlobalDefaultError;
 
 pub type Result<T> = result::Result<T, Error>;
@@ -25,6 +26,8 @@ pub enum Error {
     Internal(String),
     #[error("Bad Request: {0:?}")]
     BadRequest(String),
+    #[error("Backup error: {0:?}")]
+    BackupError(String),
     #[error("FileNotFound: {0:?}")]
     FileNotFound(String),
     #[error("IP Address Parse Error: {0:?}")]
@@ -65,4 +68,10 @@ pub enum Error {
     Config(#[from] config::ConfigError),
     #[error("global default: {0:?}")]
     SetGlobalDefaultError(#[from] SetGlobalDefaultError),
+    #[error("job scheduler: {0:?}")]
+    JobScheduler(#[from] JobSchedulerError),
+    #[error("rand: {0:?}")]
+    RandError(#[from] rand::Error),
+    #[error("openssl: {0:?}")]
+    OpenSSLStackError(#[from] openssl::error::ErrorStack),
 }
