@@ -3,16 +3,17 @@ package backup;
 
 message Backup {
   uint64 id = 1;
-  int64  backup_date = 2;
-  int64  created_at = 3;
-  optional int64  updated_at = 4;
-  Provider provider = 5;
-  optional string  local_path = 6;
-  optional string s3_bucket = 7;
-  optional string s3_region = 8;
-  Status status = 9;
-  optional string status_failed_error = 10;
-  optional int64 status_in_progress_progress = 11;
+  int64  created_at = 2;
+  optional int64  updated_at = 3;
+  Provider provider = 4;
+  optional string  local_path = 5;
+  optional string s3_bucket = 6;
+  optional string s3_region = 7;
+  Status status = 8;
+  optional string status_failed_error = 9;
+  optional int64 status_in_progress_progress = 10;
+  bool is_encrypted = 11;
+  optional string iv = 12;
 }
 
 enum Provider {

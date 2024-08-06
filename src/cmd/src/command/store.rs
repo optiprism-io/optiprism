@@ -124,7 +124,10 @@ pub async fn start(args: &Store, mut cfg: crate::Config) -> Result<()> {
     init_metrics();
     info!("system initialization...");
     init_system(&md, &db, &cfg)?;
-
+    info!("initializing session cleaner...");
+    init_session_cleaner(md.clone(), db.clone(), cfg.clone())?;
+    info!("initializing backup...");
+    init_backup(md.clone(), db.clone(), cfg.clone())?;
     if !cfg.data.ui_path.try_exists()? {
         return Err(Error::FileNotFound(format!(
             "ui path {:?} doesn't exist", cfg.data.ui_path
@@ -225,8 +228,6 @@ pub async fn start(args: &Store, mut cfg: crate::Config) -> Result<()> {
 
     info!("initializing platform...");
     let router = init_platform(md.clone(), db.clone(), router, cfg.clone())?;
-    info!("initializing session cleaner...");
-    init_session_cleaner(md.clone(), db.clone(), cfg.clone())?;
     info!("initializing ingester...");
     let router = init_ingester(&cfg.data.geo_city_path, &cfg.data.ua_db_path, &md, &db, router)?;
 

@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Poll;
+use std::time::Duration;
 use arrow2::array::{Array, Int64Array};
 use clap::Parser;
 use futures::{Stream, StreamExt};
@@ -85,19 +86,24 @@ pub fn gen(args: &DbTest, gen: &Gen) -> crate::error::Result<()> {
             .progress_chars("#>-"),
     );
     let mut rng = rand::thread_rng();
+    let db_cloned = db.clone();
+    thread::spawn(move || {
+        loop {
+            db_cloned.full_backup_local("/tmp/bak").unwrap();
+            thread::sleep(Duration::from_secs(1));
+            println!("backup");
+        }
+    });
+
+/*    let db_cloned = db.clone();
+    thread::spawn(move || {
+        loop {
+            db_cloned.full_restore_local("/tmp/bak").unwrap();
+            thread::sleep(Duration::from_secs(1));
+            println!("restore");
+        }
+    });*/
     for i in 0..gen.records {
-        /*if i % 10000 == 0 {
-            let db_cloned = db.clone();
-            thread::spawn(move || {
-                db_cloned.full_backup_local("/tmp/bak").unwrap();
-            });
-        }*/
-        /*if i % 100000 == 0 {
-            let db_cloned = db.clone();
-            thread::spawn(move || {
-                db_cloned.truncate_all().unwrap();
-            });
-        }*/
         db.insert(
             "t1",
             vec![
@@ -115,7 +121,6 @@ pub fn gen(args: &DbTest, gen: &Gen) -> crate::error::Result<()> {
         pb.inc(1);
     }
     db.flush("t1").unwrap();
-    db.truncate_all().unwrap();
     pb.finish_with_message("done");
     Ok(())
 }

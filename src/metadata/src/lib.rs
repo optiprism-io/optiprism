@@ -21,7 +21,7 @@ pub mod teams;
 pub mod util;
 pub mod bookmarks;
 pub mod config;
-mod backups;
+pub mod backups;
 
 use std::fmt::Debug;
 use ::rocksdb::Transaction;

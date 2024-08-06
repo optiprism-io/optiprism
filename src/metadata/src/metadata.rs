@@ -8,6 +8,7 @@ use storage::db::OptiDBImpl;
 
 use crate::{accounts, bookmarks, config};
 use crate::accounts::Accounts;
+use crate::backups::Backups;
 use crate::bookmarks::Bookmarks;
 use crate::config::Config;
 use crate::custom_events;
@@ -47,6 +48,7 @@ pub struct MetadataProvider {
     pub dictionaries: Arc<Dictionaries>,
     pub sessions: Arc<Sessions>,
     pub groups: Arc<Groups>,
+    pub backups: Arc<Backups>,
 }
 
 impl MetadataProvider {
@@ -70,12 +72,13 @@ impl MetadataProvider {
                 opti_db.clone(),
             )),
             group_properties: properties::Properties::new_group(db.clone(), opti_db.clone()),
-            organizations: Arc::new(organizations::Organizations::new(db.clone(),accounts.clone())),
+            organizations: Arc::new(organizations::Organizations::new(db.clone(), accounts.clone())),
             projects: Arc::new(projects::Projects::new(db.clone())),
             accounts: accounts.clone(),
             dictionaries: dicts.clone(),
             sessions: Arc::new(sessions::Sessions::new(db.clone())),
-            groups: Arc::new(Groups::new(db)),
+            groups: Arc::new(Groups::new(db.clone())),
+            backups: Arc::new(Backups::new(db)),
         })
     }
 }
@@ -87,14 +90,16 @@ pub struct ResponseMetadata {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ListResponse<T>
-where T: Debug
+where
+    T: Debug,
 {
     pub data: Vec<T>,
     pub meta: ResponseMetadata,
 }
 
 impl<T> ListResponse<T>
-where T: Debug
+where
+    T: Debug,
 {
     pub fn len(&self) -> usize {
         self.data.len()
@@ -106,7 +111,8 @@ where T: Debug
 }
 
 impl<T> IntoIterator for ListResponse<T>
-where T: Debug
+where
+    T: Debug,
 {
     type Item = T;
     type IntoIter = std::vec::IntoIter<Self::Item>;

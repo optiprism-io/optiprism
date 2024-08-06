@@ -22,7 +22,7 @@ use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tracing::debug;
 use tracing::info;
-use metadata::config::StringKey::AdminDefaultPassword;
+use metadata::config::StringKey::AuthAdminDefaultPassword;
 use crate::error::Error;
 use crate::error::Result;
 use crate::{init_config, init_ingester};
@@ -44,6 +44,10 @@ pub async fn start(mut cfg: Config) -> Result<()> {
     init_metrics();
     info!("system initialization...");
     init_system(&md, &db, &cfg)?;
+    info!("initializing session cleaner...");
+    init_session_cleaner(md.clone(), db.clone(), cfg.clone())?;
+    info!("initializing backup...");
+    init_backup(md.clone(), db.clone(), cfg.clone())?;
     if !cfg.data.ui_path.try_exists()? {
         return Err(Error::FileNotFound(format!(
             "ui path {:?} doesn't exist", cfg.data.ui_path
@@ -60,7 +64,7 @@ pub async fn start(mut cfg: Config) -> Result<()> {
                     .take(32)
                     .map(char::from)
                     .collect();
-                md.config.set_string(AdminDefaultPassword,Some(pwd.to_owned())).map_err(|e|Error::Metadata(e))?;
+                md.config.set_string(AuthAdminDefaultPassword, Some(pwd.to_owned())).map_err(|e|Error::Metadata(e))?;
                 info!("creating admin account...");
                 let acc = md.accounts.create(CreateAccountRequest {
                     created_by: ADMIN_ID,
@@ -87,8 +91,6 @@ pub async fn start(mut cfg: Config) -> Result<()> {
         }
     };
     let router = Router::new();
-    info!("initializing session cleaner...");
-    init_session_cleaner(md.clone(), db.clone(), cfg.clone())?;
     info!("initializing ingester...");
     let router = init_ingester(&cfg.data.geo_city_path, &cfg.data.ua_db_path, &md, &db, router)?;
     info!("initializing platform...");
@@ -110,7 +112,7 @@ pub async fn start(mut cfg: Config) -> Result<()> {
         info!("email: {}",admin_acc.email);
     }
     if admin_acc.force_update_password {
-        let pwd = md.config.get_string(AdminDefaultPassword)?;
+        let pwd = md.config.get_string(AuthAdminDefaultPassword)?;
         info!("password: {}",pwd.unwrap());
     }
     let listener = tokio::net::TcpListener::bind(cfg.server.host).await?;

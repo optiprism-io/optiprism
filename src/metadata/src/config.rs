@@ -11,10 +11,13 @@ pub enum StringKey {
     AuthAccessToken,
     AuthRefreshToken,
     AuthAdminDefaultPassword,
+    BackupLocalPath,
     BackupS3Bucket,
     BackupS3Region,
     BackupS3AccessKey,
     BackupS3SecretKey,
+    BackupScheduler,
+    BackupEncryptionKey,
 }
 
 impl StringKey {
@@ -23,45 +26,45 @@ impl StringKey {
             StringKey::AuthAccessToken => "auth.access_token",
             StringKey::AuthRefreshToken => "auth.refresh_token",
             StringKey::AuthAdminDefaultPassword => "auth.admin_default_password",
+            StringKey::BackupLocalPath => "backup.local_path",
             StringKey::BackupS3Bucket => "backup.s3.bucket",
             StringKey::BackupS3Region => "backup.s3.region",
             StringKey::BackupS3AccessKey => "backup.s3.access_key",
             StringKey::BackupS3SecretKey => "backup.s3.secret_key",
+            StringKey::BackupScheduler => "backup.scheduler",
+            StringKey::BackupEncryptionKey => "backup.encryption_key",
         }
     }
 }
 
 pub enum IntKey {
-    BackupFrequency,
-    BackupFrequencyUnit,
-    BackupStartHour,
+    BackupProvider = 1,
 }
 
-pub enum BackupUnit {
-    Hour = 1,
-    Day = 2,
-    Week = 3,
-    Month = 4,
+
+pub enum BackupProvider {
+    Local = 1,
+    S3 = 2,
 }
 
 impl IntKey {
     fn as_str(&self) -> &'static str {
         match self {
-            IntKey::BackupFrequency => "backup.frequency",
-            IntKey::BackupFrequencyUnit => "backup.frequency_unit",
-            IntKey::BackupStartHour => "backup.start_hour",
+            IntKey::BackupProvider => "backup.provider",
         }
     }
 }
 
 pub enum BoolKey {
-    BackupS3Enabled,
+    BackupEnabled,
+    BackupEncryptionEnabled,
 }
 
 impl crate::config::BoolKey {
     fn as_str(&self) -> &'static str {
         match self {
-            BoolKey::BackupS3Enabled => "backup.s3.enabled",
+            BoolKey::BackupEnabled => "backup.enabled",
+            BoolKey::BackupEncryptionEnabled => "backup.encryption_enabled",
         }
     }
 }
@@ -130,7 +133,7 @@ impl Config {
         Ok(())
     }
 
-    pub fn get_int(&self, key: StringKey) -> Result<Option<i64>> {
+    pub fn get_int(&self, key: IntKey) -> Result<Option<i64>> {
         let key = key.as_str();
 
         let key = format!("config/{}", key);
@@ -151,7 +154,7 @@ impl Config {
         }
     }
 
-    pub fn set_int(&self, key: StringKey, value: Option<i64>) -> Result<()> {
+    pub fn set_int(&self, key: IntKey, value: Option<i64>) -> Result<()> {
         let key = key.as_str();
 
         let key = format!("config/{}", key);

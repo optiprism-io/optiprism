@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::str::from_utf8;
 use std::str::pattern::Pattern;
 use std::sync::Arc;
@@ -14,18 +15,18 @@ use crate::metadata::{ListResponse, ResponseMetadata};
 const NAMESPACE: &[u8] = b"system/backups";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-struct S3Provider {
-    bucket: String,
-    region: String,
+pub struct S3Provider {
+    pub bucket: String,
+    pub region: String,
 }
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-enum Provider {
-    Local(String),
+pub enum Provider {
+    Local(PathBuf),
     S3(S3Provider),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-enum Status {
+pub enum Status {
     InProgress(usize),
     Failed(String),
     Completed,
@@ -34,18 +35,19 @@ enum Status {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Backup {
     pub id: u64,
-    pub backup_date: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,
     pub provider: Provider,
     pub status: Status,
+    pub is_encrypted: bool,
+    pub iv: Option<String>,
 }
 
 impl Backup {
     pub fn path(&self) -> String {
         match &self.provider {
-            Provider::Local(path) => format!("{}/{}", path, self.backup_date.format("%Y-%m-%d %H:00:00").to_string()),
-            Provider::S3(s3) => format!("s3://{}/{}", s3.bucket, self.backup_date.format("%Y-%m-%d %H:00:00").to_string()),
+            Provider::Local(path) => path.join(self.created_at.format("%Y-%m-%d %H:00:00").to_string()).into_os_string().into_string().unwrap(),
+            Provider::S3(s3) => format!("s3://{}/{}", s3.bucket, self.created_at.format("%Y-%m-%d %H:00:00").to_string()),
         }
     }
 }
@@ -75,11 +77,12 @@ impl Backups {
 
         let backup = Backup {
             id,
-            backup_date: req.backup_date,
             created_at,
             updated_at: None,
             provider: req.provider,
             status: Status::InProgress(0),
+            is_encrypted: false,
+            iv: None,
         };
 
         let data = serialize(&backup)?;
@@ -140,8 +143,9 @@ impl Backups {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct CreateBackupRequest {
-    pub backup_date: DateTime<Utc>,
     pub provider: Provider,
+    pub is_encrypted: bool,
+    pub iv: Option<String>,
 }
 
 fn serialize(b: &Backup) -> Result<Vec<u8>> {
@@ -182,16 +186,17 @@ fn serialize(b: &Backup) -> Result<Vec<u8>> {
     };
     let b = backup::Backup {
         id: b.id,
-        backup_date: b.backup_date.timestamp(),
         created_at: b.created_at.timestamp(),
         updated_at: b.updated_at.map(|t| t.timestamp()),
         provider,
-        local_path,
+        local_path: local_path.map(|lp| lp.into_os_string().into_string().unwrap()),
         s3_bucket,
         s3_region,
         status,
         status_failed_error,
         status_in_progress_progress,
+        is_encrypted: b.is_encrypted,
+        iv: b.iv.clone(),
     };
 
     Ok(b.encode_to_vec())
@@ -199,10 +204,10 @@ fn serialize(b: &Backup) -> Result<Vec<u8>> {
 fn deserialize(data: &[u8]) -> Result<Backup> {
     let from = backup::Backup::decode(data.as_ref())?;
     let provider = match from.provider {
-        1 => Provider::Local(from.local_path.unwrap()),
+        1 => Provider::Local(PathBuf::from(from.local_path.expect("local path not set"))),
         2 => Provider::S3(S3Provider {
-            bucket: from.s3_bucket.unwrap(),
-            region: from.s3_region.unwrap(),
+            bucket: from.s3_bucket.expect("s3 bucket not set"),
+            region: from.s3_region.expect("s3 region not set"),
         }),
         _ => return Err(MetadataError::Internal("invalid provider".to_string())),
     };
@@ -215,27 +220,30 @@ fn deserialize(data: &[u8]) -> Result<Backup> {
     };
     Ok(Backup {
         id: from.id,
-        backup_date: chrono::DateTime::from_timestamp(from.backup_date, 0).unwrap(),
         created_at: chrono::DateTime::from_timestamp(from.created_at, 0).unwrap(),
         updated_at: from.updated_at.map(|t| chrono::DateTime::from_timestamp(t, 0).unwrap()),
         provider,
         status,
+        is_encrypted: from.is_encrypted,
+        iv: from.iv,
     })
 }
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
     use chrono::DateTime;
 
     #[test]
     fn test_roundtrip() {
         let b = super::Backup {
             id: 1,
-            backup_date: DateTime::from_timestamp(1,0).unwrap(),
-            created_at: DateTime::from_timestamp(2,0).unwrap(),
-            updated_at: Some(DateTime::from_timestamp(3,0).unwrap()),
-            provider: super::Provider::Local("/tmp".to_string()),
+            created_at: DateTime::from_timestamp(2, 0).unwrap(),
+            updated_at: Some(DateTime::from_timestamp(3, 0).unwrap()),
+            provider: super::Provider::Local(PathBuf::from("/tmp")),
             status: super::Status::InProgress(10),
+            is_encrypted: true,
+            iv: Some("sdf".to_string()),
         };
         let data = super::serialize(&b).unwrap();
         let b2 = super::deserialize(&data).unwrap();
