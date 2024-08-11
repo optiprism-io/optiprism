@@ -46,8 +46,8 @@ pub struct Backup {
 impl Backup {
     pub fn path(&self) -> String {
         match &self.provider {
-            Provider::Local(path) => path.join(self.created_at.format("%Y-%m-%d %H:00:00").to_string()).into_os_string().into_string().unwrap(),
-            Provider::S3(s3) => format!("s3://{}/{}", s3.bucket, self.created_at.format("%Y-%m-%d %H:00:00").to_string()),
+            Provider::Local(path) => path.join(self.created_at.format("%Y-%m-%dT%H:00:00").to_string()).into_os_string().into_string().unwrap(),
+            Provider::S3(s3) => format!("s3://{}/{}", s3.bucket, self.created_at.format("%Y-%m-%dT%H:00:00").to_string()),
         }
     }
 }

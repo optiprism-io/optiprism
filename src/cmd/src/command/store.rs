@@ -61,7 +61,7 @@ use tokio::signal::unix::SignalKind;
 use tracing::debug;
 use tracing::info;
 use uaparser::UserAgentParser;
-
+use metadata::config::{BackupProvider, BoolKey, IntKey, StringKey};
 use crate::error::Error;
 use crate::error::Result;
 use crate::{init_config, init_ingester};
@@ -122,6 +122,12 @@ pub async fn start(args: &Store, mut cfg: crate::Config) -> Result<()> {
     init_config(&md, &mut cfg)?;
     info!("system initialization...");
     init_system(&md, &db, &cfg).await?;
+    md.config.set_string(StringKey::BackupSchedule, Some("* * * * *".to_string()))?;
+    md.config.set_string(StringKey::BackupEncryptionKey, Some("test".to_string()))?;
+    md.config.set_string(StringKey::BackupLocalPath, Some("/tmp/db.bak".to_string()))?;
+    md.config.set_int(IntKey::BackupProvider, Some(BackupProvider::Local as i64))?;
+    md.config.set_bool(BoolKey::BackupEnabled, Some(true))?;
+
     if !cfg.data.ui_path.try_exists()? {
         return Err(Error::FileNotFound(format!(
             "ui path {:?} doesn't exist", cfg.data.ui_path

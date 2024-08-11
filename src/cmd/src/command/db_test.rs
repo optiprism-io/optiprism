@@ -19,7 +19,7 @@ use common::types::DType;
 use storage::db::{OptiDBImpl, Options};
 use storage::{NamedValue, table, Value};
 use storage::parquet::ArrowIteratorImpl;
-use crate::init_metrics;
+use crate::{init_metrics, init_system};
 #[derive(Parser, Clone)]
 pub struct Gen {
     #[arg(long)]
@@ -42,7 +42,7 @@ pub struct DbTest {
     pub cmd: Commands,
 }
 
-pub fn gen(args: &DbTest, gen: &Gen) -> crate::error::Result<()> {
+pub async fn gen(args: &DbTest, gen: &Gen) -> crate::error::Result<()> {
     init_metrics();
     fs::remove_dir_all(args.path.join(DATA_PATH_STORAGE))?;
     let db = Arc::new(OptiDBImpl::open(args.path.join(DATA_PATH_STORAGE), Options {})?);

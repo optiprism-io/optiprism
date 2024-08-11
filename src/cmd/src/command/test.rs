@@ -66,7 +66,7 @@ pub async fn gen(args: &Test, cfg: Config) -> Result<(), anyhow::Error> {
     let db = Arc::new(OptiDBImpl::open(args.path.join("store"), Options {})?);
     let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
     info!("system initialization...");
-    init_system(&md, &db, &cfg)?;
+    init_system(&md, &db, &cfg).await?;
 
     info!("creating org structure and admin account...");
     let proj = crate::init_test_org_structure(&md)?;

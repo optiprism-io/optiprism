@@ -59,6 +59,7 @@ tokio-cron-scheduler = "*"
 flate2 = "1.0.31"
 cryptostream = "0.3.2"
 openssl = "0.10.66"
+croner = "2.0.5"
 
 [build-dependencies]
 vergen = "9.0.0"

@@ -105,7 +105,7 @@ async fn main() -> Result<()> {
             Commands::DbTest(args) => {
                 match &args.cmd {
                     db_test::Commands::Gen(gen) => {
-                        db_test::gen(args,gen)?;
+                        db_test::gen(args,gen).await?;
 
                     }
                     db_test::Commands::Query(query) => {

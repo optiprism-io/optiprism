@@ -96,7 +96,7 @@ use rand::{Rng, SeedableRng, thread_rng};
 use rand::rngs::StdRng;
 use tracing::info;
 use uaparser::UserAgentParser;
-use metadata::config::{BackupUnit, BoolKey, IntKey, StringKey};
+use metadata::config::{BoolKey, IntKey, StringKey};
 use metadata::error::MetadataError;
 use query::event_records::EventRecordsProvider;
 use query::event_segmentation::EventSegmentationProvider;
@@ -252,7 +252,7 @@ pub async fn init_system(
     info!("initializing session cleaner...");
     init_session_cleaner(md.clone(), db.clone(), cfg.clone())?;
     info!("initializing backup...");
-    backup::init(md.clone(), db.clone(), cfg.clone())?.await;
+    backup::init(md.clone(), db.clone(), cfg.clone()).await?;
 
     Ok(())
 }
@@ -458,7 +458,24 @@ fn init_config(md: &Arc<MetadataProvider>, cfg: &mut Config) -> Result<()> {
         }
     }
 
-    md.config.set_string(StringKey::BackupScheduler, Some("0 0 * * *".to_string()))?;
+    match md.config.get_bool(BoolKey::BackupEncryptionEnabled) {
+        Err(MetadataError::NotFound(_)) => {
+            md.config.set_bool(BoolKey::BackupEncryptionEnabled, Some(false))?;
+        }
+        other => {
+            other?;
+        }
+    }
+
+    match md.config.get_string(StringKey::BackupSchedule) {
+        Err(MetadataError::NotFound(_)) => {
+            md.config.set_string(StringKey::BackupSchedule, Some("0 0 * *".to_string()))?;
+        }
+        other => {
+            other?;
+        }
+    }
+
     Ok(())
 }
 
