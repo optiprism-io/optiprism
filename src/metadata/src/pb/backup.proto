@@ -13,7 +13,8 @@ message Backup {
   optional string status_failed_error = 9;
   optional int64 status_in_progress_progress = 10;
   bool is_encrypted = 11;
-  optional string iv = 12;
+  bool is_compressed = 12;
+  optional bytes iv = 13;
 }
 
 enum Provider {

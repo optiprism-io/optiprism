@@ -40,7 +40,8 @@ pub struct Backup {
     pub provider: Provider,
     pub status: Status,
     pub is_encrypted: bool,
-    pub iv: Option<String>,
+    pub is_compressed: bool,
+    pub iv: Option<Vec<u8>>,
 }
 
 impl Backup {
@@ -81,8 +82,9 @@ impl Backups {
             updated_at: None,
             provider: req.provider,
             status: Status::InProgress(0),
-            is_encrypted: false,
-            iv: None,
+            is_encrypted: req.is_encrypted,
+            is_compressed: req.is_compressed,
+            iv: req.iv,
         };
 
         let data = serialize(&backup)?;
@@ -145,7 +147,8 @@ impl Backups {
 pub struct CreateBackupRequest {
     pub provider: Provider,
     pub is_encrypted: bool,
-    pub iv: Option<String>,
+    pub is_compressed: bool,
+    pub iv: Option<Vec<u8>>,
 }
 
 fn serialize(b: &Backup) -> Result<Vec<u8>> {
@@ -196,6 +199,7 @@ fn serialize(b: &Backup) -> Result<Vec<u8>> {
         status_failed_error,
         status_in_progress_progress,
         is_encrypted: b.is_encrypted,
+        is_compressed: b.is_compressed,
         iv: b.iv.clone(),
     };
 
@@ -225,6 +229,7 @@ fn deserialize(data: &[u8]) -> Result<Backup> {
         provider,
         status,
         is_encrypted: from.is_encrypted,
+        is_compressed: from.is_compressed,
         iv: from.iv,
     })
 }
@@ -243,7 +248,8 @@ mod tests {
             provider: super::Provider::Local(PathBuf::from("/tmp")),
             status: super::Status::InProgress(10),
             is_encrypted: true,
-            iv: Some("sdf".to_string()),
+            is_compressed: true,
+            iv: Some(b"sdf".to_vec()),
         };
         let data = super::serialize(&b).unwrap();
         let b2 = super::deserialize(&data).unwrap();

@@ -23,8 +23,6 @@ pub struct Data {
 pub struct Auth {
     pub access_token_duration: Duration,
     pub refresh_token_duration: Duration,
-    pub access_token_key: String,
-    pub refresh_token_key: String,
 }
 #[derive(Debug, Clone)]
 pub struct Misc {
@@ -55,7 +53,7 @@ pub struct Table {
 }
 
 #[derive(Debug, Clone)]
-pub struct Config {
+pub struct StartupConfig {
     pub server: Server,
     pub data: Data,
     pub auth: Auth,
@@ -65,9 +63,9 @@ pub struct Config {
     pub log: Log,
 }
 
-impl Default for Config {
+impl Default for StartupConfig {
     fn default() -> Self {
-        Config {
+        StartupConfig {
             server: Server {
                 host: SocketAddr::from_str("0.0.0.0:8080").unwrap(),
             },
@@ -80,8 +78,6 @@ impl Default for Config {
             auth: Auth {
                 access_token_duration: Default::default(),
                 refresh_token_duration: Default::default(),
-                access_token_key: "".to_string(),
-                refresh_token_key: "".to_string(),
             },
             log: Log { level: LevelFilter::INFO },
             misc: Misc {

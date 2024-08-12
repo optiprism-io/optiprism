@@ -13,7 +13,7 @@ use futures::{Stream, StreamExt};
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use rand::Rng;
 use tokio::time::Instant;
-use common::config::Config;
+use common::startup_config::StartupConfig;
 use common::{DATA_PATH_METADATA, DATA_PATH_STORAGE};
 use common::types::DType;
 use storage::db::{OptiDBImpl, Options};

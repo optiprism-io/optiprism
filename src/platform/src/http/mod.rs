@@ -20,7 +20,7 @@ use std::sync::Arc;
 use axum::middleware;
 use axum::Extension;
 use axum::Router;
-use common::config::Config;
+use common::startup_config::StartupConfig;
 use common::http::{measure_request_response, print_request_response};
 use metadata::MetadataProvider;
 use tower::ServiceBuilder;
@@ -47,7 +47,7 @@ pub fn attach_routes(
     mut router: Router,
     md: &Arc<MetadataProvider>,
     platform: &Arc<PlatformProvider>,
-    cfg: Config,
+    cfg: StartupConfig,
 ) -> Router {
     router = organizations::attach_routes(router);
     router = projects::attach_routes(router);
@@ -76,6 +76,7 @@ pub fn attach_routes(
         .layer(Extension(platform.organizations.clone()))
         .layer(Extension(platform.projects.clone()))
         .layer(Extension(md.accounts.clone()))
+        .layer(Extension(md.config.clone()))
         .layer(Extension(platform.accounts.clone()))
         .layer(Extension(platform.auth.clone()))
         .layer(Extension(platform.events.clone()))

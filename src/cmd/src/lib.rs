@@ -1,3 +1,5 @@
+extern crate core;
+
 use std::fs::File;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
@@ -13,7 +15,7 @@ use axum::Router;
 use chrono::Duration;
 use std::time::Duration as StdDuration;
 use chrono::Utc;
-use common::config::Config;
+use common::startup_config::StartupConfig;
 use common::group_col;
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
@@ -96,7 +98,6 @@ use rand::{Rng, SeedableRng, thread_rng};
 use rand::rngs::StdRng;
 use tracing::info;
 use uaparser::UserAgentParser;
-use metadata::config::{BoolKey, IntKey, StringKey};
 use metadata::error::MetadataError;
 use query::event_records::EventRecordsProvider;
 use query::event_segmentation::EventSegmentationProvider;
@@ -106,7 +107,7 @@ use query::properties::PropertiesProvider;
 use crate::error::Result;
 use crate::error::Error;
 pub mod error;
-pub mod config;
+pub mod startup_config;
 pub mod command;
 pub mod backup;
 
@@ -191,7 +192,7 @@ pub fn init_metrics() {
 pub async fn init_system(
     md: &Arc<MetadataProvider>,
     db: &Arc<OptiDBImpl>,
-    cfg: &Config,
+    cfg: &StartupConfig,
 ) -> error::Result<()> {
     let events_table = TableOptions {
         levels: cfg.events_table.levels,
@@ -252,7 +253,7 @@ pub async fn init_system(
     info!("initializing session cleaner...");
     init_session_cleaner(md.clone(), db.clone(), cfg.clone())?;
     info!("initializing backup...");
-    backup::init(md.clone(), db.clone(), cfg.clone()).await?;
+    backup::init(md.clone(), db.clone()).await?;
 
     Ok(())
 }
@@ -261,7 +262,7 @@ fn init_platform(
     md: Arc<MetadataProvider>,
     db: Arc<OptiDBImpl>,
     router: Router,
-    cfg: Config,
+    cfg: StartupConfig,
 ) -> crate::error::Result<Router> {
     let es_provider = Arc::new(EventSegmentationProvider::new(md.clone(), db.clone()));
     let funnel_provider = Arc::new(FunnelProvider::new(md.clone(), db.clone()));
@@ -336,7 +337,7 @@ fn init_ingester(
 fn init_session_cleaner(
     md: Arc<MetadataProvider>,
     db: Arc<OptiDBImpl>,
-    cfg: Config,
+    cfg: StartupConfig,
 ) -> crate::error::Result<()> {
     thread::spawn(move || {
         loop {
@@ -411,71 +412,62 @@ fn init_session_cleaner(
 }
 
 // not for high load
+fn get_random_key128(rng: &mut StdRng) -> [u8; 128] {
+    let mut arr = [0u8; 128];
+    rng.try_fill(&mut arr[..]).unwrap();
+    return arr;
+}
+
+
+// not for high load
 fn get_random_key64(rng: &mut StdRng) -> [u8; 64] {
     let mut arr = [0u8; 64];
     rng.try_fill(&mut arr[..]).unwrap();
     return arr;
 }
-fn init_config(md: &Arc<MetadataProvider>, cfg: &mut Config) -> Result<()> {
+
+fn get_random_key32(rng: &mut StdRng) -> [u8; 32] {
+    let mut arr = [0u8; 32];
+    rng.try_fill(&mut arr[..]).unwrap();
+    return arr;
+}
+
+fn get_random_key16(rng: &mut StdRng) -> [u8; 16] {
+    let mut arr = [0u8; 16];
+    rng.try_fill(&mut arr[..]).unwrap();
+    return arr;
+}
+
+
+fn init_config(md: &Arc<MetadataProvider>, cfg: &mut StartupConfig) -> Result<()> {
     let mut rng = StdRng::from_rng(rand::thread_rng())?;
-    match md.config.get_string(StringKey::AuthAccessToken) {
+    let mut sys_cfg = match md.config.load() {
+        Ok(cfg) => cfg,
         Err(MetadataError::NotFound(_)) => {
-            let key = hex::encode(get_random_key64(&mut rng));
-            md.config.set_string(StringKey::AuthAccessToken, Some(key.to_owned()))?;
-            cfg.auth.access_token_key = key;
+            let cfg = metadata::config::Cfg::default();
+            md.config.save(&cfg)?;
+            cfg
         }
-        other => {
-            other?;
-        }
+        Err(err) => return Err(err.into()),
+    };
+
+    if sys_cfg.auth.access_token.is_none() {
+        let key = hex::encode(get_random_key64(&mut rng));
+        sys_cfg.auth.access_token = Some(key.to_owned());
+    }
+    if sys_cfg.auth.refresh_token.is_none() {
+        let key = hex::encode(get_random_key64(&mut rng));
+        sys_cfg.auth.refresh_token = Some(key.to_owned());
+    }
+    sys_cfg.backup.compression_enabled = true;
+    sys_cfg.backup.schedule = Some("0 0 * *".to_string());
+
+    if sys_cfg.backup.encryption_salt.is_none() {
+        let mut rng = StdRng::from_rng(rand::thread_rng())?;
+        sys_cfg.backup.encryption_salt = Some(get_random_key128(&mut rng).to_vec());
     }
 
-    match md.config.get_string(StringKey::AuthRefreshToken) {
-        Err(MetadataError::NotFound(_)) => {
-            let key = hex::encode(get_random_key64(&mut rng));
-            md.config.set_string(StringKey::AuthRefreshToken, Some(key.to_owned()))?;
-            cfg.auth.refresh_token_key = key;
-        }
-        other => {
-            other?;
-        }
-    }
-
-    match md.config.get_bool(BoolKey::BackupEnabled) {
-        Err(MetadataError::NotFound(_)) => {
-            md.config.set_bool(BoolKey::BackupEnabled, Some(false))?;
-        }
-        other => {
-            other?;
-        }
-    }
-
-    match md.config.get_bool(BoolKey::BackupEncryptionEnabled) {
-        Err(MetadataError::NotFound(_)) => {
-            md.config.set_bool(BoolKey::BackupEncryptionEnabled, Some(false))?;
-        }
-        other => {
-            other?;
-        }
-    }
-
-    match md.config.get_bool(BoolKey::BackupEncryptionEnabled) {
-        Err(MetadataError::NotFound(_)) => {
-            md.config.set_bool(BoolKey::BackupEncryptionEnabled, Some(false))?;
-        }
-        other => {
-            other?;
-        }
-    }
-
-    match md.config.get_string(StringKey::BackupSchedule) {
-        Err(MetadataError::NotFound(_)) => {
-            md.config.set_string(StringKey::BackupSchedule, Some("0 0 * *".to_string()))?;
-        }
-        other => {
-            other?;
-        }
-    }
-
+    md.config.save(&sys_cfg)?;
     Ok(())
 }
 

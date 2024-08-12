@@ -1,5 +1,5 @@
 pub mod arrow;
-pub mod config;
+pub mod startup_config;
 pub mod error;
 pub mod http;
 pub mod rbac;

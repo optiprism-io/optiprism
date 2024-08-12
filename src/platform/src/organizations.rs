@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use chrono::DateTime;
 use chrono::Utc;
-use common::config::Config;
+use common::startup_config::StartupConfig;
 use common::rbac::OrganizationPermission;
 use common::rbac::Permission;
 use common::rbac::ProjectPermission;
@@ -55,11 +55,11 @@ use crate::Result;
 
 pub struct Organizations {
     md: Arc<MetadataProvider>,
-    cfg: Config,
+    cfg: StartupConfig,
 }
 
 impl Organizations {
-    pub fn new(prov: Arc<MetadataProvider>, cfg: Config) -> Self {
+    pub fn new(prov: Arc<MetadataProvider>, cfg: StartupConfig) -> Self {
         Self { md: prov, cfg }
     }
     pub async fn create(

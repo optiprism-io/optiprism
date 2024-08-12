@@ -35,7 +35,7 @@ use tokio::net::TcpListener;
 use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tracing::info;
-use common::config::Config;
+use common::startup_config::StartupConfig;
 use query::event_records::EventRecordsProvider;
 use query::event_segmentation::EventSegmentationProvider;
 use query::funnel::FunnelProvider;
@@ -60,7 +60,7 @@ pub struct Test {
     pub config: PathBuf,
 }
 
-pub async fn gen(args: &Test, cfg: Config) -> Result<(), anyhow::Error> {
+pub async fn gen(args: &Test, cfg: StartupConfig) -> Result<(), anyhow::Error> {
     fs::remove_dir_all(&args.path).unwrap();
     let rocks = Arc::new(metadata::rocksdb::new(args.path.join("md"))?);
     let db = Arc::new(OptiDBImpl::open(args.path.join("store"), Options {})?);
@@ -280,7 +280,7 @@ pub async fn gen(args: &Test, cfg: Config) -> Result<(), anyhow::Error> {
         )?;
     }
 
-    let cfg = Config::default();
+    let cfg = StartupConfig::default();
     let es_prov = Arc::new(EventSegmentationProvider::new(md.clone(), db.clone()));
     let funnel_prov = Arc::new(FunnelProvider::new(md.clone(), db.clone()));
     let prop_prov = Arc::new(PropertiesProvider::new(md.clone(), db.clone()));

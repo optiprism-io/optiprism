@@ -31,6 +31,8 @@ use common::GROUP_USER_ID;
 use crossbeam_channel::bounded;
 use dateparser::DateTimeUtc;
 use enum_iterator::all;
+use pbkdf2::pbkdf2_hmac;
+use rand::prelude::StdRng;
 use events_gen::generator;
 use events_gen::generator::Generator;
 use events_gen::store::companies::CompanyProvider;
@@ -50,7 +52,8 @@ use ingester::Transformer;
 use metadata::MetadataProvider;
 use platform::projects::init_project;
 use query::col_name;
-use rand::thread_rng;
+use rand::{SeedableRng, thread_rng};
+use sha2::Sha256;
 use storage::db::OptiDBImpl;
 use storage::db::Options;
 use storage::NamedValue;
@@ -61,10 +64,10 @@ use tokio::signal::unix::SignalKind;
 use tracing::debug;
 use tracing::info;
 use uaparser::UserAgentParser;
-use metadata::config::{BackupProvider, BoolKey, IntKey, StringKey};
+use metadata::config::BackupProvider;
 use crate::error::Error;
 use crate::error::Result;
-use crate::{init_config, init_ingester};
+use crate::{get_random_key32, init_config, init_ingester};
 use crate::init_metrics;
 use crate::init_platform;
 use crate::init_session_cleaner;
@@ -104,7 +107,7 @@ pub struct Config<R> {
     pub partitions: usize,
 }
 
-pub async fn start(args: &Store, mut cfg: crate::Config) -> Result<()> {
+pub async fn start(args: &Store, mut cfg: crate::StartupConfig) -> Result<()> {
     debug!("db path: {:?}", cfg.data.path);
 
     if args.generate {
@@ -122,12 +125,18 @@ pub async fn start(args: &Store, mut cfg: crate::Config) -> Result<()> {
     init_config(&md, &mut cfg)?;
     info!("system initialization...");
     init_system(&md, &db, &cfg).await?;
-    md.config.set_string(StringKey::BackupSchedule, Some("* * * * *".to_string()))?;
-    md.config.set_string(StringKey::BackupEncryptionKey, Some("test".to_string()))?;
-    md.config.set_string(StringKey::BackupLocalPath, Some("/tmp/db.bak".to_string()))?;
-    md.config.set_int(IntKey::BackupProvider, Some(BackupProvider::Local as i64))?;
-    md.config.set_bool(BoolKey::BackupEnabled, Some(true))?;
-
+    let mut sys_cfg = md.config.load()?;
+    sys_cfg.backup.enabled = true;
+    sys_cfg.backup.encryption_enabled = true;
+    sys_cfg.backup.compression_enabled = true;
+    sys_cfg.backup.schedule = Some("* * * * *".to_string());
+    let mut rng = StdRng::from_rng(rand::thread_rng())?;
+    let mut key = [0u8; 16];
+    pbkdf2_hmac::<Sha256>(b"test", sys_cfg.backup.encryption_salt.as_ref().expect("no encryption salt").as_slice(), 1000, &mut key);
+    sys_cfg.backup.encryption_password = Some(key.to_vec());
+    sys_cfg.backup.local_path = Some("/tmp/db.bak".to_string());
+    sys_cfg.backup.provider = Some(BackupProvider::Local);
+    md.config.save(&sys_cfg)?;
     if !cfg.data.ui_path.try_exists()? {
         return Err(Error::FileNotFound(format!(
             "ui path {:?} doesn't exist", cfg.data.ui_path

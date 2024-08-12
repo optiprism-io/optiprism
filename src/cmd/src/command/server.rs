@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::Router;
-use common::config::Config;
+use common::startup_config::StartupConfig;
 use common::rbac::Role;
 use common::{ADMIN_ID, DATA_PATH_METADATA, DATA_PATH_STORAGE};
 use hyper::Server;
@@ -22,7 +22,6 @@ use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tracing::debug;
 use tracing::info;
-use metadata::config::StringKey::AuthAdminDefaultPassword;
 use crate::error::Error;
 use crate::error::Result;
 use crate::{backup, init_config, init_ingester};
@@ -31,7 +30,7 @@ use crate::init_platform;
 use crate::init_session_cleaner;
 use crate::init_system;
 
-pub async fn start(mut cfg: Config) -> Result<()> {
+pub async fn start(mut cfg: StartupConfig) -> Result<()> {
     debug!("db path: {:?}", cfg.data.path);
 
     fs::create_dir_all(cfg.data.path.join(DATA_PATH_METADATA))?;
@@ -50,7 +49,7 @@ pub async fn start(mut cfg: Config) -> Result<()> {
     }
     debug!("ui path: {:?}", cfg.data.ui_path);
 
-    let admin_acc = match md.accounts.get_by_id(ADMIN_ID){
+    let admin_acc = match md.accounts.get_by_id(ADMIN_ID) {
         Ok(acc) => acc,
         Err(err) => match err {
             MetadataError::NotFound(_) => {
@@ -59,7 +58,9 @@ pub async fn start(mut cfg: Config) -> Result<()> {
                     .take(32)
                     .map(char::from)
                     .collect();
-                md.config.set_string(AuthAdminDefaultPassword, Some(pwd.to_owned())).map_err(|e|Error::Metadata(e))?;
+                let mut sys_cfg = md.config.load()?;
+                sys_cfg.auth.admin_default_password = Some(pwd.to_owned());
+                md.config.save(&sys_cfg)?;
                 info!("creating admin account...");
                 let acc = md.accounts.create(CreateAccountRequest {
                     created_by: ADMIN_ID,
@@ -107,7 +108,7 @@ pub async fn start(mut cfg: Config) -> Result<()> {
         info!("email: {}",admin_acc.email);
     }
     if admin_acc.force_update_password {
-        let pwd = md.config.get_string(AuthAdminDefaultPassword)?;
+        let pwd = md.config.load()?.auth.admin_default_password;
         info!("password: {}",pwd.unwrap());
     }
     let listener = tokio::net::TcpListener::bind(cfg.server.host).await?;

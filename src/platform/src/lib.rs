@@ -43,7 +43,7 @@ use arrow::array::UInt64Array;
 use arrow::array::UInt8Array;
 use arrow::datatypes::TimeUnit;
 use chrono::{DateTime, Utc};
-use common::config::Config;
+use common::startup_config::StartupConfig;
 use common::types::DType;
 use common::types::SortDirection;
 use common::types::ROUND_DIGITS;
@@ -112,7 +112,7 @@ impl PlatformProvider {
         prop_prov: Arc<PropertiesProvider>,
         event_records_prov: Arc<EventRecordsProvider>,
         group_records_prov: Arc<GroupRecordsProvider>,
-        cfg: Config,
+        cfg: StartupConfig,
     ) -> Self {
         let group_properties = (0..GROUPS_COUNT)
             .map(|gid| Arc::new(Properties::new_group(md.group_properties[gid].clone(), prop_prov.clone())))
@@ -125,8 +125,7 @@ impl PlatformProvider {
             group_properties,
             accounts: Arc::new(Accounts::new(md.accounts.clone())),
             auth: Arc::new(Auth::new(
-                md.accounts.clone(),
-                md.organizations.clone(),
+                md.clone(),
                 cfg.clone(),
             )),
             event_segmentation: Arc::new(EventSegmentation::new(md.clone(), es_prov)),

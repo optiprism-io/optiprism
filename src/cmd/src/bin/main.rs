@@ -9,7 +9,7 @@ use cmd::command::db_test::DbTest;
 use cmd::command::{db_test, server, store, test};
 use cmd::command::store::Store;
 use cmd::command::test::Test;
-use cmd::config::{Config, LogLevel};
+use cmd::startup_config::{StartupConfig, LogLevel};
 
 extern crate parse_duration;
 
@@ -48,7 +48,7 @@ async fn main() -> Result<()> {
         return Err(Error::BadRequest("no command specified".to_string()));
     }
 
-    let cfg: Config = match &args.command {
+    let cfg: StartupConfig = match &args.command {
         Some(cmd) => match cmd {
             Commands::Server(cfg) => {
                 let config = config::Config::builder()
