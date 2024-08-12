@@ -89,7 +89,8 @@ pub async fn gen(args: &DbTest, gen: &Gen) -> crate::error::Result<()> {
     thread::spawn(move || {
         loop {
             db_cloned.full_backup_local("/tmp/bak").unwrap();
-            thread::sleep(Duration::from_secs(1));
+            dbg!("bak");
+            thread::sleep(Duration::from_millis(100));
         }
     });
 

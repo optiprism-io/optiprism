@@ -100,6 +100,7 @@ use crate::KeyValue;
 use crate::NamedValue;
 use crate::Value;
 use std::io::prelude::*;
+use std::str::pattern::Pattern;
 use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
 use binread::{BinReaderExt, io::Cursor};
@@ -161,6 +162,49 @@ fn collect_metrics(tables: Arc<RwLock<Vec<Table>>>) {
             }
         }
         thread::sleep(Duration::from_secs(1));
+    }
+}
+
+fn gc(tables: Arc<RwLock<Vec<Table>>>, path: PathBuf, fs: Arc<Fs>) {
+    loop {
+        thread::sleep(Duration::from_secs(10));
+        let tbl = tables.read().clone();
+        for tbl in tbl {
+            let dir = fs::read_dir(path.join("tables").join(tbl.name.clone())).expect("read_dir failed");
+            for f in dir {
+                let f = f.expect("read_dir failed");
+                let fname = f.file_name().to_os_string().into_string().unwrap();
+                if ".log".is_suffix_of(&fname) {
+                    let log_id = fname.split(".").next().unwrap().parse::<u64>().expect("parse failed");
+                    if log_id < tbl.metadata.lock().log_id {
+                        fs.try_remove_file(f.path()).expect("remove failed");
+                    }
+                }
+
+                let md = tbl.metadata.lock().clone();
+                for lvl in 0..md.opts.levels {
+                    let p = format!("tables/{}/levels/{}",&tbl.name,lvl);
+                    let dir = fs::read_dir(path.join(p)).expect("read_dir failed");
+                    for f in dir {
+                        let f = f.expect("read_dir failed");
+                        let fname = f.file_name().to_os_string().into_string().expect("to_str failed");
+                        if ".parquet".is_suffix_of(&fname) {
+                            let part_id = fname.split(".").next().unwrap().parse::<u64>().expect("parse failed");
+                            let mut found = false;
+                            for part in md.levels[lvl].parts.iter() {
+                                if part.id == part_id as usize {
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            if !found {
+                                fs.try_remove_file(f.path()).expect("remove failed");
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -374,6 +418,10 @@ fn recover<P: AsRef<Path>>(path: P, opts: Options) -> Result<OptiDBImpl> {
     thread::spawn(move || compactor.run());
     let tables_cloned = tables.clone();
     thread::spawn(move || collect_metrics(tables_cloned));
+    let tables_cloned = tables.clone();
+    let fs_cloned = fs.clone();
+    let path_cloned = path.to_owned();
+    thread::spawn(move || gc(tables_cloned.clone(), path_cloned, fs_cloned));
     Ok(OptiDBImpl {
         opts,
         tables,
