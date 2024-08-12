@@ -17,7 +17,7 @@ use tower_cookies::Cookie;
 use tower_cookies::Cookies;
 
 use crate::accounts::Account;
-use crate::auth::provider::LogInRequest;
+use crate::auth::provider::{LogInRequest, SetEmailRequest};
 use crate::auth::provider::Profile;
 use crate::auth::provider::SetPasswordRequest;
 use crate::auth::provider::SignUpRequest;
@@ -180,6 +180,19 @@ async fn update_password(
 
     Ok(Json(provider.update_password(ctx, req).await?))
 }
+
+async fn set_email(
+    ctx: Context,
+    Extension(provider): Extension<Arc<Auth>>,
+    Json(request): Json<SetEmailRequest>,
+) -> Result<Json<TokensResponse>> {
+    let req = SetEmailRequest {
+        email: request.email.to_string(),
+    };
+
+    Ok(Json(provider.set_email(ctx, req).await?))
+}
+
 async fn set_password(
     ctx: Context,
     Extension(provider): Extension<Arc<Auth>>,
@@ -203,4 +216,5 @@ pub fn attach_routes(router: Router) -> Router {
         .route("/api/v1/profile/email", put(update_email))
         .route("/api/v1/profile/password", put(update_password))
         .route("/api/v1/profile/set-password", put(set_password))
+        .route("/api/v1/profile/set-email", put(set_email))
 }
