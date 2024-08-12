@@ -145,8 +145,8 @@ impl Compactor {
                             for (idx, l) in res.levels.iter().enumerate().skip(1) {
                                 metadata.levels[idx] = l.clone();
                             }
-                            let mut log = table.metadata_f.lock();
-                            write_metadata(log.get_mut(), &mut metadata).unwrap();
+                            let mut manifest = table.metadata_f.lock();
+                            write_metadata(manifest.get_mut(), &mut metadata).unwrap();
                             drop(metadata);
                             // drop because next fs operation is with locking
                             for op in res.fs_ops {

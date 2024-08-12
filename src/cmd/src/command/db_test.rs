@@ -85,43 +85,63 @@ pub async fn gen(args: &DbTest, gen: &Gen) -> crate::error::Result<()> {
             })
             .progress_chars("#>-"),
     );
-    let mut rng = rand::thread_rng();
     let db_cloned = db.clone();
     thread::spawn(move || {
         loop {
             db_cloned.full_backup_local("/tmp/bak").unwrap();
             thread::sleep(Duration::from_secs(1));
-            println!("backup");
         }
     });
 
-/*    let db_cloned = db.clone();
+    let db_cloned = db.clone();
     thread::spawn(move || {
         loop {
-            db_cloned.full_restore_local("/tmp/bak").unwrap();
+            db_cloned.flush("t1").unwrap();
             thread::sleep(Duration::from_secs(1));
-            println!("restore");
         }
-    });*/
-    for i in 0..gen.records {
-        db.insert(
-            "t1",
-            vec![
-                NamedValue::new("f1".to_string(), Value::Int64(Some(10000000 - i as i64))),
-                // NamedValue::new("f1".to_string(), Value::Int64(Some(rng.gen_range(0..10000000)))),
-                NamedValue::new("f2".to_string(), Value::Int16(Some(i as i16))),
-                NamedValue::new("f3".to_string(), Value::Int32(Some(i as i32))),
-                NamedValue::new("f4".to_string(), Value::Int64(Some(i as i64))),
-                NamedValue::new("f5".to_string(), Value::String(Some(i.to_string()))),
-                NamedValue::new("f6".to_string(), Value::Decimal(Some(i as i128))),
-                NamedValue::new("f7".to_string(), Value::Boolean(Some(i % 2 == 0))),
-                NamedValue::new("f8".to_string(), Value::Timestamp(Some(i as i64))),
-            ],
-        ).unwrap();
-        pb.inc(1);
+    });
+
+
+    /*    let db_cloned = db.clone();
+        thread::spawn(move || {
+            loop {
+                db_cloned.full_restore_local("/tmp/bak").unwrap();
+                thread::sleep(Duration::from_secs(1));
+                println!("restore");
+            }
+        });*/
+    let recs = gen.records;
+    let mut hnd = vec![];
+    for i in 0..=2 {
+        let pb_cloned = pb.clone();
+        let db_cloned = db.clone();
+        let h = thread::spawn(move || {
+            for j in 0..recs {
+                if j % 3 != i {
+                    continue;
+                }
+                db_cloned.insert(
+                    "t1",
+                    vec![
+                        NamedValue::new("f1".to_string(), Value::Int64(Some(10000000 - i as i64))),
+                        // NamedValue::new("f1".to_string(), Value::Int64(Some(rng.gen_range(0..10000000)))),
+                        NamedValue::new("f2".to_string(), Value::Int16(Some(i as i16))),
+                        NamedValue::new("f3".to_string(), Value::Int32(Some(i as i32))),
+                        NamedValue::new("f4".to_string(), Value::Int64(Some(i as i64))),
+                        NamedValue::new("f5".to_string(), Value::String(Some(i.to_string()))),
+                        NamedValue::new("f6".to_string(), Value::Decimal(Some(i as i128))),
+                        NamedValue::new("f7".to_string(), Value::Boolean(Some(i % 2 == 0))),
+                        NamedValue::new("f8".to_string(), Value::Timestamp(Some(i as i64))),
+                    ],
+                ).unwrap();
+                pb_cloned.inc(1);
+            }
+        });
+        hnd.push(h);
     }
-    db.flush("t1").unwrap();
-    pb.finish_with_message("done");
+    for h in hnd {
+        h.join().unwrap();
+    }
     Ok(())
 }
 

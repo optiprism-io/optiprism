@@ -439,16 +439,11 @@ fn write_level0(metadata: &Metadata, memtable: &Memtable, path: PathBuf) -> Resu
 }
 
 fn flush_log_(
-    log: &mut File,
     memtable: &mut Memtable,
     metadata: &mut Metadata,
     path: &PathBuf,
 ) -> Result<File> {
     let start_time = Instant::now();
-
-    // in case when it is flushed by another thread
-    log.flush()?;
-    log.sync_all()?;
     // swap memtable
     // !@#trace!("swapping memtable");
 
@@ -487,7 +482,6 @@ fn flush_log_(
         log_name(metadata.log_id-1)
     );
     fs::remove_file(log_path(&path, &metadata.table_name, metadata.log_id - 1))?;
-
     let log = OpenOptions::new()
         .create_new(true)
         .write(true)
@@ -644,10 +638,10 @@ impl OptiDBImpl {
             None => return Err(StoreError::Internal("table not found".to_string())),
             Some(tbl) => tbl.to_owned(),
         };
-
         drop(tables);
-
-        let mut metadata = tbl.metadata.lock();
+        let mut md = tbl.metadata.lock();
+        let metadata = md.clone();
+        drop(md);
         for v in values.iter() {
             match metadata.schema.fields.iter().find(|f| f.name == v.name) {
                 None => {
@@ -704,10 +698,10 @@ impl OptiDBImpl {
             LogOp::Insert(pk_values.clone(), final_values.clone()),
             log.get_mut(),
         )?;
+        drop(log);
+        let mut metadata = tbl.metadata.lock();
         metadata.stats.logged_bytes += logged as u64;
-
         let mut memtable = tbl.memtable.lock();
-
         for (idx, val) in pk_values.iter().enumerate() {
             memtable.push_value(idx, val.into());
         }
@@ -718,7 +712,8 @@ impl OptiDBImpl {
         if memtable.len() > 0
             && metadata.stats.logged_bytes as usize > metadata.opts.max_log_length_bytes
         {
-            let l = flush_log_(log.get_mut(), &mut memtable, &mut metadata, &self.path)?;
+            let l = flush_log_(&mut memtable, &mut metadata, &self.path)?;
+            let mut log = tbl.log.lock();
             *log = BufWriter::new(l);
 
             // if md.levels[0].parts.len() > 0 && md.levels[0].parts.len() > self.opts.l0_max_parts {
@@ -1124,6 +1119,7 @@ impl OptiDBImpl {
     }
 
     pub fn flush(&self, tbl_name: &str) -> Result<()> {
+        let _g = self.global_lock.read();
         let tables = self.tables.read();
         let tbl = tables.iter().find(|t| t.name == tbl_name);
         let tbl = match tbl {
@@ -1131,17 +1127,15 @@ impl OptiDBImpl {
             Some(tbl) => tbl.to_owned(),
         };
         drop(tables);
-
-        let mut log = tbl.log.lock();
+        let mut metadata = tbl.metadata.lock();
         let mut memtable = tbl.memtable.lock();
         if memtable.len() == 0 {
             return Ok(());
         }
 
-        let mut metadata = tbl.metadata.lock();
-        let new_log = flush_log_(log.get_mut(), &mut memtable, &mut metadata, &self.path)?;
+        let new_log = flush_log_(&mut memtable, &mut metadata, &self.path)?;
+        let mut log = tbl.log.lock();
         *log = BufWriter::new(new_log);
-
         Ok(())
     }
 
@@ -1291,6 +1285,8 @@ impl OptiDBImpl {
         let tables = self.tables.read().clone();
         let mut mds = vec![];
         for tbl in tables.iter() {
+            let log_path = log_path(&self.path, &tbl.name, tbl.metadata.lock().log_id);
+            self.fs.open(&log_path)?;
             // md snapshot here prevents metadata changes during backup
             let md = tbl.metadata.lock().clone();
             for (lid, lvl) in md.levels.iter().enumerate() {
@@ -1303,7 +1299,6 @@ impl OptiDBImpl {
             mds.push(md);
         }
         drop(lock);
-
         // version
         writer.write(VERSION.to_le_bytes().as_slice())?;
 
@@ -1315,15 +1310,14 @@ impl OptiDBImpl {
 
         // table
         for tbl in tbls {
-            let _g = self.global_lock.write();
             // log
             let log_path = log_path(&self.path, &tbl.name, tbl.metadata.log_id);
             let log_bak_path = format!("{}.bak", log_path.clone().into_os_string().into_string().unwrap());
             fs::copy(&log_path, &log_bak_path)?;
-            drop(_g);
+            self.fs.close(&log_path)?;
             let mut log = OpenOptions::new()
                 .read(true)
-                .open(&log_bak_path)?;
+                .open(&log_bak_path).unwrap();
             writer.write(log.metadata()?.size().to_le_bytes().as_slice())?;
             io::copy(&mut log, writer)?;
             drop(log);
@@ -1333,7 +1327,7 @@ impl OptiDBImpl {
             for (lid, level) in tbl.metadata.levels.iter().enumerate() {
                 for part in &level.parts {
                     let path = part_path(&self.path, &tbl.name, lid, part.id);
-                    let mut part = OpenOptions::new().read(true).open(path)?;
+                    let mut part = OpenOptions::new().read(true).open(path).unwrap();
                     io::copy(&mut part, writer)?;
                 }
             }
@@ -1363,6 +1357,7 @@ impl OptiDBImpl {
     }
 
     pub fn full_restore<R: Read>(&self, reader: &mut R) -> Result<()> {
+        let _g = self.backup_lock.lock();
         let _g = self.global_lock.write();
         self.truncate_all().unwrap();
         let path = self.path.clone();
@@ -1427,7 +1422,6 @@ impl OptiDBImpl {
     }
 
     pub fn full_restore_local<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let _g = self.backup_lock.lock();
         let reader = BufReader::new(File::open(&path)?);
         let mut e = ZlibDecoder::new(reader);
         self.full_restore(&mut e)?;
