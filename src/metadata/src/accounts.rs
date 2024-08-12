@@ -134,6 +134,9 @@ impl Accounts {
         if let OptionalProperty::Some(name) = req.name {
             account.name = name;
         }
+        if let OptionalProperty::Some(force_update_email) = req.force_update_email {
+            account.force_update_email = force_update_email;
+        }
         if let OptionalProperty::Some(force_update_password) = req.force_update_password {
             account.force_update_password = force_update_password;
         }
@@ -149,6 +152,7 @@ impl Accounts {
         if let OptionalProperty::Some(hash) = req.password_hash {
             account.password_hash = hash;
         }
+
         let data = serialize(&account)?;
         tx.put(make_data_value_key(NAMESPACE, account.id), &data)?;
 
