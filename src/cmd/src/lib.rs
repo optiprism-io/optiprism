@@ -444,7 +444,7 @@ fn init_config(md: &Arc<MetadataProvider>, cfg: &mut StartupConfig) -> Result<()
     let mut sys_cfg = match md.config.load() {
         Ok(cfg) => cfg,
         Err(MetadataError::NotFound(_)) => {
-            let cfg = metadata::config::Cfg::default();
+            let cfg = metadata::config::Config::default();
             md.config.save(&cfg)?;
             cfg
         }

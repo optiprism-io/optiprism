@@ -22,7 +22,7 @@ use tokio_cron_scheduler::{Job, JobScheduler};
 use tracing::{debug, error, trace};
 use metadata::{backup, backups, MetadataProvider};
 use metadata::backups::{Backup, CreateBackupRequest, Provider};
-use metadata::config::Cfg;
+use metadata::config::Config;
 use storage::db::OptiDBImpl;
 use crate::error::Error::BackupError;
 use crate::error::Result;
@@ -128,7 +128,7 @@ fn backup(md: &Arc<MetadataProvider>, db: &Arc<OptiDBImpl>) -> Result<()> {
     Ok(())
 }
 
-fn backup_local(db: &Arc<OptiDBImpl>, backup: &Backup,cfg:&Cfg) -> Result<()> {
+fn backup_local(db: &Arc<OptiDBImpl>, backup: &Backup, cfg:&Config) -> Result<()> {
     debug!("starting local backup");
     let path = backup.path();
     let w = BufWriter::new(File::create(path)?);

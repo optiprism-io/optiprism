@@ -86,6 +86,10 @@ pub mod backup {
     include!(concat!(env!("OUT_DIR"), "/backup.rs"));
 }
 
+pub mod pbconfig {
+    include!(concat!(env!("OUT_DIR"), "/config.rs"));
+}
+
 pub fn project_ns(project_id: u64, ns: &[u8]) -> Vec<u8> {
     [b"projects/", project_id.to_string().as_bytes(), b"/", ns].concat()
 }
