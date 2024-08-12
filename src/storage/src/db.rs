@@ -439,6 +439,7 @@ fn write_level0(metadata: &Metadata, memtable: &Memtable, path: PathBuf) -> Resu
 }
 
 fn flush_log_(
+    fs: &Fs,
     memtable: &mut Memtable,
     metadata: &mut Metadata,
     path: &PathBuf,
@@ -481,7 +482,7 @@ fn flush_log_(
         "removing previous log file {:?}",
         log_name(metadata.log_id-1)
     );
-    fs::remove_file(log_path(&path, &metadata.table_name, metadata.log_id - 1))?;
+    fs.try_remove_file(log_path(&path, &metadata.table_name, metadata.log_id - 1))?;
     let log = OpenOptions::new()
         .create_new(true)
         .write(true)
@@ -712,7 +713,7 @@ impl OptiDBImpl {
         if memtable.len() > 0
             && metadata.stats.logged_bytes as usize > metadata.opts.max_log_length_bytes
         {
-            let l = flush_log_(&mut memtable, &mut metadata, &self.path)?;
+            let l = flush_log_(&self.fs, &mut memtable, &mut metadata, &self.path)?;
             let mut log = tbl.log.lock();
             *log = BufWriter::new(l);
 
@@ -1133,7 +1134,7 @@ impl OptiDBImpl {
             return Ok(());
         }
 
-        let new_log = flush_log_(&mut memtable, &mut metadata, &self.path)?;
+        let new_log = flush_log_(&self.fs, &mut memtable, &mut metadata, &self.path)?;
         let mut log = tbl.log.lock();
         *log = BufWriter::new(new_log);
         Ok(())
