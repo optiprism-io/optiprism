@@ -183,7 +183,7 @@ fn gc(tables: Arc<RwLock<Vec<Table>>>, path: PathBuf, fs: Arc<Fs>) {
 
                 let md = tbl.metadata.lock().clone();
                 for lvl in 0..md.opts.levels {
-                    let p = format!("tables/{}/levels/{}",&tbl.name,lvl);
+                    let p = format!("tables/{}/levels/{}", &tbl.name, lvl);
                     let dir = fs::read_dir(path.join(p)).expect("read_dir failed");
                     for f in dir {
                         let f = f.expect("read_dir failed");
@@ -1327,7 +1327,7 @@ impl OptiDBImpl {
         Ok(())
     }
 
-    pub fn full_backup<W: Write>(&self, writer: &mut W) -> Result<()> {
+    pub fn full_backup<W: Write, F: Fn(usize)>(&self, writer: &mut W, cb: F) -> Result<()> {
         let _g = self.backup_lock.lock();
         let start_time = Instant::now();
         let lock = self.global_lock.write();
@@ -1353,6 +1353,14 @@ impl OptiDBImpl {
 
         // tables
         let tbls = tables.iter().map(table::serialize_table).collect::<Vec<_>>();
+        let parts_size = tbls
+            .iter()
+            .map(|tbl| tbl.metadata.levels.iter().map(|l| l.parts.iter()
+                .map(|p| p.size_bytes)
+                .sum::<u64>())
+                .sum::<u64>()
+            ).sum::<u64>();
+
         let data = serialize(&tbls)?;
         writer.write((data.len() as u64).to_le_bytes().as_slice())?;
         writer.write(data.as_slice())?;
@@ -1373,11 +1381,15 @@ impl OptiDBImpl {
             fs::remove_file(&log_bak_path)?;
 
             // parts
+            let mut psize = 0;
             for (lid, level) in tbl.metadata.levels.iter().enumerate() {
                 for part in &level.parts {
                     let path = part_path(&self.path, &tbl.name, lid, part.id);
-                    let mut part = OpenOptions::new().read(true).open(path).unwrap();
-                    io::copy(&mut part, writer)?;
+                    let mut part_f = OpenOptions::new().read(true).open(path).unwrap();
+                    io::copy(&mut part_f, writer)?;
+                    psize += part.size_bytes;
+                    let pct = psize as f64 / parts_size as f64 * 100.;
+                    cb(pct as usize);
                 }
             }
         }
@@ -1397,10 +1409,10 @@ impl OptiDBImpl {
         Ok(())
     }
 
-    pub fn full_backup_local<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+    pub fn full_backup_local<P: AsRef<Path>, F: Fn(usize)>(&self, path: P, cb: F) -> Result<()> {
         let writer = BufWriter::new(File::create(path)?);
         let mut e = ZlibEncoder::new(writer, Compression::default());
-        self.full_backup(&mut e)?;
+        self.full_backup(&mut e, cb)?;
         e.finish()?;
         Ok(())
     }

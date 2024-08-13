@@ -62,7 +62,7 @@ pub struct Compactor {
 }
 
 impl Compactor {
-    pub fn new<P:AsRef<Path>>(
+    pub fn new<P: AsRef<Path>>(
         tables: Arc<RwLock<Vec<Table>>>,
         path: P,
         fs: Arc<Fs>,
@@ -111,7 +111,7 @@ impl Compactor {
                     Err(err) => panic!("{:?}", err),
                 }
             }
-            let _g= self.lock.read();
+            let _g = self.lock.read();
             // !@#debug!("compaction started");
             let tables = {
                 let tbls = self.tables.read();
@@ -128,6 +128,7 @@ impl Compactor {
                     table.name.as_str(),
                     metadata.levels.clone(),
                     &self.path,
+                    self.fs.clone(),
                     &metadata.opts,
                 ) {
                     Ok(res) => match res {
@@ -154,11 +155,14 @@ impl Compactor {
                                     FsOp::Rename(from, to) => {
                                         trace!("renaming {from:?} to {to:?}");
                                         // todo handle error
-                                        self.fs.try_rename(from, to).unwrap();
+                                        self.fs.rename(&from, &to).expect("rename failed");
+                                        self.fs.close(&from).expect("close failed");
+                                        self.fs.close(&to).expect("close failed");
                                     }
                                     FsOp::Delete(path) => {
                                         trace!("deleting {:?}", &path);
-                                        self.fs.try_remove_file(path).unwrap();
+                                        self.fs.remove_file(&path).unwrap();
+                                        self.fs.close(&path).expect("close failed");
                                     }
                                 }
                             }
@@ -246,6 +250,7 @@ fn compact(
     tbl_name: &str,
     levels: Vec<Level>,
     path: &Path,
+    fs: Arc<Fs>,
     opts: &table::Options,
 ) -> Result<Option<CompactResult>> {
     let init_time = Instant::now();
@@ -285,6 +290,8 @@ fn compact(
 
                     let from = part_path(path, tbl_name, level_id, to_compact[0].part);
                     let to = part_path(path, tbl_name, level_id + 1, part.id);
+                    fs.open(&from)?;
+                    fs.open(&to)?;
                     fs_ops.push(FsOp::Rename(from, to));
 
                     tmp_levels[level_id + 1].parts.push(part.clone());
@@ -326,10 +333,11 @@ fn compact(
                 };
                 let ms = Instant::now();
                 let merge_result =
-                    merge(rdrs, out_path, out_part_id, tbl_name, level_id, merger_opts)?;
+                    merge(rdrs, fs.clone(), out_path, out_part_id, tbl_name, level_id, merger_opts)?;
                 counter!(METRIC_STORE_MERGES_TOTAL,"table"=>tbl_name.to_string()).increment(1);
                 histogram!(METRIC_STORE_MERGE_TIME_MS,"table"=>tbl_name.to_string(),"level"=>level_id.to_string()).record(start_time.elapsed());
                 for f in merge_result {
+                    fs.open(&f.path)?;
                     let final_part = {
                         Part {
                             id: tmp_levels[level_id + 1].part_id + 1,
@@ -349,6 +357,10 @@ fn compact(
                     };
                     tmp_levels[level_id + 1].parts.push(final_part);
                     tmp_levels[level_id + 1].part_id += 1;
+                }
+
+                for p in tomerge.iter() {
+                    fs.open(p)?;
                 }
 
                 fs_ops.append(

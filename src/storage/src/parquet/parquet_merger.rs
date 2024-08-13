@@ -8,8 +8,8 @@ use std::io::BufWriter;
 use std::io::Read;
 use std::io::Seek;
 use std::os::unix::fs::MetadataExt;
-use std::path::PathBuf;
-
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use arrow2::array::new_null_array;
 use arrow2::array::Array;
 use arrow2::array::BinaryArray;
@@ -59,7 +59,7 @@ use parquet2::write::Version;
 use parquet2::write::WriteOptions;
 
 use crate::error::Result;
-use crate::merge_arrays;
+use crate::{Fs, merge_arrays};
 use crate::merge_arrays_inner;
 use crate::merge_list_arrays;
 use crate::merge_list_arrays_inner;
@@ -749,6 +749,7 @@ where
     // result page size
     data_page_size_limit_bytes: Option<usize>,
     max_part_file_size_bytes: Option<usize>,
+    fs: Arc<Fs>,
 }
 
 #[derive(Debug, Clone)]
@@ -767,10 +768,12 @@ pub struct MergedFile {
     pub id: usize,
     pub min: Vec<ParquetValue>,
     pub max: Vec<ParquetValue>,
+    pub path: PathBuf,
 }
 
 pub fn merge<R: Read + Seek>(
     mut readers: Vec<R>,
+    fs: Arc<Fs>,
     to_path: PathBuf,
     out_part_id: usize,
     tbl_name: &str,
@@ -816,6 +819,7 @@ pub fn merge<R: Read + Seek>(
         // null_pages_cache: HashMap::new(),
         data_page_size_limit_bytes: opts.data_page_size_limit_bytes,
         max_part_file_size_bytes: opts.max_part_size_bytes,
+        fs,
     };
 
     mr.merge(tbl_name, level_id)
@@ -871,7 +875,9 @@ where
         let mut merged_files: Vec<MergedFile> = Vec::new();
 
         'l1: for part_id in self.id_from.. {
-            let w = File::create(&self.to_path.join(format!("{}.parquet", part_id)))?;
+            let path = &self.to_path.join(format!("{}.parquet", part_id));
+            self.fs.open(path)?;
+            let w = File::create(path)?;
             let w = BufWriter::new(w);
             let mut seq_writer =
                 FileSeqWriter::new(w, self.parquet_schema.clone(), write_opts, None);
@@ -988,6 +994,7 @@ where
                             id: part_id,
                             min,
                             max,
+                            path:path.to_owned(),
                         };
                         merged_files.push(mf);
                         continue 'l1;
@@ -1000,7 +1007,7 @@ where
                 seq_writer.end(key_value_metadata)?;
 
                 let mf = MergedFile {
-                    size_bytes: File::open(self.to_path.join(format!("{}.parquet", part_id)))?
+                    size_bytes: File::open(path)?
                         .metadata()
                         .unwrap()
                         .size(),
@@ -1008,11 +1015,12 @@ where
                     id: part_id,
                     min,
                     max,
+                    path: path.to_owned(),
                 };
                 merged_files.push(mf);
             } else {
                 // delete empty file. We can do this safely because we write to temp file and then rename it
-                fs::remove_file(self.to_path.join(format!("{}.parquet", part_id)))?;
+                fs::remove_file(path)?;
             }
             break;
         }

@@ -168,12 +168,20 @@ impl Fs {
         Ok(())
     }
 
+    pub fn remove_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        Ok(fs::remove_file(path)?)
+    }
+
     pub fn try_rename<P: AsRef<Path>>(&self, from: P, to: P) -> Result<()> {
         if !self.is_opened(&from) && !self.is_opened(&to) {
             return Ok(fs::rename(from, to)?);
         }
 
         Ok(())
+    }
+
+    pub fn rename<P: AsRef<Path>>(&self, from: P, to: P) -> Result<()> {
+        Ok(fs::rename(from, to)?)
     }
 }
 

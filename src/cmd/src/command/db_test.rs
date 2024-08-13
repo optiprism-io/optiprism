@@ -86,13 +86,14 @@ pub async fn gen(args: &DbTest, gen: &Gen) -> crate::error::Result<()> {
             .progress_chars("#>-"),
     );
     let db_cloned = db.clone();
-    thread::spawn(move || {
+    /*thread::spawn(move || {
         loop {
-            db_cloned.full_backup_local("/tmp/bak").unwrap();
-            dbg!("bak");
-            thread::sleep(Duration::from_millis(100));
+            db_cloned.full_backup_local("/tmp/bak",|pct|{
+                dbg!(pct);
+            }).unwrap();
+            thread::sleep(Duration::from_secs(1));
         }
-    });
+    });*/
 
     let db_cloned = db.clone();
     thread::spawn(move || {

@@ -112,13 +112,13 @@ fn backup(md: &Arc<MetadataProvider>, db: &Arc<OptiDBImpl>) -> Result<()> {
 
     let req = CreateBackupRequest {
         provider: provider.clone(),
-        is_encrypted:cfg.backup.encryption_enabled,
-        is_compressed:cfg.backup.compression_enabled,
+        is_encrypted: cfg.backup.encryption_enabled,
+        is_compressed: cfg.backup.compression_enabled,
         iv,
     };
     let bak = md.backups.create(req)?;
     if matches!(provider,Provider::Local(_)) {
-        backup_local(&db, &bak,&cfg)?;
+        backup_local(&db, &bak, &cfg)?;
     } else {
         unimplemented!();
     };
@@ -128,7 +128,7 @@ fn backup(md: &Arc<MetadataProvider>, db: &Arc<OptiDBImpl>) -> Result<()> {
     Ok(())
 }
 
-fn backup_local(db: &Arc<OptiDBImpl>, backup: &Backup, cfg:&Config) -> Result<()> {
+fn backup_local(db: &Arc<OptiDBImpl>, backup: &Backup, cfg: &Config) -> Result<()> {
     debug!("starting local backup");
     let path = backup.path();
     let w = BufWriter::new(File::create(path)?);
@@ -143,7 +143,9 @@ fn backup_local(db: &Arc<OptiDBImpl>, backup: &Backup, cfg:&Config) -> Result<()
     };
 
     let mut w = ZlibEncoder::new(w, Compression::default());
-    db.full_backup(&mut w)?;
+    db.full_backup(&mut w, |pct| {
+        dbg!(pct);
+    })?;
     w.finish()?;
 
     debug!("backup successful");
