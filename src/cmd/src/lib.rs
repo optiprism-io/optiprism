@@ -515,7 +515,7 @@ fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<P
     }
 
 
-    info!("project token: {}", token);
+    info!("project token: {}", proj.token);
     let _user = match md.accounts.create(CreateAccountRequest {
         created_by: admin.id,
         password_hash: make_password_hash("test")?,

@@ -11,7 +11,8 @@ use arrow2::array::{Array, Int64Array};
 use clap::Parser;
 use futures::{Stream, StreamExt};
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
-use rand::Rng;
+use rand::{Rng, thread_rng};
+use rand::prelude::SliceRandom;
 use tokio::time::Instant;
 use common::startup_config::StartupConfig;
 use common::{DATA_PATH_METADATA, DATA_PATH_STORAGE};
@@ -94,15 +95,15 @@ pub async fn gen(args: &DbTest, gen: &Gen) -> crate::error::Result<()> {
             thread::sleep(Duration::from_secs(1));
         }
     });*/
-
-    let db_cloned = db.clone();
-    thread::spawn(move || {
-        loop {
-            db_cloned.flush("t1").unwrap();
-            thread::sleep(Duration::from_secs(1));
-        }
-    });
-
+    /*
+        let db_cloned = db.clone();
+        thread::spawn(move || {
+            loop {
+                db_cloned.flush("t1").unwrap();
+                thread::sleep(Duration::from_secs(1));
+            }
+        });
+    */
 
     /*    let db_cloned = db.clone();
         thread::spawn(move || {
@@ -114,19 +115,25 @@ pub async fn gen(args: &DbTest, gen: &Gen) -> crate::error::Result<()> {
         });*/
     let recs = gen.records;
     let mut hnd = vec![];
-    for i in 0..=2 {
+    for i in 0..=0 {
         let pb_cloned = pb.clone();
         let db_cloned = db.clone();
         let h = thread::spawn(move || {
+            let mut rng = thread_rng();
+            let mut vals = (0..recs).into_iter().collect::<Vec<_>>();
+            vals.shuffle(&mut rng);
+
             for j in 0..recs {
-                if j % 3 != i {
-                    continue;
-                }
+                // if j % 3 != i {
+                //     continue;
+                // }
                 db_cloned.insert(
                     "t1",
                     vec![
-                        NamedValue::new("f1".to_string(), Value::Int64(Some(10000000 - i as i64))),
-                        // NamedValue::new("f1".to_string(), Value::Int64(Some(rng.gen_range(0..10000000)))),
+                        NamedValue::new("f1".to_string(), Value::Int64(Some(vals[i] as i64))),
+                        // NamedValue::new("f1".to_string(), Value::Int64(Some(recs as i64 - i as i64))),
+                        // NamedValue::new("f1".to_string(), Value::Int64(Some(i as i64))),
+                        // NamedValue::new("f1".to_string(), Value::Int64(Some(rng.gen_range(0..gen.records)))),
                         NamedValue::new("f2".to_string(), Value::Int16(Some(i as i16))),
                         NamedValue::new("f3".to_string(), Value::Int32(Some(i as i32))),
                         NamedValue::new("f4".to_string(), Value::Int64(Some(i as i64))),
@@ -167,7 +174,7 @@ pub async fn query(args: &DbTest, q: &Query) -> crate::error::Result<()> {
 
     let s = Instant::now();
     let mut v = 0;
-    let mut scan = db.scan("t1", vec![0, 1, 2, 3, 4, 5, 6, 7])?;
+    let mut scan = db.scan("t1", vec![0])?;
     for i in scan.iter {
         v += i.unwrap().len();
     }

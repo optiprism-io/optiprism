@@ -68,7 +68,7 @@ use metrics::histogram;
 use num_traits::ToPrimitive;
 use parking_lot::Mutex;
 use parking_lot::RwLock;
-use parquet2::compression::CompressionOptions;
+use parquet2::compression::{CompressionOptions, ZstdLevel};
 use parquet2::encoding::Encoding;
 use parquet2::write::Version;
 use serde::Deserialize;
@@ -440,7 +440,7 @@ fn write_level0(metadata: &Metadata, memtable: &Memtable, path: PathBuf) -> Resu
     let (min, max) = chunk_min_max(&chunk, metadata.opts.index_cols);
     let popts = parquet::write::WriteOptions {
         write_statistics: true,
-        compression: parquet::write::CompressionOptions::Snappy,
+        compression: parquet::write::CompressionOptions::Zstd(Some(ZstdLevel::try_new(1).unwrap())),
         version: parquet::write::Version::V2,
         // todo define page size
         data_pagesize_limit: None,

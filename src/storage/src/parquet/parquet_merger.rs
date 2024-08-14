@@ -48,7 +48,7 @@ use arrow2::io::parquet::write::WriteOptions as ArrowWriteOptions;
 use arrow2::types::NativeType;
 use metrics::histogram;
 use num_traits::ToPrimitive;
-use parquet2::compression::CompressionOptions;
+use parquet2::compression::{CompressionOptions, ZstdLevel};
 use parquet2::encoding::Encoding;
 use parquet2::metadata::ColumnDescriptor;
 use parquet2::metadata::SchemaDescriptor;
@@ -331,7 +331,7 @@ impl PagesIndexChunk {
     pub fn from_arrow(arrs: &[Box<dyn Array>], index_cols: &[ColumnDescriptor]) -> Result<Self> {
         let opts = ArrowWriteOptions {
             write_statistics: true,
-            compression: CompressionOptions::Snappy,
+            compression: CompressionOptions::Zstd(Some(ZstdLevel::try_new(1).unwrap())),
             version: Version::V2,
             data_pagesize_limit: None,
         };

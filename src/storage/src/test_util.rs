@@ -46,7 +46,7 @@ use arrow_array::RecordBatch;
 use chrono::NaiveDateTime;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
-use parquet2::compression::CompressionOptions;
+use parquet2::compression::{CompressionOptions, ZstdLevel};
 use parquet2::encoding::Encoding;
 use parquet2::write::Version;
 use rust_decimal::Decimal;
@@ -1462,7 +1462,7 @@ pub fn create_parquet_from_chunk<W: Write>(
 
     let options = WriteOptions {
         write_statistics: true,
-        compression: CompressionOptions::Snappy,
+        compression: CompressionOptions::Zstd(Some(ZstdLevel::try_new(1).unwrap())),
         version: Version::V2,
         data_pagesize_limit: Some(1024),
     };

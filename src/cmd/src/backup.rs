@@ -42,7 +42,7 @@ pub async fn init(md: Arc<MetadataProvider>,
     // reset all in progress backups since they are stateless
     for backup in backups {
         if matches!(backup.status, backups::Status::InProgress(_)) {
-            md.backups.update_status(backup.id, backups::Status::Failed("server restart".to_string()))?;
+            md.backups.update_status(backup.id, backups::Status::Failed("server restarted".to_string()))?;
         };
     }
 
@@ -75,7 +75,7 @@ pub async fn init(md: Arc<MetadataProvider>,
                     continue;
                 }
             }
-            let res = backup(&md_cloned, &db_cloned);
+            let res = backup(md_cloned.clone(), &db_cloned);
             match res {
                 Ok(_) => {}
                 Err(err) => {
@@ -88,7 +88,7 @@ pub async fn init(md: Arc<MetadataProvider>,
     Ok(())
 }
 
-fn backup(md: &Arc<MetadataProvider>, db: &Arc<OptiDBImpl>) -> Result<()> {
+fn backup(md: Arc<MetadataProvider>, db: &Arc<OptiDBImpl>) -> Result<()> {
     let cfg = md.config.load()?;
     let prov = cfg.backup.provider.clone().expect("backup provider not set");
     let provider = if prov == metadata::config::BackupProvider::Local {
@@ -116,9 +116,13 @@ fn backup(md: &Arc<MetadataProvider>, db: &Arc<OptiDBImpl>) -> Result<()> {
         is_compressed: cfg.backup.compression_enabled,
         iv,
     };
+
     let bak = md.backups.create(req)?;
+    let progress = |pct: usize| {
+        md.backups.update_status(bak.id, metadata::backups::Status::InProgress(pct)).expect("update status error");
+    };
     if matches!(provider,Provider::Local(_)) {
-        backup_local(&db, &bak, &cfg)?;
+        backup_local(&db,  &bak, &cfg,progress)?;
     } else {
         unimplemented!();
     };
@@ -128,11 +132,11 @@ fn backup(md: &Arc<MetadataProvider>, db: &Arc<OptiDBImpl>) -> Result<()> {
     Ok(())
 }
 
-fn backup_local(db: &Arc<OptiDBImpl>, backup: &Backup, cfg: &Config) -> Result<()> {
+fn backup_local<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, cfg: &Config, progress: F) -> Result<()> {
     debug!("starting local backup");
     let path = backup.path();
     let w = BufWriter::new(File::create(path)?);
-    let w: Box<dyn Write> = if cfg.backup.encryption_enabled {
+    let mut w: Box<dyn Write> = if cfg.backup.encryption_enabled {
         let pwd = cfg.backup.encryption_password.clone().expect("password not set");
         let salt = cfg.backup.encryption_salt.clone().expect("salt not set");
         let mut key = [0u8; 16];
@@ -142,11 +146,17 @@ fn backup_local(db: &Arc<OptiDBImpl>, backup: &Backup, cfg: &Config) -> Result<(
         Box::new(w)
     };
 
-    let mut w = ZlibEncoder::new(w, Compression::default());
-    db.full_backup(&mut w, |pct| {
-        dbg!(pct);
-    })?;
-    w.finish()?;
+    if cfg.backup.compression_enabled {
+        let mut w = ZlibEncoder::new(w, Compression::default());
+        db.full_backup(&mut w, |pct| {
+            progress(pct);
+        })?;
+        w.finish()?;
+    } else {
+        db.full_backup(&mut w, |pct| {
+            progress(pct);
+        })?;
+    }
 
     debug!("backup successful");
 
@@ -168,14 +178,7 @@ mod tests {
 
     #[test]
     fn test_encryptor() {
-        let mut w = File::create("/tmp/zlib").unwrap();
-        /*        let mut rng = StdRng::from_rng(rand::thread_rng()).unwrap();
-                let key = get_random_key128(&mut rng);
-                let iv = "sdfdf";
-                let mut rng = StdRng::from_rng(rand::thread_rng()).unwrap();
-                // let key: Vec<_> = decode("kjtbxCPw3XPFThb3mKmzfg==").unwrap();
-                // let iv: Vec<_> = decode("dB0Ej+7zWZWTS5JUCldWMg==").unwrap();*/
-
+        let  w = File::create("/tmp/zlib").unwrap();
         let password = b"password";
         let salt = b"salt";
         // number of iterations
