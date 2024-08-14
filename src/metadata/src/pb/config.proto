@@ -7,28 +7,36 @@ message Config {
 }
 
 message Auth {
-  optional string access_token = 1;
-  optional string refresh_token = 2;
-  optional string admin_default_password = 3;
+  string access_token = 1;
+  string refresh_token = 2;
+  string admin_default_password = 3;
 }
 
+message BackupEncryption {
+  bytes password = 1;
+  bytes salt = 2;
+
+}
 message Backup {
-  bool enabled = 1;
-  bool encryption_enabled = 2;
-  bool compression_enabled = 3;
-  optional bytes encryption_password = 4;
-  optional bytes encryption_salt = 5;
-  optional Provider provider = 6;
-  optional string local_path = 7;
-  optional string s3_bucket = 8;
-  optional string s3_region = 9;
-  optional string s3_access_key = 10;
-  optional string s3_secret_key = 11;
-  optional string schedule = 12;
+  bool compression_enabled = 1;
+  BackupEncryption encryption = 2;
+  BackupProvider provider = 3;
+  string schedule = 4;
 }
 
+message BackupProvider {
+  Provider provider = 1;
+  optional string local_path = 2;
+  optional string s3_bucket = 3;
+  optional string s3_region = 4;
+  optional string s3_access_key = 5;
+  optional string s3_secret_key = 6;
+  optional string gcp_bucket = 7;
+  optional string gcp_key = 8;
+}
 enum Provider {
   NONE = 0;
   LOCAL = 1;
   S3 = 2;
+  GCP = 3;
 }

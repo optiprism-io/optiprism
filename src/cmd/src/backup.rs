@@ -123,7 +123,7 @@ fn backup(md: Arc<MetadataProvider>, db: &Arc<OptiDBImpl>) -> Result<()> {
     };
     if matches!(provider,Provider::Local(_)) {
         backup_local(&db,  &bak, &cfg,progress)?;
-    } else {
+    } else if matches!(provider,Provider::GCP(_)) {
         unimplemented!();
     };
 

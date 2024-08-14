@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::str::from_utf8;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -5,6 +6,7 @@ use chrono::Utc;
 use prost::Message;
 use rocksdb::{Transaction, TransactionDB};
 use rust_decimal::Decimal;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use common::types::OptionalProperty;
 use crate::error::MetadataError;
@@ -16,61 +18,61 @@ use crate::metadata::{ListResponse, ResponseMetadata};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Auth {
-    pub access_token: Option<String>,
-    pub refresh_token: Option<String>,
-    pub admin_default_password: Option<String>,
+    pub access_token: String,
+    pub refresh_token: String,
+    pub admin_default_password: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BackupEncryption {
+    pub password: Vec<u8>,
+    pub salt: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct S3Provider {
+    pub bucket: String,
+    pub region: String,
+    pub access_key: String,
+    pub secret_key: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct GCPProvider {
+    pub bucket: String,
+    pub key: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub enum BackupProvider {
+    Local(PathBuf),
+    S3(S3Provider),
+    GCP(GCPProvider),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Backup {
-    pub enabled: bool,
-    pub encryption_enabled: bool,
+    pub encryption: Option<BackupEncryption>,
     pub compression_enabled: bool,
-    pub encryption_password: Option<Vec<u8>>,
-    pub encryption_salt: Option<Vec<u8>>,
-    pub provider: Option<BackupProvider>,
-    pub local_path: Option<String>,
-    pub s3_bucket: Option<String>,
-    pub s3_region: Option<String>,
-    pub s3_access_key: Option<String>,
-    pub s3_secret_key: Option<String>,
-    pub schedule: Option<String>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum BackupProvider {
-    Local = 1,
-    S3 = 2,
+    pub provider: BackupProvider,
+    pub schedule: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Config {
     pub auth: Auth,
-    pub backup: Backup,
+    pub backup: Option<Backup>,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
             auth: Auth {
-                access_token: None,
-                refresh_token: None,
-                admin_default_password: None,
+                access_token: "".to_string(),
+                refresh_token: "".to_string(),
+                admin_default_password: "".to_string(),
             },
-            backup: Backup {
-                enabled: false,
-                encryption_enabled: false,
-                compression_enabled: false,
-                encryption_password: None,
-                encryption_salt: None,
-                provider: None,
-                local_path: None,
-                s3_bucket: None,
-                s3_region: None,
-                s3_access_key: None,
-                s3_secret_key: None,
-                schedule: None,
-            },
+            backup: None,
         }
     }
 }
@@ -118,27 +120,66 @@ fn serialize(v: &Config) -> Result<Vec<u8>> {
         admin_default_password: v.auth.admin_default_password.clone(),
     };
 
-    let backup = pbconfig::Backup {
-        enabled: v.backup.enabled,
-        encryption_enabled: v.backup.encryption_enabled,
-        compression_enabled: v.backup.compression_enabled,
-        encryption_password: v.backup.encryption_password.clone(),
-        encryption_salt: v.backup.encryption_salt.clone(),
-        provider: match v.backup.provider {
-            Some(BackupProvider::Local) => Some(pbconfig::Provider::Local as i32),
-            Some(BackupProvider::S3) => Some(pbconfig::Provider::S3 as i32),
-            None => None,
-        },
-        local_path: v.backup.local_path.clone(),
-        s3_bucket: v.backup.s3_bucket.clone(),
-        s3_region: v.backup.s3_region.clone(),
-        s3_access_key: v.backup.s3_access_key.clone(),
-        s3_secret_key: v.backup.s3_secret_key.clone(),
-        schedule: v.backup.schedule.clone(),
+    let backup = if let Some(backup) = &v.backup {
+        Some(pbconfig::Backup {
+            compression_enabled: backup.compression_enabled,
+            encryption: if let Some(encryption) = &backup.encryption {
+                Some(pbconfig::BackupEncryption {
+                    password: encryption.password.clone(),
+                    salt: encryption.salt.clone(),
+                })
+            } else {
+                None
+            },
+            provider: {
+                match &backup.provider {
+                    BackupProvider::Local(path) => {
+                        Some(pbconfig::BackupProvider {
+                            provider: pbconfig::Provider::Local as i32,
+                            local_path: Some(path.to_str().unwrap().to_string()),
+                            s3_bucket: None,
+                            s3_region: None,
+                            s3_access_key: None,
+                            s3_secret_key: None,
+                            gcp_bucket: None,
+                            gcp_key: None,
+                        })
+                    }
+                    BackupProvider::S3(s3) => {
+                        Some(pbconfig::BackupProvider {
+                            provider: pbconfig::Provider::S3 as i32,
+                            local_path: None,
+                            s3_bucket: Some(s3.bucket.clone()),
+                            s3_region: Some(s3.region.clone()),
+                            s3_access_key: Some(s3.access_key.clone()),
+                            s3_secret_key: Some(s3.secret_key.clone()),
+                            gcp_bucket: None,
+                            gcp_key: None,
+                        })
+                    }
+                    BackupProvider::GCP(gcp) => {
+                        Some(pbconfig::BackupProvider {
+                            provider: pbconfig::Provider::Gcp as i32,
+                            local_path: None,
+                            s3_bucket: None,
+                            s3_region: None,
+                            s3_access_key: None,
+                            s3_secret_key: None,
+                            gcp_bucket: Some(gcp.bucket.clone()),
+                            gcp_key: Some(gcp.key.clone()),
+                        })
+                    }
+                }
+            },
+            schedule: backup.schedule.clone(),
+        })
+    } else {
+        None
     };
-    let c = pbconfig::Config { auth: Some(auth), backup: Some(backup) };
 
-    Ok(c.encode_to_vec())
+    let backup = pbconfig::Config { auth: Some(auth), backup };
+
+    Ok(backup.encode_to_vec())
 }
 
 fn deserialize(data: &[u8]) -> Result<Config> {
@@ -146,60 +187,71 @@ fn deserialize(data: &[u8]) -> Result<Config> {
     let auth = c.auth.unwrap();
     let backup = c.backup.unwrap();
 
-    Ok(Config {
-        auth: Auth {
-            access_token: auth.access_token,
-            refresh_token: auth.refresh_token,
-            admin_default_password: auth.admin_default_password,
+    let auth = Auth {
+        access_token: auth.access_token,
+        refresh_token: auth.refresh_token,
+        admin_default_password: auth.admin_default_password,
+    };
+
+    let backup = Backup {
+        encryption: if let Some(encryption) = backup.encryption {
+            Some(BackupEncryption {
+                password: encryption.password,
+                salt: encryption.salt,
+            })
+        } else {
+            None
         },
-        backup: Backup {
-            enabled: backup.enabled,
-            encryption_enabled: backup.encryption_enabled,
-            compression_enabled: backup.compression_enabled,
-            encryption_password: backup.encryption_password,
-            encryption_salt: backup.encryption_salt,
-            provider: match backup.provider {
-                Some(1) => Some(BackupProvider::Local),
-                Some(2) => Some(BackupProvider::S3),
-                None => None,
-                _ => return Err(MetadataError::Internal("invalid backup provider".to_string())),
-            },
-            local_path: backup.local_path,
-            s3_bucket: backup.s3_bucket,
-            s3_region: backup.s3_region,
-            s3_access_key: backup.s3_access_key,
-            s3_secret_key: backup.s3_secret_key,
-            schedule: backup.schedule,
-        },
-    })
+        compression_enabled: backup.compression_enabled,
+        provider: backup.provider.map(|provider| {
+            match provider.provider {
+                1 => {
+                    BackupProvider::Local(PathBuf::from(provider.local_path.unwrap()))
+                }
+                2 => {
+                    BackupProvider::S3(S3Provider {
+                        bucket: provider.s3_bucket.unwrap(),
+                        region: provider.s3_region.unwrap(),
+                        access_key: provider.s3_access_key.unwrap(),
+                        secret_key: provider.s3_secret_key.unwrap(),
+                    })
+                }
+                3 => {
+                    BackupProvider::GCP(GCPProvider {
+                        bucket: provider.gcp_bucket.unwrap(),
+                        key: provider.gcp_key.unwrap(),
+                    })
+                }
+                _ => panic!("unknown backup provider")
+            }
+        }).unwrap(),
+        schedule: backup.schedule,
+    };
+
+    Ok(Config { auth, backup: Some(backup) })
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::config::{Auth, Backup, BackupProvider, Config};
+    use crate::config::{Auth, Backup, BackupEncryption, BackupProvider, Config};
 
     #[test]
     fn test_roundtrip() {
         let cfg = Config {
             auth: Auth {
-                access_token: Some("1".to_string()),
-                refresh_token: Some("2".to_string()),
-                admin_default_password: Some("3".to_string()),
+                access_token: "1".to_string(),
+                refresh_token: "2".to_string(),
+                admin_default_password: "3".to_string(),
             },
-            backup: Backup {
-                enabled: true,
-                encryption_enabled: true,
+            backup: Some(Backup {
+                encryption: Some(BackupEncryption {
+                    password: vec![1, 2, 3],
+                    salt: vec![4, 5, 6],
+                }),
                 compression_enabled: true,
-                encryption_password: Some(b"password".to_vec()),
-                encryption_salt: Some(b"salt".to_vec()),
-                provider: Some(BackupProvider::Local),
-                local_path: Some("/tmp".to_string()),
-                s3_bucket: Some("bucket".to_string()),
-                s3_region: Some("region".to_string()),
-                s3_access_key: Some("access".to_string()),
-                s3_secret_key: Some("secret".to_string()),
-                schedule: Some("schedule".to_string()),
-            },
+                provider: BackupProvider::Local("/tmp".into()),
+                schedule: "0 0 * * *".to_string(),
+            }),
         };
 
         let data = super::serialize(&cfg).unwrap();

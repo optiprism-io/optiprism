@@ -19,10 +19,17 @@ pub struct S3Provider {
     pub bucket: String,
     pub region: String,
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct GCPProvider {
+    pub bucket: String,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum Provider {
     Local(PathBuf),
     S3(S3Provider),
+    GCP(GCPProvider),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -49,6 +56,7 @@ impl Backup {
         match &self.provider {
             Provider::Local(path) => path.join(self.created_at.format("%Y-%m-%dT%H:00:00").to_string()).into_os_string().into_string().unwrap(),
             Provider::S3(s3) => format!("s3://{}/{}", s3.bucket, self.created_at.format("%Y-%m-%dT%H:00:00").to_string()),
+            Provider::GCP(gcp) => format!("https://storage.googleapis.com/{}/{}", gcp.bucket, self.created_at.format("%Y-%m-%dT%H:00:00").to_string()),
         }
     }
 }
@@ -155,6 +163,7 @@ fn serialize(b: &Backup) -> Result<Vec<u8>> {
     let provider = match b.provider {
         Provider::Local(_) => backup::Provider::Local as i32,
         Provider::S3(_) => backup::Provider::S3 as i32,
+        Provider::GCP(_) => backup::Provider::Gcp as i32,
     };
 
     let local_path = match &b.provider {
@@ -171,6 +180,12 @@ fn serialize(b: &Backup) -> Result<Vec<u8>> {
         Provider::S3(s3) => Some(s3.region.clone()),
         _ => None,
     };
+
+    let gcp_bucket = match &b.provider {
+        Provider::GCP(gcp) => Some(gcp.bucket.clone()),
+        _ => None,
+    };
+
 
     let status = match &b.status {
         Status::InProgress(p) => backup::Status::InProgress as i32,
@@ -195,6 +210,7 @@ fn serialize(b: &Backup) -> Result<Vec<u8>> {
         local_path: local_path.map(|lp| lp.into_os_string().into_string().unwrap()),
         s3_bucket,
         s3_region,
+        gcp_bucket,
         status,
         status_failed_error,
         status_in_progress_progress,
@@ -212,6 +228,9 @@ fn deserialize(data: &[u8]) -> Result<Backup> {
         2 => Provider::S3(S3Provider {
             bucket: from.s3_bucket.expect("s3 bucket not set"),
             region: from.s3_region.expect("s3 region not set"),
+        }),
+        3 => Provider::GCP(GCPProvider {
+            bucket: from.gcp_bucket.expect("gcp bucket not set"),
         }),
         _ => return Err(MetadataError::Internal("invalid provider".to_string())),
     };
