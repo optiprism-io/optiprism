@@ -6,7 +6,7 @@ use arrow::array::ArrayRef;
 use common::query::EventRef;
 use common::query::PropValueOperation;
 use common::query::PropertyRef;
-use common::types::{COLUMN_EVENT, COLUMN_PROJECT_ID, METRIC_QUERY_EXECUTION_TIME_MS, METRIC_QUERY_QUERIES_TOTAL, TABLE_EVENTS};
+use common::types::{COLUMN_EVENT, COLUMN_PROJECT_ID, METRIC_QUERY_EXECUTION_TIME_SECONDS, METRIC_QUERY_QUERIES_TOTAL, TABLE_EVENTS};
 use datafusion_common::Column;
 use datafusion_common::DFSchema;
 use datafusion_common::ScalarValue;
@@ -68,7 +68,7 @@ impl PropertiesProvider {
         let duration = start.elapsed();
         debug!("elapsed: {:?}", duration);
         let elapsed = start.elapsed();
-        histogram!(METRIC_QUERY_EXECUTION_TIME_MS, "query"=>"properties_search").record(elapsed);
+        histogram!(METRIC_QUERY_EXECUTION_TIME_SECONDS, "query"=>"properties_search").record(elapsed);
         counter!(METRIC_QUERY_QUERIES_TOTAL,"query"=>"properties_search").increment(1);
         debug!("elapsed: {:?}", elapsed);
 

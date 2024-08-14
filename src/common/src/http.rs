@@ -36,7 +36,7 @@ use thiserror::Error;
 
 use crate::error::CommonError;
 use crate::error::Result;
-use crate::types::{METRIC_HTTP_REQUEST_TIME_MS, METRIC_HTTP_REQUESTS_TOTAL};
+use crate::types::{METRIC_HTTP_REQUEST_TIME_SECONDS, METRIC_HTTP_REQUESTS_TOTAL};
 
 #[derive(Error, Serialize, Debug, Clone)]
 pub struct ApiError {
@@ -213,7 +213,7 @@ pub async fn measure_request_response(
     let metrics = req.method() != Method::OPTIONS;
     let res = next.run(req).await;
     if metrics {
-        histogram!(METRIC_HTTP_REQUEST_TIME_MS,"path"=>path.to_owned(),"status"=>res.status().as_u16().to_string()).record(start.elapsed().as_millis() as f64);
+        histogram!(METRIC_HTTP_REQUEST_TIME_SECONDS,"path"=>path.to_owned(),"status"=>res.status().as_u16().to_string()).record(start.elapsed().as_millis() as f64);
         counter!(METRIC_HTTP_REQUESTS_TOTAL,"path"=>path,"status"=>res.status().as_u16().to_string()).increment(1);
     }
     Ok(res)

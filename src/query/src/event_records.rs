@@ -8,7 +8,7 @@ use common::query::EventRef;
 use common::query::PropValueFilter;
 use common::query::PropertyRef;
 use common::query::QueryTime;
-use common::types::{COLUMN_CREATED_AT, COLUMN_EVENT, METRIC_QUERY_EXECUTION_TIME_MS, METRIC_QUERY_QUERIES_TOTAL, TABLE_EVENTS};
+use common::types::{COLUMN_CREATED_AT, COLUMN_EVENT, METRIC_QUERY_EXECUTION_TIME_SECONDS, METRIC_QUERY_QUERIES_TOTAL, TABLE_EVENTS};
 use common::types::COLUMN_EVENT_ID;
 use common::types::COLUMN_PROJECT_ID;
 use common::{DECIMAL_PRECISION, DECIMAL_SCALE, group_col, GROUPS_COUNT};
@@ -70,7 +70,7 @@ impl EventRecordsProvider {
         println!("{plan:?}");
         let result = execute(session_ctx, state, plan).await?;
         let elapsed = start.elapsed();
-        histogram!(METRIC_QUERY_EXECUTION_TIME_MS, "query"=>"event_records_get_by_id").record(elapsed);
+        histogram!(METRIC_QUERY_EXECUTION_TIME_SECONDS, "query"=>"event_records_get_by_id").record(elapsed);
         counter!(METRIC_QUERY_QUERIES_TOTAL,"query"=>"event_records_get_by_id").increment(1);
         debug!("elapsed: {:?}", elapsed);
 
@@ -170,7 +170,7 @@ impl EventRecordsProvider {
         let duration = start.elapsed();
         debug!("elapsed: {:?}", duration);
         let elapsed = start.elapsed();
-        histogram!(METRIC_QUERY_EXECUTION_TIME_MS, "query"=>"event_records_search").record(elapsed);
+        histogram!(METRIC_QUERY_EXECUTION_TIME_SECONDS, "query"=>"event_records_search").record(elapsed);
         counter!(METRIC_QUERY_QUERIES_TOTAL,"query"=>"event_records_search").increment(1);
         debug!("elapsed: {:?}", elapsed);
 

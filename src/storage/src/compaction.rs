@@ -12,12 +12,12 @@ use std::thread;
 #[cfg(not(test))]
 use std::time::Duration;
 use std::time::Instant;
-
+use chrono::Utc;
 use log::trace;
 use metrics::counter;
 use metrics::histogram;
 use parking_lot::RwLock;
-use common::types::{METRIC_STORE_COMPACTION_TIME_MS, METRIC_STORE_COMPACTIONS_TOTAL, METRIC_STORE_LEVEL_COMPACTION_TIME_MS, METRIC_STORE_MERGE_TIME_MS, METRIC_STORE_MERGES_TOTAL};
+use common::types::{METRIC_STORE_COMPACTION_TIME_SECONDS, METRIC_STORE_COMPACTIONS_TOTAL, METRIC_STORE_LEVEL_COMPACTION_TIME_SECONDS, METRIC_STORE_MERGE_TIME_SECONDS, METRIC_STORE_MERGES_TOTAL};
 use crate::db::{part_path, write_metadata};
 use crate::error::Result;
 use crate::parquet::parquet_merger;
@@ -335,7 +335,7 @@ fn compact(
                 let merge_result =
                     merge(rdrs, fs.clone(), out_path, out_part_id, tbl_name, level_id, merger_opts)?;
                 counter!(METRIC_STORE_MERGES_TOTAL,"table"=>tbl_name.to_string()).increment(1);
-                histogram!(METRIC_STORE_MERGE_TIME_MS,"table"=>tbl_name.to_string(),"level"=>level_id.to_string()).record(start_time.elapsed());
+                histogram!(METRIC_STORE_MERGE_TIME_SECONDS,"table"=>tbl_name.to_string(),"level"=>level_id.to_string()).record(start_time.elapsed());
                 for f in merge_result {
                     fs.open(&f.path)?;
                     let final_part = {
@@ -370,12 +370,12 @@ fn compact(
                         .collect::<Vec<_>>()
                         .as_mut(),
                 );
-                histogram!(METRIC_STORE_LEVEL_COMPACTION_TIME_MS,"table"=>tbl_name.to_string(),"level"=>level_id.to_string()).record(start_time.elapsed());
+                histogram!(METRIC_STORE_LEVEL_COMPACTION_TIME_SECONDS,"table"=>tbl_name.to_string(),"level"=>level_id.to_string()).record(start_time.elapsed());
             }
         }
     }
     counter!(METRIC_STORE_COMPACTIONS_TOTAL,"table"=>tbl_name.to_string()).increment(1);
-    histogram!(METRIC_STORE_COMPACTION_TIME_MS,"table"=>tbl_name.to_string())
+    histogram!(METRIC_STORE_COMPACTION_TIME_SECONDS,"table"=>tbl_name.to_string())
         .record(init_time.elapsed());
 
     Ok(Some(CompactResult {

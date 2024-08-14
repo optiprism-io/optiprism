@@ -16,7 +16,7 @@ use axum_macros::debug_handler;
 use chrono::DateTime;
 use chrono::Utc;
 use common::http::{measure_request_response, print_request_response};
-use common::types::{EVENT_CLICK, METRIC_INGESTER_TRACK_TIME_MS, METRIC_INGESTER_TRACKED_TOTAL};
+use common::types::{EVENT_CLICK, METRIC_INGESTER_TRACK_TIME_SECONDS, METRIC_INGESTER_TRACKED_TOTAL};
 use common::types::EVENT_PAGE;
 use common::types::EVENT_SCREEN;
 use metrics::counter;

@@ -15,7 +15,7 @@ use common::query::EventRef;
 use common::query::PropValueFilter;
 use common::query::PropertyRef;
 use common::query::QueryTime;
-use common::types::{COLUMN_CREATED_AT, COLUMN_EVENT, METRIC_QUERY_EXECUTION_TIME_MS, METRIC_QUERY_QUERIES_TOTAL, ROUND_DIGITS, TABLE_EVENTS};
+use common::types::{COLUMN_CREATED_AT, COLUMN_EVENT, METRIC_QUERY_EXECUTION_TIME_SECONDS, METRIC_QUERY_QUERIES_TOTAL, ROUND_DIGITS, TABLE_EVENTS};
 use common::types::COLUMN_PROJECT_ID;
 use datafusion_common::Column;
 use datafusion_common::ScalarValue;
@@ -84,7 +84,7 @@ impl FunnelProvider {
         let result = execute(session_ctx, state, plan).await?;
         let duration = start.elapsed();
         let elapsed = start.elapsed();
-        histogram!(METRIC_QUERY_EXECUTION_TIME_MS, "query"=>"funnel").record(elapsed);
+        histogram!(METRIC_QUERY_EXECUTION_TIME_SECONDS, "query"=>"funnel").record(elapsed);
         counter!(METRIC_QUERY_QUERIES_TOTAL,"query"=>"funnel").increment(1);
         debug!("elapsed: {:?}", duration);
         let mut group_cols: Vec<StringArray> = vec![];

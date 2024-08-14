@@ -43,10 +43,10 @@ use arrow_array::TimestampNanosecondArray;
 use bincode::deserialize;
 use bincode::serialize;
 use flate2::Compression;
-use common::types::{METRIC_BACKUP_TIME_MS, METRIC_BACKUPS_TOTAL, METRIC_STORE_FLUSH_TIME_MS};
+use common::types::{METRIC_BACKUP_TIME_SECONDS, METRIC_BACKUPS_TOTAL, METRIC_STORE_FLUSH_TIME_SECONDS};
 use common::types::DType;
 use common::types::METRIC_STORE_FLUSHES_TOTAL;
-use common::types::METRIC_STORE_INSERT_TIME_MS;
+use common::types::METRIC_STORE_INSERT_TIME_SECONDS;
 use common::types::METRIC_STORE_INSERTS_TOTAL;
 use common::types::METRIC_STORE_MEMTABLE_ROWS;
 use common::types::METRIC_STORE_PART_SIZE_BYTES;
@@ -54,10 +54,10 @@ use common::types::METRIC_STORE_PART_VALUES;
 use common::types::METRIC_STORE_PARTS;
 use common::types::METRIC_STORE_PARTS_SIZE_BYTES;
 use common::types::METRIC_STORE_PARTS_VALUES;
-use common::types::METRIC_STORE_RECOVERY_TIME_MS;
-use common::types::METRIC_STORE_SCAN_MEMTABLE_MS;
+use common::types::METRIC_STORE_RECOVERY_TIME_SECONDS;
+use common::types::METRIC_STORE_SCAN_MEMTABLE_SECONDS;
 use common::types::METRIC_STORE_SCAN_PARTS;
-use common::types::METRIC_STORE_SCAN_TIME_MS;
+use common::types::METRIC_STORE_SCAN_TIME_SECONDS;
 use common::types::METRIC_STORE_SCANS_TOTAL;
 use common::types::METRIC_STORE_TABLE_FIELDS;
 use futures::Stream;
@@ -378,7 +378,7 @@ fn try_recover_table(path: PathBuf, name: String) -> Result<Table> {
     // if trigger_compact {
     //     // compactor_outbox.send(CompactorMessage::Compact).unwrap();
     // }
-    histogram!(METRIC_STORE_RECOVERY_TIME_MS).record(start_time.elapsed());
+    histogram!(METRIC_STORE_RECOVERY_TIME_SECONDS).record(start_time.elapsed());
     Ok(Table {
         name,
         memtable: Arc::new(Mutex::new(memtable)),
@@ -536,7 +536,7 @@ fn flush_log_(
         .write(true)
         .read(true)
         .open(log_path(&path, &metadata.table_name, metadata.log_id))?;
-    histogram!(METRIC_STORE_FLUSH_TIME_MS,"table"=>metadata.table_name.clone()).record(start_time.elapsed());
+    histogram!(METRIC_STORE_FLUSH_TIME_SECONDS,"table"=>metadata.table_name.clone()).record(start_time.elapsed());
     counter!(METRIC_STORE_FLUSHES_TOTAL,"table"=>metadata.table_name.clone()).increment(1);
 
     Ok(log)
@@ -583,7 +583,7 @@ impl Stream for ScanStream {
                     }
                 }
 
-                histogram!(METRIC_STORE_SCAN_TIME_MS,"table"=>self.table_name.to_string())
+                histogram!(METRIC_STORE_SCAN_TIME_SECONDS,"table"=>self.table_name.to_string())
                     .record(self.start_time.elapsed());
                 Poll::Ready(None)
             }
@@ -636,7 +636,7 @@ impl OptiDBImpl {
             metadata.opts.index_cols,
             metadata.opts.is_replacing,
         )?;
-        histogram!(METRIC_STORE_SCAN_MEMTABLE_MS,"table"=>tbl_name.to_string())
+        histogram!(METRIC_STORE_SCAN_MEMTABLE_SECONDS,"table"=>tbl_name.to_string())
             .record(start_time.elapsed());
         let mut rdrs = vec![];
         // todo remove?
@@ -772,7 +772,7 @@ impl OptiDBImpl {
             // }
         }
         counter!(METRIC_STORE_INSERTS_TOTAL, "table"=>tbl_name.to_string()).increment(1);
-        histogram!(METRIC_STORE_INSERT_TIME_MS,"table"=>tbl_name.to_string())
+        histogram!(METRIC_STORE_INSERT_TIME_SECONDS,"table"=>tbl_name.to_string())
             .record(start_time.elapsed());
         // !@#debug!("insert finished in {: ?}", duration);
         Ok(())
@@ -1403,7 +1403,7 @@ impl OptiDBImpl {
             }
         }
 
-        histogram!(METRIC_BACKUP_TIME_MS).record(start_time.elapsed());
+        histogram!(METRIC_BACKUP_TIME_SECONDS).record(start_time.elapsed());
         counter!(METRIC_BACKUPS_TOTAL).increment(1);
 
         Ok(())
