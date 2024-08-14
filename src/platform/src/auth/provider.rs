@@ -46,13 +46,13 @@ impl Auth {
                 account_id,
                 organisation_id,
                 self.cfg.auth.access_token_duration.clone(),
-                sys_cfg.auth.access_token.expect("access_token not found"),
+                sys_cfg.auth.access_token,
             )
                 .map_err(|err| err.wrap_into(AuthError::CantMakeAccessToken))?,
             refresh_token: make_refresh_token(
                 account_id,
                 self.cfg.auth.refresh_token_duration.clone(),
-                sys_cfg.auth.refresh_token.expect("refresh_token not found"),
+                sys_cfg.auth.refresh_token,
             )
                 .map_err(|err| err.wrap_into(AuthError::CantMakeRefreshToken))?,
         })
@@ -139,7 +139,7 @@ impl Auth {
     }
 
     pub async fn refresh_token(&self, ctx: Context, refresh_token: &str) -> Result<TokensResponse> {
-        let refresh_claims = parse_refresh_token(refresh_token, self.md.config.load()?.auth.refresh_token.expect("refresh_token not found"))
+        let refresh_claims = parse_refresh_token(refresh_token, self.md.config.load()?.auth.refresh_token)
             .map_err(|err| err.wrap_into(AuthError::InvalidRefreshToken))?;
         let tokens = self.make_tokens(refresh_claims.account_id, ctx.organization_id)?;
 

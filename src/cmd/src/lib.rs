@@ -451,20 +451,13 @@ fn init_config(md: &Arc<MetadataProvider>, cfg: &mut StartupConfig) -> Result<()
         Err(err) => return Err(err.into()),
     };
 
-    if sys_cfg.auth.access_token.is_none() {
+    if sys_cfg.auth.access_token.is_empty() {
         let key = hex::encode(get_random_key64(&mut rng));
-        sys_cfg.auth.access_token = Some(key.to_owned());
+        sys_cfg.auth.access_token = key;
     }
-    if sys_cfg.auth.refresh_token.is_none() {
+    if sys_cfg.auth.refresh_token.is_empty() {
         let key = hex::encode(get_random_key64(&mut rng));
-        sys_cfg.auth.refresh_token = Some(key.to_owned());
-    }
-    sys_cfg.backup.compression_enabled = true;
-    sys_cfg.backup.schedule = Some("0 0 * *".to_string());
-
-    if sys_cfg.backup.encryption_salt.is_none() {
-        let mut rng = StdRng::from_rng(rand::thread_rng())?;
-        sys_cfg.backup.encryption_salt = Some(get_random_key128(&mut rng).to_vec());
+        sys_cfg.auth.refresh_token = key;
     }
 
     md.config.save(&sys_cfg)?;

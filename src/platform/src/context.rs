@@ -185,7 +185,7 @@ where
             .await
             .map_err(|err| PlatformError::Internal(err.to_string()))?;
 
-        let claims = parse_access_token(bearer.token(), cfg.load()?.auth.access_token.expect("access token not found"))
+        let claims = parse_access_token(bearer.token(), cfg.load()?.auth.access_token)
             .map_err(|err| err.wrap_into(AuthError::CantParseAccessToken))?;
         let Extension(md_acc_prov) =
             Extension::<Arc<metadata::accounts::Accounts>>::from_request_parts(parts, state)

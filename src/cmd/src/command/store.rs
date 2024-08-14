@@ -126,16 +126,15 @@ pub async fn start(args: &Store, mut cfg: crate::StartupConfig) -> Result<()> {
     info!("system initialization...");
     init_system(&md, &db, &cfg).await?;
     let mut sys_cfg = md.config.load()?;
-    sys_cfg.backup.enabled = true;
-    sys_cfg.backup.encryption_enabled = true;
-    sys_cfg.backup.compression_enabled = true;
-    sys_cfg.backup.schedule = Some("* * * * *".to_string());
     let mut rng = StdRng::from_rng(rand::thread_rng())?;
     let mut key = [0u8; 16];
-    pbkdf2_hmac::<Sha256>(b"test", sys_cfg.backup.encryption_salt.as_ref().expect("no encryption salt").as_slice(), 1000, &mut key);
-    sys_cfg.backup.encryption_password = Some(key.to_vec());
-    sys_cfg.backup.local_path = Some("/tmp/db.bak".to_string());
-    sys_cfg.backup.provider = Some(BackupProvider::Local);
+    pbkdf2_hmac::<Sha256>(b"test", b"salt", 1000, &mut key);
+    sys_cfg.backup = Some(metadata::config::Backup {
+        encryption: Some(metadata::config::Encryption { password: key.to_vec(), salt: b"salt".to_vec() }),
+        compression_enabled: true,
+        provider: metadata::config::BackupProvider::Local(PathBuf::from("/tmp/db.bak")),
+        schedule: "* * * * *".to_string(),
+    });
     md.config.save(&sys_cfg)?;
     if !cfg.data.ui_path.try_exists()? {
         return Err(Error::FileNotFound(format!(

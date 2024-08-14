@@ -59,7 +59,7 @@ pub async fn start(mut cfg: StartupConfig) -> Result<()> {
                     .map(char::from)
                     .collect();
                 let mut sys_cfg = md.config.load()?;
-                sys_cfg.auth.admin_default_password = Some(pwd.to_owned());
+                sys_cfg.auth.admin_default_password = pwd.clone();
                 md.config.save(&sys_cfg)?;
                 info!("creating admin account...");
                 let acc = md.accounts.create(CreateAccountRequest {
@@ -109,7 +109,7 @@ pub async fn start(mut cfg: StartupConfig) -> Result<()> {
     }
     if admin_acc.force_update_password {
         let pwd = md.config.load()?.auth.admin_default_password;
-        info!("password: {}",pwd.unwrap());
+        info!("password: {}",pwd);
     }
     let listener = tokio::net::TcpListener::bind(cfg.server.host).await?;
     Ok(axum::serve(

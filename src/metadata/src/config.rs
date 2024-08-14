@@ -24,7 +24,7 @@ pub struct Auth {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct BackupEncryption {
+pub struct Encryption {
     pub password: Vec<u8>,
     pub salt: Vec<u8>,
 }
@@ -52,7 +52,7 @@ pub enum BackupProvider {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Backup {
-    pub encryption: Option<BackupEncryption>,
+    pub encryption: Option<Encryption>,
     pub compression_enabled: bool,
     pub provider: BackupProvider,
     pub schedule: String,
@@ -185,7 +185,6 @@ fn serialize(v: &Config) -> Result<Vec<u8>> {
 fn deserialize(data: &[u8]) -> Result<Config> {
     let c = pbconfig::Config::decode(data)?;
     let auth = c.auth.unwrap();
-    let backup = c.backup.unwrap();
 
     let auth = Auth {
         access_token: auth.access_token,
@@ -193,47 +192,54 @@ fn deserialize(data: &[u8]) -> Result<Config> {
         admin_default_password: auth.admin_default_password,
     };
 
-    let backup = Backup {
-        encryption: if let Some(encryption) = backup.encryption {
-            Some(BackupEncryption {
-                password: encryption.password,
-                salt: encryption.salt,
-            })
-        } else {
-            None
-        },
-        compression_enabled: backup.compression_enabled,
-        provider: backup.provider.map(|provider| {
-            match provider.provider {
-                1 => {
-                    BackupProvider::Local(PathBuf::from(provider.local_path.unwrap()))
+    let backup = if let Some(backup) = &c.backup {
+        let backup = Backup {
+            encryption: if let Some(encryption) = &backup.encryption {
+                Some(Encryption {
+                    password: encryption.password.to_vec(),
+                    salt: encryption.salt.to_vec(),
+                })
+            } else {
+                None
+            },
+            compression_enabled: backup.compression_enabled,
+            provider: backup.provider.as_ref().map(|provider| {
+                match &provider.provider {
+                    1 => {
+                        BackupProvider::Local(PathBuf::from(provider.local_path.clone().unwrap()))
+                    }
+                    2 => {
+                        BackupProvider::S3(S3Provider {
+                            bucket: provider.s3_bucket.clone().unwrap(),
+                            region: provider.s3_region.clone().unwrap(),
+                            access_key: provider.s3_access_key.clone().unwrap(),
+                            secret_key: provider.s3_secret_key.clone().unwrap(),
+                        })
+                    }
+                    3 => {
+                        BackupProvider::GCP(GCPProvider {
+                            bucket: provider.gcp_bucket.clone().unwrap(),
+                            key: provider.gcp_key.clone().unwrap(),
+                        })
+                    }
+                    _ => panic!("unknown backup provider")
                 }
-                2 => {
-                    BackupProvider::S3(S3Provider {
-                        bucket: provider.s3_bucket.unwrap(),
-                        region: provider.s3_region.unwrap(),
-                        access_key: provider.s3_access_key.unwrap(),
-                        secret_key: provider.s3_secret_key.unwrap(),
-                    })
-                }
-                3 => {
-                    BackupProvider::GCP(GCPProvider {
-                        bucket: provider.gcp_bucket.unwrap(),
-                        key: provider.gcp_key.unwrap(),
-                    })
-                }
-                _ => panic!("unknown backup provider")
-            }
-        }).unwrap(),
-        schedule: backup.schedule,
+            }).unwrap(),
+            schedule: backup.schedule.clone(),
+        };
+
+        Some(backup)
+    } else {
+        None
     };
 
-    Ok(Config { auth, backup: Some(backup) })
+
+    Ok(Config { auth, backup })
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::config::{Auth, Backup, BackupEncryption, BackupProvider, Config};
+    use crate::config::{Auth, Backup, Encryption, BackupProvider, Config};
 
     #[test]
     fn test_roundtrip() {
@@ -244,7 +250,7 @@ mod tests {
                 admin_default_password: "3".to_string(),
             },
             backup: Some(Backup {
-                encryption: Some(BackupEncryption {
+                encryption: Some(Encryption {
                     password: vec![1, 2, 3],
                     salt: vec![4, 5, 6],
                 }),

@@ -21,8 +21,8 @@ use tokio::task;
 use tokio_cron_scheduler::{Job, JobScheduler};
 use tracing::{debug, error, trace};
 use metadata::{backup, backups, MetadataProvider};
-use metadata::backups::{Backup, CreateBackupRequest, Provider};
-use metadata::config::Config;
+use metadata::backups::{Backup, CreateBackupRequest, GCPProvider, Provider, S3Provider};
+use metadata::config::{BackupProvider, Config};
 use storage::db::OptiDBImpl;
 use crate::error::Error::BackupError;
 use crate::error::Result;
@@ -55,10 +55,12 @@ pub async fn init(md: Arc<MetadataProvider>,
             thread::sleep(Duration::from_secs(5));
             let cfg = md.config.load().expect("load config error");
             // cancel if not enabled
-            if !cfg.backup.enabled {
+            if cfg.backup.is_none() {
                 continue;
             }
-            let schedule = cfg.backup.schedule.expect("backup scheduler not set");
+            let backup_cfg = cfg.backup.unwrap();
+
+            let schedule = backup_cfg.schedule;
             let cron = Cron::new(&schedule).parse().expect("cron schedule parse error");
             let cur_time = Utc::now().naive_utc();
             let cur_time = truncate_to_minute(&cur_time);
@@ -90,19 +92,13 @@ pub async fn init(md: Arc<MetadataProvider>,
 
 fn backup(md: Arc<MetadataProvider>, db: &Arc<OptiDBImpl>) -> Result<()> {
     let cfg = md.config.load()?;
-    let prov = cfg.backup.provider.clone().expect("backup provider not set");
-    let provider = if prov == metadata::config::BackupProvider::Local {
-        Provider::Local(PathBuf::from(cfg.backup.local_path.clone().expect("local path not set")))
-    } else if prov == metadata::config::BackupProvider::S3 {
-        Provider::S3(backups::S3Provider {
-            bucket: cfg.backup.s3_bucket.clone().expect("s3 bucket not set"),
-            region: cfg.backup.s3_region.clone().expect("s3 region not set"),
-        })
-    } else {
-        panic!("invalid backup provider: {:?}", prov)
-    };
-
-    let iv = if cfg.backup.encryption_enabled {
+    let backup_cfg = cfg.backup.unwrap();
+    let prov = backup_cfg.provider.clone();
+    match backup_cfg.provider {
+        metadata::config::BackupProvider::Local(_) => {}
+        _ => panic!("invalid backup provider: {:?}", prov)
+    }
+    let iv = if let Some(e) = &backup_cfg.encryption {
         let mut rng = StdRng::from_rng(rand::thread_rng())?;
         let key = get_random_key64(&mut rng);
         Some(key.to_vec())
@@ -110,10 +106,16 @@ fn backup(md: Arc<MetadataProvider>, db: &Arc<OptiDBImpl>) -> Result<()> {
         None
     };
 
+    let provider = match prov {
+        metadata::config::BackupProvider::Local(path) => Provider::Local(path),
+        metadata::config::BackupProvider::S3(s3) => Provider::S3(S3Provider { bucket: s3.bucket, region: s3.region }),
+        metadata::config::BackupProvider::GCP(gcp) => Provider::GCP(GCPProvider { bucket: gcp.bucket })
+    };
+
     let req = CreateBackupRequest {
         provider: provider.clone(),
-        is_encrypted: cfg.backup.encryption_enabled,
-        is_compressed: cfg.backup.compression_enabled,
+        is_encrypted: backup_cfg.encryption.is_some(),
+        is_compressed: backup_cfg.compression_enabled,
         iv,
     };
 
@@ -122,7 +124,7 @@ fn backup(md: Arc<MetadataProvider>, db: &Arc<OptiDBImpl>) -> Result<()> {
         md.backups.update_status(bak.id, metadata::backups::Status::InProgress(pct)).expect("update status error");
     };
     if matches!(provider,Provider::Local(_)) {
-        backup_local(&db,  &bak, &cfg,progress)?;
+        backup_local(&db, &bak, &backup_cfg, progress)?;
     } else if matches!(provider,Provider::GCP(_)) {
         unimplemented!();
     };
@@ -132,13 +134,13 @@ fn backup(md: Arc<MetadataProvider>, db: &Arc<OptiDBImpl>) -> Result<()> {
     Ok(())
 }
 
-fn backup_local<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, cfg: &Config, progress: F) -> Result<()> {
+fn backup_local<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, cfg: &metadata::config::Backup, progress: F) -> Result<()> {
     debug!("starting local backup");
     let path = backup.path();
     let w = BufWriter::new(File::create(path)?);
-    let mut w: Box<dyn Write> = if cfg.backup.encryption_enabled {
-        let pwd = cfg.backup.encryption_password.clone().expect("password not set");
-        let salt = cfg.backup.encryption_salt.clone().expect("salt not set");
+    let mut w: Box<dyn Write> = if let Some(enc) = &cfg.encryption {
+        let pwd = enc.password.clone();
+        let salt = enc.salt.clone();
         let mut key = [0u8; 16];
         pbkdf2_hmac::<Sha256>(pwd.as_slice(), salt.as_slice(), 1000, &mut key);
         Box::new(Encryptor::new(w, Cipher::aes_128_cbc(), key.as_slice(), backup.iv.clone().unwrap().as_slice())?)
@@ -146,7 +148,7 @@ fn backup_local<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, cfg: &Confi
         Box::new(w)
     };
 
-    if cfg.backup.compression_enabled {
+    if cfg.compression_enabled {
         let mut w = ZlibEncoder::new(w, Compression::default());
         db.full_backup(&mut w, |pct| {
             progress(pct);
@@ -178,7 +180,7 @@ mod tests {
 
     #[test]
     fn test_encryptor() {
-        let  w = File::create("/tmp/zlib").unwrap();
+        let w = File::create("/tmp/zlib").unwrap();
         let password = b"password";
         let salt = b"salt";
         // number of iterations
