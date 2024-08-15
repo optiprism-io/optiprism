@@ -63,7 +63,8 @@ croner = "2.0.5"
 base64 = "0.22.1"
 pbkdf2 = "0.12.2"
 sha2 = "0.10.8"
-object_store = "0.10.2"
+object_store = { version = "0.10.2" ,features = ["gcp","aws"]}
+quick-xml = { version = "0.23.0-alpha3" }
 
 [build-dependencies]
 vergen = "9.0.0"

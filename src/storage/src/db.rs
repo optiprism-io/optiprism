@@ -167,27 +167,32 @@ fn collect_metrics(tables: Arc<RwLock<Vec<Table>>>) {
 
 fn gc(tables: Arc<RwLock<Vec<Table>>>, path: PathBuf, fs: Arc<Fs>) {
     loop {
-        thread::sleep(Duration::from_secs(10));
+        thread::sleep(Duration::from_secs(1));
         let tbl = tables.read().clone();
         for tbl in tbl {
+                let md = tbl.metadata.lock().clone();
             let dir = fs::read_dir(path.join("tables").join(tbl.name.clone())).expect("read_dir failed");
             for f in dir {
                 let f = f.expect("read_dir failed");
                 let fname = f.file_name().to_os_string().into_string().unwrap();
                 if ".log".is_suffix_of(&fname) {
                     let log_id = fname.split(".").next().unwrap().parse::<u64>().expect("parse failed");
-                    if log_id < tbl.metadata.lock().log_id {
-                        fs.try_remove_file(f.path()).expect("remove failed");
+                    if log_id < md.log_id {
+                        match fs.try_remove_file(f.path()) { // try to remove log. It may be removed during flush_op
+                            Ok(_) => {}
+                            Err(err) => {
+                                error!("remove failed: {}", err);
+                            }
+                        }
                     }
                 }
 
-                let md = tbl.metadata.lock().clone();
                 for lvl in 0..md.opts.levels {
                     let p = format!("tables/{}/levels/{}", &tbl.name, lvl);
                     let dir = fs::read_dir(path.join(p)).expect("read_dir failed");
                     for f in dir {
                         let f = f.expect("read_dir failed");
-                        let fname = f.file_name().to_os_string().into_string().expect("to_str failed");
+                        let fname = f.file_name().to_os_string().into_string().unwrap();
                         if ".parquet".is_suffix_of(&fname) {
                             let part_id = fname.split(".").next().unwrap().parse::<u64>().expect("parse failed");
                             let mut found = false;

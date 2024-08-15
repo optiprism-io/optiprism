@@ -17,10 +17,11 @@ use tokio::time::Instant;
 use common::startup_config::StartupConfig;
 use common::{DATA_PATH_METADATA, DATA_PATH_STORAGE};
 use common::types::DType;
+use metadata::MetadataProvider;
 use storage::db::{OptiDBImpl, Options};
 use storage::{NamedValue, table, Value};
 use storage::parquet::ArrowIteratorImpl;
-use crate::{init_metrics, init_system};
+use crate::{backup, init_metrics, init_system};
 #[derive(Parser, Clone)]
 pub struct Gen {
     #[arg(long)]
@@ -46,7 +47,9 @@ pub struct DbTest {
 pub async fn gen(args: &DbTest, gen: &Gen) -> crate::error::Result<()> {
     init_metrics();
     fs::remove_dir_all(args.path.join(DATA_PATH_STORAGE))?;
+    let rocks = Arc::new(metadata::rocksdb::new(args.path.join(DATA_PATH_METADATA))?);
     let db = Arc::new(OptiDBImpl::open(args.path.join(DATA_PATH_STORAGE), Options {})?);
+    let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
     let topts = table::Options {
         levels: 7,
         merge_array_size: 10000,
@@ -86,6 +89,15 @@ pub async fn gen(args: &DbTest, gen: &Gen) -> crate::error::Result<()> {
             })
             .progress_chars("#>-"),
     );
+    let mut sys_cfg = metadata::config::Config::default();
+    sys_cfg.backup = Some(metadata::config::Backup {
+        encryption: None,
+        compression_enabled: false,
+        provider: metadata::config::BackupProvider::Local(PathBuf::from("/tmp/db.bak")),
+        schedule: "* * * * *".to_string(),
+    });
+    md.config.save(&sys_cfg)?;
+    backup::init(md.clone(), db.clone()).await?;
     let db_cloned = db.clone();
     /*thread::spawn(move || {
         loop {

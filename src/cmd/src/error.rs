@@ -74,4 +74,6 @@ pub enum Error {
     RandError(#[from] rand::Error),
     #[error("openssl: {0:?}")]
     OpenSSLStackError(#[from] openssl::error::ErrorStack),
+    #[error("object store: {0:?}")]
+    ObjectStoreError(#[from] object_store::Error),
 }
