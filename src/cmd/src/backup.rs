@@ -27,7 +27,7 @@ use tokio_cron_scheduler::{Job, JobScheduler};
 use tracing::{debug, error, trace};
 use metadata::{backup, backups, MetadataProvider};
 use metadata::backups::{Backup, CreateBackupRequest, GCPProvider, Provider, S3Provider};
-use metadata::config::{BackupProvider, Config};
+use metadata::settings::{BackupProvider, Settings};
 use storage::db::OptiDBImpl;
 use crate::error::Error::BackupError;
 use crate::error::Result;
@@ -135,7 +135,7 @@ async fn backup(md: Arc<MetadataProvider>, db: &Arc<OptiDBImpl>) -> Result<()> {
     let backup_cfg = cfg.backup.unwrap();
     let prov = backup_cfg.provider.clone();
     match backup_cfg.provider {
-        metadata::config::BackupProvider::Local(_) => {}
+        metadata::settings::BackupProvider::Local(_) => {}
         _ => panic!("invalid backup provider: {:?}", prov)
     }
     let iv = if let Some(e) = &backup_cfg.encryption {
@@ -147,9 +147,9 @@ async fn backup(md: Arc<MetadataProvider>, db: &Arc<OptiDBImpl>) -> Result<()> {
     };
 
     let provider = match prov {
-        metadata::config::BackupProvider::Local(path) => Provider::Local(path),
-        metadata::config::BackupProvider::S3(s3) => Provider::S3(S3Provider { bucket: s3.bucket, region: s3.region }),
-        metadata::config::BackupProvider::GCP(gcp) => Provider::GCP(GCPProvider { bucket: gcp.bucket })
+        metadata::settings::BackupProvider::Local(path) => Provider::Local(path),
+        metadata::settings::BackupProvider::S3(s3) => Provider::S3(S3Provider { bucket: s3.bucket, region: s3.region }),
+        metadata::settings::BackupProvider::GCP(gcp) => Provider::GCP(GCPProvider { bucket: gcp.bucket })
     };
 
     let req = CreateBackupRequest {
@@ -166,8 +166,7 @@ async fn backup(md: Arc<MetadataProvider>, db: &Arc<OptiDBImpl>) -> Result<()> {
     if matches!(provider,Provider::Local(_)) {
         backup_local(&db, &bak, &backup_cfg, progress).await?;
     } else if matches!(provider,Provider::GCP(_)) {
-        unimplemented!()
-        // backup_gcp(&db, &bak, &backup_cfg, progress).await?;
+        backup_gcp(&db, &bak, &backup_cfg, progress).await?;
     };
 
     md.backups.update_status(bak.id, backups::Status::Completed)?;
@@ -230,7 +229,7 @@ impl Write for Bridge {
     }
 }
 
-async fn backup_local<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, cfg: &metadata::config::Backup, progress: F) -> Result<()> {
+async fn backup_local<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, cfg: &metadata::settings::Backup, progress: F) -> Result<()> {
     debug!("starting local backup");
     let path = backup.path();
     let w = BufWriter::new(File::create(path)?);
@@ -252,8 +251,8 @@ async fn backup_local<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, cfg: 
     Ok(())
 }
 
-/*
-async fn backup_gcp<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, cfg: &metadata::config::Backup, progress: F) -> Result<()> {
+
+async fn backup_gcp<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, cfg: &metadata::settings::Backup, progress: F) -> Result<()> {
     debug!("starting gcp backup");
 
     let a = r#"
@@ -285,7 +284,7 @@ async fn backup_gcp<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, cfg: &m
 
     Ok(())
 }
-*/
+
 #[cfg(test)]
 mod tests {
     use std::fs::File;

@@ -89,11 +89,11 @@ pub async fn gen(args: &DbTest, gen: &Gen) -> crate::error::Result<()> {
             })
             .progress_chars("#>-"),
     );
-    let mut sys_cfg = metadata::config::Config::default();
-    sys_cfg.backup = Some(metadata::config::Backup {
+    let mut sys_cfg = metadata::settings::Settings::default();
+    sys_cfg.backup = Some(metadata::settings::Backup {
         encryption: None,
         compression_enabled: false,
-        provider: metadata::config::BackupProvider::Local(PathBuf::from("/tmp/db.bak")),
+        provider: metadata::settings::BackupProvider::Local(PathBuf::from("/tmp/db.bak")),
         schedule: "* * * * *".to_string(),
     });
     md.config.save(&sys_cfg)?;

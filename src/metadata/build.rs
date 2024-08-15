@@ -14,7 +14,7 @@ fn main() {
             "src/pb/session.proto",
             "src/pb/team.proto",
             "src/pb/backup.proto",
-            "src/pb/config.proto",
+            "src/pb/settings.proto",
         ],
         &["src"],
     ).unwrap();

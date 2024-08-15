@@ -64,7 +64,7 @@ use tokio::signal::unix::SignalKind;
 use tracing::debug;
 use tracing::info;
 use uaparser::UserAgentParser;
-use metadata::config::BackupProvider;
+use metadata::settings::BackupProvider;
 use crate::error::Error;
 use crate::error::Result;
 use crate::{get_random_key32, init_config, init_ingester};
@@ -129,10 +129,10 @@ pub async fn start(args: &Store, mut cfg: crate::StartupConfig) -> Result<()> {
     let mut rng = StdRng::from_rng(rand::thread_rng())?;
     let mut key = [0u8; 16];
     pbkdf2_hmac::<Sha256>(b"test", b"salt", 1000, &mut key);
-    sys_cfg.backup = Some(metadata::config::Backup {
-        encryption: Some(metadata::config::Encryption { password: key.to_vec(), salt: b"salt".to_vec() }),
+    sys_cfg.backup = Some(metadata::settings::Backup {
+        encryption: Some(metadata::settings::Encryption { password: key.to_vec(), salt: b"salt".to_vec() }),
         compression_enabled: true,
-        provider: metadata::config::BackupProvider::Local(PathBuf::from("/tmp/db.bak")),
+        provider: metadata::settings::BackupProvider::Local(PathBuf::from("/tmp/db.bak")),
         schedule: "* * * * *".to_string(),
     });
     md.config.save(&sys_cfg)?;

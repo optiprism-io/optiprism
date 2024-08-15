@@ -29,7 +29,7 @@ use common::rbac::ORGANIZATION_PERMISSIONS;
 use common::rbac::PERMISSIONS;
 use common::rbac::PROJECT_PERMISSIONS;
 use serde_json::Value;
-use metadata::config::ConfigProvider;
+use metadata::settings::SettingsProvider;
 use metadata::MetadataProvider;
 use crate::auth::token::parse_access_token;
 use crate::error::AuthError;
@@ -181,7 +181,7 @@ where
                 .await
                 .map_err(|_err| AuthError::CantParseBearerHeader)?;
 
-        let Extension(cfg) = Extension::<Arc<ConfigProvider>>::from_request_parts(parts, state)
+        let Extension(cfg) = Extension::<Arc<SettingsProvider>>::from_request_parts(parts, state)
             .await
             .map_err(|err| PlatformError::Internal(err.to_string()))?;
 

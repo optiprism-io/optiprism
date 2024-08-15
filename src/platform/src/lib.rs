@@ -20,6 +20,7 @@ pub mod reports;
 pub mod event_segmentation;
 mod funnel;
 mod bookmarks;
+mod settings;
 // pub mod stub;
 
 use std::fmt::Debug;
