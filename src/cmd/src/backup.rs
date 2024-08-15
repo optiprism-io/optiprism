@@ -140,6 +140,7 @@ async fn backup(md: Arc<MetadataProvider>, db: &Arc<OptiDBImpl>) -> Result<()> {
     let settings = md.settings.load()?;
     match settings.backup_provider {
         BackupProvider::Local => {}
+        BackupProvider::GCP => {}
         _ => panic!("invalid backup provider")
     }
     let iv = if settings.backup_encryption_enabled {
@@ -164,7 +165,7 @@ async fn backup(md: Arc<MetadataProvider>, db: &Arc<OptiDBImpl>) -> Result<()> {
     };
 
     let req = CreateBackupRequest {
-        provider:provider.clone(),
+        provider: provider.clone(),
         is_encrypted: settings.backup_encryption_enabled,
         is_compressed: settings.backup_compression_enabled,
         iv,
@@ -177,8 +178,7 @@ async fn backup(md: Arc<MetadataProvider>, db: &Arc<OptiDBImpl>) -> Result<()> {
     if matches!(provider,Provider::Local(_)) {
         backup_local(&db, &bak, &settings, progress).await?;
     } else if matches!(provider,Provider::GCP(_)) {
-        panic!("not implemented");
-        // backup_gcp(&db, &bak, &settings, progress).await?;
+        backup_gcp(&db, &bak, &settings, progress).await?;
     };
 
     md.backups.update_status(bak.id, backups::Status::Completed)?;
@@ -243,7 +243,12 @@ impl Write for Bridge {
 
 async fn backup_local<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, settings: &metadata::settings::Settings, progress: F) -> Result<()> {
     debug!("starting local backup");
-    let path = backup.path();
+    let path = match &backup.provider {
+        Provider::Local(path) => path.clone(),
+        Provider::S3(_) => panic!("invalid provider"),
+        Provider::GCP(_) => panic!("invalid provider")
+    };
+
     let w = BufWriter::new(File::create(path)?);
 
     let obj = LocalFileSystem::new();
@@ -263,40 +268,28 @@ async fn backup_local<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, setti
     Ok(())
 }
 
-/*
-async fn backup_gcp<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, cfg: &metadata::settings::Backup, progress: F) -> Result<()> {
-    debug!("starting gcp backup");
 
-    let a = r#"
-        {
-            "type": "service_account",
-            "project_id": "optiprism",
-            "private_key_id": "f3a08e9fe78f5c896b5e0cc19473dcd1630f2f9e",
-            "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQCx+l8z/P35Gotj\nIxQxdsl5oh56sm8c5iLi4mY2rrp10SNJ3mo2uheEthQp5CCu0OCsBLJRwrfh000Y\nEKVaOmMS2ngintNzKXpMRU945ekzKQEe4Bv6al2Id1vsiy8pdJIAaChAxhTr0609\nzoaEE/SxisZWsrCApA2t+Dr00ZF64F/1Jyeb1RHy3UynZ4HxtC/X90PwKa4W1JB6\n2wCHm+8M/yGGbFXvWGFsHcirIWrFBMWO3U4gx99AOCosvhgzPIDCD6QJtgS9U3bx\nUIiQaGlfJC+uaSXbao4Tzt0lDK/+h68C3s71j1OUBj2D9piA7c0J0+BY6xbc7Pg3\n56nJPbwRAgMBAAECggEAL0Q8FnWBCbAYBpshWMWgWlJI3/MVeUpRR4oy9SDQWkvR\noGOWN7SSXGdy0XFJkMPedzDEHtyksy/H0LVTBLRu7Wnh7+fYZkREu47IvWXp2fFw\n379LDuVCs+RnIFoSi2LvB3aiAhnZIoxT/Q8lQFyAZsphRFMuduuaynIbTjt99HDC\nCa2WgyowY3KTLcH6TvUVvbVCuRoxEjG5YyDWf22gVVNauVJihIGEsrz86iE0+SVE\nVDpsdEjevlkr9gxQqGvVFq9UteeaCZWFhkQBIQeaNpZqSfjtHcDy9L9btlkZmIry\nVTjin29cqfO7y2BmT9/W02xePLxvka3UI0bj/s+7lQKBgQDzzhFNJC/doipUkUOj\ntr+ajB62jb8imRyh1kUZ979w3cXkBCjt8MWK1ZLNTgsB0I09vIpiC/lZVL6KxfQZ\n41DaIw9B8jFuxQIRGuh8rP6HknlzCxxZ3HqeP/JNwhcCoedkK0o+XCehgev6n3mv\nHc4rI+zpmtda6Mk3QydqIe+WrwKBgQC64WM/DBKGHTSZkLe+27KqHJo58/UNLynx\ne9rJIGJm31E+YaNwmbeqRJATe9OLQ7ZboVV06wAp4tPpv9RpSla8P+QE/7NM9GW1\nYj8MW8bKoYSVxcX6a5oh1zXgp6aXQqSiFwd75lhS5xMaHoKBZQiPL2HyJuTiJlVp\ne8ndK5yJPwKBgQDOqsWbwKsakxaS7TiLFKTC2zhFw05cg7HztfCJnKuZf0T6jlQr\nrselcnmosxk9ho3T4XjkuAW8pcuHU1oif8DPyJxsaGNi5HlmCos89GAmiBGPZcG4\not8GOmqpY3eh8aB2FwQubGvjyoBAyOKbgQZ9J0zykSEwnNfEkpZcrzurXQKBgQCP\nz5xxSxgCLv1oY46TCDxQXlxs1oiwkafkVlyCRDKVWasKp1Z/8zr8g3CgHb0oQX5W\nuyupIqLomM5c5itOr09Z5IzTL/bJ9JVEZQuBtiqfinYeT6jP0fg1rIigjkNLyZQp\nzDENLrCvc3Umt23Up2xTy7HDCB1AzyERYJpyYfo/PwKBgQCUmoC78M7LCUkRcbqS\n4OkCSbc1JvwmocAr3EMRsT26J4fCgKcPRg+HV8z7N6KGRg4A4UaBw6U3j/zZ0b46\nTUf445UDWFmDiFxcq1kJhirDCfPPfy2eMLrlI29L35LzvYtqtK2/WIwZek1wvicC\nUchQxFt5LrFO2ivzFU9RQxOsTg==\n-----END PRIVATE KEY-----\n",
-            "client_email": "test-baclup@optiprism.iam.gserviceaccount.com",
-            "client_id": "115313246361308233448",
-            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-            "token_uri": "https://oauth2.googleapis.com/token",
-            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-            "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/test-baclup%40optiprism.iam.gserviceaccount.com",
-            "universe_domain": "googleapis.com"
-        }"#;
-    let gcs = GoogleCloudStorageBuilder::new().with_bucket_name("optiprism").with_service_account_key(a).build()?;
-    let path = object_store::path::Path::from("bak");
+async fn backup_gcp<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, settings: &metadata::settings::Settings, progress: F) -> Result<()> {
+    debug!("starting gcp backup");
+    dbg!(&settings.backup_provider_gcp_key);
+    let gcs = GoogleCloudStorageBuilder::new()
+        .with_bucket_name(settings.backup_provider_gcp_bucket.clone())
+        .with_service_account_key(settings.backup_provider_gcp_key.clone())
+        .build()?;
+    let path = object_store::path::Path::from(backup.path());
     let upload = gcs.put_multipart(&path).await?;
     let mut w = WriteMultipart::new(upload);
     w.write(b"hello");
-    w.put()
     w.finish().await.unwrap();
-    db.full_backup(&mut w, |pct| {
+    /*db.full_backup(&mut w, |pct| {
         progress(pct);
-    })?;
+    })?;*/
 
     debug!("backup successful");
 
     Ok(())
 }
-*/
+
 
 #[cfg(test)]
 mod tests {

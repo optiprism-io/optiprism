@@ -57,8 +57,14 @@ impl Backup {
     pub fn path(&self) -> String {
         match &self.provider {
             Provider::Local(path) => path.join(self.created_at.format("%Y-%m-%dT%H:00:00").to_string()).into_os_string().into_string().unwrap(),
-            Provider::S3(s3) => format!("s3://{}/{}", s3.bucket, self.created_at.format("%Y-%m-%dT%H:00:00").to_string()),
-            Provider::GCP(gcp) => format!("https://storage.googleapis.com/{}/{}", gcp.bucket, self.created_at.format("%Y-%m-%dT%H:00:00").to_string()),
+            Provider::S3(s3) => {
+                let p = PathBuf::from(&s3.path);
+                p.join(self.created_at.format("%Y-%m-%dT%H:00:00").to_string()).into_os_string().into_string().unwrap()
+            }
+            Provider::GCP(gcp) => {
+                let p = PathBuf::from(&gcp.path);
+                p.join(self.created_at.format("%Y-%m-%dT%H:00:00").to_string()).into_os_string().into_string().unwrap()
+            }
         }
     }
 }
@@ -169,7 +175,7 @@ fn serialize(b: &Backup) -> Result<Vec<u8>> {
     };
 
     let local_path = match &b.provider {
-        Provider::Local(path) =>path.clone(),
+        Provider::Local(path) => path.clone(),
         _ => PathBuf::new(),
     };
 
@@ -239,7 +245,7 @@ fn deserialize(data: &[u8]) -> Result<Backup> {
         1 => Provider::Local(PathBuf::from(from.local_path)),
         2 => Provider::S3(S3Provider {
             bucket: from.s3_bucket,
-            path:from.s3_path,
+            path: from.s3_path,
             region: from.s3_region,
         }),
         3 => Provider::GCP(GCPProvider {
@@ -279,7 +285,7 @@ mod tests {
             id: 1,
             created_at: DateTime::from_timestamp(2, 0).unwrap(),
             updated_at: Some(DateTime::from_timestamp(3, 0).unwrap()),
-            provider: super::Provider::S3(S3Provider{
+            provider: super::Provider::S3(S3Provider {
                 bucket: "1".to_string(),
                 path: "2".to_string(),
                 region: "3".to_string(),
