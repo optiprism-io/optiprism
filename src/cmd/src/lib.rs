@@ -15,7 +15,7 @@ use axum::Router;
 use chrono::Duration;
 use std::time::Duration as StdDuration;
 use chrono::Utc;
-use common::startup_config::StartupConfig;
+use common::config::Config;
 use common::group_col;
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
@@ -107,7 +107,7 @@ use query::properties::PropertiesProvider;
 use crate::error::Result;
 use crate::error::Error;
 pub mod error;
-pub mod startup_config;
+pub mod config;
 pub mod command;
 pub mod backup;
 
@@ -192,7 +192,7 @@ pub fn init_metrics() {
 pub async fn init_system(
     md: &Arc<MetadataProvider>,
     db: &Arc<OptiDBImpl>,
-    cfg: &StartupConfig,
+    cfg: &Config,
 ) -> error::Result<()> {
     let events_table = TableOptions {
         levels: cfg.events_table.levels,
@@ -262,7 +262,7 @@ fn init_platform(
     md: Arc<MetadataProvider>,
     db: Arc<OptiDBImpl>,
     router: Router,
-    cfg: StartupConfig,
+    cfg: Config,
 ) -> crate::error::Result<Router> {
     let es_provider = Arc::new(EventSegmentationProvider::new(md.clone(), db.clone()));
     let funnel_provider = Arc::new(FunnelProvider::new(md.clone(), db.clone()));
@@ -337,7 +337,7 @@ fn init_ingester(
 fn init_session_cleaner(
     md: Arc<MetadataProvider>,
     db: Arc<OptiDBImpl>,
-    cfg: StartupConfig,
+    cfg: Config,
 ) -> crate::error::Result<()> {
     thread::spawn(move || {
         loop {
@@ -439,28 +439,28 @@ fn get_random_key16(rng: &mut StdRng) -> [u8; 16] {
 }
 
 
-fn init_config(md: &Arc<MetadataProvider>, cfg: &mut StartupConfig) -> Result<()> {
+fn init_config(md: &Arc<MetadataProvider>, cfg: &mut Config) -> Result<()> {
     let mut rng = StdRng::from_rng(rand::thread_rng())?;
-    let mut sys_cfg = match md.config.load() {
+    let mut settings = match md.settings.load() {
         Ok(cfg) => cfg,
         Err(MetadataError::NotFound(_)) => {
             let cfg = metadata::settings::Settings::default();
-            md.config.save(&cfg)?;
+            md.settings.save(&cfg)?;
             cfg
         }
         Err(err) => return Err(err.into()),
     };
 
-    if sys_cfg.auth.access_token.is_empty() {
+    if settings.auth_access_token.is_empty() {
         let key = hex::encode(get_random_key64(&mut rng));
-        sys_cfg.auth.access_token = key;
+        settings.auth_access_token = key;
     }
-    if sys_cfg.auth.refresh_token.is_empty() {
+    if settings.auth_refresh_token.is_empty() {
         let key = hex::encode(get_random_key64(&mut rng));
-        sys_cfg.auth.refresh_token = key;
+        settings.auth_refresh_token = key;
     }
 
-    md.config.save(&sys_cfg)?;
+    md.settings.save(&settings)?;
     Ok(())
 }
 

@@ -6,16 +6,18 @@ message Backup {
   int64  created_at = 2;
   optional int64  updated_at = 3;
   Provider provider = 4;
-  optional string  local_path = 5;
-  optional string s3_bucket = 6;
-  optional string s3_region = 7;
-  optional string gcp_bucket = 8;
+  string  local_path = 5;
+  string s3_bucket = 6;
+  string s3_region = 7;
+  string gcp_bucket = 8;
   Status status = 9;
-  optional string status_failed_error = 10;
-  optional int64 status_in_progress_progress = 11;
+  string status_failed_error = 10;
+  int64 status_in_progress_progress = 11;
   bool is_encrypted = 12;
   bool is_compressed = 13;
   optional bytes iv = 14;
+  string s3_path = 15;
+  string gcp_path = 16;
 }
 
 enum Provider {

@@ -33,7 +33,7 @@ use crate::sessions::Sessions;
 use crate::Result;
 
 pub struct MetadataProvider {
-    pub config: Arc<SettingsProvider>,
+    pub settings: Arc<SettingsProvider>,
     pub dashboards: Arc<Dashboards>,
     pub reports: Arc<Reports>,
     pub bookmarks: Arc<Bookmarks>,
@@ -57,7 +57,7 @@ impl MetadataProvider {
         let events = Arc::new(events::Events::new(db.clone(), dicts.clone()));
         let accounts = Arc::new(accounts::Accounts::new(db.clone()));
         Ok(MetadataProvider {
-            config: Arc::new(settings::SettingsProvider::new(db.clone())),
+            settings: Arc::new(settings::SettingsProvider::new(db.clone())),
             dashboards: Arc::new(dashboards::Dashboards::new(db.clone())),
             reports: Arc::new(reports::Reports::new(db.clone())),
             bookmarks: Arc::new(bookmarks::Bookmarks::new(db.clone())),

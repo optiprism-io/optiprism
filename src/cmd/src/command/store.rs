@@ -64,7 +64,7 @@ use tokio::signal::unix::SignalKind;
 use tracing::debug;
 use tracing::info;
 use uaparser::UserAgentParser;
-use metadata::settings::BackupProvider;
+use metadata::settings::{BackupProvider, BackupScheduleInterval};
 use crate::error::Error;
 use crate::error::Result;
 use crate::{get_random_key32, init_config, init_ingester};
@@ -107,7 +107,7 @@ pub struct Config<R> {
     pub partitions: usize,
 }
 
-pub async fn start(args: &Store, mut cfg: crate::StartupConfig) -> Result<()> {
+pub async fn start(args: &Store, mut cfg: crate::Config) -> Result<()> {
     debug!("db path: {:?}", cfg.data.path);
 
     if args.generate {
@@ -125,17 +125,19 @@ pub async fn start(args: &Store, mut cfg: crate::StartupConfig) -> Result<()> {
     init_config(&md, &mut cfg)?;
     info!("system initialization...");
     init_system(&md, &db, &cfg).await?;
-    let mut sys_cfg = md.config.load()?;
+    let mut settings = md.settings.load()?;
     let mut rng = StdRng::from_rng(rand::thread_rng())?;
     let mut key = [0u8; 16];
     pbkdf2_hmac::<Sha256>(b"test", b"salt", 1000, &mut key);
-    sys_cfg.backup = Some(metadata::settings::Backup {
-        encryption: Some(metadata::settings::Encryption { password: key.to_vec(), salt: b"salt".to_vec() }),
-        compression_enabled: true,
-        provider: metadata::settings::BackupProvider::Local(PathBuf::from("/tmp/db.bak")),
-        schedule: "* * * * *".to_string(),
-    });
-    md.config.save(&sys_cfg)?;
+    settings.backup_enabled = true;
+    settings.backup_encryption_enabled = true;
+    settings.backup_encryption_password = "test".to_string();
+    settings.backup_compression_enabled = true;
+    settings.backup_schedule_interval = BackupScheduleInterval::Hourly;
+    settings.backup_schedule_start_hour = 0;
+    settings.backup_provider = BackupProvider::Local;
+    settings.backup_provider_local_path = "/tmp/optiprism/backups".to_string();
+    md.settings.save(&settings)?;
     if !cfg.data.ui_path.try_exists()? {
         return Err(Error::FileNotFound(format!(
             "ui path {:?} doesn't exist", cfg.data.ui_path

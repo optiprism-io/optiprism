@@ -22,7 +22,7 @@ mod tests {
     use axum::Router;
     use axum_extra::headers::Server;
     use chrono::Duration;
-    use common::startup_config::StartupConfig;
+    use common::config::Config;
     use common::rbac::OrganizationRole;
     use lazy_static::lazy_static;
     use metadata::accounts::Accounts;
@@ -46,7 +46,7 @@ mod tests {
 
     lazy_static! {
         pub static ref EMPTY_LIST: serde_json::Value = json!({"data":[],"meta":{"next":null}});
-        pub static ref AUTH_CFG: StartupConfig = StartupConfig {
+        pub static ref AUTH_CFG: Config = Config {
             path: Default::default(),
             host: SocketAddr::from_str(":8080").unwrap(),
             ui_path: None,

@@ -14,10 +14,11 @@ use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use rand::{Rng, thread_rng};
 use rand::prelude::SliceRandom;
 use tokio::time::Instant;
-use common::startup_config::StartupConfig;
+use common::config::Config;
 use common::{DATA_PATH_METADATA, DATA_PATH_STORAGE};
 use common::types::DType;
 use metadata::MetadataProvider;
+use metadata::settings::BackupScheduleInterval;
 use storage::db::{OptiDBImpl, Options};
 use storage::{NamedValue, table, Value};
 use storage::parquet::ArrowIteratorImpl;
@@ -89,14 +90,16 @@ pub async fn gen(args: &DbTest, gen: &Gen) -> crate::error::Result<()> {
             })
             .progress_chars("#>-"),
     );
-    let mut sys_cfg = metadata::settings::Settings::default();
-    sys_cfg.backup = Some(metadata::settings::Backup {
-        encryption: None,
-        compression_enabled: false,
-        provider: metadata::settings::BackupProvider::Local(PathBuf::from("/tmp/db.bak")),
-        schedule: "* * * * *".to_string(),
-    });
-    md.config.save(&sys_cfg)?;
+    let mut settings = metadata::settings::Settings::default();
+    settings.backup_enabled = true;
+    settings.backup_encryption_enabled = true;
+    settings.backup_encryption_password = "test".to_string();
+    settings.backup_compression_enabled = true;
+    settings.backup_schedule_interval = BackupScheduleInterval::Hourly;
+    settings.backup_schedule_start_hour = 0;
+    settings.backup_provider = metadata::settings::BackupProvider::Local;
+    settings.backup_provider_local_path = "/tmp/optiprism/backups".to_string();
+    md.settings.save(&settings)?;
     backup::init(md.clone(), db.clone()).await?;
     let db_cloned = db.clone();
     /*thread::spawn(move || {

@@ -17,12 +17,14 @@ const NAMESPACE: &[u8] = b"system/backups";
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct S3Provider {
     pub bucket: String,
+    pub path: String,
     pub region: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct GCPProvider {
     pub bucket: String,
+    pub path: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -167,26 +169,34 @@ fn serialize(b: &Backup) -> Result<Vec<u8>> {
     };
 
     let local_path = match &b.provider {
-        Provider::Local(path) => Some(path.clone()),
-        _ => None,
+        Provider::Local(path) =>path.clone(),
+        _ => PathBuf::new(),
     };
 
     let s3_bucket = match &b.provider {
-        Provider::S3(s3) => Some(s3.bucket.clone()),
-        _ => None,
+        Provider::S3(s3) => s3.bucket.clone(),
+        _ => String::new(),
     };
 
     let s3_region = match &b.provider {
-        Provider::S3(s3) => Some(s3.region.clone()),
-        _ => None,
+        Provider::S3(s3) => s3.region.clone(),
+        _ => String::new(),
     };
 
     let gcp_bucket = match &b.provider {
-        Provider::GCP(gcp) => Some(gcp.bucket.clone()),
-        _ => None,
+        Provider::GCP(gcp) => gcp.bucket.clone(),
+        _ => String::new(),
     };
 
+    let gcp_path = match &b.provider {
+        Provider::GCP(gcp) => gcp.path.clone(),
+        _ => String::new(),
+    };
 
+    let s3_path = match &b.provider {
+        Provider::S3(s3) => s3.path.clone(),
+        _ => String::new(),
+    };
     let status = match &b.status {
         Status::InProgress(p) => backup::Status::InProgress as i32,
         Status::Failed(e) => backup::Status::Failed as i32,
@@ -194,20 +204,20 @@ fn serialize(b: &Backup) -> Result<Vec<u8>> {
     };
 
     let status_failed_error = match &b.status {
-        Status::Failed(e) => Some(e.clone()),
-        _ => None,
+        Status::Failed(e) => e.clone(),
+        _ => String::new(),
     };
 
     let status_in_progress_progress = match &b.status {
-        Status::InProgress(p) => Some(*p as i64),
-        _ => None,
+        Status::InProgress(p) => *p as i64,
+        _ => 0,
     };
     let b = backup::Backup {
         id: b.id,
         created_at: b.created_at.timestamp(),
         updated_at: b.updated_at.map(|t| t.timestamp()),
         provider,
-        local_path: local_path.map(|lp| lp.into_os_string().into_string().unwrap()),
+        local_path: local_path.into_os_string().into_string().unwrap(),
         s3_bucket,
         s3_region,
         gcp_bucket,
@@ -217,6 +227,8 @@ fn serialize(b: &Backup) -> Result<Vec<u8>> {
         is_encrypted: b.is_encrypted,
         is_compressed: b.is_compressed,
         iv: b.iv.clone(),
+        s3_path,
+        gcp_path,
     };
 
     Ok(b.encode_to_vec())
@@ -224,20 +236,22 @@ fn serialize(b: &Backup) -> Result<Vec<u8>> {
 fn deserialize(data: &[u8]) -> Result<Backup> {
     let from = backup::Backup::decode(data.as_ref())?;
     let provider = match from.provider {
-        1 => Provider::Local(PathBuf::from(from.local_path.expect("local path not set"))),
+        1 => Provider::Local(PathBuf::from(from.local_path)),
         2 => Provider::S3(S3Provider {
-            bucket: from.s3_bucket.expect("s3 bucket not set"),
-            region: from.s3_region.expect("s3 region not set"),
+            bucket: from.s3_bucket,
+            path:from.s3_path,
+            region: from.s3_region,
         }),
         3 => Provider::GCP(GCPProvider {
-            bucket: from.gcp_bucket.expect("gcp bucket not set"),
+            bucket: from.gcp_bucket,
+            path: from.gcp_path,
         }),
         _ => return Err(MetadataError::Internal("invalid provider".to_string())),
     };
 
     let status = match from.status {
-        1 => Status::InProgress(from.status_in_progress_progress.unwrap() as usize),
-        2 => Status::Failed(from.status_failed_error.unwrap()),
+        1 => Status::InProgress(from.status_in_progress_progress as usize),
+        2 => Status::Failed(from.status_failed_error),
         3 => Status::Completed,
         _ => return Err(MetadataError::Internal("invalid status".to_string())),
     };
@@ -257,6 +271,7 @@ fn deserialize(data: &[u8]) -> Result<Backup> {
 mod tests {
     use std::path::PathBuf;
     use chrono::DateTime;
+    use crate::backups::S3Provider;
 
     #[test]
     fn test_roundtrip() {
@@ -264,7 +279,11 @@ mod tests {
             id: 1,
             created_at: DateTime::from_timestamp(2, 0).unwrap(),
             updated_at: Some(DateTime::from_timestamp(3, 0).unwrap()),
-            provider: super::Provider::Local(PathBuf::from("/tmp")),
+            provider: super::Provider::S3(S3Provider{
+                bucket: "1".to_string(),
+                path: "2".to_string(),
+                region: "3".to_string(),
+            }),
             status: super::Status::InProgress(10),
             is_encrypted: true,
             is_compressed: true,

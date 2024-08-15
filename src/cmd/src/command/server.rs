@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::Router;
-use common::startup_config::StartupConfig;
+use common::config::Config;
 use common::rbac::Role;
 use common::{ADMIN_ID, DATA_PATH_METADATA, DATA_PATH_STORAGE};
 use hyper::Server;
@@ -30,7 +30,7 @@ use crate::init_platform;
 use crate::init_session_cleaner;
 use crate::init_system;
 
-pub async fn start(mut cfg: StartupConfig) -> Result<()> {
+pub async fn start(mut cfg: Config) -> Result<()> {
     debug!("db path: {:?}", cfg.data.path);
 
     fs::create_dir_all(cfg.data.path.join(DATA_PATH_METADATA))?;
@@ -58,9 +58,9 @@ pub async fn start(mut cfg: StartupConfig) -> Result<()> {
                     .take(32)
                     .map(char::from)
                     .collect();
-                let mut sys_cfg = md.config.load()?;
-                sys_cfg.auth.admin_default_password = pwd.clone();
-                md.config.save(&sys_cfg)?;
+                let mut sys_cfg = md.settings.load()?;
+                sys_cfg.auth_admin_default_password = pwd.clone();
+                md.settings.save(&sys_cfg)?;
                 info!("creating admin account...");
                 let acc = md.accounts.create(CreateAccountRequest {
                     created_by: ADMIN_ID,
@@ -108,7 +108,7 @@ pub async fn start(mut cfg: StartupConfig) -> Result<()> {
         info!("email: {}",admin_acc.email);
     }
     if admin_acc.force_update_password {
-        let pwd = md.config.load()?.auth.admin_default_password;
+        let pwd = md.settings.load()?.auth_admin_default_password;
         info!("password: {}",pwd);
     }
     let listener = tokio::net::TcpListener::bind(cfg.server.host).await?;

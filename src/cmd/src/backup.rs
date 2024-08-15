@@ -27,7 +27,7 @@ use tokio_cron_scheduler::{Job, JobScheduler};
 use tracing::{debug, error, trace};
 use metadata::{backup, backups, MetadataProvider};
 use metadata::backups::{Backup, CreateBackupRequest, GCPProvider, Provider, S3Provider};
-use metadata::settings::{BackupProvider, Settings};
+use metadata::settings::{BackupProvider, BackupScheduleInterval, Settings};
 use storage::db::OptiDBImpl;
 use crate::error::Error::BackupError;
 use crate::error::Result;
@@ -57,15 +57,21 @@ pub async fn init(md: Arc<MetadataProvider>,
     tokio::spawn(async move {
         loop {
             sleep(Duration::from_secs(5)).await;
-            let cfg = md.config.load().expect("load config error");
+            let settings = md.settings.load().expect("load config error");
             // cancel if not enabled
-            if cfg.backup.is_none() {
+            if !settings.backup_enabled {
                 continue;
             }
-            let backup_cfg = cfg.backup.unwrap();
+            let cron = match settings.backup_schedule_interval {
+                BackupScheduleInterval::Hourly => "0 * * * *".to_string(),
+                BackupScheduleInterval::Daily => format!("0 {} * * *", settings.backup_schedule_start_hour),
+                BackupScheduleInterval::Weekly => format!("0 {} * * 0", settings.backup_schedule_start_hour),
+                BackupScheduleInterval::Monthly => format!("0 {} 1 * *", settings.backup_schedule_start_hour),
+                BackupScheduleInterval::Yearly => format!("0 {} 1 1 *", settings.backup_schedule_start_hour),
+            };
 
-            let schedule = backup_cfg.schedule;
-            let cron = Cron::new(&schedule).parse().expect("cron schedule parse error");
+            let cron = "* * * * *";
+            let cron = Cron::new(&cron).parse().expect("cron schedule parse error");
             let cur_time = Utc::now().naive_utc();
             let cur_time = truncate_to_minute(&cur_time);
             let next_time = cron.find_next_occurrence(&DateTime::from_timestamp(cur_time.timestamp(), 0).unwrap(), true).expect("find next occurrence error").naive_utc();
@@ -131,14 +137,12 @@ pub async fn init(md: Arc<MetadataProvider>,
 }
 
 async fn backup(md: Arc<MetadataProvider>, db: &Arc<OptiDBImpl>) -> Result<()> {
-    let cfg = md.config.load()?;
-    let backup_cfg = cfg.backup.unwrap();
-    let prov = backup_cfg.provider.clone();
-    match backup_cfg.provider {
-        metadata::settings::BackupProvider::Local(_) => {}
-        _ => panic!("invalid backup provider: {:?}", prov)
+    let settings = md.settings.load()?;
+    match settings.backup_provider {
+        BackupProvider::Local => {}
+        _ => panic!("invalid backup provider")
     }
-    let iv = if let Some(e) = &backup_cfg.encryption {
+    let iv = if settings.backup_encryption_enabled {
         let mut rng = StdRng::from_rng(rand::thread_rng())?;
         let key = get_random_key64(&mut rng);
         Some(key.to_vec())
@@ -146,7 +150,15 @@ async fn backup(md: Arc<MetadataProvider>, db: &Arc<OptiDBImpl>) -> Result<()> {
         None
     };
 
-    let provider = match prov {
+    let provider = match settings.backup_provider {
+        BackupProvider::Local => Provider::Local(PathBuf::from(settings.backup_provider_local_path)),
+        BackupProvider::S3 => Provider::S3(S3Provider {
+            bucket: settings.backup_provider_s3_bucket.clone().expect("s3 bucket not set"),
+            region: settings.backup_provider_s3_region.clone().expect("s3 region not set"),
+        }),
+        BackupProvider::GCP => {}
+    }
+    let provider = match settings.backup_provider {
         metadata::settings::BackupProvider::Local(path) => Provider::Local(path),
         metadata::settings::BackupProvider::S3(s3) => Provider::S3(S3Provider { bucket: s3.bucket, region: s3.region }),
         metadata::settings::BackupProvider::GCP(gcp) => Provider::GCP(GCPProvider { bucket: gcp.bucket })

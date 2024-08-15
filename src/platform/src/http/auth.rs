@@ -8,7 +8,7 @@ use axum::routing::post;
 use axum::routing::put;
 use axum::Router;
 use axum_macros::debug_handler;
-use common::startup_config::StartupConfig;
+use common::config::Config;
 use common::http::Json;
 use serde::Deserialize;
 use serde::Serialize;
@@ -52,7 +52,7 @@ async fn switch_organization(
     ctx: Context,
     cookies: Cookies,
     Extension(provider): Extension<Arc<Auth>>,
-    Extension(cfg): Extension<StartupConfig>,
+    Extension(cfg): Extension<Config>,
     Path(id): Path<u64>,
 ) -> Result<(StatusCode, Json<TokensResponse>)> {
     let tokens = provider.switch_organization(ctx, id).await?;
@@ -70,7 +70,7 @@ async fn switch_organization(
 async fn sign_up(
     cookies: Cookies,
     Extension(provider): Extension<Arc<Auth>>,
-    Extension(cfg): Extension<StartupConfig>,
+    Extension(cfg): Extension<Config>,
     Json(req): Json<SignUpRequest>,
 ) -> Result<(StatusCode, Json<TokensResponse>)> {
     let tokens = provider.sign_up(req).await?;
@@ -86,7 +86,7 @@ async fn sign_up(
 async fn log_in(
     cookies: Cookies,
     Extension(provider): Extension<Arc<Auth>>,
-    Extension(cfg): Extension<StartupConfig>,
+    Extension(cfg): Extension<Config>,
     Json(req): Json<LogInRequest>,
 ) -> Result<Json<TokensResponse>> {
     // check org id in cookies. Skip if none
@@ -114,7 +114,7 @@ async fn refresh_token(
     ctx: Context,
     cookies: Cookies,
     Extension(provider): Extension<Arc<Auth>>,
-    Extension(cfg): Extension<StartupConfig>,
+    Extension(cfg): Extension<Config>,
     Json(req): Json<RefreshTokenRequest>,
 ) -> Result<Json<TokensResponse>> {
     // read refresh token giving priority to cookies

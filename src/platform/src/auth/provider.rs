@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use chrono::Duration;
-use common::startup_config::StartupConfig;
+use common::config::Config;
 use common::types::OptionalProperty;
 use common::ADMIN_ID;
 use common::GROUP_USER_ID;
@@ -31,16 +31,16 @@ use metadata::organizations::Organizations as MDOrganizations;
 #[derive(Clone)]
 pub struct Auth {
     md:Arc<MetadataProvider>,
-    cfg: StartupConfig,
+    cfg: Config,
 }
 
 impl Auth {
-    pub fn new(md: Arc<MetadataProvider>, cfg: StartupConfig) -> Self {
+    pub fn new(md: Arc<MetadataProvider>, cfg: Config) -> Self {
         Self { md, cfg }
     }
 
     fn make_tokens(&self, account_id: u64, organisation_id: u64) -> Result<TokensResponse> {
-        let sys_cfg=self.md.config.load()?;
+        let sys_cfg=self.md.settings.load()?;
         Ok(TokensResponse {
             access_token: make_access_token(
                 account_id,
@@ -139,7 +139,7 @@ impl Auth {
     }
 
     pub async fn refresh_token(&self, ctx: Context, refresh_token: &str) -> Result<TokensResponse> {
-        let refresh_claims = parse_refresh_token(refresh_token, self.md.config.load()?.auth.refresh_token)
+        let refresh_claims = parse_refresh_token(refresh_token, self.md.settings.load()?.auth.refresh_token)
             .map_err(|err| err.wrap_into(AuthError::InvalidRefreshToken))?;
         let tokens = self.make_tokens(refresh_claims.account_id, ctx.organization_id)?;
 

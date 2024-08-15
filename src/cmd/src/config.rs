@@ -53,7 +53,7 @@ pub struct Table {
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
-pub struct StartupConfig {
+pub struct Config {
     pub server: Server,
     pub data: Data,
     pub misc: Misc,
@@ -66,32 +66,32 @@ pub struct StartupConfig {
 fn parse_duration(s: &str) -> crate::error::Result<chrono::Duration> {
     Ok(chrono::Duration::from_std(parse_duration::parse(s)?)?)
 }
-impl TryInto<common::startup_config::StartupConfig> for StartupConfig {
+impl TryInto<common::config::Config> for Config {
     type Error = crate::error::Error;
 
-    fn try_into(self) -> Result<common::startup_config::StartupConfig, Self::Error> {
-        Ok(common::startup_config::StartupConfig {
-            server: common::startup_config::Server {
+    fn try_into(self) -> Result<common::config::Config, Self::Error> {
+        Ok(common::config::Config {
+            server: common::config::Server {
                 host: self.server.host,
             },
-            data: common::startup_config::Data {
+            data: common::config::Data {
                 path: self.data.path,
                 ua_db_path: self.data.ua_db_path,
                 geo_city_path: self.data.geo_city_path,
                 ui_path: self.data.ui_path,
             },
-            auth: common::startup_config::Auth {
+            auth: common::config::Auth {
                 access_token_duration: parse_duration(self.auth.access_token_duration.as_str())?,
                 refresh_token_duration: parse_duration(self.auth.refresh_token_duration.as_str())?,
             },
-            log: common::startup_config::Log { level: self.log.level.into() },
-            misc: common::startup_config::Misc {
+            log: common::config::Log { level: self.log.level.into() },
+            misc: common::config::Misc {
                 session_cleaner_interval: parse_duration(self.misc.session_cleaner_interval.as_str())?,
                 project_default_session_duration: parse_duration(
                     self.misc.project_default_session_duration.as_str(),
                 )?,
             },
-            events_table: common::startup_config::Table {
+            events_table: common::config::Table {
                 levels: self.events_table.levels,
                 l0_max_parts: self.events_table.l0_max_parts,
                 l1_max_size_bytes: self.events_table.l1_max_size_bytes,
@@ -106,7 +106,7 @@ impl TryInto<common::startup_config::StartupConfig> for StartupConfig {
                 merge_array_page_size: self.events_table.merge_array_page_size,
                 merge_max_page_size: self.events_table.merge_max_page_size,
             },
-            group_table: common::startup_config::Table {
+            group_table: common::config::Table {
                 levels: self.group_table.levels,
                 l0_max_parts: self.group_table.l0_max_parts,
                 l1_max_size_bytes: self.group_table.l1_max_size_bytes,

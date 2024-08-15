@@ -17,7 +17,7 @@ use crate::index::next_seq;
 use crate::metadata::{ListResponse, ResponseMetadata};
 
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
-enum BackupProvider {
+pub enum BackupProvider {
     #[default]
     Local,
     S3,
@@ -25,7 +25,7 @@ enum BackupProvider {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
-enum BackupScheduleInterval {
+pub enum BackupScheduleInterval {
     #[default]
     Hourly,
     Daily,
@@ -35,7 +35,7 @@ enum BackupScheduleInterval {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
-struct Settings {
+pub struct Settings {
     pub auth_access_token: String,
     pub auth_refresh_token: String,
     pub auth_admin_default_password: String,
@@ -44,6 +44,7 @@ struct Settings {
     pub backup_encryption_password: String,
     pub backup_compression_enabled: bool,
     pub backup_provider: BackupProvider,
+    pub backup_provider_local_path: String,
     pub backup_provider_s3_bucket: String,
     pub backup_provider_s3_path: String,
     pub backup_provider_s3_region: String,
@@ -107,6 +108,7 @@ fn serialize(v: &Settings) -> Result<Vec<u8>> {
             BackupProvider::S3 => pbconfig::BackupProvider::S3 as i32,
             BackupProvider::GCP => pbconfig::BackupProvider::Gcp as i32,
         },
+        backup_provider_local: v.backup_provider_local_path.clone(),
         backup_provider_s3_bucket: v.backup_provider_s3_bucket.clone(),
         backup_provider_s3_path: v.backup_provider_s3_path.clone(),
         backup_provider_s3_region: v.backup_provider_s3_region.clone(),
@@ -144,6 +146,7 @@ fn deserialize(data: &[u8]) -> Result<Settings> {
             3 => BackupProvider::GCP,
             _=>panic!("Invalid backup provider")
         },
+        backup_provider_local_path: c.backup_provider_local,
         backup_provider_s3_bucket: c.backup_provider_s3_bucket,
         backup_provider_s3_path: c.backup_provider_s3_path,
         backup_provider_s3_region: c.backup_provider_s3_region,
@@ -179,6 +182,7 @@ mod tests {
            backup_encryption_password: "4".to_string(),
            backup_compression_enabled: true,
            backup_provider: BackupProvider::Local,
+           backup_provider_local_path: "4.1".to_string(),
            backup_provider_s3_bucket: "5".to_string(),
            backup_provider_s3_path: "6".to_string(),
            backup_provider_s3_region: "7".to_string(),

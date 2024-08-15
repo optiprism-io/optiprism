@@ -53,7 +53,7 @@ pub struct Table {
 }
 
 #[derive(Debug, Clone)]
-pub struct StartupConfig {
+pub struct Config {
     pub server: Server,
     pub data: Data,
     pub auth: Auth,
@@ -63,9 +63,9 @@ pub struct StartupConfig {
     pub log: Log,
 }
 
-impl Default for StartupConfig {
+impl Default for Config {
     fn default() -> Self {
-        StartupConfig {
+        Config {
             server: Server {
                 host: SocketAddr::from_str("0.0.0.0:8080").unwrap(),
             },

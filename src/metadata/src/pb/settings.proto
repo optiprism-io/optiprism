@@ -10,16 +10,17 @@ message Config {
   string backup_encryption_password = 6;
   bool backup_compression_enabled = 7;
   BackupProvider backup_provider = 8;
-  string backup_provider_s3_bucket = 9;
-  string backup_provider_s3_path = 10;
-  string backup_provider_s3_region = 11;
-  string backup_provider_s3_access_key = 12;
-  string backup_provider_s3_secret_key = 13;
-  string backup_provider_gcp_bucket = 14;
-  string backup_provider_gcp_path = 15;
-  string backup_provider_gcp_key = 16;
-  BackupScheduleInterval backup_schedule_interval = 17;
-  uint32 backup_schedule_start_hour = 18;
+  string backup_provider_local = 9;
+  string backup_provider_s3_bucket = 10;
+  string backup_provider_s3_path = 11;
+  string backup_provider_s3_region = 12;
+  string backup_provider_s3_access_key = 13;
+  string backup_provider_s3_secret_key = 14;
+  string backup_provider_gcp_bucket = 15;
+  string backup_provider_gcp_path = 16;
+  string backup_provider_gcp_key = 17;
+  BackupScheduleInterval backup_schedule_interval = 18;
+  uint32 backup_schedule_start_hour = 19;
 }
 
 enum BackupScheduleInterval {
