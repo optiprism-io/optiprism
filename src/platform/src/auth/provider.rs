@@ -40,19 +40,19 @@ impl Auth {
     }
 
     fn make_tokens(&self, account_id: u64, organisation_id: u64) -> Result<TokensResponse> {
-        let sys_cfg=self.md.settings.load()?;
+        let settings =self.md.settings.load()?;
         Ok(TokensResponse {
             access_token: make_access_token(
                 account_id,
                 organisation_id,
                 self.cfg.auth.access_token_duration.clone(),
-                sys_cfg.auth.access_token,
+                settings.auth_access_token,
             )
                 .map_err(|err| err.wrap_into(AuthError::CantMakeAccessToken))?,
             refresh_token: make_refresh_token(
                 account_id,
                 self.cfg.auth.refresh_token_duration.clone(),
-                sys_cfg.auth.refresh_token,
+                settings.auth_refresh_token,
             )
                 .map_err(|err| err.wrap_into(AuthError::CantMakeRefreshToken))?,
         })
@@ -139,7 +139,7 @@ impl Auth {
     }
 
     pub async fn refresh_token(&self, ctx: Context, refresh_token: &str) -> Result<TokensResponse> {
-        let refresh_claims = parse_refresh_token(refresh_token, self.md.settings.load()?.auth.refresh_token)
+        let refresh_claims = parse_refresh_token(refresh_token, self.md.settings.load()?.auth_refresh_token)
             .map_err(|err| err.wrap_into(AuthError::InvalidRefreshToken))?;
         let tokens = self.make_tokens(refresh_claims.account_id, ctx.organization_id)?;
 

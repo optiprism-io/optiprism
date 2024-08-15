@@ -151,23 +151,22 @@ async fn backup(md: Arc<MetadataProvider>, db: &Arc<OptiDBImpl>) -> Result<()> {
     };
 
     let provider = match settings.backup_provider {
-        BackupProvider::Local => Provider::Local(PathBuf::from(settings.backup_provider_local_path)),
+        BackupProvider::Local => Provider::Local(PathBuf::from(settings.backup_provider_local_path.clone())),
         BackupProvider::S3 => Provider::S3(S3Provider {
-            bucket: settings.backup_provider_s3_bucket.clone().expect("s3 bucket not set"),
-            region: settings.backup_provider_s3_region.clone().expect("s3 region not set"),
+            bucket: settings.backup_provider_s3_bucket.clone(),
+            path: settings.backup_provider_s3_path.clone(),
+            region: settings.backup_provider_s3_region.clone(),
         }),
-        BackupProvider::GCP => {}
-    }
-    let provider = match settings.backup_provider {
-        metadata::settings::BackupProvider::Local(path) => Provider::Local(path),
-        metadata::settings::BackupProvider::S3(s3) => Provider::S3(S3Provider { bucket: s3.bucket, region: s3.region }),
-        metadata::settings::BackupProvider::GCP(gcp) => Provider::GCP(GCPProvider { bucket: gcp.bucket })
+        BackupProvider::GCP => Provider::GCP(GCPProvider {
+            bucket: settings.backup_provider_gcp_bucket.clone(),
+            path: settings.backup_provider_gcp_path.clone(),
+        })
     };
 
     let req = CreateBackupRequest {
-        provider: provider.clone(),
-        is_encrypted: backup_cfg.encryption.is_some(),
-        is_compressed: backup_cfg.compression_enabled,
+        provider:provider.clone(),
+        is_encrypted: settings.backup_encryption_enabled,
+        is_compressed: settings.backup_compression_enabled,
         iv,
     };
 
@@ -176,9 +175,10 @@ async fn backup(md: Arc<MetadataProvider>, db: &Arc<OptiDBImpl>) -> Result<()> {
         md.backups.update_status(bak.id, metadata::backups::Status::InProgress(pct)).expect("update status error");
     };
     if matches!(provider,Provider::Local(_)) {
-        backup_local(&db, &bak, &backup_cfg, progress).await?;
+        backup_local(&db, &bak, &settings, progress).await?;
     } else if matches!(provider,Provider::GCP(_)) {
-        backup_gcp(&db, &bak, &backup_cfg, progress).await?;
+        panic!("not implemented");
+        // backup_gcp(&db, &bak, &settings, progress).await?;
     };
 
     md.backups.update_status(bak.id, backups::Status::Completed)?;
@@ -241,7 +241,7 @@ impl Write for Bridge {
     }
 }
 
-async fn backup_local<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, cfg: &metadata::settings::Backup, progress: F) -> Result<()> {
+async fn backup_local<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, settings: &metadata::settings::Settings, progress: F) -> Result<()> {
     debug!("starting local backup");
     let path = backup.path();
     let w = BufWriter::new(File::create(path)?);
@@ -263,7 +263,7 @@ async fn backup_local<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, cfg: 
     Ok(())
 }
 
-
+/*
 async fn backup_gcp<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, cfg: &metadata::settings::Backup, progress: F) -> Result<()> {
     debug!("starting gcp backup");
 
@@ -296,6 +296,7 @@ async fn backup_gcp<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, cfg: &m
 
     Ok(())
 }
+*/
 
 #[cfg(test)]
 mod tests {

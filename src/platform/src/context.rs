@@ -181,11 +181,11 @@ where
                 .await
                 .map_err(|_err| AuthError::CantParseBearerHeader)?;
 
-        let Extension(cfg) = Extension::<Arc<SettingsProvider>>::from_request_parts(parts, state)
+        let Extension(settings) = Extension::<Arc<SettingsProvider>>::from_request_parts(parts, state)
             .await
             .map_err(|err| PlatformError::Internal(err.to_string()))?;
 
-        let claims = parse_access_token(bearer.token(), cfg.load()?.auth.access_token)
+        let claims = parse_access_token(bearer.token(), settings.load()?.auth_access_token)
             .map_err(|err| err.wrap_into(AuthError::CantParseAccessToken))?;
         let Extension(md_acc_prov) =
             Extension::<Arc<metadata::accounts::Accounts>>::from_request_parts(parts, state)
