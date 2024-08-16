@@ -36,6 +36,7 @@ pub enum Provider {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum Status {
+    Idle,
     InProgress(usize),
     Uploading,
     Failed(String),
@@ -97,7 +98,7 @@ impl Backups {
             created_at,
             updated_at: None,
             provider: req.provider,
-            status: Status::InProgress(0),
+            status: req.status,
             is_encrypted: req.is_encrypted,
             password: req.password,
         };
@@ -163,6 +164,7 @@ pub struct CreateBackupRequest {
     pub provider: Provider,
     pub password: Option<String>,
     pub is_encrypted: bool,
+    pub status: Status,
 }
 
 fn serialize(b: &Backup) -> Result<Vec<u8>> {
@@ -202,7 +204,8 @@ fn serialize(b: &Backup) -> Result<Vec<u8>> {
         _ => String::new(),
     };
     let status = match &b.status {
-        Status::InProgress(p) => backup::Status::InProgress as i32,
+        Status::Idle => backup::Status::Idle as i32,
+        Status::InProgress(_) => backup::Status::InProgress as i32,
         Status::Uploading => backup::Status::Uploading as i32,
         Status::Failed(e) => backup::Status::Failed as i32,
         Status::Completed => backup::Status::Completed as i32,
@@ -254,10 +257,11 @@ fn deserialize(data: &[u8]) -> Result<Backup> {
     };
 
     let status = match from.status {
-        1 => Status::InProgress(from.status_in_progress_progress as usize),
-        2 => Status::Uploading,
-        3 => Status::Failed(from.status_failed_error),
-        4 => Status::Completed,
+        1 => Status::Idle,
+        2 => Status::InProgress(from.status_in_progress_progress as usize),
+        3 => Status::Uploading,
+        4 => Status::Failed(from.status_failed_error),
+        5 => Status::Completed,
         _ => return Err(MetadataError::Internal("invalid status".to_string())),
     };
     Ok(Backup {

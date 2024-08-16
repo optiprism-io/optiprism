@@ -20,7 +20,7 @@ use pbkdf2::pbkdf2_hmac;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use sha2::Sha256;
-use tokio::task;
+use tokio::{select, task};
 use tokio::task::spawn_blocking;
 use tokio::time::sleep;
 use tokio_cron_scheduler::{Job, JobScheduler};
@@ -30,7 +30,7 @@ use zip::write::SimpleFileOptions;
 use common::config::Config;
 use common::{DATA_PATH_BACKUP_TMP, DATA_PATH_BACKUPS};
 use metadata::{backup, backups, MetadataProvider};
-use metadata::backups::{Backup, CreateBackupRequest, GCPProvider, Provider, S3Provider};
+use metadata::backups::{Backup, CreateBackupRequest, GCPProvider, Provider, S3Provider, Status};
 use metadata::settings::{BackupProvider, BackupScheduleInterval, Settings};
 use storage::db::OptiDBImpl;
 use crate::error::Error::BackupError;
@@ -70,6 +70,21 @@ pub async fn init(md: Arc<MetadataProvider>,
             if !settings.backup_enabled {
                 continue;
             }
+
+            let backups = md_cloned.backups.list().expect("list backups error");
+            let maybe_idle = backups.into_iter().find(|b| b.status == backups::Status::Idle);
+            if let Some(backup) = maybe_idle {
+                match run_backup(backup, db_cloned.clone(), md_cloned.clone(), cfg.clone(), &settings).await {
+                    Ok(b) => {
+                        md_cloned.backups.update_status(b.id, metadata::backups::Status::Completed).expect("update status error");
+                    }
+                    Err(e) => {
+                        error!("backup error: {:?}", e);
+                    }
+                };
+                continue;
+            }
+
             let cron = match settings.backup_schedule_interval {
                 BackupScheduleInterval::Hourly => "0 * * * *".to_string(),
                 BackupScheduleInterval::Daily => format!("0 {} * * *", settings.backup_schedule_start_hour),
@@ -78,7 +93,7 @@ pub async fn init(md: Arc<MetadataProvider>,
                 BackupScheduleInterval::Yearly => format!("0 {} 1 1 *", settings.backup_schedule_start_hour),
             };
 
-            let cron = "* * * * *";
+            // let cron = "* * * * *";
             let cron = Cron::new(&cron).parse().expect("cron schedule parse error");
             let cur_time = Utc::now().naive_utc();
             let cur_time = truncate_to_minute(&cur_time);
@@ -97,25 +112,26 @@ pub async fn init(md: Arc<MetadataProvider>,
                 }
             }
 
-            let backup = match run_backup(db_cloned.clone(), md_cloned.clone(), cfg.clone(), &settings).await {
-                Ok(b) => b,
+            let backup = create_backup(md.clone()).expect("create backup error");
+            match run_backup(backup, db_cloned.clone(), md_cloned.clone(), cfg.clone(), &settings).await {
+                Ok(b) => {
+                    md_cloned.backups.update_status(b.id, metadata::backups::Status::Completed).expect("update status error");
+                }
                 Err(e) => {
                     error!("backup error: {:?}", e);
                     continue;
                 }
             };
-            md_cloned.backups.update_status(backup.id, metadata::backups::Status::Completed).expect("update status error");
         }
     });
     Ok(())
 }
 
-async fn run_backup(db: Arc<OptiDBImpl>, md: Arc<MetadataProvider>, cfg: Config, settings: &Settings) -> Result<Backup> {
-    let backup = create_backup(md.clone())?;
-    let backup_cloned = backup.clone();
+async fn run_backup(backup: Backup, db: Arc<OptiDBImpl>, md: Arc<MetadataProvider>, cfg: Config, settings: &Settings) -> Result<Backup> {
     let md_cloned = md.clone();
     let tmp_path = cfg.data.path.join(DATA_PATH_BACKUP_TMP).join(backup.id.to_string());
     let tmp_path_cloned = tmp_path.clone();
+    let backup_cloned = backup.clone();
     let hnd = task::spawn_blocking(move || {
         let progress = |pct: usize| {
             md_cloned.backups.update_status(backup_cloned.id, metadata::backups::Status::InProgress(pct)).expect("update status error");
@@ -138,6 +154,7 @@ async fn run_backup(db: Arc<OptiDBImpl>, md: Arc<MetadataProvider>, cfg: Config,
     debug!("backup successful");
     Ok(backup)
 }
+
 fn create_backup(md: Arc<MetadataProvider>) -> Result<Backup> {
     let settings = md.settings.load()?;
     match settings.backup_provider {
@@ -170,6 +187,7 @@ fn create_backup(md: Arc<MetadataProvider>) -> Result<Backup> {
         provider: provider.clone(),
         password: if settings.backup_encryption_enabled { Some(settings.backup_encryption_password.clone()) } else { None },
         is_encrypted: settings.backup_encryption_enabled,
+        status: Status::InProgress(0),
     };
 
     Ok(md.backups.create(req)?)
@@ -205,14 +223,14 @@ fn backup_to_tmp<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, tmp_path: 
 fn backup_local(backup: &Backup, cfg: &Config, tmp_path: &PathBuf) -> Result<()> {
     let dst_path = cfg.data.path.join(DATA_PATH_BACKUPS).join(backup.created_at.format("%Y-%m-%dT%H:00:00.zip").to_string());
     debug!("starting local backup to {:?}",&dst_path);
-    let dst_path = match &backup.provider {
+    // generate backup to default dir for now
+    /*let dst_path = match &backup.provider {
         Provider::Local(path) => path.clone(),
         Provider::S3(_) => panic!("invalid provider"),
         Provider::GCP(_) => panic!("invalid provider")
-    };
-
+    };*/
+    dbg!(&tmp_path,&dst_path);
     fs::rename(tmp_path, &dst_path)?;
-
     Ok(())
 }
 
