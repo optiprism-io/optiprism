@@ -76,4 +76,6 @@ pub enum Error {
     OpenSSLStackError(#[from] openssl::error::ErrorStack),
     #[error("object store: {0:?}")]
     ObjectStoreError(#[from] object_store::Error),
+    #[error("zip: {0:?}")]
+    ZipError(#[from] zip::result::ZipError),
 }

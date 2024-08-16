@@ -65,6 +65,7 @@ pbkdf2 = "0.12.2"
 sha2 = "0.10.8"
 object_store = { version = "0.10.2" ,features = ["gcp","aws"]}
 quick-xml = { version = "0.23.0-alpha3" }
+zip = "2.1.6"
 
 [build-dependencies]
 vergen = "9.0.0"

@@ -14,10 +14,9 @@ message Backup {
   string status_failed_error = 10;
   int64 status_in_progress_progress = 11;
   bool is_encrypted = 12;
-  bool is_compressed = 13;
-  optional bytes iv = 14;
-  string s3_path = 15;
-  string gcp_path = 16;
+  optional string password = 13;
+  string s3_path = 14;
+  string gcp_path = 15;
 }
 
 enum Provider {

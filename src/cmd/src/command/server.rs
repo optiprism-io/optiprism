@@ -24,7 +24,7 @@ use tracing::debug;
 use tracing::info;
 use crate::error::Error;
 use crate::error::Result;
-use crate::{backup, init_config, init_ingester};
+use crate::{backup, init_config, init_fs, init_ingester};
 use crate::init_metrics;
 use crate::init_platform;
 use crate::init_session_cleaner;
@@ -33,8 +33,7 @@ use crate::init_system;
 pub async fn start(mut cfg: Config) -> Result<()> {
     debug!("db path: {:?}", cfg.data.path);
 
-    fs::create_dir_all(cfg.data.path.join(DATA_PATH_METADATA))?;
-    fs::create_dir_all(cfg.data.path.join(DATA_PATH_STORAGE))?;
+    init_fs(&cfg)?;
     let rocks = Arc::new(metadata::rocksdb::new(cfg.data.path.join(DATA_PATH_METADATA))?);
     let db = Arc::new(OptiDBImpl::open(cfg.data.path.join(DATA_PATH_STORAGE), Options {})?);
     let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);

@@ -22,7 +22,7 @@ use metadata::settings::BackupScheduleInterval;
 use storage::db::{OptiDBImpl, Options};
 use storage::{NamedValue, table, Value};
 use storage::parquet::ArrowIteratorImpl;
-use crate::{backup, init_metrics, init_system};
+use crate::{backup, init_fs, init_metrics, init_system};
 #[derive(Parser, Clone)]
 pub struct Gen {
     #[arg(long)]
@@ -45,9 +45,10 @@ pub struct DbTest {
     pub cmd: Commands,
 }
 
-pub async fn gen(args: &DbTest, gen: &Gen) -> crate::error::Result<()> {
+pub async fn gen(args: &DbTest, gen: &Gen,cfg: Config) -> crate::error::Result<()> {
     init_metrics();
-    fs::remove_dir_all(args.path.join(DATA_PATH_STORAGE))?;
+    fs::remove_dir_all(&args.path)?;
+    init_fs(&cfg)?;
     let rocks = Arc::new(metadata::rocksdb::new(args.path.join(DATA_PATH_METADATA))?);
     let db = Arc::new(OptiDBImpl::open(args.path.join(DATA_PATH_STORAGE), Options {})?);
     let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
@@ -100,7 +101,9 @@ pub async fn gen(args: &DbTest, gen: &Gen) -> crate::error::Result<()> {
     settings.backup_provider = metadata::settings::BackupProvider::Local;
     settings.backup_provider_local_path = "/tmp/optiprism/backups".to_string();
     md.settings.save(&settings)?;
-    backup::init(md.clone(), db.clone()).await?;
+    let mut cfg = Config::default();
+    cfg.data.path = args.path.clone();
+    backup::init(md.clone(), db.clone(), cfg).await?;
     let db_cloned = db.clone();
     /*thread::spawn(move || {
         loop {

@@ -1,10 +1,10 @@
 #![feature(async_closure)]
 
-use std::fs::File;
-use std::io::{BufWriter, Read, Write};
+use std::fs::{File, OpenOptions};
+use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use std::thread;
+use std::{fs, thread};
 use std::time::Duration;
 use chrono::{Datelike, DateTime, NaiveDateTime, NaiveTime, Timelike, Utc};
 use croner::Cron;
@@ -25,6 +25,10 @@ use tokio::task::spawn_blocking;
 use tokio::time::sleep;
 use tokio_cron_scheduler::{Job, JobScheduler};
 use tracing::{debug, error, trace};
+use zip::AesMode;
+use zip::write::SimpleFileOptions;
+use common::config::Config;
+use common::{DATA_PATH_BACKUP_TMP, DATA_PATH_BACKUPS};
 use metadata::{backup, backups, MetadataProvider};
 use metadata::backups::{Backup, CreateBackupRequest, GCPProvider, Provider, S3Provider};
 use metadata::settings::{BackupProvider, BackupScheduleInterval, Settings};
@@ -42,7 +46,7 @@ fn truncate_to_minute(dt: &NaiveDateTime) -> NaiveDateTime {
 }
 
 pub async fn init(md: Arc<MetadataProvider>,
-                  db: Arc<OptiDBImpl>) -> Result<()> {
+                  db: Arc<OptiDBImpl>, cfg: Config) -> Result<()> {
     let backups = md.backups.list()?;
     // reset all in progress backups since they are stateless
     for backup in backups {
@@ -87,7 +91,7 @@ pub async fn init(md: Arc<MetadataProvider>,
                     continue;
                 }
             }
-            let res = backup(md_cloned.clone(), &db_cloned).await;
+            let res = backup(md_cloned.clone(), &db_cloned, &cfg).await;
             match res {
                 Ok(_) => {}
                 Err(err) => {
@@ -136,7 +140,7 @@ pub async fn init(md: Arc<MetadataProvider>,
     Ok(())
 }
 
-async fn backup(md: Arc<MetadataProvider>, db: &Arc<OptiDBImpl>) -> Result<()> {
+async fn backup(md: Arc<MetadataProvider>, db: &Arc<OptiDBImpl>, cfg: &Config) -> Result<()> {
     let settings = md.settings.load()?;
     match settings.backup_provider {
         BackupProvider::Local => {}
@@ -166,9 +170,8 @@ async fn backup(md: Arc<MetadataProvider>, db: &Arc<OptiDBImpl>) -> Result<()> {
 
     let req = CreateBackupRequest {
         provider: provider.clone(),
+        password: if settings.backup_encryption_enabled { Some(settings.backup_encryption_password.clone()) } else { None },
         is_encrypted: settings.backup_encryption_enabled,
-        is_compressed: settings.backup_compression_enabled,
-        iv,
     };
 
     let bak = md.backups.create(req)?;
@@ -176,10 +179,11 @@ async fn backup(md: Arc<MetadataProvider>, db: &Arc<OptiDBImpl>) -> Result<()> {
         md.backups.update_status(bak.id, metadata::backups::Status::InProgress(pct)).expect("update status error");
     };
     if matches!(provider,Provider::Local(_)) {
-        backup_local(&db, &bak, &settings, progress).await?;
+        backup_local(&db, &bak, &cfg, &settings, progress)?;
     } else if matches!(provider,Provider::GCP(_)) {
-        backup_gcp(&db, &bak, &settings, progress).await?;
+        backup_gcp(&db, &bak, &cfg, &settings, progress).await?;
     };
+    debug!("backup successful");
 
     md.backups.update_status(bak.id, backups::Status::Completed)?;
 
@@ -219,59 +223,79 @@ fn backup_local<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, cfg: &metad
 }
 */
 
-struct Bridge {
-    w: object_store::WriteMultipart,
+struct ObjectStoreCompressionBridge {
+    obj_w: object_store::WriteMultipart,
+    // comp_w:
 }
 
-impl Bridge {
+impl ObjectStoreCompressionBridge {
     pub async fn finish(mut self) -> Result<()> {
-        self.w.finish().await?;
+        self.obj_w.finish().await?;
         Ok(())
     }
 }
 
-impl Write for Bridge {
+impl Write for ObjectStoreCompressionBridge {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.w.write(buf);
+        self.obj_w.write(buf);
         Ok(buf.len())
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
-        todo!()
+        unimplemented!()
     }
 }
 
-async fn backup_local<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, settings: &metadata::settings::Settings, progress: F) -> Result<()> {
-    debug!("starting local backup");
-    let path = match &backup.provider {
+
+// backup to temporary directory. Unfortunately we can't stream zip because it has Write+Seek trait
+fn backup_to_tmp<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, cfg: &Config, tmp_path: &PathBuf, progress: F) -> Result<()> {
+    let tmp = File::create(tmp_path.clone())?;
+    let mut zip = zip::ZipWriter::new(tmp);
+
+    let options = SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Deflated)
+        .large_file(true)
+        .unix_permissions(0o755);
+
+    let options = if backup.is_encrypted {
+        options.with_aes_encryption(AesMode::Aes128, backup.password.as_ref().expect("password not set"))
+    } else {
+        options
+    };
+
+    zip.start_file("backup", options)?;
+
+    db.full_backup(&mut zip, |pct| {
+        progress(pct);
+    })?;
+
+    zip.finish()?;
+
+    Ok(())
+}
+
+fn backup_local<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, cfg: &Config, settings: &metadata::settings::Settings, progress: F) -> Result<()> {
+    let dst_path = cfg.data.path.join(DATA_PATH_BACKUPS).join(backup.created_at.format("%Y-%m-%dT%H:00:00.zip").to_string());
+    debug!("starting local backup to {:?}",&dst_path);
+    let tmp_path = cfg.data.path.join(DATA_PATH_BACKUP_TMP).join(backup.id.to_string());
+    backup_to_tmp(db, backup, cfg, &tmp_path, progress)?;
+
+    let dst_path = match &backup.provider {
         Provider::Local(path) => path.clone(),
         Provider::S3(_) => panic!("invalid provider"),
         Provider::GCP(_) => panic!("invalid provider")
     };
 
-    let w = BufWriter::new(File::create(path)?);
-
-    let obj = LocalFileSystem::new();
-    let path = object_store::path::Path::from(backup.path());
-    let upload = obj.put_multipart(&path).await?;
-    let mut mp = WriteMultipart::new(upload);
-    let mut w = Bridge { w: mp };
-
-    db.full_backup(&mut w, |pct| {
-        progress(pct);
-    })?;
-
-    w.finish().await?;
-
-    debug!("backup successful");
+    fs::rename(&tmp_path, &dst_path)?;
 
     Ok(())
 }
 
+async fn backup_gcp<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, cfg: &Config, settings: &metadata::settings::Settings, progress: F) -> Result<()> {
+    debug!("starting gcp backup to {:?}",backup.path());
+    let tmp_path = cfg.data.path.join(DATA_PATH_BACKUP_TMP).join(backup.id.to_string());
+    backup_to_tmp(db, backup, cfg, &tmp_path, progress)?;
 
-async fn backup_gcp<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, settings: &metadata::settings::Settings, progress: F) -> Result<()> {
-    debug!("starting gcp backup");
-    dbg!(&settings.backup_provider_gcp_key);
     let gcs = GoogleCloudStorageBuilder::new()
         .with_bucket_name(settings.backup_provider_gcp_bucket.clone())
         .with_service_account_key(settings.backup_provider_gcp_key.clone())
@@ -279,13 +303,19 @@ async fn backup_gcp<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, setting
     let path = object_store::path::Path::from(backup.path());
     let upload = gcs.put_multipart(&path).await?;
     let mut w = WriteMultipart::new(upload);
-    w.write(b"hello");
-    w.finish().await.unwrap();
-    /*db.full_backup(&mut w, |pct| {
-        progress(pct);
-    })?;*/
 
-    debug!("backup successful");
+    let tmp = OpenOptions::new().read(true).open(&tmp_path)?;
+    let mut r = BufReader::new(tmp);
+    loop {
+        let mut buf = [0u8; 1024];
+        let n = r.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        w.write(&buf[..n]);
+    }
+    w.finish().await.unwrap();
+    fs::remove_file(tmp_path)?;
 
     Ok(())
 }

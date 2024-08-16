@@ -67,7 +67,7 @@ use uaparser::UserAgentParser;
 use metadata::settings::{BackupProvider, BackupScheduleInterval};
 use crate::error::Error;
 use crate::error::Result;
-use crate::{get_random_key32, init_config, init_ingester};
+use crate::{get_random_key32, init_config, init_fs, init_ingester};
 use crate::init_metrics;
 use crate::init_platform;
 use crate::init_session_cleaner;
@@ -116,6 +116,7 @@ pub async fn start(args: &Store, mut cfg: crate::Config) -> Result<()> {
             Err(_) => {}
         }
     }
+    init_fs(&cfg)?;
     let rocks = Arc::new(metadata::rocksdb::new(cfg.data.path.join(DATA_PATH_METADATA))?);
     let db = Arc::new(OptiDBImpl::open(
         cfg.data.path.join(DATA_PATH_STORAGE),
@@ -143,7 +144,6 @@ pub async fn start(args: &Store, mut cfg: crate::Config) -> Result<()> {
     settings.backup_provider_gcp_key = match env::var("GOOGLE_APPLICATION_CREDENTIALS").unwrap().as_str() {
         "" => "".to_string(),
         _ => {
-            // read file
             fs::read_to_string(env::var("GOOGLE_APPLICATION_CREDENTIALS").unwrap())?
         }
     };

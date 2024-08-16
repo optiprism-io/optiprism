@@ -49,21 +49,20 @@ pub struct Backup {
     pub provider: Provider,
     pub status: Status,
     pub is_encrypted: bool,
-    pub is_compressed: bool,
-    pub iv: Option<Vec<u8>>,
+    pub password: Option<String>,
 }
 
 impl Backup {
     pub fn path(&self) -> String {
         match &self.provider {
-            Provider::Local(path) => path.join(self.created_at.format("%Y-%m-%dT%H:00:00").to_string()).into_os_string().into_string().unwrap(),
+            Provider::Local(path) => path.join(self.created_at.format("%Y-%m-%dT%H:00:00.zip").to_string()).into_os_string().into_string().unwrap(),
             Provider::S3(s3) => {
                 let p = PathBuf::from(&s3.path);
-                p.join(self.created_at.format("%Y-%m-%dT%H:00:00").to_string()).into_os_string().into_string().unwrap()
+                p.join(self.created_at.format("%Y-%m-%dT%H:00:00.zip").to_string()).into_os_string().into_string().unwrap()
             }
             Provider::GCP(gcp) => {
                 let p = PathBuf::from(&gcp.path);
-                p.join(self.created_at.format("%Y-%m-%dT%H:00:00").to_string()).into_os_string().into_string().unwrap()
+                p.join(self.created_at.format("%Y-%m-%dT%H:00:00.zip").to_string()).into_os_string().into_string().unwrap()
             }
         }
     }
@@ -99,8 +98,7 @@ impl Backups {
             provider: req.provider,
             status: Status::InProgress(0),
             is_encrypted: req.is_encrypted,
-            is_compressed: req.is_compressed,
-            iv: req.iv,
+            password: req.password,
         };
 
         let data = serialize(&backup)?;
@@ -162,9 +160,8 @@ impl Backups {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct CreateBackupRequest {
     pub provider: Provider,
+    pub password: Option<String>,
     pub is_encrypted: bool,
-    pub is_compressed: bool,
-    pub iv: Option<Vec<u8>>,
 }
 
 fn serialize(b: &Backup) -> Result<Vec<u8>> {
@@ -231,10 +228,9 @@ fn serialize(b: &Backup) -> Result<Vec<u8>> {
         status_failed_error,
         status_in_progress_progress,
         is_encrypted: b.is_encrypted,
-        is_compressed: b.is_compressed,
-        iv: b.iv.clone(),
         s3_path,
         gcp_path,
+        password: b.password.clone(),
     };
 
     Ok(b.encode_to_vec())
@@ -268,8 +264,7 @@ fn deserialize(data: &[u8]) -> Result<Backup> {
         provider,
         status,
         is_encrypted: from.is_encrypted,
-        is_compressed: from.is_compressed,
-        iv: from.iv,
+        password: from.password,
     })
 }
 
@@ -292,8 +287,7 @@ mod tests {
             }),
             status: super::Status::InProgress(10),
             is_encrypted: true,
-            is_compressed: true,
-            iv: Some(b"sdf".to_vec()),
+            password: Some("pass".to_string()),
         };
         let data = super::serialize(&b).unwrap();
         let b2 = super::deserialize(&data).unwrap();

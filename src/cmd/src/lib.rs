@@ -4,7 +4,7 @@ use std::fs::File;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::thread;
+use std::{fs, thread};
 
 use ::storage::db::OptiDBImpl;
 use ::storage::error::StoreError;
@@ -16,7 +16,7 @@ use chrono::Duration;
 use std::time::Duration as StdDuration;
 use chrono::Utc;
 use common::config::Config;
-use common::group_col;
+use common::{DATA_PATH_BACKUP_TMP, DATA_PATH_BACKUPS, DATA_PATH_METADATA, DATA_PATH_STORAGE, group_col};
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::rbac::Role;
@@ -189,6 +189,15 @@ pub fn init_metrics() {
     );
 }
 
+pub fn init_fs(cfg: &Config) -> Result<()> {
+    fs::create_dir_all(cfg.data.path.join(DATA_PATH_STORAGE))?;
+    fs::create_dir_all(cfg.data.path.join(DATA_PATH_METADATA))?;
+    fs::create_dir_all(cfg.data.path.join(DATA_PATH_BACKUP_TMP))?;
+    fs::create_dir_all(cfg.data.path.join(DATA_PATH_BACKUPS))?;
+
+    Ok(())
+}
+
 pub async fn init_system(
     md: &Arc<MetadataProvider>,
     db: &Arc<OptiDBImpl>,
@@ -253,7 +262,7 @@ pub async fn init_system(
     info!("initializing session cleaner...");
     init_session_cleaner(md.clone(), db.clone(), cfg.clone())?;
     info!("initializing backup...");
-    backup::init(md.clone(), db.clone()).await?;
+    backup::init(md.clone(), db.clone(), cfg.clone()).await?;
 
     Ok(())
 }
