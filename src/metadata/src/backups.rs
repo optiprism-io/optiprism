@@ -14,6 +14,7 @@ use crate::metadata::{ListResponse, ResponseMetadata};
 
 const NAMESPACE: &[u8] = b"system/backups";
 
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct S3Provider {
     pub bucket: String,
@@ -90,6 +91,14 @@ impl Backups {
 
     pub fn create(&self, req: CreateBackupRequest) -> Result<Backup> {
         let tx = self.db.transaction();
+        if req.status == Status::Idle {
+            let list = self.list_(&tx)?;
+            for backup in list.data {
+                if backup.status == Status::Idle {
+                    return Err(MetadataError::AlreadyExists("There is already an idle backup".to_string()));
+                }
+            }
+        }
         let created_at = Utc::now();
         let id = next_seq(&tx, make_id_seq_key(NAMESPACE))?;
 
@@ -115,8 +124,7 @@ impl Backups {
         self.get_by_id_(&tx, id)
     }
 
-    pub fn list(&self) -> Result<ListResponse<Backup>> {
-        let tx = self.db.transaction();
+    pub fn list_(&self, tx: &Transaction<TransactionDB>) -> Result<ListResponse<Backup>> {
         let prefix = make_data_key(NAMESPACE);
 
         let iter = tx.prefix_iterator(prefix.clone());
@@ -134,6 +142,11 @@ impl Backups {
             data: list,
             meta: ResponseMetadata { next: None },
         })
+    }
+
+    pub fn list(&self) -> Result<ListResponse<Backup>> {
+        let tx = self.db.transaction();
+        Ok(self.list_(&tx).unwrap())
     }
 
     pub fn update_status(&self, backup_id: u64, status: Status) -> Result<()> {
