@@ -83,42 +83,7 @@ pub async fn init(md: Arc<MetadataProvider>,
             if cur_time != next_time {
                 continue;
             }
-            let backups = md.backups.list().expect("list backups error");
-            if let Some(last) = backups.data.last() {
-                let cur_time = last.created_at.naive_utc();
-                let cur_time = truncate_to_minute(&cur_time);
-                if cur_time == next_time {
-                    continue;
-                }
-            }
-            let res = backup(md_cloned.clone(), &db_cloned, &cfg).await;
-            match res {
-                Ok(_) => {}
-                Err(err) => {
-                    error!("failed to backup: {:?}", err);
-                }
-            }
-        }
-    });
-    /*thread::spawn(move || {
-        loop {
-            thread::sleep(Duration::from_secs(5));
-            let cfg = md.config.load().expect("load config error");
-            // cancel if not enabled
-            if cfg.backup.is_none() {
-                continue;
-            }
-            let backup_cfg = cfg.backup.unwrap();
 
-            let schedule = backup_cfg.schedule;
-            let cron = Cron::new(&schedule).parse().expect("cron schedule parse error");
-            let cur_time = Utc::now().naive_utc();
-            let cur_time = truncate_to_minute(&cur_time);
-            let next_time = cron.find_next_occurrence(&DateTime::from_timestamp(cur_time.timestamp(), 0).unwrap(), true).expect("find next occurrence error").naive_utc();
-            let next_time = truncate_to_minute(&next_time);
-            if cur_time != next_time {
-                continue;
-            }
             let backups = md.backups.list().expect("list backups error");
             if let Some(last) = backups.data.last() {
                 let cur_time = last.created_at.naive_utc();
@@ -127,20 +92,48 @@ pub async fn init(md: Arc<MetadataProvider>,
                     continue;
                 }
             }
-            let res = backup(md_cloned.clone(), &db_cloned);
-            match res {
-                Ok(_) => {}
-                Err(err) => {
-                    error!("failed to backup: {:?}", err);
+
+            let backup = match run_backup(db_cloned.clone(), md_cloned.clone(), cfg.clone(), &settings).await {
+                Ok(b) => b,
+                Err(e) => {
+                    error!("backup error: {:?}", e);
+                    continue;
                 }
-            }
+            };
+            md_cloned.backups.update_status(backup.id, metadata::backups::Status::Completed).expect("update status error");
         }
     });
-*/
     Ok(())
 }
 
-async fn backup(md: Arc<MetadataProvider>, db: &Arc<OptiDBImpl>, cfg: &Config) -> Result<()> {
+async fn run_backup(db: Arc<OptiDBImpl>, md: Arc<MetadataProvider>, cfg: Config, settings: &Settings) -> Result<Backup> {
+    let backup = create_backup(md.clone())?;
+    let cfg_cloned = cfg.clone();
+    let backup_cloned = backup.clone();
+    let md_cloned = md.clone();
+    let hnd = task::spawn_blocking(move || {
+        let progress = |pct: usize| {
+            md_cloned.backups.update_status(backup_cloned.id, metadata::backups::Status::InProgress(pct)).expect("update status error");
+        };
+
+        match backup_to_tmp(&db, &backup_cloned, &cfg_cloned, progress) {
+            Ok(_) => {}
+            Err(e) => {
+                md_cloned.backups.update_status(backup_cloned.id, metadata::backups::Status::Failed(e.to_string())).expect("update status error");
+            }
+        }
+    });
+    hnd.await.unwrap();
+    if matches!(backup.provider,Provider::Local(_)) {
+        backup_local(&backup, &cfg)?;
+    } else if matches!(backup.provider,Provider::GCP(_)) {
+        md.backups.update_status(backup.id, metadata::backups::Status::Uploading)?;
+        backup_gcp(&backup, &cfg, settings).await?;
+    };
+    debug!("backup successful");
+    Ok(backup)
+}
+fn create_backup(md: Arc<MetadataProvider>) -> Result<Backup> {
     let settings = md.settings.load()?;
     match settings.backup_provider {
         BackupProvider::Local => {}
@@ -174,81 +167,12 @@ async fn backup(md: Arc<MetadataProvider>, db: &Arc<OptiDBImpl>, cfg: &Config) -
         is_encrypted: settings.backup_encryption_enabled,
     };
 
-    let bak = md.backups.create(req)?;
-    let progress = |pct: usize| {
-        md.backups.update_status(bak.id, metadata::backups::Status::InProgress(pct)).expect("update status error");
-    };
-    if matches!(provider,Provider::Local(_)) {
-        backup_local(&db, &bak, &cfg, &settings, progress)?;
-    } else if matches!(provider,Provider::GCP(_)) {
-        backup_gcp(&db, &bak, &cfg, &settings, progress).await?;
-    };
-    debug!("backup successful");
-
-    md.backups.update_status(bak.id, backups::Status::Completed)?;
-
-    Ok(())
+    Ok(md.backups.create(req)?)
 }
-
-/*
-fn backup_local<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, cfg: &metadata::config::Backup, progress: F) -> Result<()> {
-    debug!("starting local backup");
-    let path = backup.path();
-    let w = BufWriter::new(File::create(path)?);
-    let mut w: Box<dyn Write> = if let Some(enc) = &cfg.encryption {
-        let pwd = enc.password.clone();
-        let salt = enc.salt.clone();
-        let mut key = [0u8; 16];
-        pbkdf2_hmac::<Sha256>(pwd.as_slice(), salt.as_slice(), 1000, &mut key);
-        Box::new(Encryptor::new(w, Cipher::aes_128_cbc(), key.as_slice(), backup.iv.clone().unwrap().as_slice())?)
-    } else {
-        Box::new(w)
-    };
-
-    if cfg.compression_enabled {
-        let mut w = ZlibEncoder::new(w, Compression::default());
-        db.full_backup(&mut w, |pct| {
-            progress(pct);
-        })?;
-        w.finish()?;
-    } else {
-        db.full_backup(&mut w, |pct| {
-            progress(pct);
-        })?;
-    }
-
-    debug!("backup successful");
-
-    Ok(())
-}
-*/
-
-struct ObjectStoreCompressionBridge {
-    obj_w: object_store::WriteMultipart,
-    // comp_w:
-}
-
-impl ObjectStoreCompressionBridge {
-    pub async fn finish(mut self) -> Result<()> {
-        self.obj_w.finish().await?;
-        Ok(())
-    }
-}
-
-impl Write for ObjectStoreCompressionBridge {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.obj_w.write(buf);
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        unimplemented!()
-    }
-}
-
 
 // backup to temporary directory. Unfortunately we can't stream zip because it has Write+Seek trait
-fn backup_to_tmp<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, cfg: &Config, tmp_path: &PathBuf, progress: F) -> Result<()> {
+fn backup_to_tmp<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, cfg: &Config, progress: F) -> Result<()> {
+    let tmp_path = cfg.data.path.join(DATA_PATH_BACKUP_TMP).join(backup.id.to_string());
     let tmp = File::create(tmp_path.clone())?;
     let mut zip = zip::ZipWriter::new(tmp);
 
@@ -274,28 +198,24 @@ fn backup_to_tmp<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, cfg: &Conf
     Ok(())
 }
 
-fn backup_local<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, cfg: &Config, settings: &metadata::settings::Settings, progress: F) -> Result<()> {
+fn backup_local(backup: &Backup, cfg: &Config) -> Result<()> {
+    let tmp_path = cfg.data.path.join(DATA_PATH_BACKUP_TMP).join(backup.id.to_string());
     let dst_path = cfg.data.path.join(DATA_PATH_BACKUPS).join(backup.created_at.format("%Y-%m-%dT%H:00:00.zip").to_string());
     debug!("starting local backup to {:?}",&dst_path);
-    let tmp_path = cfg.data.path.join(DATA_PATH_BACKUP_TMP).join(backup.id.to_string());
-    backup_to_tmp(db, backup, cfg, &tmp_path, progress)?;
-
     let dst_path = match &backup.provider {
         Provider::Local(path) => path.clone(),
         Provider::S3(_) => panic!("invalid provider"),
         Provider::GCP(_) => panic!("invalid provider")
     };
 
-    fs::rename(&tmp_path, &dst_path)?;
+    fs::rename(tmp_path, &dst_path)?;
 
     Ok(())
 }
 
-async fn backup_gcp<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, cfg: &Config, settings: &metadata::settings::Settings, progress: F) -> Result<()> {
+async fn backup_gcp(backup: &Backup, cfg: &Config, settings: &metadata::settings::Settings) -> Result<()> {
     debug!("starting gcp backup to {:?}",backup.path());
     let tmp_path = cfg.data.path.join(DATA_PATH_BACKUP_TMP).join(backup.id.to_string());
-    backup_to_tmp(db, backup, cfg, &tmp_path, progress)?;
-
     let gcs = GoogleCloudStorageBuilder::new()
         .with_bucket_name(settings.backup_provider_gcp_bucket.clone())
         .with_service_account_key(settings.backup_provider_gcp_key.clone())

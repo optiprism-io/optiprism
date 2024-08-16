@@ -127,9 +127,6 @@ pub async fn start(args: &Store, mut cfg: crate::Config) -> Result<()> {
     info!("system initialization...");
     init_system(&md, &db, &cfg).await?;
     let mut settings = md.settings.load()?;
-    let mut rng = StdRng::from_rng(rand::thread_rng())?;
-    let mut key = [0u8; 16];
-    pbkdf2_hmac::<Sha256>(b"test", b"salt", 1000, &mut key);
     settings.backup_enabled = true;
     settings.backup_encryption_enabled = true;
     settings.backup_encryption_password = "test".to_string();

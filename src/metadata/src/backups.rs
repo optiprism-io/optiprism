@@ -37,6 +37,7 @@ pub enum Provider {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum Status {
     InProgress(usize),
+    Uploading,
     Failed(String),
     Completed,
 }
@@ -202,6 +203,7 @@ fn serialize(b: &Backup) -> Result<Vec<u8>> {
     };
     let status = match &b.status {
         Status::InProgress(p) => backup::Status::InProgress as i32,
+        Status::Uploading => backup::Status::Uploading as i32,
         Status::Failed(e) => backup::Status::Failed as i32,
         Status::Completed => backup::Status::Completed as i32,
     };
@@ -253,8 +255,9 @@ fn deserialize(data: &[u8]) -> Result<Backup> {
 
     let status = match from.status {
         1 => Status::InProgress(from.status_in_progress_progress as usize),
-        2 => Status::Failed(from.status_failed_error),
-        3 => Status::Completed,
+        2 => Status::Uploading,
+        3 => Status::Failed(from.status_failed_error),
+        4 => Status::Completed,
         _ => return Err(MetadataError::Internal("invalid status".to_string())),
     };
     Ok(Backup {

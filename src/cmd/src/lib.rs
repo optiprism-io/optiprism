@@ -16,7 +16,7 @@ use chrono::Duration;
 use std::time::Duration as StdDuration;
 use chrono::Utc;
 use common::config::Config;
-use common::{DATA_PATH_BACKUP_TMP, DATA_PATH_BACKUPS, DATA_PATH_METADATA, DATA_PATH_STORAGE, group_col};
+use common::{DATA_PATH_BACKUP_TMP, DATA_PATH_BACKUPS, DATA_PATH_METADATA, DATA_PATH_RECOVERS, DATA_PATH_STORAGE, group_col};
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::rbac::Role;
@@ -194,6 +194,7 @@ pub fn init_fs(cfg: &Config) -> Result<()> {
     fs::create_dir_all(cfg.data.path.join(DATA_PATH_METADATA))?;
     fs::create_dir_all(cfg.data.path.join(DATA_PATH_BACKUP_TMP))?;
     fs::create_dir_all(cfg.data.path.join(DATA_PATH_BACKUPS))?;
+    fs::create_dir_all(cfg.data.path.join(DATA_PATH_RECOVERS))?;
 
     Ok(())
 }

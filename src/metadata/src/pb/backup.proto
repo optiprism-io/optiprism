@@ -29,6 +29,7 @@ enum Provider {
 enum Status {
   STATUS_UNKNOWN = 0;
   IN_PROGRESS = 1;
-  FAILED = 2;
-  COMPLETED = 3;
+  UPLOADING = 2;
+  FAILED = 3;
+  COMPLETED = 4;
 }
