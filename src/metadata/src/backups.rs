@@ -11,9 +11,9 @@ use crate::{account, backup, make_data_key, make_data_value_key, make_id_seq_key
 use crate::error::MetadataError;
 use crate::index::{check_insert_constraints, check_update_constraints, delete_index, get_index, insert_index, next_seq, update_index};
 use crate::metadata::{ListResponse, ResponseMetadata};
+use crate::settings::{BackupProvider, Settings};
 
 const NAMESPACE: &[u8] = b"system/backups";
-
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct S3Provider {
@@ -180,6 +180,29 @@ pub struct CreateBackupRequest {
     pub status: Status,
 }
 
+impl CreateBackupRequest {
+    pub fn from_settings(settings:&Settings)->Self {
+        let provider = match settings.backup_provider {
+            BackupProvider::Local => Provider::Local(PathBuf::from(settings.backup_provider_local_path.clone())),
+            BackupProvider::S3 => Provider::S3(S3Provider {
+                bucket: settings.backup_provider_s3_bucket.clone(),
+                path: settings.backup_provider_s3_path.clone(),
+                region: settings.backup_provider_s3_region.clone(),
+            }),
+            BackupProvider::GCP => Provider::GCP(GCPProvider {
+                bucket: settings.backup_provider_gcp_bucket.clone(),
+                path: settings.backup_provider_gcp_path.clone(),
+            })
+        };
+
+        CreateBackupRequest {
+            provider: provider.clone(),
+            password: if settings.backup_encryption_enabled { Some(settings.backup_encryption_password.clone()) } else { None },
+            is_encrypted: settings.backup_encryption_enabled,
+            status: Status::Idle,
+        }
+    }
+}
 fn serialize(b: &Backup) -> Result<Vec<u8>> {
     let provider = match b.provider {
         Provider::Local(_) => backup::Provider::Local as i32,

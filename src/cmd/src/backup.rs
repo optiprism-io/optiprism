@@ -64,7 +64,7 @@ pub async fn init(md: Arc<MetadataProvider>,
     let md_cloned = md.clone();
     tokio::spawn(async move {
         loop {
-            sleep(Duration::from_secs(5)).await;
+            sleep(Duration::from_secs(10)).await;
             let settings = md.settings.load().expect("load config error");
             // cancel if not enabled
             if !settings.backup_enabled {
@@ -74,12 +74,13 @@ pub async fn init(md: Arc<MetadataProvider>,
             let backups = md_cloned.backups.list().expect("list backups error");
             let maybe_idle = backups.into_iter().find(|b| b.status == backups::Status::Idle);
             if let Some(backup) = maybe_idle {
-                match run_backup(backup, db_cloned.clone(), md_cloned.clone(), cfg.clone(), &settings).await {
+                match run_backup(backup.clone(), db_cloned.clone(), md_cloned.clone(), cfg.clone(), &settings).await {
                     Ok(b) => {
                         md_cloned.backups.update_status(b.id, metadata::backups::Status::Completed).expect("update status error");
                     }
                     Err(e) => {
                         error!("backup error: {:?}", e);
+                        md_cloned.backups.update_status(backup.id, metadata::backups::Status::Failed(e.to_string())).expect("update status error");
                     }
                 };
                 continue;
@@ -113,13 +114,13 @@ pub async fn init(md: Arc<MetadataProvider>,
             }
 
             let backup = create_backup(md.clone()).expect("create backup error");
-            match run_backup(backup, db_cloned.clone(), md_cloned.clone(), cfg.clone(), &settings).await {
+            match run_backup(backup.clone(), db_cloned.clone(), md_cloned.clone(), cfg.clone(), &settings).await {
                 Ok(b) => {
                     md_cloned.backups.update_status(b.id, metadata::backups::Status::Completed).expect("update status error");
                 }
                 Err(e) => {
                     error!("backup error: {:?}", e);
-                    continue;
+                    md_cloned.backups.update_status(backup.id, metadata::backups::Status::Failed(e.to_string())).expect("update status error");
                 }
             };
         }
@@ -162,34 +163,8 @@ fn create_backup(md: Arc<MetadataProvider>) -> Result<Backup> {
         BackupProvider::GCP => {}
         _ => panic!("invalid backup provider")
     }
-    let iv = if settings.backup_encryption_enabled {
-        let mut rng = StdRng::from_rng(rand::thread_rng())?;
-        let key = get_random_key64(&mut rng);
-        Some(key.to_vec())
-    } else {
-        None
-    };
 
-    let provider = match settings.backup_provider {
-        BackupProvider::Local => Provider::Local(PathBuf::from(settings.backup_provider_local_path.clone())),
-        BackupProvider::S3 => Provider::S3(S3Provider {
-            bucket: settings.backup_provider_s3_bucket.clone(),
-            path: settings.backup_provider_s3_path.clone(),
-            region: settings.backup_provider_s3_region.clone(),
-        }),
-        BackupProvider::GCP => Provider::GCP(GCPProvider {
-            bucket: settings.backup_provider_gcp_bucket.clone(),
-            path: settings.backup_provider_gcp_path.clone(),
-        })
-    };
-
-    let req = CreateBackupRequest {
-        provider: provider.clone(),
-        password: if settings.backup_encryption_enabled { Some(settings.backup_encryption_password.clone()) } else { None },
-        is_encrypted: settings.backup_encryption_enabled,
-        status: Status::InProgress(0),
-    };
-
+    let req = CreateBackupRequest::from_settings(&settings);
     Ok(md.backups.create(req)?)
 }
 

@@ -21,6 +21,7 @@ pub mod event_segmentation;
 mod funnel;
 mod bookmarks;
 mod settings;
+mod backups;
 // pub mod stub;
 
 use std::fmt::Debug;
@@ -72,6 +73,7 @@ use query::properties::PropertiesProvider;
 
 use crate::accounts::Accounts;
 use crate::auth::Auth;
+use crate::backups::Backups;
 use crate::bookmarks::Bookmarks;
 use crate::custom_events::CustomEvents;
 use crate::dashboards::Dashboards;
@@ -99,6 +101,7 @@ pub struct PlatformProvider {
     pub dashboards: Arc<Dashboards>,
     pub reports: Arc<Reports>,
     pub bookmarks: Arc<Bookmarks>,
+    pub backups: Arc<Backups>,
     pub projects: Arc<Projects>,
     pub organizations: Arc<Organizations>,
     pub event_records: Arc<EventRecords>,
@@ -138,6 +141,7 @@ impl PlatformProvider {
             projects: Arc::new(Projects::new(md.clone(), cfg.clone())),
             organizations: Arc::new(Organizations::new(md.clone(), cfg.clone())),
             bookmarks: Arc::new(Bookmarks::new(md.bookmarks.clone())),
+            backups: Arc::new(Backups::new(md.clone())),
         }
     }
 }
