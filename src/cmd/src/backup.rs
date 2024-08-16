@@ -51,6 +51,10 @@ pub async fn init(md: Arc<MetadataProvider>,
     // reset all in progress backups since they are stateless
     for backup in backups {
         if matches!(backup.status, backups::Status::InProgress(_)) {
+            let p = cfg.data.path.join(DATA_PATH_BACKUP_TMP).join(backup.id.to_string());
+            if fs::try_exists(&p).unwrap() {
+                fs::remove_file(p)?;
+            }
             md.backups.update_status(backup.id, backups::Status::Failed("server restarted".to_string()))?;
         };
     }
@@ -108,15 +112,16 @@ pub async fn init(md: Arc<MetadataProvider>,
 
 async fn run_backup(db: Arc<OptiDBImpl>, md: Arc<MetadataProvider>, cfg: Config, settings: &Settings) -> Result<Backup> {
     let backup = create_backup(md.clone())?;
-    let cfg_cloned = cfg.clone();
     let backup_cloned = backup.clone();
     let md_cloned = md.clone();
+    let tmp_path = cfg.data.path.join(DATA_PATH_BACKUP_TMP).join(backup.id.to_string());
+    let tmp_path_cloned = tmp_path.clone();
     let hnd = task::spawn_blocking(move || {
         let progress = |pct: usize| {
             md_cloned.backups.update_status(backup_cloned.id, metadata::backups::Status::InProgress(pct)).expect("update status error");
         };
 
-        match backup_to_tmp(&db, &backup_cloned, &cfg_cloned, progress) {
+        match backup_to_tmp(&db, &backup_cloned, tmp_path_cloned, progress) {
             Ok(_) => {}
             Err(e) => {
                 md_cloned.backups.update_status(backup_cloned.id, metadata::backups::Status::Failed(e.to_string())).expect("update status error");
@@ -125,10 +130,10 @@ async fn run_backup(db: Arc<OptiDBImpl>, md: Arc<MetadataProvider>, cfg: Config,
     });
     hnd.await.unwrap();
     if matches!(backup.provider,Provider::Local(_)) {
-        backup_local(&backup, &cfg)?;
+        backup_local(&backup, &cfg, &tmp_path)?;
     } else if matches!(backup.provider,Provider::GCP(_)) {
-        md.backups.update_status(backup.id, metadata::backups::Status::Uploading)?;
-        backup_gcp(&backup, &cfg, settings).await?;
+        md.backups.update_status(backup.id, backups::Status::Uploading)?;
+        backup_gcp(&backup, settings, &tmp_path).await?;
     };
     debug!("backup successful");
     Ok(backup)
@@ -171,8 +176,7 @@ fn create_backup(md: Arc<MetadataProvider>) -> Result<Backup> {
 }
 
 // backup to temporary directory. Unfortunately we can't stream zip because it has Write+Seek trait
-fn backup_to_tmp<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, cfg: &Config, progress: F) -> Result<()> {
-    let tmp_path = cfg.data.path.join(DATA_PATH_BACKUP_TMP).join(backup.id.to_string());
+fn backup_to_tmp<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, tmp_path: PathBuf, progress: F) -> Result<()> {
     let tmp = File::create(tmp_path.clone())?;
     let mut zip = zip::ZipWriter::new(tmp);
 
@@ -198,8 +202,7 @@ fn backup_to_tmp<F: Fn(usize)>(db: &Arc<OptiDBImpl>, backup: &Backup, cfg: &Conf
     Ok(())
 }
 
-fn backup_local(backup: &Backup, cfg: &Config) -> Result<()> {
-    let tmp_path = cfg.data.path.join(DATA_PATH_BACKUP_TMP).join(backup.id.to_string());
+fn backup_local(backup: &Backup, cfg: &Config, tmp_path: &PathBuf) -> Result<()> {
     let dst_path = cfg.data.path.join(DATA_PATH_BACKUPS).join(backup.created_at.format("%Y-%m-%dT%H:00:00.zip").to_string());
     debug!("starting local backup to {:?}",&dst_path);
     let dst_path = match &backup.provider {
@@ -213,9 +216,7 @@ fn backup_local(backup: &Backup, cfg: &Config) -> Result<()> {
     Ok(())
 }
 
-async fn backup_gcp(backup: &Backup, cfg: &Config, settings: &metadata::settings::Settings) -> Result<()> {
-    debug!("starting gcp backup to {:?}",backup.path());
-    let tmp_path = cfg.data.path.join(DATA_PATH_BACKUP_TMP).join(backup.id.to_string());
+async fn backup_gcp(backup: &Backup, settings: &Settings, tmp_path: &PathBuf) -> Result<()> {
     let gcs = GoogleCloudStorageBuilder::new()
         .with_bucket_name(settings.backup_provider_gcp_bucket.clone())
         .with_service_account_key(settings.backup_provider_gcp_key.clone())

@@ -1,3 +1,4 @@
+#![feature(fs_try_exists)]
 extern crate core;
 
 use std::fs::File;
