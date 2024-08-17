@@ -67,7 +67,7 @@ use uaparser::UserAgentParser;
 use metadata::settings::{BackupProvider, BackupScheduleInterval};
 use crate::error::Error;
 use crate::error::Result;
-use crate::{get_random_key32, init_config, init_fs, init_ingester};
+use crate::{get_random_key32, init_settings, init_fs, init_ingester};
 use crate::init_metrics;
 use crate::init_platform;
 use crate::init_session_cleaner;
@@ -123,7 +123,7 @@ pub async fn start(args: &Store, mut cfg: crate::Config) -> Result<()> {
         Options {},
     )?);
     let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
-    init_config(&md, &mut cfg)?;
+    init_settings(&md)?;
     info!("system initialization...");
     init_system(&md, &db, &cfg).await?;
     let mut settings = md.settings.load()?;

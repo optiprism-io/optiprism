@@ -26,15 +26,15 @@ pub enum BackupProvider {
 
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub enum BackupScheduleInterval {
-    #[default]
     Hourly,
+    #[default]
     Daily,
     Weekly,
     Monthly,
     Yearly,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Settings {
     pub auth_access_token: String,
     pub auth_refresh_token: String,
@@ -57,6 +57,84 @@ pub struct Settings {
     pub backup_schedule_start_hour: usize,
 }
 
+impl Default for Settings {
+    fn default() -> Self {
+        Settings{
+            auth_access_token: "".to_string(),
+            auth_refresh_token: "".to_string(),
+            auth_admin_default_password: "".to_string(),
+            backup_enabled: false,
+            backup_encryption_enabled: false,
+            backup_encryption_password: "".to_string(),
+            backup_compression_enabled: false,
+            backup_provider: Default::default(),
+            backup_provider_local_path: "".to_string(),
+            backup_provider_s3_bucket: "".to_string(),
+            backup_provider_s3_path: "".to_string(),
+            backup_provider_s3_region: "".to_string(),
+            backup_provider_s3_access_key: "".to_string(),
+            backup_provider_s3_secret_key: "".to_string(),
+            backup_provider_gcp_bucket: "".to_string(),
+            backup_provider_gcp_path: "".to_string(),
+            backup_provider_gcp_key: "".to_string(),
+            backup_schedule_interval: Default::default(),
+            backup_schedule_start_hour: 0,
+        }
+    }
+}
+impl Settings {
+    fn validate(&self) -> Result<()> {
+        if self.backup_encryption_enabled {
+            if self.backup_encryption_password.is_empty() {
+                return Err(MetadataError::BadRequest(
+                    "backup encryption password is required".to_string(),
+                ));
+            }
+        }
+
+        match self.backup_provider {
+            BackupProvider::Local => {
+            }
+            BackupProvider::S3 => {
+                if self.backup_provider_s3_bucket.is_empty() {
+                    return Err(MetadataError::BadRequest(
+                        "backup provider s3 bucket is required".to_string(),
+                    ));
+                }
+                if self.backup_provider_s3_region.is_empty() {
+                    return Err(MetadataError::BadRequest(
+                        "backup provider s3 region is required".to_string(),
+                    ));
+                }
+                if self.backup_provider_s3_access_key.is_empty() {
+                    return Err(MetadataError::BadRequest(
+                        "backup provider s3 access key is required".to_string(),
+                    ));
+                }
+                if self.backup_provider_s3_secret_key.is_empty() {
+                    return Err(MetadataError::BadRequest(
+                        "backup provider s3 secret key is required".to_string(),
+                    ));
+                }
+            }
+            BackupProvider::GCP => {
+                if self.backup_provider_gcp_bucket.is_empty() {
+                    return Err(MetadataError::BadRequest(
+                        "backup provider gcp bucket is required".to_string(),
+                    ));
+                }
+                if self.backup_provider_gcp_key.is_empty() {
+                    return Err(MetadataError::BadRequest(
+                        "backup provider gcp key is required".to_string(),
+                    ));
+                }
+            }
+        }
+
+        Ok(())
+
+    }
+}
 pub struct SettingsProvider {
     db: Arc<TransactionDB>,
 }
@@ -80,10 +158,11 @@ impl SettingsProvider {
         }
     }
 
-    pub fn save(&self, cfg: &Settings) -> Result<()> {
+    pub fn save(&self, settings: &Settings) -> Result<()> {
+        settings.validate()?;
         let tx = self.db.transaction();
         let key = "config";
-        let data = serialize(cfg)?;
+        let data = serialize(settings)?;
         tx.put(
             key,
             data,
@@ -95,7 +174,7 @@ impl SettingsProvider {
 }
 
 fn serialize(v: &Settings) -> Result<Vec<u8>> {
-    let backup = pbconfig::Config{
+    let backup = pbconfig::Config {
         auth_access_token: v.auth_access_token.clone(),
         auth_refresh_token: v.auth_refresh_token.clone(),
         auth_admin_default_password: v.auth_admin_default_password.clone(),
@@ -144,7 +223,7 @@ fn deserialize(data: &[u8]) -> Result<Settings> {
             1 => BackupProvider::Local,
             2 => BackupProvider::S3,
             3 => BackupProvider::GCP,
-            _=>panic!("Invalid backup provider")
+            _ => panic!("Invalid backup provider")
         },
         backup_provider_local_path: c.backup_provider_local,
         backup_provider_s3_bucket: c.backup_provider_s3_bucket,
@@ -161,7 +240,7 @@ fn deserialize(data: &[u8]) -> Result<Settings> {
             3 => BackupScheduleInterval::Weekly,
             4 => BackupScheduleInterval::Monthly,
             5 => BackupScheduleInterval::Yearly,
-            _=>panic!("Invalid backup schedule interval")
+            _ => panic!("Invalid backup schedule interval")
         },
         backup_schedule_start_hour: c.backup_schedule_start_hour as usize,
     })
@@ -173,27 +252,27 @@ mod tests {
 
     #[test]
     fn test_roundtrip() {
-       let settings = Settings {
-           auth_access_token: "1".to_string(),
-           auth_refresh_token: "2".to_string(),
-           auth_admin_default_password: "3".to_string(),
-           backup_enabled: true,
-           backup_encryption_enabled: true,
-           backup_encryption_password: "4".to_string(),
-           backup_compression_enabled: true,
-           backup_provider: BackupProvider::Local,
-           backup_provider_local_path: "4.1".to_string(),
-           backup_provider_s3_bucket: "5".to_string(),
-           backup_provider_s3_path: "6".to_string(),
-           backup_provider_s3_region: "7".to_string(),
-           backup_provider_s3_access_key: "8".to_string(),
-           backup_provider_s3_secret_key: "9".to_string(),
-           backup_provider_gcp_bucket: "10".to_string(),
-           backup_provider_gcp_path: "11".to_string(),
-           backup_provider_gcp_key: "12".to_string(),
-           backup_schedule_interval: BackupScheduleInterval::Hourly,
-           backup_schedule_start_hour: 0,
-       };
+        let settings = Settings {
+            auth_access_token: "1".to_string(),
+            auth_refresh_token: "2".to_string(),
+            auth_admin_default_password: "3".to_string(),
+            backup_enabled: true,
+            backup_encryption_enabled: true,
+            backup_encryption_password: "4".to_string(),
+            backup_compression_enabled: true,
+            backup_provider: BackupProvider::Local,
+            backup_provider_local_path: "4.1".to_string(),
+            backup_provider_s3_bucket: "5".to_string(),
+            backup_provider_s3_path: "6".to_string(),
+            backup_provider_s3_region: "7".to_string(),
+            backup_provider_s3_access_key: "8".to_string(),
+            backup_provider_s3_secret_key: "9".to_string(),
+            backup_provider_gcp_bucket: "10".to_string(),
+            backup_provider_gcp_path: "11".to_string(),
+            backup_provider_gcp_key: "12".to_string(),
+            backup_schedule_interval: BackupScheduleInterval::Hourly,
+            backup_schedule_start_hour: 0,
+        };
 
         let data = super::serialize(&settings).unwrap();
         let settings2 = super::deserialize(&data).unwrap();

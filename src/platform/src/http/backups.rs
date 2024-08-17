@@ -7,6 +7,7 @@ use axum::routing;
 use axum::Router;
 use common::http::Json;
 use crate::backups::{Backup, Backups};
+use crate::bookmarks::{Bookmark, Bookmarks, CreateBookmarkRequest};
 use crate::reports::CreateReportRequest;
 use crate::reports::Report;
 use crate::reports::Reports;

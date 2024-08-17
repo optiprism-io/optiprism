@@ -415,4 +415,24 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_option() -> Result<(), serde_json::Error> {
+        #[derive(Deserialize)]
+        struct Test {
+            #[serde(default)]
+            v: Option<bool>,
+        }
+
+        assert_eq!(
+            serde_json::from_str::<Test>(r#"{}"#)?.v,
+            None
+        );
+        assert_eq!(
+            serde_json::from_str::<Test>(r#"{"v":true}"#)?.v,
+            Some(true)
+        );
+
+        Ok(())
+    }
 }

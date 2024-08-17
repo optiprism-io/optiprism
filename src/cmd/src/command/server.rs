@@ -24,7 +24,7 @@ use tracing::debug;
 use tracing::info;
 use crate::error::Error;
 use crate::error::Result;
-use crate::{backup, init_config, init_fs, init_ingester};
+use crate::{backup, init_settings, init_fs, init_ingester};
 use crate::init_metrics;
 use crate::init_platform;
 use crate::init_session_cleaner;
@@ -37,7 +37,7 @@ pub async fn start(mut cfg: Config) -> Result<()> {
     let rocks = Arc::new(metadata::rocksdb::new(cfg.data.path.join(DATA_PATH_METADATA))?);
     let db = Arc::new(OptiDBImpl::open(cfg.data.path.join(DATA_PATH_STORAGE), Options {})?);
     let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
-    init_config(&md, &mut cfg)?;
+    init_settings(&md)?;
 
     info!("system initialization...");
     init_system(&md, &db, &cfg).await?;
@@ -57,9 +57,9 @@ pub async fn start(mut cfg: Config) -> Result<()> {
                     .take(32)
                     .map(char::from)
                     .collect();
-                let mut sys_cfg = md.settings.load()?;
-                sys_cfg.auth_admin_default_password = pwd.clone();
-                md.settings.save(&sys_cfg)?;
+                let mut settings = md.settings.load()?;
+                settings.auth_admin_default_password = pwd.clone();
+                md.settings.save(&settings)?;
                 info!("creating admin account...");
                 let acc = md.accounts.create(CreateAccountRequest {
                     created_by: ADMIN_ID,

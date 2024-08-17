@@ -450,7 +450,7 @@ fn get_random_key16(rng: &mut StdRng) -> [u8; 16] {
 }
 
 
-fn init_config(md: &Arc<MetadataProvider>, cfg: &mut Config) -> Result<()> {
+fn init_settings(md: &Arc<MetadataProvider>) -> Result<()> {
     let mut rng = StdRng::from_rng(rand::thread_rng())?;
     let mut settings = match md.settings.load() {
         Ok(cfg) => cfg,

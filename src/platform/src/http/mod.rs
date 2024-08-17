@@ -14,7 +14,7 @@ mod event_segmentation;
 mod funnel;
 mod bookmarks;
 mod backups;
-
+mod settings;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -54,6 +54,7 @@ pub fn attach_routes(
     router = projects::attach_routes(router);
     router = accounts::attach_routes(router);
     router = backups::attach_routes(router);
+    router = settings::attach_routes(router);
     router = auth::attach_routes(router);
     router = events::attach_routes(router);
     router = custom_events::attach_routes(router);
@@ -78,6 +79,7 @@ pub fn attach_routes(
         .layer(Extension(platform.organizations.clone()))
         .layer(Extension(platform.projects.clone()))
         .layer(Extension(platform.backups.clone()))
+        .layer(Extension(platform.settings.clone()))
         .layer(Extension(md.accounts.clone()))
         .layer(Extension(md.settings.clone()))
         .layer(Extension(platform.accounts.clone()))

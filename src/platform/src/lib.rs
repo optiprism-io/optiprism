@@ -87,6 +87,7 @@ use crate::organizations::Organizations;
 use crate::projects::Projects;
 use crate::properties::Properties;
 use crate::reports::Reports;
+use crate::settings::SettingsProvider;
 
 pub struct PlatformProvider {
     pub events: Arc<Events>,
@@ -102,6 +103,7 @@ pub struct PlatformProvider {
     pub reports: Arc<Reports>,
     pub bookmarks: Arc<Bookmarks>,
     pub backups: Arc<Backups>,
+    pub settings: Arc<SettingsProvider>,
     pub projects: Arc<Projects>,
     pub organizations: Arc<Organizations>,
     pub event_records: Arc<EventRecords>,
@@ -142,6 +144,7 @@ impl PlatformProvider {
             organizations: Arc::new(Organizations::new(md.clone(), cfg.clone())),
             bookmarks: Arc::new(Bookmarks::new(md.bookmarks.clone())),
             backups: Arc::new(Backups::new(md.clone())),
+            settings: Arc::new(SettingsProvider::new(md.settings.clone())),
         }
     }
 }
