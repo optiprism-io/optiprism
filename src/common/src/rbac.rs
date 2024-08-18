@@ -10,6 +10,7 @@ pub enum Permission {
     ManageOrganizations,
     ViewOrganizations,
     ManageProjects,
+    ManageServer,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -37,16 +38,16 @@ pub enum OrganizationRole {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum ProjectPermission {
     ManageProject = 1,
-    DeleteProject =2,
-    ViewProject=3,
-    ManageSchema=4,
-    DeleteSchema=5,
-    ViewSchema=6,
-    InviteMembers=7,
-    ManageMembers=8,
-    ExploreReports=9,
-    ManageReports=10,
-    All=11,
+    DeleteProject = 2,
+    ViewProject = 3,
+    ManageSchema = 4,
+    DeleteSchema = 5,
+    ViewSchema = 6,
+    InviteMembers = 7,
+    ManageMembers = 8,
+    ExploreReports = 9,
+    ManageReports = 10,
+    All = 11,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]

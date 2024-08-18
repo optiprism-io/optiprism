@@ -1,0 +1,36 @@
+syntax = "proto3";
+package backup;
+
+message Backup {
+  uint64 id = 1;
+  int64  created_at = 2;
+  optional int64  updated_at = 3;
+  Provider provider = 4;
+  string  local_path = 5;
+  string s3_bucket = 6;
+  string s3_region = 7;
+  string gcp_bucket = 8;
+  Status status = 9;
+  string status_failed_error = 10;
+  int64 status_in_progress_progress = 11;
+  bool is_encrypted = 12;
+  optional string password = 13;
+  string s3_path = 14;
+  string gcp_path = 15;
+}
+
+enum Provider {
+  PROVIDER_UNKNOWN = 0;
+  LOCAL = 1;
+  S3 = 2;
+  GCP = 3;
+}
+
+enum Status {
+  STATUS_UNKNOWN = 0;
+  IDLE = 1;
+  IN_PROGRESS = 2;
+  UPLOADING = 3;
+  FAILED = 4;
+  COMPLETED = 5;
+}

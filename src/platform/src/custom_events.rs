@@ -27,7 +27,6 @@ impl CustomEvents {
     pub async fn create(
         &self,
         ctx: Context,
-
         project_id: u64,
         req: CreateCustomEventRequest,
     ) -> Result<CustomEvent> {

@@ -22,10 +22,9 @@ use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tracing::debug;
 use tracing::info;
-use metadata::config::StringKey::AdminDefaultPassword;
 use crate::error::Error;
 use crate::error::Result;
-use crate::{init_config, init_ingester};
+use crate::{backup, init_settings, init_fs, init_ingester};
 use crate::init_metrics;
 use crate::init_platform;
 use crate::init_session_cleaner;
@@ -34,16 +33,14 @@ use crate::init_system;
 pub async fn start(mut cfg: Config) -> Result<()> {
     debug!("db path: {:?}", cfg.data.path);
 
-    fs::create_dir_all(cfg.data.path.join(DATA_PATH_METADATA))?;
-    fs::create_dir_all(cfg.data.path.join(DATA_PATH_STORAGE))?;
+    init_fs(&cfg)?;
     let rocks = Arc::new(metadata::rocksdb::new(cfg.data.path.join(DATA_PATH_METADATA))?);
     let db = Arc::new(OptiDBImpl::open(cfg.data.path.join(DATA_PATH_STORAGE), Options {})?);
     let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
-    init_config(&md, &mut cfg)?;
-    info!("metrics initialization...");
-    init_metrics();
+    init_settings(&md)?;
+
     info!("system initialization...");
-    init_system(&md, &db, &cfg)?;
+    init_system(&md, &db, &cfg).await?;
     if !cfg.data.ui_path.try_exists()? {
         return Err(Error::FileNotFound(format!(
             "ui path {:?} doesn't exist", cfg.data.ui_path
@@ -51,7 +48,7 @@ pub async fn start(mut cfg: Config) -> Result<()> {
     }
     debug!("ui path: {:?}", cfg.data.ui_path);
 
-    let admin_acc = match md.accounts.get_by_id(ADMIN_ID){
+    let admin_acc = match md.accounts.get_by_id(ADMIN_ID) {
         Ok(acc) => acc,
         Err(err) => match err {
             MetadataError::NotFound(_) => {
@@ -60,7 +57,9 @@ pub async fn start(mut cfg: Config) -> Result<()> {
                     .take(32)
                     .map(char::from)
                     .collect();
-                md.config.set_string(AdminDefaultPassword,Some(pwd.to_owned())).map_err(|e|Error::Metadata(e))?;
+                let mut settings = md.settings.load()?;
+                settings.auth_admin_default_password = pwd.clone();
+                md.settings.save(&settings)?;
                 info!("creating admin account...");
                 let acc = md.accounts.create(CreateAccountRequest {
                     created_by: ADMIN_ID,
@@ -87,8 +86,6 @@ pub async fn start(mut cfg: Config) -> Result<()> {
         }
     };
     let router = Router::new();
-    info!("initializing session cleaner...");
-    init_session_cleaner(md.clone(), db.clone(), cfg.clone())?;
     info!("initializing ingester...");
     let router = init_ingester(&cfg.data.geo_city_path, &cfg.data.ua_db_path, &md, &db, router)?;
     info!("initializing platform...");
@@ -110,8 +107,8 @@ pub async fn start(mut cfg: Config) -> Result<()> {
         info!("email: {}",admin_acc.email);
     }
     if admin_acc.force_update_password {
-        let pwd = md.config.get_string(AdminDefaultPassword)?;
-        info!("password: {}",pwd.unwrap());
+        let pwd = md.settings.load()?.auth_admin_default_password;
+        info!("password: {}",pwd);
     }
     let listener = tokio::net::TcpListener::bind(cfg.server.host).await?;
     Ok(axum::serve(

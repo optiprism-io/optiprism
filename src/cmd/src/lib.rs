@@ -1,8 +1,11 @@
+#![feature(fs_try_exists)]
+extern crate core;
+
 use std::fs::File;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::thread;
+use std::{fs, thread};
 
 use ::storage::db::OptiDBImpl;
 use ::storage::error::StoreError;
@@ -14,11 +17,11 @@ use chrono::Duration;
 use std::time::Duration as StdDuration;
 use chrono::Utc;
 use common::config::Config;
-use common::group_col;
+use common::{DATA_PATH_BACKUP_TMP, DATA_PATH_BACKUPS, DATA_PATH_METADATA, DATA_PATH_RECOVERS, DATA_PATH_STORAGE, group_col};
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::rbac::Role;
-use common::types::{DType, METRIC_HTTP_REQUEST_TIME_MS, METRIC_HTTP_REQUESTS_TOTAL, METRIC_INGESTER_IDENTIFIED_TOTAL, METRIC_INGESTER_IDENTIFY_TIME_MS, METRIC_INGESTER_TRACK_TIME_MS, METRIC_INGESTER_TRACKED_TOTAL, METRIC_QUERY_EXECUTION_TIME_MS, METRIC_QUERY_QUERIES_TOTAL, METRIC_STORE_COMPACTION_TIME_MS, METRIC_STORE_COMPACTIONS_TOTAL, METRIC_STORE_FLUSH_TIME_MS, METRIC_STORE_FLUSHES_TOTAL, METRIC_STORE_INSERT_TIME_MS, METRIC_STORE_INSERTS_TOTAL, METRIC_STORE_LEVEL_COMPACTION_TIME_MS, METRIC_STORE_MEMTABLE_ROWS, METRIC_STORE_MERGE_TIME_MS, METRIC_STORE_MERGES_TOTAL, METRIC_STORE_PART_SIZE_BYTES, METRIC_STORE_PART_VALUES, METRIC_STORE_PARTS, METRIC_STORE_PARTS_SIZE_BYTES, METRIC_STORE_PARTS_VALUES, METRIC_STORE_RECOVERY_TIME_MS, METRIC_STORE_SCAN_MEMTABLE_MS, METRIC_STORE_SCAN_PARTS, METRIC_STORE_SCAN_TIME_MS, METRIC_STORE_SCANS_TOTAL, METRIC_STORE_TABLE_FIELDS};
+use common::types::{DType, METRIC_HTTP_REQUEST_TIME_SECONDS, METRIC_HTTP_REQUESTS_TOTAL, METRIC_INGESTER_IDENTIFIED_TOTAL, METRIC_INGESTER_IDENTIFY_TIME_SECONDS, METRIC_INGESTER_TRACK_TIME_SECONDS, METRIC_INGESTER_TRACKED_TOTAL, METRIC_QUERY_EXECUTION_TIME_SECONDS, METRIC_QUERY_QUERIES_TOTAL, METRIC_STORE_COMPACTION_TIME_SECONDS, METRIC_STORE_COMPACTIONS_TOTAL, METRIC_STORE_FLUSH_TIME_SECONDS, METRIC_STORE_FLUSHES_TOTAL, METRIC_STORE_INSERT_TIME_SECONDS, METRIC_STORE_INSERTS_TOTAL, METRIC_STORE_LEVEL_COMPACTION_TIME_SECONDS, METRIC_STORE_MEMTABLE_ROWS, METRIC_STORE_MERGE_TIME_SECONDS, METRIC_STORE_MERGES_TOTAL, METRIC_STORE_PART_SIZE_BYTES, METRIC_STORE_PART_VALUES, METRIC_STORE_PARTS, METRIC_STORE_PARTS_SIZE_BYTES, METRIC_STORE_PARTS_VALUES, METRIC_STORE_RECOVERY_TIME_SECONDS, METRIC_STORE_SCAN_MEMTABLE_SECONDS, METRIC_STORE_SCAN_PARTS, METRIC_STORE_SCAN_TIME_SECONDS, METRIC_STORE_SCANS_TOTAL, METRIC_STORE_TABLE_FIELDS};
 use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_EVENT_ID;
@@ -92,10 +95,10 @@ use platform::auth::password::make_password_hash;
 use platform::PlatformProvider;
 use rand::distributions::Alphanumeric;
 use rand::distributions::DistString;
-use rand::{Rng, thread_rng};
+use rand::{Rng, SeedableRng, thread_rng};
+use rand::rngs::StdRng;
 use tracing::info;
 use uaparser::UserAgentParser;
-use metadata::config::StringKey;
 use metadata::error::MetadataError;
 use query::event_records::EventRecordsProvider;
 use query::event_segmentation::EventSegmentationProvider;
@@ -105,11 +108,9 @@ use query::properties::PropertiesProvider;
 use crate::error::Result;
 use crate::error::Error;
 pub mod error;
-pub mod store;
-pub mod test;
 pub mod config;
-pub mod server;
-pub mod db_test;
+pub mod command;
+pub mod backup;
 
 pub fn init_metrics() {
     PrometheusBuilder::new()
@@ -124,12 +125,12 @@ pub fn init_metrics() {
         .expect("failed to install Prometheus recorder");
 
     describe_counter!(METRIC_STORE_INSERTS_TOTAL, "number of inserts processed");
-    describe_histogram!(METRIC_STORE_INSERT_TIME_MS, Unit::Milliseconds, "insert time");
+    describe_histogram!(METRIC_STORE_INSERT_TIME_SECONDS, Unit::Seconds, "insert time");
     describe_counter!(METRIC_STORE_SCANS_TOTAL, "number of scans processed");
-    describe_histogram!(METRIC_STORE_SCAN_TIME_MS, Unit::Milliseconds, "scan time");
+    describe_histogram!(METRIC_STORE_SCAN_TIME_SECONDS, Unit::Seconds, "scan time");
     describe_gauge!(METRIC_STORE_SCAN_PARTS, "number of scans parts");
     describe_counter!(METRIC_STORE_MERGES_TOTAL, "number of merges during scan");
-    describe_histogram!(METRIC_STORE_MERGE_TIME_MS, Unit::Milliseconds, "merge time");
+    describe_histogram!(METRIC_STORE_MERGE_TIME_SECONDS, Unit::Seconds, "merge time");
     describe_gauge!(METRIC_STORE_TABLE_FIELDS, "number of table fields");
     describe_gauge!(METRIC_STORE_PARTS_SIZE_BYTES, "parts size in bytes");
     describe_gauge!(METRIC_STORE_PART_SIZE_BYTES, "part size in bytes");
@@ -138,52 +139,68 @@ pub fn init_metrics() {
     describe_gauge!(METRIC_STORE_PARTS_VALUES, "parts values");
     describe_gauge!(METRIC_STORE_MEMTABLE_ROWS, "number of memtable rows");
     describe_histogram!(
-        METRIC_STORE_SCAN_MEMTABLE_MS,
-        Unit::Milliseconds,
+        METRIC_STORE_SCAN_MEMTABLE_SECONDS,
+        Unit::Seconds,
         "scan memtable time"
     );
     describe_counter!(METRIC_STORE_COMPACTIONS_TOTAL, "number of compactions");
     describe_histogram!(
-        METRIC_STORE_LEVEL_COMPACTION_TIME_MS,
-        Unit::Milliseconds,
+        METRIC_STORE_LEVEL_COMPACTION_TIME_SECONDS,
+        Unit::Seconds,
         "level compaction time"
     );
     describe_histogram!(
-        METRIC_STORE_COMPACTION_TIME_MS,
-        Unit::Milliseconds,
+        METRIC_STORE_COMPACTION_TIME_SECONDS,
+        Unit::Seconds,
         "compaction time"
     );
     describe_histogram!(
-        METRIC_STORE_RECOVERY_TIME_MS,
-        Unit::Milliseconds,
+        METRIC_STORE_RECOVERY_TIME_SECONDS,
+        Unit::Seconds,
         "recovery time"
     );
 
-    describe_histogram!(METRIC_STORE_FLUSH_TIME_MS, Unit::Milliseconds, "recovery time");
+    describe_histogram!(METRIC_STORE_FLUSH_TIME_SECONDS, Unit::Seconds, "recovery time");
     describe_counter!(METRIC_STORE_FLUSHES_TOTAL, "number of flushes");
 
     describe_counter!(METRIC_INGESTER_TRACKED_TOTAL, "total number of tracks");
-    describe_histogram!(METRIC_INGESTER_TRACK_TIME_MS, Unit::Milliseconds, "ingester track time");
+    describe_histogram!(METRIC_INGESTER_TRACK_TIME_SECONDS, Unit::Seconds, "ingester track time");
     describe_counter!(METRIC_INGESTER_IDENTIFIED_TOTAL, "total number of identifies");
-    describe_histogram!(METRIC_INGESTER_IDENTIFY_TIME_MS, Unit::Milliseconds, "ingester identify time");
+    describe_histogram!(METRIC_INGESTER_IDENTIFY_TIME_SECONDS, Unit::Seconds, "ingester identify time");
 
     describe_counter!(METRIC_QUERY_QUERIES_TOTAL, "total number of queries");
     describe_histogram!(
-        METRIC_QUERY_EXECUTION_TIME_MS,
-        Unit::Milliseconds,
+        METRIC_QUERY_EXECUTION_TIME_SECONDS,
+        Unit::Seconds,
         "query execution time"
     );
 
     describe_histogram!(
-        METRIC_HTTP_REQUEST_TIME_MS,
-        Unit::Milliseconds,
+        METRIC_HTTP_REQUEST_TIME_SECONDS,
+        Unit::Seconds,
         "http execution time"
     );
 
     describe_counter!(METRIC_HTTP_REQUESTS_TOTAL, "total number of http requests");
+    describe_counter!(METRIC_QUERY_QUERIES_TOTAL, "total number of queries");
+    describe_histogram!(
+        METRIC_QUERY_EXECUTION_TIME_SECONDS,
+        Unit::Seconds,
+        "query execution time"
+    );
 }
 
-pub fn init_system(
+pub fn init_fs(cfg: &Config) -> Result<()> {
+    fs::create_dir_all(cfg.data.path.join(DATA_PATH_STORAGE))?;
+    fs::create_dir_all(cfg.data.path.join(DATA_PATH_METADATA))?;
+    fs::create_dir_all(cfg.data.path.join(DATA_PATH_BACKUP_TMP))?;
+    fs::create_dir_all(cfg.data.path.join(DATA_PATH_BACKUPS))?;
+    fs::create_dir_all(cfg.data.path.join(DATA_PATH_RECOVERS))?;
+
+    Ok(())
+}
+
+pub async fn init_system(
     md: &Arc<MetadataProvider>,
     db: &Arc<OptiDBImpl>,
     cfg: &Config,
@@ -241,6 +258,13 @@ pub fn init_system(
             },
         }
     }
+
+    info!("metrics initialization...");
+    init_metrics();
+    info!("initializing session cleaner...");
+    init_session_cleaner(md.clone(), db.clone(), cfg.clone())?;
+    info!("initializing backup...");
+    backup::init(md.clone(), db.clone(), cfg.clone()).await?;
 
     Ok(())
 }
@@ -398,36 +422,59 @@ fn init_session_cleaner(
     Ok(())
 }
 
-fn get_random_key64() -> [u8; 64] {
-    let mut arr = [0u8; 64];
-    thread_rng().try_fill(&mut arr[..]).unwrap();
+// not for high load
+fn get_random_key128(rng: &mut StdRng) -> [u8; 128] {
+    let mut arr = [0u8; 128];
+    rng.try_fill(&mut arr[..]).unwrap();
     return arr;
 }
-fn init_config(md: &Arc<MetadataProvider>, cfg: &mut Config) -> Result<()> {
-    match md.config.get_string(StringKey::AuthAccessToken) {
+
+
+// not for high load
+fn get_random_key64(rng: &mut StdRng) -> [u8; 64] {
+    let mut arr = [0u8; 64];
+    rng.try_fill(&mut arr[..]).unwrap();
+    return arr;
+}
+
+fn get_random_key32(rng: &mut StdRng) -> [u8; 32] {
+    let mut arr = [0u8; 32];
+    rng.try_fill(&mut arr[..]).unwrap();
+    return arr;
+}
+
+fn get_random_key16(rng: &mut StdRng) -> [u8; 16] {
+    let mut arr = [0u8; 16];
+    rng.try_fill(&mut arr[..]).unwrap();
+    return arr;
+}
+
+
+fn init_settings(md: &Arc<MetadataProvider>) -> Result<()> {
+    let mut rng = StdRng::from_rng(rand::thread_rng())?;
+    let mut settings = match md.settings.load() {
+        Ok(cfg) => cfg,
         Err(MetadataError::NotFound(_)) => {
-            let key = hex::encode(get_random_key64());
-            md.config.set_string(StringKey::AuthAccessToken, Some(key.to_owned()))?;
-            cfg.auth.access_token_key = key;
+            let cfg = metadata::settings::Settings::default();
+            md.settings.save(&cfg)?;
+            cfg
         }
-        other => {
-            other?;
-        }
+        Err(err) => return Err(err.into()),
+    };
+
+    if settings.auth_access_token.is_empty() {
+        let key = hex::encode(get_random_key64(&mut rng));
+        settings.auth_access_token = key;
+    }
+    if settings.auth_refresh_token.is_empty() {
+        let key = hex::encode(get_random_key64(&mut rng));
+        settings.auth_refresh_token = key;
     }
 
-    match md.config.get_string(StringKey::AuthRefreshToken) {
-        Err(MetadataError::NotFound(_)) => {
-            let key = hex::encode(get_random_key64());
-            md.config.set_string(StringKey::AuthRefreshToken, Some(key.to_owned()))?;
-            cfg.auth.refresh_token_key = key;
-        }
-        other => {
-            other?;
-        }
-    }
-
+    md.settings.save(&settings)?;
     Ok(())
 }
+
 fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<Project> {
     let admin = match md.accounts.create(CreateAccountRequest {
         created_by: ADMIN_ID,
@@ -472,7 +519,7 @@ fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<P
     }
 
 
-    info!("project token: {}", token);
+    info!("project token: {}", proj.token);
     let _user = match md.accounts.create(CreateAccountRequest {
         created_by: admin.id,
         password_hash: make_password_hash("test")?,

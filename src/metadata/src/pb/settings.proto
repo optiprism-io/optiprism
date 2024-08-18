@@ -1,0 +1,39 @@
+syntax = "proto3";
+package config;
+
+message Config {
+  string auth_access_token = 1;
+  string auth_refresh_token = 2;
+  string auth_admin_default_password = 3;
+  bool backup_enabled = 4;
+  bool backup_encryption_enabled = 5;
+  string backup_encryption_password = 6;
+  bool backup_compression_enabled = 7;
+  BackupProvider backup_provider = 8;
+  string backup_provider_local = 9;
+  string backup_provider_s3_bucket = 10;
+  string backup_provider_s3_path = 11;
+  string backup_provider_s3_region = 12;
+  string backup_provider_s3_access_key = 13;
+  string backup_provider_s3_secret_key = 14;
+  string backup_provider_gcp_bucket = 15;
+  string backup_provider_gcp_path = 16;
+  string backup_provider_gcp_key = 17;
+  BackupScheduleInterval backup_schedule_interval = 18;
+  uint32 backup_schedule_start_hour = 19;
+}
+
+enum BackupScheduleInterval {
+  BACKUP_SCHEDULE_INTERVAL_NONE = 0;
+  BACKUP_SCHEDULE_INTERVAL_HOURLY = 1;
+  BACKUP_SCHEDULE_INTERVAL_DAILY = 2;
+  BACKUP_SCHEDULE_INTERVAL_WEEKLY = 3;
+  BACKUP_SCHEDULE_INTERVAL_MONTHLY = 4;
+  BACKUP_SCHEDULE_INTERVAL_YEARLY = 5;
+}
+enum BackupProvider {
+  BACKUP_PROVIDER_NONE = 0;
+  BACKUP_PROVIDER_LOCAL = 1;
+  BACKUP_PROVIDER_S3 = 2;
+  BACKUP_PROVIDER_GCP = 3;
+}

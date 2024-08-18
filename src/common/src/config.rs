@@ -23,14 +23,13 @@ pub struct Data {
 pub struct Auth {
     pub access_token_duration: Duration,
     pub refresh_token_duration: Duration,
-    pub access_token_key: String,
-    pub refresh_token_key: String,
 }
 #[derive(Debug, Clone)]
 pub struct Misc {
     pub session_cleaner_interval: Duration,
     pub project_default_session_duration: Duration,
 }
+
 #[derive(Debug, Clone)]
 pub struct Log {
     pub level: LevelFilter,
@@ -62,7 +61,6 @@ pub struct Config {
     pub events_table: Table,
     pub group_table: Table,
     pub log: Log,
-
 }
 
 impl Default for Config {
@@ -80,8 +78,6 @@ impl Default for Config {
             auth: Auth {
                 access_token_duration: Default::default(),
                 refresh_token_duration: Default::default(),
-                access_token_key: "".to_string(),
-                refresh_token_key: "".to_string(),
             },
             log: Log { level: LevelFilter::INFO },
             misc: Misc {

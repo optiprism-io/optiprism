@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::time::Instant;
 use metrics::{counter, histogram};
 use common::group_col;
-use common::types::{DType, GROUP_COLUMN_ID, METRIC_INGESTER_IDENTIFIED_TOTAL, METRIC_INGESTER_IDENTIFY_TIME_MS, METRIC_INGESTER_TRACK_TIME_MS, METRIC_INGESTER_TRACKED_TOTAL, TABLE_EVENTS};
+use common::types::{DType, GROUP_COLUMN_ID, METRIC_INGESTER_IDENTIFIED_TOTAL, METRIC_INGESTER_IDENTIFY_TIME_SECONDS, METRIC_INGESTER_TRACK_TIME_SECONDS, METRIC_INGESTER_TRACKED_TOTAL, TABLE_EVENTS};
 use common::GROUP_USER_ID;
 use metadata::events;
 use metadata::events::CreateEventRequest;
@@ -244,7 +244,7 @@ impl Executor<Track> {
             .increment_events_counter(ctx.project_id.unwrap())?;
 
         counter!(METRIC_INGESTER_TRACKED_TOTAL).increment(1);
-        histogram!(METRIC_INGESTER_TRACK_TIME_MS).record(init_time.elapsed());
+        histogram!(METRIC_INGESTER_TRACK_TIME_SECONDS).record(init_time.elapsed());
 
         Ok(())
     }
@@ -369,7 +369,7 @@ impl Executor<Identify> {
         }
 
         counter!(METRIC_INGESTER_IDENTIFIED_TOTAL).increment(1);
-        histogram!(METRIC_INGESTER_IDENTIFY_TIME_MS).record(init_time.elapsed());
+        histogram!(METRIC_INGESTER_IDENTIFY_TIME_SECONDS).record(init_time.elapsed());
 
         Ok(())
     }

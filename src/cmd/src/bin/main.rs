@@ -5,16 +5,16 @@ use clap::Subcommand;
 use metrics::Level;
 use tracing::info;
 use tracing_subscriber::FmtSubscriber;
+use cmd::command::db_test::DbTest;
+use cmd::command::{db_test, server, store, test};
+use cmd::command::store::Store;
+use cmd::command::test::Test;
 use cmd::config::{Config, LogLevel};
-use cmd::store::Store;
-use cmd::test::Test;
 
 extern crate parse_duration;
 
 use cmd::error::Error;
 use cmd::error::Result;
-use cmd::{db_test, test};
-use cmd::db_test::DbTest;
 
 #[derive(Parser, Clone)]
 pub struct Cfg {
@@ -94,10 +94,10 @@ async fn main() -> Result<()> {
     match &args.command {
         Some(cmd) => match cmd {
             Commands::Server(_) => {
-                cmd::server::start(cfg.try_into()?).await?;
+                server::start(cfg.try_into()?).await?;
             }
             Commands::Store(store) => {
-                cmd::store::start(store, cfg.try_into()?).await?;
+                store::start(store, cfg.try_into()?).await?;
             }
             Commands::Test(args) => {
                 test::gen(args, cfg.try_into()?).await?;
@@ -105,7 +105,7 @@ async fn main() -> Result<()> {
             Commands::DbTest(args) => {
                 match &args.cmd {
                     db_test::Commands::Gen(gen) => {
-                        db_test::gen(args,gen)?;
+                        db_test::gen(args,gen,cfg.try_into()?).await?;
 
                     }
                     db_test::Commands::Query(query) => {

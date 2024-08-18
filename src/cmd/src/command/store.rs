@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 use std::collections::HashMap;
-use std::fs;
+use std::{env, fs};
 use std::fs::File;
 use std::io;
 use std::net::SocketAddr;
@@ -31,6 +31,8 @@ use common::GROUP_USER_ID;
 use crossbeam_channel::bounded;
 use dateparser::DateTimeUtc;
 use enum_iterator::all;
+use pbkdf2::pbkdf2_hmac;
+use rand::prelude::StdRng;
 use events_gen::generator;
 use events_gen::generator::Generator;
 use events_gen::store::companies::CompanyProvider;
@@ -50,7 +52,8 @@ use ingester::Transformer;
 use metadata::MetadataProvider;
 use platform::projects::init_project;
 use query::col_name;
-use rand::thread_rng;
+use rand::{SeedableRng, thread_rng};
+use sha2::Sha256;
 use storage::db::OptiDBImpl;
 use storage::db::Options;
 use storage::NamedValue;
@@ -61,10 +64,10 @@ use tokio::signal::unix::SignalKind;
 use tracing::debug;
 use tracing::info;
 use uaparser::UserAgentParser;
-
+use metadata::settings::{BackupProvider, BackupScheduleInterval};
 use crate::error::Error;
 use crate::error::Result;
-use crate::{init_config, init_ingester};
+use crate::{get_random_key32, init_settings, init_fs, init_ingester};
 use crate::init_metrics;
 use crate::init_platform;
 use crate::init_session_cleaner;
@@ -113,17 +116,35 @@ pub async fn start(args: &Store, mut cfg: crate::Config) -> Result<()> {
             Err(_) => {}
         }
     }
+    init_fs(&cfg)?;
     let rocks = Arc::new(metadata::rocksdb::new(cfg.data.path.join(DATA_PATH_METADATA))?);
     let db = Arc::new(OptiDBImpl::open(
         cfg.data.path.join(DATA_PATH_STORAGE),
         Options {},
     )?);
     let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
-    init_config(&md, &mut cfg)?;
-    info!("metrics initialization...");
-    init_metrics();
+    init_settings(&md)?;
     info!("system initialization...");
-    init_system(&md, &db, &cfg)?;
+    init_system(&md, &db, &cfg).await?;
+    let mut settings = md.settings.load()?;
+    settings.backup_enabled = true;
+    settings.backup_encryption_enabled = true;
+    settings.backup_encryption_password = "test".to_string();
+    settings.backup_compression_enabled = true;
+    settings.backup_schedule_interval = BackupScheduleInterval::Hourly;
+    settings.backup_schedule_start_hour = 0;
+    // settings.backup_provider = BackupProvider::Local;
+    // settings.backup_provider_local_path = "/tmp/optiprism/backups".to_string();
+    settings.backup_provider = BackupProvider::GCP;
+    settings.backup_provider_gcp_bucket = "optiprism".to_string();
+    settings.backup_provider_gcp_path = "backups".to_string();
+    settings.backup_provider_gcp_key = match env::var("GOOGLE_APPLICATION_CREDENTIALS").unwrap().as_str() {
+        "" => "".to_string(),
+        _ => {
+            fs::read_to_string(env::var("GOOGLE_APPLICATION_CREDENTIALS").unwrap())?
+        }
+    };
+    md.settings.save(&settings)?;
 
     if !cfg.data.ui_path.try_exists()? {
         return Err(Error::FileNotFound(format!(
@@ -225,8 +246,6 @@ pub async fn start(args: &Store, mut cfg: crate::Config) -> Result<()> {
 
     info!("initializing platform...");
     let router = init_platform(md.clone(), db.clone(), router, cfg.clone())?;
-    info!("initializing session cleaner...");
-    init_session_cleaner(md.clone(), db.clone(), cfg.clone())?;
     info!("initializing ingester...");
     let router = init_ingester(&cfg.data.geo_city_path, &cfg.data.ua_db_path, &md, &db, router)?;
 

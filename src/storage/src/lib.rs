@@ -2,6 +2,7 @@
 #![feature(let_chains)]
 #![feature(allocator_api)]
 #![feature(fs_try_exists)]
+#![feature(pattern)]
 
 extern crate core;
 
@@ -15,11 +16,12 @@ pub mod parquet;
 pub mod table;
 pub mod test_util;
 
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
-
+use std::sync::{Arc, RwLock};
 use error::Result;
 use get_size::GetSize;
 use parking_lot::Mutex;
@@ -115,7 +117,7 @@ impl From<&Value> for KeyValue {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Stats {
     pub(crate) resident_bytes: u64,
     pub(crate) on_disk_bytes: u64,
@@ -128,23 +130,57 @@ pub struct Stats {
 
 #[derive(Debug)]
 pub(crate) struct Fs {
-    lock: Mutex<()>,
+    count: Arc<RwLock<HashMap<String, usize>>>,
 }
 
 impl Fs {
     pub fn new() -> Self {
         Self {
-            lock: Default::default(),
+            count: Default::default()
         }
     }
 
+    pub fn open<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        let mut count = self.count.write().unwrap();
+        let c = count.entry(path.as_ref().display().to_string()).or_insert(0);
+        *c += 1;
+        Ok(())
+    }
+
+    pub fn close<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        let mut count = self.count.write().unwrap();
+        let c = count.entry(path.as_ref().display().to_string()).or_insert(0);
+        *c -= 1;
+        Ok(())
+    }
+
+    pub fn is_opened<P: AsRef<Path>>(&self, path: P) -> bool {
+        let count = self.count.read().unwrap();
+        match count.get(&path.as_ref().display().to_string()) {
+            None => false,
+            Some(v) => *v != 0
+        }
+    }
+    pub fn try_remove_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        if !self.is_opened(&path) {
+            return Ok(fs::remove_file(path)?);
+        }
+        Ok(())
+    }
+
     pub fn remove_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let _g = self.lock.lock();
         Ok(fs::remove_file(path)?)
     }
 
+    pub fn try_rename<P: AsRef<Path>>(&self, from: P, to: P) -> Result<()> {
+        if !self.is_opened(&from) && !self.is_opened(&to) {
+            return Ok(fs::rename(from, to)?);
+        }
+
+        Ok(())
+    }
+
     pub fn rename<P: AsRef<Path>>(&self, from: P, to: P) -> Result<()> {
-        let _g = self.lock.lock();
         Ok(fs::rename(from, to)?)
     }
 }

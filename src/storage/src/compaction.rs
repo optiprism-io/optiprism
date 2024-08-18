@@ -12,18 +12,17 @@ use std::thread;
 #[cfg(not(test))]
 use std::time::Duration;
 use std::time::Instant;
-
+use chrono::Utc;
 use log::trace;
 use metrics::counter;
 use metrics::histogram;
 use parking_lot::RwLock;
-use common::types::{METRIC_STORE_COMPACTION_TIME_MS, METRIC_STORE_COMPACTIONS_TOTAL, METRIC_STORE_LEVEL_COMPACTION_TIME_MS, METRIC_STORE_MERGE_TIME_MS, METRIC_STORE_MERGES_TOTAL};
-use crate::db::write_metadata;
+use common::types::{METRIC_STORE_COMPACTION_TIME_SECONDS, METRIC_STORE_COMPACTIONS_TOTAL, METRIC_STORE_LEVEL_COMPACTION_TIME_SECONDS, METRIC_STORE_MERGE_TIME_SECONDS, METRIC_STORE_MERGES_TOTAL};
+use crate::db::{part_path, write_metadata};
 use crate::error::Result;
 use crate::parquet::parquet_merger;
 use crate::parquet::parquet_merger::merge;
-use crate::table;
-use crate::table::part_path;
+use crate::{Fs, table};
 use crate::table::Level;
 use crate::table::Part;
 use crate::table::Table;
@@ -57,19 +56,25 @@ struct CompactResult {
 pub struct Compactor {
     tables: Arc<RwLock<Vec<Table>>>,
     path: PathBuf,
+    fs: Arc<Fs>,
     inbox: Receiver<CompactorMessage>,
+    lock: Arc<RwLock<()>>,
 }
 
 impl Compactor {
-    pub fn new(
+    pub fn new<P: AsRef<Path>>(
         tables: Arc<RwLock<Vec<Table>>>,
-        path: PathBuf,
+        path: P,
+        fs: Arc<Fs>,
         inbox: Receiver<CompactorMessage>,
+        lock: Arc<RwLock<()>>,
     ) -> Self {
         Compactor {
             tables,
-            path,
+            path: path.as_ref().to_path_buf(),
+            fs,
             inbox,
+            lock,
         }
     }
     pub fn run(self) {
@@ -106,6 +111,7 @@ impl Compactor {
                     Err(err) => panic!("{:?}", err),
                 }
             }
+            let _g = self.lock.read();
             // !@#debug!("compaction started");
             let tables = {
                 let tbls = self.tables.read();
@@ -122,6 +128,7 @@ impl Compactor {
                     table.name.as_str(),
                     metadata.levels.clone(),
                     &self.path,
+                    self.fs.clone(),
                     &metadata.opts,
                 ) {
                     Ok(res) => match res {
@@ -139,8 +146,8 @@ impl Compactor {
                             for (idx, l) in res.levels.iter().enumerate().skip(1) {
                                 metadata.levels[idx] = l.clone();
                             }
-                            let mut log = table.metadata_f.lock();
-                            write_metadata(log.get_mut(), &mut metadata).unwrap();
+                            let mut manifest = table.metadata_f.lock();
+                            write_metadata(manifest.get_mut(), &mut metadata).unwrap();
                             drop(metadata);
                             // drop because next fs operation is with locking
                             for op in res.fs_ops {
@@ -148,11 +155,14 @@ impl Compactor {
                                     FsOp::Rename(from, to) => {
                                         trace!("renaming {from:?} to {to:?}");
                                         // todo handle error
-                                        table.vfs.rename(from, to).unwrap();
+                                        self.fs.rename(&from, &to).expect("rename failed");
+                                        self.fs.close(&from).expect("close failed");
+                                        self.fs.close(&to).expect("close failed");
                                     }
                                     FsOp::Delete(path) => {
                                         trace!("deleting {:?}", &path);
-                                        table.vfs.remove_file(path).unwrap();
+                                        self.fs.remove_file(&path).unwrap();
+                                        self.fs.close(&path).expect("close failed");
                                     }
                                 }
                             }
@@ -192,6 +202,7 @@ pub(crate) fn determine_compaction(
         }
         // return Ok(Some(to_compact));
     } else if level_id > 0 && !level_parts.is_empty() {
+        // todo check logic
         let max_part_size_bytes = opts.merge_max_l1_part_size_bytes
             * opts.merge_part_size_multiplier.pow(level_id as u32);
         let level_threshold =
@@ -239,6 +250,7 @@ fn compact(
     tbl_name: &str,
     levels: Vec<Level>,
     path: &Path,
+    fs: Arc<Fs>,
     opts: &table::Options,
 ) -> Result<Option<CompactResult>> {
     let init_time = Instant::now();
@@ -278,6 +290,8 @@ fn compact(
 
                     let from = part_path(path, tbl_name, level_id, to_compact[0].part);
                     let to = part_path(path, tbl_name, level_id + 1, part.id);
+                    fs.open(&from)?;
+                    fs.open(&to)?;
                     fs_ops.push(FsOp::Rename(from, to));
 
                     tmp_levels[level_id + 1].parts.push(part.clone());
@@ -319,10 +333,11 @@ fn compact(
                 };
                 let ms = Instant::now();
                 let merge_result =
-                    merge(rdrs, out_path, out_part_id, tbl_name, level_id, merger_opts)?;
+                    merge(rdrs, fs.clone(), out_path, out_part_id, tbl_name, level_id, merger_opts)?;
                 counter!(METRIC_STORE_MERGES_TOTAL,"table"=>tbl_name.to_string()).increment(1);
-                histogram!(METRIC_STORE_MERGE_TIME_MS,"table"=>tbl_name.to_string(),"level"=>level_id.to_string()).record(start_time.elapsed());
+                histogram!(METRIC_STORE_MERGE_TIME_SECONDS,"table"=>tbl_name.to_string(),"level"=>level_id.to_string()).record(start_time.elapsed());
                 for f in merge_result {
+                    fs.open(&f.path)?;
                     let final_part = {
                         Part {
                             id: tmp_levels[level_id + 1].part_id + 1,
@@ -344,6 +359,10 @@ fn compact(
                     tmp_levels[level_id + 1].part_id += 1;
                 }
 
+                for p in tomerge.iter() {
+                    fs.open(p)?;
+                }
+
                 fs_ops.append(
                     tomerge
                         .iter()
@@ -351,12 +370,12 @@ fn compact(
                         .collect::<Vec<_>>()
                         .as_mut(),
                 );
-                histogram!(METRIC_STORE_LEVEL_COMPACTION_TIME_MS,"table"=>tbl_name.to_string(),"level"=>level_id.to_string()).record(start_time.elapsed());
+                histogram!(METRIC_STORE_LEVEL_COMPACTION_TIME_SECONDS,"table"=>tbl_name.to_string(),"level"=>level_id.to_string()).record(start_time.elapsed());
             }
         }
     }
     counter!(METRIC_STORE_COMPACTIONS_TOTAL,"table"=>tbl_name.to_string()).increment(1);
-    histogram!(METRIC_STORE_COMPACTION_TIME_MS,"table"=>tbl_name.to_string())
+    histogram!(METRIC_STORE_COMPACTION_TIME_SECONDS,"table"=>tbl_name.to_string())
         .record(init_time.elapsed());
 
     Ok(Some(CompactResult {

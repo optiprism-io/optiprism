@@ -23,3 +23,6 @@ pub fn group_col(group_id: usize) -> String {
 
 pub const DATA_PATH_METADATA: &str = "md/data";
 pub const DATA_PATH_STORAGE: &str = "data";
+pub const DATA_PATH_BACKUP_TMP: &str = "backup_tmp";
+pub const DATA_PATH_BACKUPS: &str = "backups";
+pub const DATA_PATH_RECOVERS: &str = "recovers";

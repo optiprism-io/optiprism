@@ -1,24 +1,28 @@
 use std::fmt::Write;
-use std::fs;
+use std::{fs, thread};
 use std::io::BufReader;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Poll;
+use std::time::Duration;
 use arrow2::array::{Array, Int64Array};
 use clap::Parser;
 use futures::{Stream, StreamExt};
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
-use rand::Rng;
+use rand::{Rng, thread_rng};
+use rand::prelude::SliceRandom;
 use tokio::time::Instant;
 use common::config::Config;
 use common::{DATA_PATH_METADATA, DATA_PATH_STORAGE};
 use common::types::DType;
+use metadata::MetadataProvider;
+use metadata::settings::BackupScheduleInterval;
 use storage::db::{OptiDBImpl, Options};
 use storage::{NamedValue, table, Value};
 use storage::parquet::ArrowIteratorImpl;
-use crate::init_metrics;
+use crate::{backup, init_fs, init_metrics, init_system};
 #[derive(Parser, Clone)]
 pub struct Gen {
     #[arg(long)]
@@ -41,10 +45,13 @@ pub struct DbTest {
     pub cmd: Commands,
 }
 
-pub fn gen(args: &DbTest, gen: &Gen) -> crate::error::Result<()> {
+pub async fn gen(args: &DbTest, gen: &Gen,cfg: Config) -> crate::error::Result<()> {
     init_metrics();
-    fs::remove_dir_all(args.path.join(DATA_PATH_STORAGE))?;
+    fs::remove_dir_all(&args.path)?;
+    init_fs(&cfg)?;
+    let rocks = Arc::new(metadata::rocksdb::new(args.path.join(DATA_PATH_METADATA))?);
     let db = Arc::new(OptiDBImpl::open(args.path.join(DATA_PATH_STORAGE), Options {})?);
+    let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
     let topts = table::Options {
         levels: 7,
         merge_array_size: 10000,
@@ -84,26 +91,84 @@ pub fn gen(args: &DbTest, gen: &Gen) -> crate::error::Result<()> {
             })
             .progress_chars("#>-"),
     );
-    let mut rng = rand::thread_rng();
-    for i in 0..gen.records {
-        db.insert(
-            "t1",
-            vec![
-                NamedValue::new("f1".to_string(), Value::Int64(Some(10000000 - i as i64))),
-                // NamedValue::new("f1".to_string(), Value::Int64(Some(rng.gen_range(0..10000000)))),
-                NamedValue::new("f2".to_string(), Value::Int16(Some(i as i16))),
-                NamedValue::new("f3".to_string(), Value::Int32(Some(i as i32))),
-                NamedValue::new("f4".to_string(), Value::Int64(Some(i as i64))),
-                NamedValue::new("f5".to_string(), Value::String(Some(i.to_string()))),
-                NamedValue::new("f6".to_string(), Value::Decimal(Some(i as i128))),
-                NamedValue::new("f7".to_string(), Value::Boolean(Some(i % 2 == 0))),
-                NamedValue::new("f8".to_string(), Value::Timestamp(Some(i as i64))),
-            ],
-        ).unwrap();
-        pb.inc(1);
+    let mut settings = metadata::settings::Settings::default();
+    settings.backup_enabled = true;
+    settings.backup_encryption_enabled = true;
+    settings.backup_encryption_password = "test".to_string();
+    settings.backup_compression_enabled = true;
+    settings.backup_schedule_interval = BackupScheduleInterval::Hourly;
+    settings.backup_schedule_start_hour = 0;
+    settings.backup_provider = metadata::settings::BackupProvider::Local;
+    settings.backup_provider_local_path = "/tmp/optiprism/backups".to_string();
+    md.settings.save(&settings)?;
+    let mut cfg = Config::default();
+    cfg.data.path = args.path.clone();
+    backup::init(md.clone(), db.clone(), cfg).await?;
+    let db_cloned = db.clone();
+    /*thread::spawn(move || {
+        loop {
+            db_cloned.full_backup_local("/tmp/bak",|pct|{
+                dbg!(pct);
+            }).unwrap();
+            thread::sleep(Duration::from_secs(1));
+        }
+    });*/
+    /*
+        let db_cloned = db.clone();
+        thread::spawn(move || {
+            loop {
+                db_cloned.flush("t1").unwrap();
+                thread::sleep(Duration::from_secs(1));
+            }
+        });
+    */
+
+    /*    let db_cloned = db.clone();
+        thread::spawn(move || {
+            loop {
+                db_cloned.full_restore_local("/tmp/bak").unwrap();
+                thread::sleep(Duration::from_secs(1));
+                println!("restore");
+            }
+        });*/
+    let recs = gen.records;
+    let mut hnd = vec![];
+    for i in 0..=0 {
+        let pb_cloned = pb.clone();
+        let db_cloned = db.clone();
+        let h = thread::spawn(move || {
+            let mut rng = thread_rng();
+            let mut vals = (0..recs).into_iter().collect::<Vec<_>>();
+            vals.shuffle(&mut rng);
+
+            for j in 0..recs {
+                // if j % 3 != i {
+                //     continue;
+                // }
+                db_cloned.insert(
+                    "t1",
+                    vec![
+                        NamedValue::new("f1".to_string(), Value::Int64(Some(vals[i] as i64))),
+                        // NamedValue::new("f1".to_string(), Value::Int64(Some(recs as i64 - i as i64))),
+                        // NamedValue::new("f1".to_string(), Value::Int64(Some(i as i64))),
+                        // NamedValue::new("f1".to_string(), Value::Int64(Some(rng.gen_range(0..gen.records)))),
+                        NamedValue::new("f2".to_string(), Value::Int16(Some(i as i16))),
+                        NamedValue::new("f3".to_string(), Value::Int32(Some(i as i32))),
+                        NamedValue::new("f4".to_string(), Value::Int64(Some(i as i64))),
+                        NamedValue::new("f5".to_string(), Value::String(Some(i.to_string()))),
+                        NamedValue::new("f6".to_string(), Value::Decimal(Some(i as i128))),
+                        NamedValue::new("f7".to_string(), Value::Boolean(Some(i % 2 == 0))),
+                        NamedValue::new("f8".to_string(), Value::Timestamp(Some(i as i64))),
+                    ],
+                ).unwrap();
+                pb_cloned.inc(1);
+            }
+        });
+        hnd.push(h);
     }
-    db.flush("t1").unwrap();
-    pb.finish_with_message("done");
+    for h in hnd {
+        h.join().unwrap();
+    }
     Ok(())
 }
 
@@ -127,7 +192,7 @@ pub async fn query(args: &DbTest, q: &Query) -> crate::error::Result<()> {
 
     let s = Instant::now();
     let mut v = 0;
-    let mut scan = db.scan("t1", vec![0,1,2,3,4,5,6,7])?;
+    let mut scan = db.scan("t1", vec![0])?;
     for i in scan.iter {
         v += i.unwrap().len();
     }

@@ -1,19 +1,20 @@
-pub mod accounts;
-pub mod auth;
-pub mod custom_events;
-pub mod dashboards;
-pub mod event_records;
-pub mod events;
-pub mod group_records;
+mod accounts;
+mod auth;
+mod custom_events;
+mod dashboards;
+mod event_records;
+mod events;
+mod group_records;
 mod groups;
-pub mod organizations;
-pub mod projects;
-pub mod properties;
-pub mod reports;
+mod organizations;
+mod projects;
+mod properties;
+mod reports;
 mod event_segmentation;
-pub mod funnel;
+mod funnel;
 mod bookmarks;
-
+mod backups;
+mod settings;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -52,6 +53,8 @@ pub fn attach_routes(
     router = organizations::attach_routes(router);
     router = projects::attach_routes(router);
     router = accounts::attach_routes(router);
+    router = backups::attach_routes(router);
+    router = settings::attach_routes(router);
     router = auth::attach_routes(router);
     router = events::attach_routes(router);
     router = custom_events::attach_routes(router);
@@ -75,7 +78,10 @@ pub fn attach_routes(
     router = router
         .layer(Extension(platform.organizations.clone()))
         .layer(Extension(platform.projects.clone()))
+        .layer(Extension(platform.backups.clone()))
+        .layer(Extension(platform.settings.clone()))
         .layer(Extension(md.accounts.clone()))
+        .layer(Extension(md.settings.clone()))
         .layer(Extension(platform.accounts.clone()))
         .layer(Extension(platform.auth.clone()))
         .layer(Extension(platform.events.clone()))

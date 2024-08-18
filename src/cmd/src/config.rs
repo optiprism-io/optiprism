@@ -83,8 +83,6 @@ impl TryInto<common::config::Config> for Config {
             auth: common::config::Auth {
                 access_token_duration: parse_duration(self.auth.access_token_duration.as_str())?,
                 refresh_token_duration: parse_duration(self.auth.refresh_token_duration.as_str())?,
-                access_token_key: "".to_string(),
-                refresh_token_key: "".to_string(),
             },
             log: common::config::Log { level: self.log.level.into() },
             misc: common::config::Misc {
@@ -122,7 +120,7 @@ impl TryInto<common::config::Config> for Config {
                 merge_chunk_size: self.group_table.merge_chunk_size,
                 merge_array_page_size: self.group_table.merge_array_page_size,
                 merge_max_page_size: self.group_table.merge_max_page_size,
-            }
+            },
         })
     }
 }

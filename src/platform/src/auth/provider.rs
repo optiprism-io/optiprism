@@ -14,6 +14,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use validator::validate_email;
 use common::rbac::OrganizationPermission;
+use metadata::MetadataProvider;
 use super::password::{check_password_complexity, make_password_hash};
 use super::password::verify_password;
 use super::token::make_access_token;
@@ -26,31 +27,32 @@ use crate::organizations::Organizations;
 use crate::PlatformError;
 use crate::Result;
 use metadata::organizations::Organizations as MDOrganizations;
+
 #[derive(Clone)]
 pub struct Auth {
-    accounts: Arc<Accounts>,
-    orgs: Arc<MDOrganizations>,
+    md:Arc<MetadataProvider>,
     cfg: Config,
 }
 
 impl Auth {
-    pub fn new(accounts: Arc<Accounts>, orgs: Arc<MDOrganizations>, cfg: Config) -> Self {
-        Self { accounts, orgs, cfg }
+    pub fn new(md: Arc<MetadataProvider>, cfg: Config) -> Self {
+        Self { md, cfg }
     }
 
     fn make_tokens(&self, account_id: u64, organisation_id: u64) -> Result<TokensResponse> {
+        let settings =self.md.settings.load()?;
         Ok(TokensResponse {
             access_token: make_access_token(
                 account_id,
                 organisation_id,
                 self.cfg.auth.access_token_duration.clone(),
-                self.cfg.auth.access_token_key.clone(),
+                settings.auth_access_token,
             )
                 .map_err(|err| err.wrap_into(AuthError::CantMakeAccessToken))?,
             refresh_token: make_refresh_token(
                 account_id,
                 self.cfg.auth.refresh_token_duration.clone(),
-                self.cfg.auth.refresh_token_key.clone(),
+                settings.auth_refresh_token,
             )
                 .map_err(|err| err.wrap_into(AuthError::CantMakeRefreshToken))?,
         })
@@ -66,7 +68,7 @@ impl Auth {
         let password_hash = make_password_hash(req.password.as_str())
             .map_err(|err| err.wrap_into(AuthError::InvalidPasswordHashing))?;
 
-        let maybe_account = self.accounts.create(CreateAccountRequest {
+        let maybe_account = self.md.accounts.create(CreateAccountRequest {
             created_by: ADMIN_ID, // todo make it meaningful
             password_hash,
             email: req.email,
@@ -100,7 +102,7 @@ impl Auth {
         }
 
         let account = self
-            .accounts
+            .md.accounts
             .get_by_email(&req.email)
             .map_err(|_err| AuthError::InvalidCredentials)?;
 
@@ -112,7 +114,7 @@ impl Auth {
 
         // if org_id is provided, check if the account is a member of the org
         let org_id = if let Some(org_id) = org_id {
-            let org = self.orgs.get_by_id(org_id)?;
+            let org = self.md.organizations.get_by_id(org_id)?;
             if !org.is_member(account.id) {
                 0
             } else {
@@ -120,7 +122,7 @@ impl Auth {
             }
         } else {
             // find first organization
-            let orgs = self.orgs.list()?;
+            let orgs = self.md.organizations.list()?;
             let org = orgs.data.iter().find(|org| {
                 org.is_member(account.id)
             });
@@ -137,7 +139,7 @@ impl Auth {
     }
 
     pub async fn refresh_token(&self, ctx: Context, refresh_token: &str) -> Result<TokensResponse> {
-        let refresh_claims = parse_refresh_token(refresh_token, self.cfg.auth.refresh_token_key.clone())
+        let refresh_claims = parse_refresh_token(refresh_token, self.md.settings.load()?.auth_refresh_token)
             .map_err(|err| err.wrap_into(AuthError::InvalidRefreshToken))?;
         let tokens = self.make_tokens(refresh_claims.account_id, ctx.organization_id)?;
 
@@ -145,7 +147,7 @@ impl Auth {
     }
 
     pub async fn get(&self, ctx: Context) -> Result<Account> {
-        match self.accounts.get_by_id(ctx.account_id) {
+        match self.md.accounts.get_by_id(ctx.account_id) {
             Ok(acc) => Ok(acc.into()),
             Err(MetadataError::NotFound(_)) => {
                 Err(PlatformError::NotFound("account not found".to_string()))
@@ -171,7 +173,7 @@ impl Auth {
             force_update_email: OptionalProperty::None,
         };
 
-        self.accounts.update(ctx.account_id, md_req)?;
+        self.md.accounts.update(ctx.account_id, md_req)?;
 
         Ok(())
     }
@@ -185,7 +187,7 @@ impl Auth {
             return Err(PlatformError::invalid_field("email", "invalid email"));
         }
 
-        let account = self.accounts.get_by_id(ctx.account_id)?;
+        let account = self.md.accounts.get_by_id(ctx.account_id)?;
 
         if let Err(err) = verify_password(
             &req.password,
@@ -207,7 +209,7 @@ impl Auth {
             force_update_email: OptionalProperty::None,
         };
 
-        match self.accounts.update(ctx.account_id, md_req) {
+        match self.md.accounts.update(ctx.account_id, md_req) {
             Ok(_) => {}
             Err(MetadataError::AlreadyExists(_)) => {
                 return Err(PlatformError::invalid_field(
@@ -228,7 +230,7 @@ impl Auth {
         ctx: Context,
         req: UpdatePasswordRequest,
     ) -> Result<TokensResponse> {
-        let account = self.accounts.get_by_id(ctx.account_id)?;
+        let account = self.md.accounts.get_by_id(ctx.account_id)?;
 
         if verify_password(
             &req.password,
@@ -257,7 +259,7 @@ impl Auth {
             force_update_email: OptionalProperty::None,
         };
 
-        self.accounts.update(ctx.account_id, md_req)?;
+        self.md.accounts.update(ctx.account_id, md_req)?;
 
         let tokens = self.make_tokens(account.id, ctx.organization_id)?;
 
@@ -269,7 +271,7 @@ impl Auth {
         ctx: Context,
         req: SetPasswordRequest,
     ) -> Result<TokensResponse> {
-        let account = self.accounts.get_by_id(ctx.account_id)?;
+        let account = self.md.accounts.get_by_id(ctx.account_id)?;
         if !account.force_update_password {
             return Err(PlatformError::Forbidden("forbidden".to_string()));
         }
@@ -292,7 +294,7 @@ impl Auth {
             force_update_email: OptionalProperty::None,
         };
 
-        self.accounts.update(ctx.account_id, md_req)?;
+        self.md.accounts.update(ctx.account_id, md_req)?;
 
         let tokens = self.make_tokens(account.id, ctx.organization_id)?;
 
@@ -304,7 +306,7 @@ impl Auth {
         ctx: Context,
         req: SetEmailRequest,
     ) -> Result<TokensResponse> {
-        let account = self.accounts.get_by_id(ctx.account_id)?;
+        let account = self.md.accounts.get_by_id(ctx.account_id)?;
         if !account.force_update_email {
             return Err(PlatformError::Forbidden("forbidden".to_string()));
         }
@@ -321,7 +323,7 @@ impl Auth {
             force_update_email: OptionalProperty::Some(false),
         };
 
-        self.accounts.update(ctx.account_id, md_req)?;
+        self.md.accounts.update(ctx.account_id, md_req)?;
 
         let tokens = self.make_tokens(account.id, ctx.organization_id)?;
 
@@ -334,7 +336,7 @@ impl Auth {
         org_id: u64,
     ) -> Result<TokensResponse> {
         ctx.check_organization_permission(org_id, OrganizationPermission::ViewOrganization)?;
-        self.orgs.get_by_id(org_id)?;
+        self.md.organizations.get_by_id(org_id)?;
         let tokens = self.make_tokens(ctx.account_id, org_id)?;
         Ok(tokens)
     }

@@ -62,6 +62,9 @@ scan_dir = "0.3.3"
 tempfile = "3.8.0"
 prost = "0.13"
 prost-build = "0.13.1"
+flate2 = "1.0.31"
+zip = "2.1.6"
+binread = "2.2.0"
 
 [dev-dependencies]
 rstest = "0.18.1"

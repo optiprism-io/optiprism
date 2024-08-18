@@ -20,6 +20,8 @@ pub mod reports;
 pub mod event_segmentation;
 mod funnel;
 mod bookmarks;
+mod settings;
+mod backups;
 // pub mod stub;
 
 use std::fmt::Debug;
@@ -71,6 +73,7 @@ use query::properties::PropertiesProvider;
 
 use crate::accounts::Accounts;
 use crate::auth::Auth;
+use crate::backups::Backups;
 use crate::bookmarks::Bookmarks;
 use crate::custom_events::CustomEvents;
 use crate::dashboards::Dashboards;
@@ -84,6 +87,7 @@ use crate::organizations::Organizations;
 use crate::projects::Projects;
 use crate::properties::Properties;
 use crate::reports::Reports;
+use crate::settings::SettingsProvider;
 
 pub struct PlatformProvider {
     pub events: Arc<Events>,
@@ -98,6 +102,8 @@ pub struct PlatformProvider {
     pub dashboards: Arc<Dashboards>,
     pub reports: Arc<Reports>,
     pub bookmarks: Arc<Bookmarks>,
+    pub backups: Arc<Backups>,
+    pub settings: Arc<SettingsProvider>,
     pub projects: Arc<Projects>,
     pub organizations: Arc<Organizations>,
     pub event_records: Arc<EventRecords>,
@@ -125,8 +131,7 @@ impl PlatformProvider {
             group_properties,
             accounts: Arc::new(Accounts::new(md.accounts.clone())),
             auth: Arc::new(Auth::new(
-                md.accounts.clone(),
-                md.organizations.clone(),
+                md.clone(),
                 cfg.clone(),
             )),
             event_segmentation: Arc::new(EventSegmentation::new(md.clone(), es_prov)),
@@ -138,6 +143,8 @@ impl PlatformProvider {
             projects: Arc::new(Projects::new(md.clone(), cfg.clone())),
             organizations: Arc::new(Organizations::new(md.clone(), cfg.clone())),
             bookmarks: Arc::new(Bookmarks::new(md.bookmarks.clone())),
+            backups: Arc::new(Backups::new(md.clone())),
+            settings: Arc::new(SettingsProvider::new(md.settings.clone())),
         }
     }
 }

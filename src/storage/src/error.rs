@@ -23,6 +23,8 @@ pub enum StoreError {
     Common(#[from] CommonError),
     #[error("execution {0:?}")]
     Execution(String),
+    #[error("invalid backup magic number")]
+    InvalidBackupMagicNumber,
     #[error("arrow {0:?}")]
     Arrow(#[from] arrow::error::ArrowError),
     #[error("arrow2 {0:?}")]

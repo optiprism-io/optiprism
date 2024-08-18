@@ -11,7 +11,7 @@ use common::query::Breakdown;
 use common::query::DidEventAggregate;
 use common::query::PropertyRef;
 use common::query::SegmentCondition;
-use common::types::{COLUMN_CREATED_AT, COLUMN_IP, GROUP_COLUMN_ID, METRIC_QUERY_EXECUTION_TIME_MS, METRIC_QUERY_QUERIES_TOTAL, TABLE_EVENTS};
+use common::types::{COLUMN_CREATED_AT, COLUMN_IP, GROUP_COLUMN_ID, METRIC_QUERY_EXECUTION_TIME_SECONDS, METRIC_QUERY_QUERIES_TOTAL, TABLE_EVENTS};
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_PROJECT_ID;
 use common::types::COLUMN_SEGMENT;
@@ -117,7 +117,7 @@ impl EventSegmentationProvider {
 
         println!("{plan:?}");
         let result = execute(session_ctx, state, plan).await?;
-        histogram!(METRIC_QUERY_EXECUTION_TIME_MS, "query"=>"event_segmentation").record(start.elapsed().as_millis() as f64);
+        histogram!(METRIC_QUERY_EXECUTION_TIME_SECONDS, "query"=>"event_segmentation").record(start.elapsed().as_millis() as f64);
         counter!(METRIC_QUERY_QUERIES_TOTAL,"query"=>"event_segmentation").increment(1);
         debug!("elapsed: {:?}", start.elapsed());
 

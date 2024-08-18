@@ -19,7 +19,6 @@ use axum_extra::headers::authorization::Bearer;
 use axum_extra::headers::Authorization;
 use axum_extra::TypedHeader;
 use bytes::Bytes;
-use common::config::Config;
 use common::rbac::OrganizationPermission;
 use common::rbac::OrganizationRole;
 use common::rbac::Permission;
@@ -30,7 +29,8 @@ use common::rbac::ORGANIZATION_PERMISSIONS;
 use common::rbac::PERMISSIONS;
 use common::rbac::PROJECT_PERMISSIONS;
 use serde_json::Value;
-
+use metadata::settings::SettingsProvider;
+use metadata::MetadataProvider;
 use crate::auth::token::parse_access_token;
 use crate::error::AuthError;
 use crate::PlatformError;
@@ -181,11 +181,11 @@ where
                 .await
                 .map_err(|_err| AuthError::CantParseBearerHeader)?;
 
-        let Extension(cfg) = Extension::<Config>::from_request_parts(parts, state)
+        let Extension(settings) = Extension::<Arc<SettingsProvider>>::from_request_parts(parts, state)
             .await
             .map_err(|err| PlatformError::Internal(err.to_string()))?;
 
-        let claims = parse_access_token(bearer.token(), cfg.auth.access_token_key)
+        let claims = parse_access_token(bearer.token(), settings.load()?.auth_access_token)
             .map_err(|err| err.wrap_into(AuthError::CantParseAccessToken))?;
         let Extension(md_acc_prov) =
             Extension::<Arc<metadata::accounts::Accounts>>::from_request_parts(parts, state)
