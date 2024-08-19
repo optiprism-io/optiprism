@@ -2,6 +2,7 @@ use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::hash::Hash;
 use std::hash::Hasher;
+use std::str::from_utf8;
 use std::sync::Arc;
 
 use byteorder::ByteOrder;
@@ -56,7 +57,7 @@ impl Debug for Dictionaries {
 }
 
 fn tbl_dict(tbl: &str, dict: &str) -> String {
-    format!("tables/{tbl}/{dict}")
+    format!("tables/{tbl}/{dict}/")
 }
 
 impl Dictionaries {
@@ -70,9 +71,10 @@ impl Dictionaries {
     ) -> Result<u64> {
         let res = match tx.get(make_value_key(project_id, tbl_dict(table, dict).as_str(), value))? {
             None => {
+                let key = make_id_seq_key(project_ns(project_id, dict_ns(tbl_dict(table, dict).as_str()).as_slice()).as_slice());
                 let id = next_seq(
                     &tx,
-                    make_id_seq_key(project_ns(project_id, dict_ns(tbl_dict(table, dict).as_str()).as_slice()).as_slice()),
+                    key,
                 )?;
                 tx.put(make_key_key(project_id, tbl_dict(table, dict).as_str(), id), value.as_bytes())?;
                 tx.put(
@@ -93,7 +95,7 @@ impl Dictionaries {
         tx.put(make_key_key(project_id, tbl_dict(table, dict).as_str(), key), value.as_bytes())?;
         tx.put(
             make_value_key(project_id, tbl_dict(table, dict).as_str(), value),
-            key.to_string().as_bytes(),
+            key.to_le_bytes(),
         )?;
         tx.commit()?;
         Ok(())

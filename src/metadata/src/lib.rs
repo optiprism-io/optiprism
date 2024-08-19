@@ -117,7 +117,7 @@ pub fn make_index_key(ns: &[u8], idx_name: &[u8], key: &str) -> Vec<u8> {
 }
 
 pub fn make_id_seq_key(ns: &[u8]) -> Vec<u8> {
-    [ns, b"/id_seq"].concat()
+    [ns, b"id_seq"].concat()
 }
 
 pub fn list_data<T>(tx: &Transaction<TransactionDB>, ns: &[u8]) -> Result<ListResponse<T>>

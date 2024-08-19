@@ -2098,7 +2098,7 @@ mod tests {
             ])
                 .unwrap();
         }
-        db.full_backup_local("/tmp/db.bak").unwrap();
+        db.full_backup_local("/tmp/db.bak",|c|{}).unwrap();
         db.full_restore_local("/tmp/db.bak").unwrap();
 
         let mut scan = db.scan("0", vec![0]).unwrap();
