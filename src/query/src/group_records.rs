@@ -60,7 +60,7 @@ impl GroupRecordsProvider {
         &self,
         ctx: Context,
         group_id: usize,
-        id: u64,
+        id: String,
     ) -> Result<GroupRecord> {
         let start = Instant::now();
         let schema = self.db.schema1(&group_col(group_id))?;
@@ -153,7 +153,7 @@ impl GroupRecordsProvider {
         };
 
         let (session_ctx, state, plan) = initial_plan(&self.db, group_col(req.group_id), projection)?;
-        let (plan,props) = build_search_plan(ctx, self.metadata.clone(), plan, req.clone())?;
+        let (plan, props) = build_search_plan(ctx, self.metadata.clone(), plan, req.clone())?;
         println!("{plan:?}");
         let result = execute(session_ctx, state, plan).await?;
 
@@ -192,7 +192,7 @@ pub fn build_search_plan(
     metadata: Arc<MetadataProvider>,
     input: LogicalPlan,
     req: GroupRecordsSearchRequest,
-) -> Result<(LogicalPlan,Vec<Property>)> {
+) -> Result<(LogicalPlan, Vec<Property>)> {
     let mut properties = vec![];
     let input = if let Some(props) = &req.properties {
         let mut prop_names = vec![];
@@ -355,7 +355,7 @@ pub fn build_search_plan(
         node: Arc::new(RenameColumnsNode::try_new(input, rename)?),
     });
 
-    Ok((input,properties))
+    Ok((input, properties))
 }
 
 pub fn build_get_by_id_plan(
@@ -363,8 +363,10 @@ pub fn build_get_by_id_plan(
     metadata: Arc<MetadataProvider>,
     input: LogicalPlan,
     group_id: usize,
-    id: u64,
+    id: String,
 ) -> Result<LogicalPlan> {
+    let id_prop = metadata.group_properties[group_id].get_by_name(ctx.project_id, GROUP_COLUMN_ID)?;
+    let id_int = metadata.dictionaries.get_key(ctx.project_id, group_col(group_id).as_str(), id_prop.column_name().as_str(), id.as_str())?;
     let mut filter_exprs = vec![
         binary_expr(
             col(GROUP_COLUMN_PROJECT_ID),
@@ -374,7 +376,7 @@ pub fn build_get_by_id_plan(
         binary_expr(
             col(GROUP_COLUMN_ID),
             Operator::Eq,
-            lit(ScalarValue::from(id as i64)),
+            lit(ScalarValue::from(id_int)),
         ),
     ];
 

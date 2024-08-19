@@ -17,7 +17,7 @@ use crate::Result;
 async fn get_by_id(
     ctx: Context,
     Extension(provider): Extension<Arc<GroupRecords>>,
-    Path((project_id, group_id, id)): Path<(u64, usize, u64)>,
+    Path((project_id, group_id, id)): Path<(u64, usize, String)>,
 ) -> Result<Json<GroupRecord>> {
     Ok(Json(provider.get_by_id(ctx, project_id, group_id, id).await?))
 }

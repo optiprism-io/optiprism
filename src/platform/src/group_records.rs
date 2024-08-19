@@ -29,7 +29,7 @@ impl GroupRecords {
         Self { md, prov }
     }
 
-    pub async fn get_by_id(&self, ctx: Context, project_id: u64, group_id: usize, id: u64) -> Result<GroupRecord> {
+    pub async fn get_by_id(&self, ctx: Context, project_id: u64, group_id: usize, id: String) -> Result<GroupRecord> {
         ctx.check_project_permission(
             ctx.organization_id,
             project_id,
