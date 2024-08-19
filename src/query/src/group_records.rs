@@ -293,7 +293,7 @@ pub fn build_search_plan(
 
     let input = LogicalPlan::Limit(Limit {
         skip: 0,
-        fetch: Some(1000),
+        fetch: Some(100),
         input: Arc::new(input),
     });
 

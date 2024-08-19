@@ -130,7 +130,6 @@ impl Memtable {
         if self.len() == 0 {
             return Ok(None);
         }
-
         let arrs = match cols {
             None => self
                 .cols
@@ -171,15 +170,21 @@ impl Memtable {
                     .downcast_ref::<arrow2::array::Int64Array>()
                     .unwrap();
 
+                let b = arrs[1]
+                    .as_any()
+                    .downcast_ref::<arrow2::array::Int64Array>()
+                    .unwrap();
+
+
                 let mut last = None;
                 for row_id in 0..arrs[0].len() {
                     if last.is_none() {
-                        last = Some(vec![a.value(row_id)]);
+                        last = Some(vec![a.value(row_id), b.value(row_id)]);
                         continue;
                     }
-                    if last != Some(vec![a.value(row_id)]) {
+                    if last != Some(vec![a.value(row_id), b.value(row_id)]) {
                         indices.push(Some(row_id as i64 - 1));
-                        last = Some(vec![a.value(row_id)]);
+                        last = Some(vec![a.value(row_id), b.value(row_id)]);
                     }
                 }
                 indices.push(Some(arrs[0].len() as i64 - 1));
@@ -336,7 +341,7 @@ mod tests {
         ]);
         mt.push_row(vec![
             Value::Int64(Some(1)),
-            Value::Int64(Some(2)),
+            Value::Int64(Some(1)),
             Value::Int64(Some(2)),
         ]);
         mt.push_row(vec![
@@ -347,6 +352,9 @@ mod tests {
 
         let res = mt.chunk(None, 2, true).unwrap();
 
-        assert_eq!(res.unwrap(), Chunk::new(vec![Int64Array::from(vec![Some(1), Some(2), Some(1)]).boxed()]));
+        assert_eq!(res.unwrap(), Chunk::new(vec![
+            Int64Array::from(vec![Some(1), Some(1)]).boxed(),
+            Int64Array::from(vec![Some(1), Some(2)]).boxed(),
+            Int64Array::from(vec![Some(2), Some(1)]).boxed()]));
     }
 }

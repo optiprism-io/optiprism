@@ -256,14 +256,12 @@ impl Groups {
     }
 
     pub fn next_record_sequence(&self, project_id: u64, group_id: u64) -> Result<u64> {
-        let group_key = format!("groups/{group_id}/records");
+        let group_key = format!("groups/{group_id}/records/");
         let tx = self.db.transaction();
-
         let id = next_seq(
             &tx,
             make_id_seq_key(project_ns(project_id, group_key.as_bytes()).as_slice()),
         )?;
-
         tx.commit()?;
         Ok(id)
     }
