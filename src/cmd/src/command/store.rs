@@ -323,10 +323,10 @@ where
 
         let now = Utc::now();
         let res = scenario.run();
-        /*db.flush(TABLE_EVENTS).unwrap();
+        db.flush(TABLE_EVENTS).unwrap();
         for i in 0..GROUPS_COUNT {
             db.flush(group_col(i).as_str()).unwrap();
-        }*/
+        }
         match res {
             Ok(_) => {}
             Err(err) => println!("generation error: {:?}", err),
