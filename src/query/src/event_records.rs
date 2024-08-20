@@ -204,6 +204,7 @@ pub fn build_search_plan(
     req: EventRecordsSearchRequest,
 ) -> Result<(LogicalPlan, Vec<Property>)> {
     let mut properties = vec![];
+    // todo: add events and filters
     let input = if let Some(props) = &req.properties {
         let mut prop_names = vec![];
         let mut exprs = vec![
@@ -567,6 +568,8 @@ pub fn fix_search_request(
     if let Some(events) = &req.events {
         if events.is_empty() {
             out.events = None;
+        } else {
+            //todo need to fix event filters
         }
     }
 

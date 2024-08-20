@@ -44,7 +44,7 @@ use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::logical_plan::expr::multi_and;
 use crate::logical_plan::expr::multi_or;
 use crate::logical_plan::rename_columns::RenameColumnsNode;
-use crate::{col_name, ColumnType, Context, ColumnarDataTable, decode_filter_single_dictionary, execute, initial_plan, PropertyAndValue};
+use crate::{col_name, ColumnType, Context, ColumnarDataTable, decode_filter_single_dictionary, execute, initial_plan, PropertyAndValue, fix_filter};
 
 pub struct GroupRecordsProvider {
     metadata: Arc<MetadataProvider>,
@@ -472,6 +472,40 @@ fn projection(
     }
 
     Ok(fields)
+}
+
+pub fn fix_search_request(
+    md: &Arc<MetadataProvider>,
+    project_id: u64,
+    req: GroupRecordsSearchRequest,
+) -> Result<GroupRecordsSearchRequest> {
+    let mut out = req.clone();
+
+    if let Some(filters) = &req.filters {
+        if filters.is_empty() {
+            out.filters = None;
+        }
+    }
+
+    if let Some(properties) = &req.properties {
+        if properties.is_empty() {
+            out.properties = None;
+        }
+    }
+
+    if let Some(filters) = &req.filters {
+        if filters.is_empty() {
+            out.filters = None;
+        } else {
+            let mut filters_out = vec![];
+            for filter in filters.iter() {
+                let f = fix_filter(md, project_id, filter)?;
+                filters_out.push(f);
+            }
+            out.filters = Some(filters_out);
+        }
+    }
+    Ok(out)
 }
 
 #[derive(Clone, Debug)]
