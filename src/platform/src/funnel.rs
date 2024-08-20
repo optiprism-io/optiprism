@@ -32,7 +32,7 @@ impl Funnel {
             ProjectPermission::ExploreReports,
         )?;
         validate_request(&self.md, project_id, &req)?;
-        let req = fix_request(req.into())?;
+        let req = fix_request(&self.md, project_id, req.into())?;
 
         let lreq = req.into();
         let cur_time = match query.timestamp {

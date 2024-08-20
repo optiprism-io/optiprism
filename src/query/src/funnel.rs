@@ -42,7 +42,7 @@ use common::funnel::{Count, ExcludeSteps, Filter, Funnel, StepOrder, TimeWindow,
 use metadata::properties::Property;
 use storage::db::OptiDBImpl;
 
-use crate::{breakdowns_to_dicts, col_name, decode_filter_single_dictionary, execute, initial_plan};
+use crate::{breakdowns_to_dicts, col_name, decode_filter_single_dictionary, execute, fix_filter, initial_plan};
 use crate::error::QueryError;
 use crate::error::Result;
 use crate::expr::event_expression;
@@ -538,8 +538,9 @@ fn projection(
     Ok(fields)
 }
 
-pub fn fix_request(
-    req: common::funnel::Funnel,
+pub fn fix_request(md: &Arc<MetadataProvider>,
+                   project_id: u64,
+                   req: common::funnel::Funnel,
 ) -> crate::Result<common::funnel::Funnel> {
     let mut out = req.clone();
 
@@ -584,8 +585,15 @@ pub fn fix_request(
     }
 
     if let Some(filters) = &req.filters {
+        let mut of = vec![];
         if filters.is_empty() {
             out.filters = None;
+        } else {
+            for filter in filters.iter() {
+                let f = fix_filter(md, project_id, filter)?;
+                of.push(f);
+            }
+            out.filters = Some(of);
         }
     }
     Ok(out)

@@ -482,8 +482,15 @@ pub fn fix_search_request(
     let mut out = req.clone();
 
     if let Some(filters) = &req.filters {
+        let mut of = vec![];
         if filters.is_empty() {
             out.filters = None;
+        } else {
+            for filter in filters.iter() {
+                let f = fix_filter(md, project_id, filter)?;
+                of.push(f);
+            }
+            out.filters = Some(of);
         }
     }
 

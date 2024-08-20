@@ -565,13 +565,27 @@ pub fn fix_search_request(
         }
     }
 
-    if let Some(events) = &req.events {
-        if events.is_empty() {
-            out.events = None;
-        } else {
-            //todo need to fix event filters
+    if let Some(events) = req.events {
+        let mut oe = vec![];
+        for event in events.iter() {
+            let mut of = vec![];
+            if let Some(filters) = &event.filters {
+                if filters.is_empty() {} else {
+                    for filter in filters.iter() {
+                        let f = fix_filter(md, project_id, filter)?;
+                        of.push(f);
+                    }
+                }
+                let e = Event {
+                    event: event.event.clone(),
+                    filters: if of.is_empty() { None } else { Some(of) },
+                };
+                oe.push(e);
+            }
         }
+        out.events = Some(oe);
     }
+
 
     if let Some(filters) = &req.filters {
         if filters.is_empty() {
