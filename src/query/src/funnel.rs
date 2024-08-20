@@ -537,3 +537,56 @@ fn projection(
     fields.dedup();
     Ok(fields)
 }
+
+pub fn fix_request(
+    req: common::funnel::Funnel,
+) -> crate::Result<common::funnel::Funnel> {
+    let mut out = req.clone();
+
+    for (step_id, step) in req.steps.iter().enumerate() {
+        for (event_id, event) in step.events.iter().enumerate() {
+            if let Some(filters) = &event.filters {
+                if filters.is_empty() {
+                    out.steps[step_id].events[event_id].filters = None;
+                }
+            }
+        }
+    }
+
+    if let Some(exclude) = &req.exclude
+    {
+        if exclude.is_empty() {
+            out.exclude = None;
+        } else {
+            let mut out_exclude = exclude.to_vec();
+            for (exclude_id, exclude) in exclude.iter().enumerate() {
+                if let Some(filters) = &exclude.filters {
+                    if filters.is_empty() {
+                        out_exclude[exclude_id].filters = None;
+                    }
+                }
+            }
+
+            out.exclude = Some(out_exclude)
+        }
+    }
+
+    if let Some(breakdowns) = &req.breakdowns
+        && breakdowns.is_empty()
+    {
+        out.breakdowns = None;
+    }
+
+    if let Some(holding_constants) = &req.holding_constants
+        && holding_constants.is_empty()
+    {
+        out.holding_constants = None;
+    }
+
+    if let Some(filters) = &req.filters {
+        if filters.is_empty() {
+            out.filters = None;
+        }
+    }
+    Ok(out)
+}
