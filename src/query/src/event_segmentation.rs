@@ -40,7 +40,7 @@ use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
 use storage::db::OptiDBImpl;
 
-use crate::{breakdowns_to_dicts, col_name, ColumnType, ColumnarDataTable, decode_filter_single_dictionary, execute, initial_plan, segment_projection, segment_plan};
+use crate::{breakdowns_to_dicts, col_name, ColumnType, ColumnarDataTable, decode_filter_single_dictionary, execute, initial_plan, segment_projection, segment_plan, fix_filter};
 use crate::context::Format;
 use crate::error::QueryError;
 use crate::error::Result;
@@ -945,4 +945,41 @@ impl LogicalPlanBuilder {
             group_expr.into_iter().map(|(a, _)| a).collect::<Vec<_>>(),
         ))
     }
+}
+
+pub fn fix_request(
+    md: &Arc<MetadataProvider>,
+    project_id: u64,
+    req: common::event_segmentation::EventSegmentationRequest,
+) -> Result<common::event_segmentation::EventSegmentationRequest> {
+    let mut out = req.clone();
+    for (event_id, event) in req.events.iter().enumerate() {
+        if let Some(filters) = &event.filters {
+            if filters.is_empty() {
+                out.events[event_id].filters = None;
+            } else {
+                let mut filters_out = vec![];
+                for filter in filters.iter() {
+                    let f = fix_filter(md, project_id, filter)?;
+                    filters_out.push(f);
+                }
+                out.events[event_id].filters = Some(filters_out);
+            }
+        }
+    }
+
+    if let Some(filters) = &req.filters {
+        if filters.is_empty() {
+            out.filters = None;
+        } else {
+            let mut filters_out = vec![];
+            for filter in filters.iter() {
+                let f = fix_filter(md, project_id, filter)?;
+                filters_out.push(f);
+            }
+            out.filters = Some(filters_out);
+        }
+    }
+
+    Ok(out)
 }

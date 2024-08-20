@@ -1025,7 +1025,7 @@ impl Into<common::query::SegmentCondition> for SegmentCondition {
                 operation,
                 value,
             } => common::query::SegmentCondition::HasPropertyValue {
-                property:property.into(),
+                property: property.into(),
                 operation: operation.into(),
                 value: match value {
                     Some(v) if !v.is_empty() => {
@@ -1040,7 +1040,7 @@ impl Into<common::query::SegmentCondition> for SegmentCondition {
                 value,
                 time,
             } => common::query::SegmentCondition::HadPropertyValue {
-                property:property.into(),
+                property: property.into(),
                 operation: operation.into(),
                 value: match value {
                     Some(v) if !v.is_empty() => {
@@ -1165,7 +1165,7 @@ impl Into<SegmentCondition> for common::query::SegmentCondition {
                 operation,
                 value,
             } => SegmentCondition::HasPropertyValue {
-                property:property.into(),
+                property: property.into(),
                 operation: operation.into(),
                 value: value.map_or_else(
                     || None,
@@ -1184,7 +1184,7 @@ impl Into<SegmentCondition> for common::query::SegmentCondition {
                 value,
                 time,
             } => SegmentCondition::HadPropertyValue {
-                property:property.into(),
+                property: property.into(),
                 operation: operation.into(),
                 value: value.map_or_else(
                     || None,

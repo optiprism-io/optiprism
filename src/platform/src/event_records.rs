@@ -10,8 +10,8 @@ use serde_json::{json, Value};
 use common::rbac::ProjectPermission;
 use metadata::MetadataProvider;
 use query::context::Format;
-use query::{event_records};
-
+use query::{event_records, fix_filter};
+use query::event_records::fix_search_request;
 use crate::{Context, PlatformError, PropertyAndValue, PropertyRef, QueryParams, QueryResponse, QueryResponseFormat, QueryTime, scalar_to_json, validate_event, validate_event_filter};
 use crate::EventGroupedFilters;
 use crate::EventRef;
@@ -53,7 +53,7 @@ impl EventRecords {
             ProjectPermission::ExploreReports,
         )?;
         validate_search_request(&self.md, project_id, &req)?;
-        let lreq = fix_search_request(req.into())?;
+        let lreq = fix_search_request(&self.md, project_id, req.into())?;
         let cur_time = match query.timestamp {
             None => Utc::now(),
             Some(ts_sec) => DateTime::from_naive_utc_and_offset(
@@ -123,7 +123,7 @@ pub struct Event {
 pub struct EventRecordsSearchRequest {
     pub time: QueryTime,
     pub events: Option<Vec<Event>>,
-    pub filters: Option<Vec<PropValueFilter>>,
+    pub filters: Option<EventGroupedFilters>,
     pub properties: Option<Vec<PropertyRef>>,
 }
 
@@ -151,11 +151,12 @@ impl Into<event_records::EventRecordsSearchRequest> for EventRecordsSearchReques
                     .map(|event| event.into())
                     .collect::<Vec<_>>()
             }),
-            filters: self.filters.map(|filters| {
-                filters
-                    .iter()
-                    .map(|filter| filter.to_owned().into())
-                    .collect::<Vec<_>>()
+            filters: self.filters.map_or_else(|| None, |v| {
+                if v.groups[0].filters.is_empty() {
+                    None
+                } else {
+                    Some(v.groups[0].filters.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>())
+                }
             }),
             properties: self.properties.map(|props| {
                 props
@@ -211,8 +212,20 @@ pub(crate) fn validate_search_request(
     match &req.filters {
         None => {}
         Some(filters) => {
-            for (filter_id, filter) in filters.iter().enumerate() {
-                validate_event_filter(md, project_id, filter, filter_id, "".to_string())?;
+            for filter_group in &filters.groups {
+                if filters.groups.is_empty() {
+                    return Err(PlatformError::BadRequest(
+                        "filter_group field can't be empty".to_string(),
+                    ));
+                }
+                if filter_group.filters.is_empty() {
+                    return Err(PlatformError::BadRequest(
+                        "filters field can't be empty".to_string(),
+                    ));
+                }
+                for (filter_id, filter) in filter_group.filters.iter().enumerate() {
+                    validate_event_filter(md, project_id, filter, filter_id, "".to_string())?;
+                }
             }
         }
     }
@@ -246,36 +259,4 @@ pub(crate) fn validate_search_request(
         }
     }
     Ok(())
-}
-
-pub(crate) fn fix_search_request(
-    req: EventRecordsSearchRequest,
-) -> Result<EventRecordsSearchRequest> {
-    let mut out = req.clone();
-
-    if let Some(props) = &req.properties {
-        if props.is_empty() {
-            out.properties = None;
-        }
-    }
-
-
-    if let Some(events) = &req.events {
-        if events.is_empty() {
-            out.events = None;
-        }
-    }
-
-    if let Some(filters) = &req.filters {
-        if filters.is_empty() {
-            out.filters = None;
-        }
-    }
-
-    if let Some(properties) = &req.properties {
-        if properties.is_empty() {
-            out.properties = None;
-        }
-    }
-    Ok(out)
 }

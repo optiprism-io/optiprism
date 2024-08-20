@@ -12,7 +12,7 @@ use serde::Serialize;
 use serde_json::Value;
 use common::rbac::ProjectPermission;
 use query::context::Format;
-use query::event_segmentation::EventSegmentationProvider;
+use query::event_segmentation::{EventSegmentationProvider, fix_request};
 
 use crate::error::Result;
 use crate::{json_value_to_scalar, QueryParams, QueryResponse, QueryResponseFormat, SegmentCondition, validate_event, validate_event_filter, validate_event_property};
@@ -472,7 +472,13 @@ impl Into<common::event_segmentation::EventSegmentationRequest> for EventSegment
             analysis: self.analysis.into(),
             compare: self.compare.map(|v| v.into()),
             events: self.events.iter().map(|v| v.into()).collect::<Vec<_>>(),
-            filters: None,
+            filters: self.filters.map_or_else(|| None, |v| {
+                if v.groups[0].filters.is_empty() {
+                    None
+                } else {
+                    Some(v.groups[0].filters.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>())
+                }
+            }),
             breakdowns: self.breakdowns.map_or_else(
                 || None,
                 |v| {
@@ -634,104 +640,6 @@ pub(crate) fn validate_request(
     Ok(())
 }
 
-pub(crate) fn fix_request(
-    md: &Arc<MetadataProvider>,
-    project_id: u64,
-    req: common::event_segmentation::EventSegmentationRequest,
-) -> Result<common::event_segmentation::EventSegmentationRequest> {
-    let mut out = req.clone();
-    for (event_id, event) in req.events.iter().enumerate() {
-        let filters = if let Some(filters) = &event.filters {
-            if filters.is_empty() {
-                None
-            } else {
-                let mut filters_out = vec![];
-                for (filter_id, filter) in filters.iter().enumerate() {
-                    match filter {
-                        common::query::PropValueFilter::Property {
-                            property,
-                            value,
-                            operation,
-                        } => {
-                            let prop = match property {
-                                common::query::PropertyRef::Group(name, group) => {
-                                    md.group_properties[*group].get_by_name(project_id, name)?
-                                }
-                                common::query::PropertyRef::Event(name) => {
-                                    md.event_properties.get_by_name(project_id, name)?
-                                }
-                                _ => {
-                                    return Err(PlatformError::Unimplemented(
-                                        "invalid property type".to_string(),
-                                    ));
-                                }
-                            };
-
-                            let mut ev = vec![];
-                            if let Some(value) = value {
-                                for value in value {
-                                    match (&prop.data_type, value) {
-                                        (&DType::Timestamp, &ScalarValue::Decimal128(_, _, _)) => {
-                                            match out.events[event_id].clone().filters.unwrap()
-                                                [filter_id]
-                                                .clone()
-                                            {
-                                                common::query::PropValueFilter::Property {
-                                                    value,
-                                                    ..
-                                                } => {
-                                                    for value in value.unwrap().iter() {
-                                                        if let ScalarValue::Decimal128(
-                                                            Some(ts),
-                                                            _,
-                                                            _,
-                                                        ) = value
-                                                        {
-                                                            let sv =
-                                                                ScalarValue::TimestampMillisecond(
-                                                                    Some(*ts as i64),
-                                                                    None,
-                                                                );
-                                                            ev.push(sv);
-                                                        } else {
-                                                            unreachable!()
-                                                        }
-                                                    }
-                                                }
-                                            };
-                                        }
-                                        _ => ev.push(value.to_owned()),
-                                    }
-                                }
-                            }
-
-                            let filter = common::query::PropValueFilter::Property {
-                                property: property.to_owned(),
-                                operation: operation.to_owned(),
-                                value: Some(ev),
-                            };
-                            filters_out.push(filter);
-                        }
-                    };
-                }
-                Some(filters_out)
-            }
-        } else {
-            None
-        };
-        out.events[event_id].filters = filters;
-
-        if let Some(filters) = &req.filters {
-            if filters.is_empty() {
-                out.filters = None;
-            }
-        }
-    }
-
-    // TODO make for out.filters
-
-    Ok(out)
-}
 
 #[cfg(test)]
 mod tests {

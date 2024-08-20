@@ -66,10 +66,11 @@ use indexmap::IndexMap;
 use tracing::debug;
 use common::event_segmentation::{EventSegmentationRequest, Query};
 use common::group_col;
-use common::types::{COLUMN_CREATED_AT, COLUMN_EVENT, COLUMN_PROJECT_ID, TABLE_EVENTS};
+use common::types::{COLUMN_CREATED_AT, COLUMN_EVENT, COLUMN_PROJECT_ID, DType, TABLE_EVENTS};
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
 use storage::db::OptiDBImpl;
+use crate::error::QueryError;
 use crate::logical_plan::db_parquet::DbParquetNode;
 use crate::physical_plan::planner::QueryPlanner;
 
@@ -399,7 +400,7 @@ pub fn initial_plan(
 
 fn segment_plan(db: &Arc<OptiDBImpl>,
                 table: String,
-                projection: Vec<usize>, ) -> Result<LogicalPlan>{
+                projection: Vec<usize>, ) -> Result<LogicalPlan> {
     let plan = LogicalPlan::Extension(Extension {
         node: Arc::new(DbParquetNode::try_new(db.clone(), table, projection.clone())?),
     });
@@ -794,4 +795,71 @@ pub fn col_name(ctx: &Context, prop: &PropertyRef, md: &Arc<MetadataProvider>) -
     };
 
     Ok(name)
+}
+
+pub fn fix_filter(md: &Arc<MetadataProvider>, project_id: u64, filter: &PropValueFilter) -> Result<PropValueFilter> {
+    match filter {
+        PropValueFilter::Property {
+            property,
+            operation,
+            value,
+        } => {
+            let prop = match property {
+                PropertyRef::Group(name, group) => {
+                    md.group_properties[*group].get_by_name(project_id, name.as_str())?
+                }
+                PropertyRef::Event(name) => {
+                    md.event_properties.get_by_name(project_id, name.as_str())?
+                }
+                _ => {
+                    return Err(QueryError::Unimplemented(
+                        "invalid property type".to_string(),
+                    ));
+                }
+            };
+
+            let mut ev = vec![];
+            if let Some(value) = value {
+                for value in value {
+                    match (&prop.data_type, value) {
+                        (&DType::Timestamp, &ScalarValue::Decimal128(_, _, _)) => {
+                            match filter.clone()
+                            {
+                                PropValueFilter::Property {
+                                    value,
+                                    ..
+                                } => {
+                                    for value in value.unwrap().iter() {
+                                        if let ScalarValue::Decimal128(
+                                            Some(ts),
+                                            _,
+                                            _,
+                                        ) = value
+                                        {
+                                            let sv =
+                                                ScalarValue::TimestampMillisecond(
+                                                    Some(*ts as i64),
+                                                    None,
+                                                );
+                                            ev.push(sv);
+                                        } else {
+                                            unreachable!()
+                                        }
+                                    }
+                                }
+                            };
+                        }
+                        _ => ev.push(value.to_owned()),
+                    }
+                }
+            }
+
+            let filter = common::query::PropValueFilter::Property {
+                property: property.to_owned(),
+                operation: operation.to_owned(),
+                value: Some(ev),
+            };
+            Ok(filter)
+        }
+    }
 }

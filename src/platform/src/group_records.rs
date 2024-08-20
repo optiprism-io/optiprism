@@ -95,7 +95,7 @@ impl GroupRecords {
 impl Into<group_records::GroupRecordsSearchRequest> for GroupRecordsSearchRequest {
     fn into(self) -> group_records::GroupRecordsSearchRequest {
         group_records::GroupRecordsSearchRequest {
-            time: self.time.map(|t|t.into()),
+            time: self.time.map(|t| t.into()),
             group_id: self.group,
             filters: self.filters.map(|filters| {
                 filters
