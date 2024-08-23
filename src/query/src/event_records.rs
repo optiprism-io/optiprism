@@ -283,7 +283,6 @@ pub fn build_search_plan(
     if let Some(events) = &req.events
         && !events.is_empty()
     {
-        println!("!");
         let mut exprs = vec![];
         for event in events {
             // event expression
@@ -303,7 +302,6 @@ pub fn build_search_plan(
         filter_exprs.push(multi_or(exprs))
     }
 
-        dbg!(&filter_exprs);
     let input = LogicalPlan::Filter(PlanFilter::try_new(
         multi_and(filter_exprs),
         Arc::new(input),
