@@ -279,9 +279,11 @@ pub fn build_search_plan(
         time_expression(COLUMN_CREATED_AT, input.schema(), &req.time, ctx.cur_time)?,
     ];
 
+    // todo find out why it doesn't work
     if let Some(events) = &req.events
         && !events.is_empty()
     {
+        println!("!");
         let mut exprs = vec![];
         for event in events {
             // event expression
@@ -301,11 +303,7 @@ pub fn build_search_plan(
         filter_exprs.push(multi_or(exprs))
     }
 
-    if let Some(filters) = &req.filters {
-        let expr = event_filters_expression(&ctx, &metadata, filters)?;
-        filter_exprs = vec![and(filter_exprs[0].clone(), expr)];
-    }
-
+        dbg!(&filter_exprs);
     let input = LogicalPlan::Filter(PlanFilter::try_new(
         multi_and(filter_exprs),
         Arc::new(input),
