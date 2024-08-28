@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 project-root = "0.2.2"
 arrow = { version = "52.0.0" }
-maxminddb = "0.23.0"
+maxminddb = "0.24.0"
 uaparser = "0.6.1"
 metadata = { path = "../metadata" }
 chrono = { version = "0.4.23", features = ["serde"] }
@@ -25,7 +25,7 @@ tokio = { version = "1.23.0", features = [
     "sync",
     "signal"
 ] }
-sailfish = "0.8.4-beta.0"
+sailfish = "0.9.0"
 axum = { version = "0.7.4" }
 axum-macros = "0.4.1"
 tower = "0.4.13"
@@ -37,6 +37,6 @@ storage = { path = "../storage" }
 futures = "0.3.25"
 clap = { version = "4.5.0", features = ["derive"] }
 anyhow = "1.0.75"
-hyper = "0.14.27"
-metrics-util = "0.16.0"
-metrics = "0.22.0"
+hyper = "1.4.1"
+metrics-util = "0.17.0"
+metrics = "0.23.0"

@@ -1,4 +1,4 @@
-FROM rust:1.72.0 AS rust
+FROM rust:1.80.0 AS rust
 ARG GIT_SHA
 ENV GIT_SHA=${GIT_SHA}
 WORKDIR /app
@@ -10,6 +10,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/home/root/app/target \
     --mount=type=ssh \
     cargo build --release
+RUN ls -al /app/target/release/main
 
 FROM debian:stable-slim AS runtime
 RUN groupadd -r optiprism --gid=101 && useradd -r -g optiprism --uid=101 --home-dir=/var/lib/optiprism --shell=/bin/bash optiprism
@@ -25,7 +26,7 @@ ENV LANG en_US.UTF-8
 ENV LANGUAGE en_US:en
 ENV LC_ALL en_US.UTF-8
 ENV TZ UTC
-COPY --from=rust /app/target/release/cmd /usr/bin/optiprism
+COPY --from=rust /app/target/release/main /usr/bin/optiprism
 RUN chown -R optiprism:optiprism /usr/bin/optiprism
 COPY init /var/lib/optiprism/init
 EXPOSE 8080

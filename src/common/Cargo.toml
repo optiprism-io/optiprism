@@ -15,7 +15,7 @@ http-body-util = "0.1.0"
 datafusion = {  version = "39.0.0" }
 datafusion-common = {  version = "39.0.0" }
 datafusion-expr = {  version = "39.0.0" }
-jsonwebtoken = "8.2.0"
+jsonwebtoken = "9.3.0"
 lazy_static = "1.4.0"
 rand = "0.8.5"
 serde = { version = "1.0.149", features = ["derive"] }
@@ -30,5 +30,5 @@ regex = "1"
 tracing = "0.1.37"
 hyper = "1.1.0"
 bytes = "1.4.0"
-metrics-util = "0.16.0"
-metrics = "0.22.0"
+metrics-util = "0.17.0"
+metrics = "0.23.0"

@@ -15,14 +15,14 @@ crossbeam-channel = "0.5.6"
 csv = "1.1"
 cubic_spline = "1.0.0"
 dateparser = "0.2.0"
-enum-iterator = "1.2.0"
+enum-iterator = "2.1.0"
 futures = "0.3.25"
 humantime = "2.1.0"
 indicatif = "0.17.6"
 lazy_static = "1.4.0"
 metadata = { path = "../metadata" }
 num_cpus = "1.14.0"
-parquet = "42.0.0"
+parquet = "52.2.0"
 parse_duration = "2.1.1"
 platform = { path = "../platform" }
 rand = "0.8.5"
@@ -30,8 +30,8 @@ rust_decimal = { version = "1.27.0", features = ["serde-float"] }
 serde = { version = "1.0.149", features = ["derive"] }
 ingester = { path = "../ingester" }
 storage = { path = "../storage" }
-strum = "0.24"
-strum_macros = "0.24"
+strum = "0.26.3"
+strum_macros = "0.26.4"
 thiserror = "1.0.37"
 tokio = { version = "1.23.0", features = ["full"] }
 tracing = "0.1.37"

@@ -453,7 +453,7 @@ fn projection(
 ) -> Result<Vec<String>> {
     let mut fields = vec![
         GROUP_COLUMN_PROJECT_ID.to_string(),
-        group_col(req.group_id).to_string(),
+        GROUP_COLUMN_ID.to_string(),
         GROUP_COLUMN_VERSION.to_string(),
         GROUP_COLUMN_CREATED_AT.to_string(),
     ];

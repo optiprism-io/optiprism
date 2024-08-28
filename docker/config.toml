@@ -15,5 +15,35 @@ project_default_session_duration = "1 day"
 access_token_duration = "1 hour"
 refresh_token_duration = "24 hours"
 
+[events_table]
+levels = 7
+merge_array_size = 10000
+l1_max_size_bytes = 10485760
+level_size_multiplier = 10
+l0_max_parts = 4
+max_log_length_bytes = 10485760
+merge_array_page_size = 100000
+merge_data_page_size_limit_bytes = 10485760
+merge_max_l1_part_size_bytes = 10485760
+merge_part_size_multiplier = 10
+merge_row_group_values_limit = 1000
+merge_chunk_size = 65536
+merge_max_page_size = 10485760
+
+[group_table]
+levels = 7
+merge_array_size = 10000
+l1_max_size_bytes = 10485760
+level_size_multiplier = 10
+l0_max_parts = 4
+max_log_length_bytes = 10485760
+merge_array_page_size = 100000
+merge_data_page_size_limit_bytes = 10485760
+merge_max_l1_part_size_bytes = 10485760
+merge_part_size_multiplier = 10
+merge_row_group_values_limit = 1000
+merge_chunk_size = 65536
+merge_max_page_size = 10485760
+
 [log]
 level = "debug"

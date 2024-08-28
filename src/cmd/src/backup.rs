@@ -52,7 +52,7 @@ pub async fn init(md: Arc<MetadataProvider>,
     for backup in backups {
         if matches!(backup.status, backups::Status::InProgress(_)) {
             let p = cfg.data.path.join(DATA_PATH_BACKUP_TMP).join(backup.id.to_string());
-            if fs::try_exists(&p).unwrap() {
+            if p.exists() {
                 fs::remove_file(p)?;
             }
             md.backups.update_status(backup.id, backups::Status::Failed("server restarted".to_string()))?;

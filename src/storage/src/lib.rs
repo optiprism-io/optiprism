@@ -1,7 +1,6 @@
 #![feature(slice_take)]
 #![feature(let_chains)]
 #![feature(allocator_api)]
-#![feature(fs_try_exists)]
 #![feature(pattern)]
 
 extern crate core;

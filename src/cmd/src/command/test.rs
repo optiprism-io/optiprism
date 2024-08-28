@@ -14,7 +14,6 @@ use clap::Parser;
 use common::types::DType;
 use common::types::TABLE_EVENTS;
 use common::DECIMAL_SCALE;
-use hyper::Server;
 use indicatif::ProgressBar;
 use indicatif::ProgressState;
 use indicatif::ProgressStyle;

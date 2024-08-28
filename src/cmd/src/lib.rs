@@ -1,4 +1,3 @@
-#![feature(fs_try_exists)]
 extern crate core;
 
 use std::fs::File;
@@ -200,6 +199,15 @@ pub fn init_fs(cfg: &Config) -> Result<()> {
     Ok(())
 }
 
+pub fn clenaup_fs(cfg: &Config) -> Result<()> {
+    fs::remove_dir_all(cfg.data.path.join(DATA_PATH_STORAGE))?;
+    fs::remove_dir_all(cfg.data.path.join(DATA_PATH_METADATA))?;
+    fs::remove_dir_all(cfg.data.path.join(DATA_PATH_BACKUP_TMP))?;
+    fs::remove_dir_all(cfg.data.path.join(DATA_PATH_BACKUPS))?;
+    fs::remove_dir_all(cfg.data.path.join(DATA_PATH_RECOVERS))?;
+
+    Ok(())
+}
 pub async fn init_system(
     md: &Arc<MetadataProvider>,
     db: &Arc<OptiDBImpl>,

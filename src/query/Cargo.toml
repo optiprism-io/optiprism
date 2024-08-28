@@ -6,8 +6,8 @@ authors = ["Optiprism <dev@optiprism.io>"]
 
 [dependencies]
 indexmap = "2.2.6"
-metrics-util = "0.16.0"
-metrics = "0.22.0"
+metrics-util = "0.17.0"
+metrics = "0.23.0"
 ahash = { version = "0.8.8", default-features = false }
 anyhow = "1.0.66"
 arrow = { version = "52.0.0", features = ["prettyprint"] }

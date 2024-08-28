@@ -67,7 +67,7 @@ use uaparser::UserAgentParser;
 use metadata::settings::{BackupProvider, BackupScheduleInterval};
 use crate::error::Error;
 use crate::error::Result;
-use crate::{get_random_key32, init_settings, init_fs, init_ingester};
+use crate::{get_random_key32, init_settings, init_fs, init_ingester, clenaup_fs};
 use crate::init_metrics;
 use crate::init_platform;
 use crate::init_session_cleaner;
@@ -110,13 +110,10 @@ pub struct Config<R> {
 pub async fn start(args: &Store, mut cfg: crate::Config) -> Result<()> {
     debug!("db path: {:?}", cfg.data.path);
 
-    if args.generate {
-        match fs::remove_dir_all(&cfg.data.path) {
-            Ok(_) => {}
-            Err(_) => {}
-        }
-    }
     init_fs(&cfg)?;
+    if args.generate {
+        clenaup_fs(&cfg)?;
+    }
     let rocks = Arc::new(metadata::rocksdb::new(cfg.data.path.join(DATA_PATH_METADATA))?);
     let db = Arc::new(OptiDBImpl::open(
         cfg.data.path.join(DATA_PATH_STORAGE),
@@ -127,15 +124,15 @@ pub async fn start(args: &Store, mut cfg: crate::Config) -> Result<()> {
     info!("system initialization...");
     init_system(&md, &db, &cfg).await?;
     let mut settings = md.settings.load()?;
-    settings.backup_enabled = true;
+    settings.backup_enabled = false;
     settings.backup_encryption_enabled = true;
     settings.backup_encryption_password = "test".to_string();
     settings.backup_compression_enabled = true;
-    settings.backup_schedule_interval = BackupScheduleInterval::Hourly;
+    settings.backup_schedule_interval = BackupScheduleInterval::Daily;
     settings.backup_schedule_start_hour = 0;
     // settings.backup_provider = BackupProvider::Local;
     // settings.backup_provider_local_path = "/tmp/optiprism/backups".to_string();
-    settings.backup_provider = BackupProvider::GCP;
+    /*settings.backup_provider = BackupProvider::GCP;
     settings.backup_provider_gcp_bucket = "optiprism".to_string();
     settings.backup_provider_gcp_path = "backups".to_string();
     settings.backup_provider_gcp_key = match env::var("GOOGLE_APPLICATION_CREDENTIALS").unwrap().as_str() {
@@ -143,17 +140,17 @@ pub async fn start(args: &Store, mut cfg: crate::Config) -> Result<()> {
         _ => {
             fs::read_to_string(env::var("GOOGLE_APPLICATION_CREDENTIALS").unwrap())?
         }
-    };
+    };*/
     md.settings.save(&settings)?;
 
-    if !cfg.data.ui_path.try_exists()? {
+    if !cfg.data.ui_path.exists() {
         return Err(Error::FileNotFound(format!(
             "ui path {:?} doesn't exist", cfg.data.ui_path
         )));
     }
     debug!("ui path: {:?}", cfg.data.ui_path);
 
-    if !args.demo_data_path.try_exists()? {
+    if !args.demo_data_path.exists() {
         return Err(Error::FileNotFound(format!(
             "demo data path {:?} doesn't exist",
             args.demo_data_path

@@ -8,7 +8,7 @@ geo_city_path = "init/ingester/GeoLite2-City.mmdb"
 ui_path = "/Users/maximbogdanov/optiprism/optiprism/frontend/dist"
 
 [misc]
-session_cleaner_interval = "1 second"
+session_cleaner_interval = "30 second"
 project_default_session_duration = "1 day"
 
 [auth]

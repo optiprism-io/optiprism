@@ -19,7 +19,7 @@ RUN npm i yarn --legacy-peer-deps
 RUN npm i --legacy-peer-deps
 RUN yarn build
 
-FROM rust:1.72.0 AS rust
+FROM rust:1.80.0 AS rust
 ARG GIT_SHA
 ENV GIT_SHA=${GIT_SHA}
 WORKDIR /app

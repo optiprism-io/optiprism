@@ -6,7 +6,6 @@ use axum::Router;
 use common::config::Config;
 use common::rbac::Role;
 use common::{ADMIN_ID, DATA_PATH_METADATA, DATA_PATH_STORAGE};
-use hyper::Server;
 use rand::distributions::Alphanumeric;
 use rand::Rng;
 use metadata::accounts::CreateAccountRequest;
@@ -41,7 +40,7 @@ pub async fn start(mut cfg: Config) -> Result<()> {
 
     info!("system initialization...");
     init_system(&md, &db, &cfg).await?;
-    if !cfg.data.ui_path.try_exists()? {
+    if !cfg.data.ui_path.exists() {
         return Err(Error::FileNotFound(format!(
             "ui path {:?} doesn't exist", cfg.data.ui_path
         )));
