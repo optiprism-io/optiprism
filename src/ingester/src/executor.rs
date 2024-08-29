@@ -191,14 +191,19 @@ impl Executor<Track> {
                     group_name.to_owned(),
                     group_name.to_owned(),
                 )?;
-
                 let resolved_group_values = self.md.groups.get_or_create(
                     ctx.project_id.unwrap(),
                     group.id,
                     group_val,
                     vec![],
                 )?;
-
+                self.md.dictionaries.create_key(
+                    ctx.project_id.unwrap(),
+                    TABLE_EVENTS,
+                    group_col(group.id as usize).as_str(),
+                    resolved_group_values.id,
+                    group_val.as_str(),
+                )?;
                 resolved_groups.push((group.id as usize, resolved_group_values));
             }
             req.resolved_group_values = Some(resolved_groups);
@@ -338,15 +343,6 @@ impl Executor<Identify> {
         let group_vals_id = resolved_group_values.id;
         req.group_id = group.id;
         req.resolved_group_values = Some(resolved_group_values);
-
-        // create dict for each group values so we can use it in property values
-        self.md.dictionaries.create_key(
-            ctx.project_id.unwrap(),
-            TABLE_EVENTS,
-            group_col(req.group_id as usize).as_str(),
-            group_vals_id,
-            req.id.as_str(),
-        )?;
 
         self.md.dictionaries.create_key(
             ctx.project_id.unwrap(),
