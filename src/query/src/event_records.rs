@@ -161,7 +161,6 @@ impl EventRecordsProvider {
         };
         proj.sort();
         proj.dedup();
-
         // todo make tests for schema evolution: add property here. Move initial plan behind build_search_plan
         let (session_ctx, state, plan) = initial_plan(&self.db, TABLE_EVENTS.to_string(), proj)?;
         let (plan, props) = build_search_plan(ctx, self.metadata.clone(), plan, req.clone())?;
@@ -204,32 +203,11 @@ pub fn build_search_plan(
     req: EventRecordsSearchRequest,
 ) -> Result<(LogicalPlan, Vec<Property>)> {
     let mut properties = vec![];
+    let mut exprs = vec![];
     // todo: add events and filters
-    let input = if let Some(props) = &req.properties {
+    if let Some(props) = &req.properties {
         let mut prop_names = vec![];
-        let mut exprs = vec![
-            col(Column {
-                relation: None,
-                name: COLUMN_PROJECT_ID.to_string(),
-            }),
-            col(Column {
-                relation: None,
-                name: COLUMN_EVENT_ID.to_string(),
-            }),
-            col(Column {
-                relation: None,
-                name: COLUMN_CREATED_AT.to_string(),
-            }),
-        ];
-        prop_names.push(COLUMN_PROJECT_ID.to_string());
-        prop_names.push(COLUMN_CREATED_AT.to_string());
-        prop_names.push(COLUMN_EVENT_ID.to_string());
-        let p = metadata.event_properties.get_by_column_name(ctx.project_id, COLUMN_PROJECT_ID)?;
-        properties.push(p);
-        let p = metadata.event_properties.get_by_column_name(ctx.project_id, COLUMN_EVENT_ID)?;
-        properties.push(p);
-        let p = metadata.event_properties.get_by_column_name(ctx.project_id, COLUMN_CREATED_AT)?;
-        properties.push(p);
+
         for prop in props {
             let p = match prop {
                 PropertyRef::Group(n, group_id) => {
@@ -254,10 +232,6 @@ pub fn build_search_plan(
                 name: p.column_name(),
             }));
         }
-
-        LogicalPlan::Projection(Projection::try_new(exprs, Arc::new(input))?)
-    } else {
-        input
     };
 
     let mut cols_hash: HashMap<String, ()> = HashMap::new();
@@ -307,6 +281,18 @@ pub fn build_search_plan(
         Arc::new(input),
     )?);
 
+    let input = if exprs.is_empty() {
+        input
+    } else {
+        let exprs = vec![vec![
+            col(Column {
+                relation: None,
+                name: COLUMN_EVENT_ID.to_string(),
+            })], exprs.to_vec()].concat();
+        LogicalPlan::Projection(Projection::try_new(exprs, Arc::new(input))?)
+    };
+
+
     let input = {
         let s = Expr::Sort(expr::Sort {
             expr: Box::new(col(COLUMN_EVENT_ID)),
@@ -321,6 +307,11 @@ pub fn build_search_plan(
         })
     };
 
+    let input = if exprs.is_empty() {
+        input
+    } else {
+        LogicalPlan::Projection(Projection::try_new(exprs, Arc::new(input))?)
+    };
     let input = LogicalPlan::Limit(Limit {
         skip: 0,
         fetch: Some(100),

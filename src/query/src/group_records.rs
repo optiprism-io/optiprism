@@ -142,7 +142,7 @@ impl GroupRecordsProvider {
     ) -> Result<ColumnarDataTable> {
         let start = Instant::now();
         let schema = self.db.schema1(group_col(req.group_id).as_str())?;
-        let projection = if req.properties.is_some() {
+        let mut projection = if req.properties.is_some() {
             let projection = projection(&ctx, &req, &self.metadata)?;
             projection
                 .iter()
@@ -151,7 +151,8 @@ impl GroupRecordsProvider {
         } else {
             (0..schema.fields.len()).collect::<Vec<_>>()
         };
-
+        projection.sort();
+        projection.dedup();
         let (session_ctx, state, plan) = initial_plan(&self.db, group_col(req.group_id), projection)?;
         let (plan, props) = build_search_plan(ctx, self.metadata.clone(), plan, req.clone())?;
         println!("{plan:?}");
@@ -194,30 +195,9 @@ pub fn build_search_plan(
     req: GroupRecordsSearchRequest,
 ) -> Result<(LogicalPlan, Vec<Property>)> {
     let mut properties = vec![];
-    let input = if let Some(props) = &req.properties {
+    let mut exprs = vec![];
+    if let Some(props) = &req.properties {
         let mut prop_names = vec![];
-        let mut exprs = vec![
-            col(Column {
-                relation: None,
-                name: GROUP_COLUMN_PROJECT_ID.to_string(),
-            }),
-            col(Column {
-                relation: None,
-                name: GROUP_COLUMN_ID.to_string(),
-            }),
-            col(Column {
-                relation: None,
-                name: GROUP_COLUMN_VERSION.to_string(),
-            }),
-            col(Column {
-                relation: None,
-                name: GROUP_COLUMN_CREATED_AT.to_string(),
-            }),
-        ];
-        prop_names.push(GROUP_COLUMN_PROJECT_ID.to_string());
-        prop_names.push(GROUP_COLUMN_ID.to_string());
-        prop_names.push(GROUP_COLUMN_VERSION.to_string());
-        prop_names.push(GROUP_COLUMN_CREATED_AT.to_string());
 
         for prop in props {
             let p = match prop {
@@ -240,16 +220,10 @@ pub fn build_search_plan(
                 name: p.column_name(),
             }));
         }
-
-        LogicalPlan::Projection(Projection::try_new(exprs, Arc::new(input))?)
-    } else {
-        input
     };
-
     let mut cols_hash: HashMap<String, ()> = HashMap::new();
     let input =
         decode_filter_dictionaries(&ctx, &metadata, req.filters.as_ref(), input, &mut cols_hash)?;
-
     let mut filter_exprs = vec![binary_expr(
         col(GROUP_COLUMN_PROJECT_ID),
         Operator::Eq,
@@ -270,6 +244,12 @@ pub fn build_search_plan(
         multi_and(filter_exprs),
         Arc::new(input),
     )?);
+
+    let input = if exprs.is_empty() {
+        input
+    } else {
+        LogicalPlan::Projection(Projection::try_new(exprs, Arc::new(input))?)
+    };
 
     let input = if let Some((prop, sort)) = &req.sort {
         let s = Expr::Sort(expr::Sort {
@@ -303,7 +283,6 @@ pub fn build_search_plan(
             .data;
         properties.append(&mut (l));
     }
-
     let dict_props = properties
         .iter()
         .filter(|prop| prop.is_dictionary && !cols_hash.contains_key(&prop.column_name()))
@@ -331,7 +310,6 @@ pub fn build_search_plan(
     } else {
         input
     };
-
     let mut rename = vec![];
     let mut rename_found: Vec<String> = vec![];
     for prop in &properties {
@@ -351,6 +329,7 @@ pub fn build_search_plan(
         rename.push((col_name, new_name));
         rename_found.push(prop.name());
     }
+
     let input = LogicalPlan::Extension(Extension {
         node: Arc::new(RenameColumnsNode::try_new(input, rename)?),
     });
