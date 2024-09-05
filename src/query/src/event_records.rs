@@ -251,7 +251,7 @@ pub fn build_search_plan(
         ),
         time_expression(COLUMN_CREATED_AT, input.schema(), &req.time, ctx.cur_time)?,
     ];
-    // todo find out why it doesn't work
+
     if let Some(events) = &req.events
         && !events.is_empty()
     {
@@ -273,20 +273,26 @@ pub fn build_search_plan(
         }
         filter_exprs.push(multi_or(exprs))
     }
+
     let input = LogicalPlan::Filter(PlanFilter::try_new(
         multi_and(filter_exprs),
         Arc::new(input),
     )?);
+
     let input = if exprs.is_empty() {
         input
     } else {
-        let mut exprs = vec![vec![
-            col(Column {
-                relation: None,
-                name: COLUMN_EVENT_ID.to_string(),
-            })], exprs.to_vec()].concat();
-        exprs.dedup(); // remove duplicate columns. For example, column_event_id
-        LogicalPlan::Projection(Projection::try_new(exprs, Arc::new(input))?)
+        if !exprs.iter().any(|v| match v {
+            Expr::Column(c) => { c.name == COLUMN_EVENT_ID.to_string() }
+            _ => unreachable!()
+        }) {
+            exprs = vec![vec![
+                col(Column {
+                    relation: None,
+                    name: COLUMN_EVENT_ID.to_string(),
+                })], exprs.to_vec()].concat();
+        }
+        LogicalPlan::Projection(Projection::try_new(exprs.clone(), Arc::new(input))?)
     };
 
 
@@ -303,6 +309,7 @@ pub fn build_search_plan(
             fetch: None,
         })
     };
+
     let input = if exprs.is_empty() {
         input
     } else {
@@ -362,6 +369,7 @@ pub fn build_search_plan(
     } else {
         input
     };
+
     let mut rename = vec![];
     let mut rename_found: Vec<String> = vec![];
     for prop in &properties {
