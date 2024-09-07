@@ -12,9 +12,9 @@ Optimize your product and increase users engagement.
 - Events stream
 - User profiles
 - Group analytics
-- http ingester
-- backups
-- organization and project based access
+- HTTP ingester
+- Backups
+- Organization and project based access
 # Roadmap
 
 - Replication
@@ -23,7 +23,7 @@ Optimize your product and increase users engagement.
 - Cohorts
 - Segments
 
-# How to run demo
+# How to run with Docker
 
 1. Run docker container with demo dataset
 ```
@@ -32,6 +32,10 @@ docker run -p 8080:8080 docker.io/optiprismio/optiprism:v0.7.3 store --demo-data
 
 2. Check the UI http://localhost:8080
 
+# How to install with Helm
+1. Configure `helm/values.yaml` (setup ingress host and set storage class if needed)
+2. Apply: ```helm upgrade --install --values ./helm/optiprism/values.yaml optiprism ./helm/optiprism/ -n optiprism``` 
+3. Check the UI http://your-host
 # Frontend
 
 https://github.com/optiprism-io/frontend
