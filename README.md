@@ -34,8 +34,12 @@ docker run -p 8080:8080 docker.io/optiprismio/optiprism:v0.7.3 store --demo-data
 
 # How to install with Helm
 1. Configure `helm/values.yaml` (setup ingress host and set storage class if needed)
-2. Apply: ```helm upgrade --install --values ./helm/optiprism/values.yaml optiprism ./helm/optiprism/ -n optiprism``` 
+2. Apply  
+```
+helm upgrade --install --values ./helm/optiprism/values.yaml optiprism ./helm/optiprism/ -n optiprism
+```
 3. Check the UI http://your-host
+
 # Frontend
 
 https://github.com/optiprism-io/frontend
