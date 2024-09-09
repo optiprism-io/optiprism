@@ -18,22 +18,23 @@ use crate::PlatformError;
 use crate::Result;
 
 pub struct Properties {
-    md: Arc<metadata::properties::Properties>,
-    prov:Arc<PropertiesProvider>
+    props: Arc<metadata::properties::Properties>,
+    md: Arc<MetadataProvider>,
+    prov: Arc<PropertiesProvider>,
 }
 
 impl Properties {
-    pub fn new(md: Arc<metadata::properties::Properties>,prov:Arc<PropertiesProvider>) -> Self {
-        Self { md, prov }
+    pub fn new(props: Arc<metadata::properties::Properties>, md: Arc<MetadataProvider>, prov: Arc<PropertiesProvider>) -> Self {
+        Self { props, md, prov }
     }
-    pub fn new_group(md: Arc<metadata::properties::Properties>,prov:Arc<PropertiesProvider>) -> Self {
-        Self { md, prov }
+    pub fn new_group(props: Arc<metadata::properties::Properties>, md: Arc<MetadataProvider>, prov: Arc<PropertiesProvider>) -> Self {
+        Self { props, md, prov }
     }
-    pub fn new_event(md: Arc<metadata::properties::Properties>,prov:Arc<PropertiesProvider>) -> Self {
-        Self { md, prov }
+    pub fn new_event(props: Arc<metadata::properties::Properties>, md: Arc<MetadataProvider>, prov: Arc<PropertiesProvider>) -> Self {
+        Self { props, md, prov }
     }
-    pub fn new_system(md: Arc<metadata::properties::Properties>,prov:Arc<PropertiesProvider>) -> Self {
-        Self { md, prov }
+    pub fn new_system(props: Arc<metadata::properties::Properties>, md: Arc<MetadataProvider>, prov: Arc<PropertiesProvider>) -> Self {
+        Self { props, md, prov }
     }
     pub async fn get_by_id(&self, ctx: Context, project_id: u64, id: u64) -> Result<Property> {
         ctx.check_project_permission(
@@ -42,7 +43,7 @@ impl Properties {
             ProjectPermission::ViewSchema,
         )?;
 
-        Ok(self.md.get_by_id(project_id, id)?.into())
+        Ok(self.props.get_by_id(project_id, id)?.into())
     }
 
     pub async fn get_by_name(&self, ctx: Context, project_id: u64, name: &str) -> Result<Property> {
@@ -52,7 +53,7 @@ impl Properties {
             ProjectPermission::ViewSchema,
         )?;
 
-        let event = self.md.get_by_name(project_id, name)?;
+        let event = self.props.get_by_name(project_id, name)?;
 
         Ok(event.into())
     }
@@ -63,7 +64,7 @@ impl Properties {
             project_id,
             ProjectPermission::ViewSchema,
         )?;
-        let resp = self.md.list(project_id)?;
+        let resp = self.props.list(project_id)?;
 
         Ok(resp.into())
     }
@@ -92,7 +93,7 @@ impl Properties {
             ..Default::default()
         };
 
-        let prop = self.md.update(project_id, property_id, md_req)?;
+        let prop = self.props.update(project_id, property_id, md_req)?;
 
         Ok(prop.into())
     }
@@ -104,7 +105,7 @@ impl Properties {
             ProjectPermission::DeleteSchema,
         )?;
 
-        Ok(self.md.delete(project_id, id)?.into())
+        Ok(self.props.delete(project_id, id)?.into())
     }
 
     pub async fn values(
@@ -119,6 +120,7 @@ impl Properties {
             ProjectPermission::ExploreReports,
         )?;
 
+        validate_request(&self.md, project_id, &req)?;
         let lreq = req.into();
         let result = self
             .prov
@@ -144,65 +146,6 @@ pub enum Type {
     Event,
     Group,
 }
-
-// #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
-// #[serde(rename_all = "camelCase")]
-// pub enum DataType {
-//     String,
-//     Int8,
-//     Int16,
-//     Int32,
-//     Int64,
-//     UInt8,
-//     UInt16,
-//     UInt32,
-//     UInt64,
-//     Float64,
-//     Decimal,
-//     Boolean,
-//     Timestamp,
-// }
-//
-// impl From<metadata::properties::DataType> for DataType {
-//     fn from(value: metadata::properties::DataType) -> Self {
-//         match value {
-//             metadata::properties::DataType::String => DataType::String,
-//             metadata::properties::DataType::Int8 => DataType::Int8,
-//             metadata::properties::DataType::Int16 => DataType::Int16,
-//             metadata::properties::DataType::Int32 => DataType::Int32,
-//             metadata::properties::DataType::Int64 => DataType::Int64,
-//             metadata::properties::DataType::UInt8 => DataType::UInt8,
-//             metadata::properties::DataType::UInt16 => DataType::UInt16,
-//             metadata::properties::DataType::UInt32 => DataType::UInt32,
-//             metadata::properties::DataType::UInt64 => DataType::UInt64,
-//             metadata::properties::DataType::Float64 => DataType::Float64,
-//             metadata::properties::DataType::Decimal => DataType::Decimal,
-//             metadata::properties::DataType::Boolean => DataType::Boolean,
-//             metadata::properties::DataType::Timestamp => DataType::Timestamp,
-//         }
-//     }
-// }
-//
-// impl From<DataType> for metadata::properties::DataType {
-//     fn from(value: DataType) -> Self {
-//         match value {
-//             DataType::String => metadata::properties::DataType::String,
-//             DataType::Int8 => metadata::properties::DataType::Int8,
-//             DataType::Int16 => metadata::properties::DataType::Int16,
-//             DataType::Int32 => metadata::properties::DataType::Int32,
-//             DataType::Int64 => metadata::properties::DataType::Int64,
-//             DataType::UInt8 => metadata::properties::DataType::UInt8,
-//             DataType::UInt16 => metadata::properties::DataType::UInt16,
-//             DataType::UInt32 => metadata::properties::DataType::UInt32,
-//             DataType::UInt64 => metadata::properties::DataType::UInt64,
-//             DataType::Float64 => metadata::properties::DataType::Float64,
-//             DataType::Decimal => metadata::properties::DataType::Decimal,
-//             DataType::Boolean => metadata::properties::DataType::Boolean,
-//             DataType::Timestamp => metadata::properties::DataType::Timestamp,
-//         }
-//     }
-// }
-
 impl From<metadata::properties::Status> for Status {
     fn from(s: metadata::properties::Status) -> Self {
         match s {
@@ -424,12 +367,12 @@ pub(crate) fn validate_request(
             group,
         } => {
             md.group_properties[*group]
-                .get_by_name(project_id, &property_name)
+                .get_by_name(project_id, property_name)
                 .map_err(|err| PlatformError::BadRequest(format!("{err}")))?;
         }
         PropertyRef::Event { property_name } => {
             md.event_properties
-                .get_by_name(project_id, &property_name)
+                .get_by_name(project_id, property_name)
                 .map_err(|err| PlatformError::BadRequest(format!("{err}")))?;
         }
         _ => {
@@ -443,7 +386,7 @@ pub(crate) fn validate_request(
         match event {
             EventRef::Regular { event_name } => {
                 md.events
-                    .get_by_name(project_id, &event_name)
+                    .get_by_name(project_id, event_name)
                     .map_err(|err| PlatformError::BadRequest(format!("{err}")))?;
             }
             EventRef::Custom { event_id } => {

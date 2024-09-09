@@ -51,7 +51,7 @@ pub(crate) fn build_funnel(
         .steps
         .iter()
         .map(|(expr, order)| {
-            let expr = create_physical_expr(&expr, &dfschema, &execution_props).unwrap();
+            let expr = create_physical_expr(expr, &dfschema, &execution_props).unwrap();
             let order = match order {
                 logical_plan::funnel::StepOrder::Exact => StepOrder::Exact,
                 logical_plan::funnel::StepOrder::Any(v) => StepOrder::Any(v.to_vec()),
@@ -64,14 +64,11 @@ pub(crate) fn build_funnel(
         let mut out = vec![];
         for exclude in exclude {
             let expr = create_physical_expr(&exclude.expr, &dfschema, &execution_props)?;
-            let steps = if let Some(steps) = exclude.steps {
-                Some(ExcludeSteps {
-                    from: steps.from,
-                    to: steps.to,
-                })
-            } else {
-                None
-            };
+            let steps = exclude.steps.map(|steps| ExcludeSteps {
+                from: steps.from,
+                to: steps.to,
+            });
+
             out.push(ExcludeExpr { expr, steps })
         }
         Some(out)
@@ -95,7 +92,7 @@ pub(crate) fn build_funnel(
             groups
                 .iter()
                 .map(|(expr, name, sort_field)| {
-                    let expr = create_physical_expr(&expr, &dfschema, &execution_props)?;
+                    let expr = create_physical_expr(expr, &dfschema, &execution_props)?;
                     let sf = SortField::new(sort_field.data_type.clone());
                     Ok((expr, name.clone(), sf))
                 })
@@ -125,7 +122,7 @@ pub(crate) fn build_funnel(
                 Filter::TimeToConvert(from, to)
             }
         }),
-        touch: f.touch.map(|f|match f {
+        touch: f.touch.map(|f| match f {
             logical_plan::funnel::Touch::First => Touch::First,
             logical_plan::funnel::Touch::Last => Touch::Last,
             logical_plan::funnel::Touch::Step(n) => Touch::Step(n),
@@ -141,12 +138,12 @@ pub(crate) fn build_funnel(
         Arc::new(Mutex::new(Funnel::try_new(opts)?)),
     )?;
 
-    Ok(FunnelFinalExec::try_new(
+    FunnelFinalExec::try_new(
         Arc::new(partial),
         match &f.groups {
             None => 0,
             Some(g) => g.len(),
         },
         f.steps.len(),
-    )?)
+    )
 }

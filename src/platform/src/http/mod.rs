@@ -66,7 +66,7 @@ pub fn attach_routes(
     router = event_segmentation::attach_routes(router);
     router = funnel::attach_routes(router);
     router = group_records::attach_routes(router);
-    let serve_dir = ServeDir::new(cfg.data.ui_path.to_owned())
+    let serve_dir = ServeDir::new(&cfg.data.ui_path)
         .not_found_service(ServeFile::new(cfg.data.ui_path.join("index.html")));
     router = router
         .nest_service("/", serve_dir.clone())

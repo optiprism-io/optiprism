@@ -115,7 +115,7 @@ impl ExecutionPlan for DBParquetExec {
 }
 
 struct ParquetStream {
-    #[warn(clippy::type_complexity)]
+    #[allow(clippy::type_complexity)]
     stream: Pin<Box<dyn Stream<Item=storage::error::Result<Chunk<Box<dyn Array>>>> + Send>>,
     schema: SchemaRef,
 }

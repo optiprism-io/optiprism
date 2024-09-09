@@ -178,26 +178,26 @@ impl FunnelProvider {
                 let step_data = StepData {
                     groups,
                     ts: ts_col.value(idx),
-                    total: int_val_cols[step_id * 4].value(idx) as i64,
+                    total: int_val_cols[step_id * 4].value(idx),
                     conversion_ratio: Decimal::from_i128_with_scale(
-                        dec_val_cols[step_id * 4].value(idx) as i128,
+                        dec_val_cols[step_id * 4].value(idx),
                         DECIMAL_SCALE as u32,
                     ).round_dp(ROUND_DIGITS.into()),
                     avg_time_to_convert: Decimal::from_i128_with_scale(
-                        dec_val_cols[step_id * 4 + 1].value(idx) as i128,
+                        dec_val_cols[step_id * 4 + 1].value(idx),
                         DECIMAL_SCALE as u32,
                     ).round_dp(ROUND_DIGITS.into()),
                     avg_time_to_convert_from_start: Decimal::from_i128_with_scale(
-                        dec_val_cols[step_id * 4 + 2].value(idx) as i128,
+                        dec_val_cols[step_id * 4 + 2].value(idx),
                         DECIMAL_SCALE as u32,
                     ).round_dp(ROUND_DIGITS.into()),
-                    dropped_off: int_val_cols[step_id * 4 + 1].value(idx) as i64,
+                    dropped_off: int_val_cols[step_id * 4 + 1].value(idx),
                     drop_off_ratio: Decimal::from_i128_with_scale(
-                        dec_val_cols[step_id * 4 + 3].value(idx) as i128,
+                        dec_val_cols[step_id * 4 + 3].value(idx),
                         DECIMAL_SCALE as u32,
                     ).round_dp(ROUND_DIGITS.into()),
-                    time_to_convert: int_val_cols[step_id * 4 + 2].value(idx) as i64,
-                    time_to_convert_from_start: int_val_cols[step_id * 4 + 3].value(idx) as i64,
+                    time_to_convert: int_val_cols[step_id * 4 + 2].value(idx),
+                    time_to_convert_from_start: int_val_cols[step_id * 4 + 3].value(idx),
                 };
                 step.data.push(step_data);
             }
@@ -225,9 +225,8 @@ pub fn build(
 
     let (from, to) = req.time.range(ctx.cur_time);
 
-    let window = match req.time_window {
-        TimeWindow { n, unit } => unit.duration(n as i64),
-    };
+    let TimeWindow { n, unit } = req.time_window;
+    let window = unit.duration(n as i64);
 
     let steps = {
         let mut steps = vec![];
@@ -236,7 +235,7 @@ pub fn build(
             for event in step.events.iter() {
                 let mut expr = event_expression(&ctx, &metadata, &event.event)?;
                 if let Some(filters) = &event.filters {
-                    expr = and(expr, event_filters_expression(&ctx, &metadata, &filters)?);
+                    expr = and(expr, event_filters_expression(&ctx, &metadata, filters)?);
                 }
                 exprs.push(expr)
             }
@@ -256,7 +255,7 @@ pub fn build(
         for exclude in excludes {
             let mut expr = event_expression(&ctx, &metadata, &exclude.event)?;
             if let Some(filters) = &exclude.filters {
-                expr = and(expr, event_filters_expression(&ctx, &metadata, &filters)?);
+                expr = and(expr, event_filters_expression(&ctx, &metadata, filters)?);
             }
             let steps = if let Some(steps) = &exclude.steps {
                 let steps = match steps {

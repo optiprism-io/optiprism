@@ -283,10 +283,10 @@ pub fn build_search_plan(
         input
     } else {
         if !exprs.iter().any(|v| match v {
-            Expr::Column(c) => { c.name == COLUMN_EVENT_ID.to_string() }
+            Expr::Column(c) => { c.name == *COLUMN_EVENT_ID }
             _ => unreachable!()
         }) {
-            exprs = vec![vec![
+            exprs = [vec![
                 col(Column {
                     relation: None,
                     name: COLUMN_EVENT_ID.to_string(),

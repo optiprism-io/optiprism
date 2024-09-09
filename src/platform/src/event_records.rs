@@ -51,10 +51,7 @@ impl EventRecords {
         let lreq = fix_search_request(&self.md, project_id, req.into())?;
         let cur_time = match query.timestamp {
             None => Utc::now(),
-            Some(ts_sec) => DateTime::from_naive_utc_and_offset(
-                chrono::NaiveDateTime::from_timestamp_millis(ts_sec * 1000).unwrap(),
-                Utc,
-            ),
+            Some(ts_sec) => DateTime::from_timestamp_millis(ts_sec * 1000).unwrap(),
         };
         let ctx = query::Context {
             project_id,
@@ -68,7 +65,7 @@ impl EventRecords {
             cur_time,
         };
 
-        let mut data = self.prov.search(ctx, lreq.into()).await?;
+        let mut data = self.prov.search(ctx, lreq).await?;
 
         // do empty response so it will be [] instead of [[],[],[],...]
         if !data.columns.is_empty() && data.columns[0].data.is_empty() {
@@ -168,16 +165,14 @@ pub(crate) fn validate_search_request(
     project_id: u64,
     req: &EventRecordsSearchRequest,
 ) -> Result<()> {
-    match req.time {
-        QueryTime::Between { from, to } => {
-            if from > to {
-                return Err(PlatformError::BadRequest(
-                    "from time must be less than to time".to_string(),
-                ));
-            }
+    if let QueryTime::Between { from, to } = req.time {
+        if from > to {
+            return Err(PlatformError::BadRequest(
+                "from time must be less than to time".to_string(),
+            ));
         }
-        _ => {}
     }
+
 
     if let Some(events) = &req.events {
         if events.is_empty() {
@@ -234,13 +229,13 @@ pub(crate) fn validate_search_request(
                         property_name,
                         group,
                     } => md.group_properties[*group]
-                        .get_by_name(project_id, &property_name)
+                        .get_by_name(project_id, property_name)
                         .map_err(|err| {
                             PlatformError::BadRequest(format!("property {idx}: {err}"))
                         })?,
                     PropertyRef::Event { property_name } => md
                         .event_properties
-                        .get_by_name(project_id, &property_name)
+                        .get_by_name(project_id, property_name)
                         .map_err(|err| {
                             PlatformError::BadRequest(format!("property {idx}: {err}"))
                         })?,

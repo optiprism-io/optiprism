@@ -40,13 +40,13 @@ impl Auth {
             access_token: make_access_token(
                 account_id,
                 organisation_id,
-                self.cfg.auth.access_token_duration.clone(),
+                self.cfg.auth.access_token_duration,
                 settings.auth_access_token,
             )
                 .map_err(|err| err.wrap_into(AuthError::CantMakeAccessToken))?,
             refresh_token: make_refresh_token(
                 account_id,
-                self.cfg.auth.refresh_token_duration.clone(),
+                self.cfg.auth.refresh_token_duration,
                 settings.auth_refresh_token,
             )
                 .map_err(|err| err.wrap_into(AuthError::CantMakeRefreshToken))?,
@@ -58,7 +58,7 @@ impl Auth {
             return Err(PlatformError::invalid_field("email", "invalid email"));
         }
 
-        check_password_complexity(&req.password, &vec![req.email.as_str()])?;
+        check_password_complexity(&req.password, &[req.email.as_str()])?;
 
         let password_hash = make_password_hash(req.password.as_str())
             .map_err(|err| err.wrap_into(AuthError::InvalidPasswordHashing))?;
@@ -236,7 +236,7 @@ impl Auth {
             return Err(PlatformError::invalid_field("password", "invalid password"));
         }
 
-        check_password_complexity(&req.new_password, &vec![])?;
+        check_password_complexity(&req.new_password, &[])?;
 
         let password_hash = make_password_hash(req.new_password.as_str())
             .map_err(|err| err.wrap_into(AuthError::InvalidPasswordHashing))?;
@@ -271,7 +271,7 @@ impl Auth {
             return Err(PlatformError::Forbidden("forbidden".to_string()));
         }
 
-        check_password_complexity(&req.password, &vec![])?;
+        check_password_complexity(&req.password, &[])?;
 
         let password_hash = make_password_hash(req.password.as_str())
             .map_err(|err| err.wrap_into(AuthError::InvalidPasswordHashing))?;

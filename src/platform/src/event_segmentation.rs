@@ -55,10 +55,7 @@ impl EventSegmentation {
 
         let cur_time = match query.timestamp {
             None => Utc::now(),
-            Some(ts_sec) => DateTime::from_naive_utc_and_offset(
-                chrono::NaiveDateTime::from_timestamp_millis(ts_sec * 1000).unwrap(),
-                Utc,
-            ),
+            Some(ts_sec) => DateTime::from_timestamp_millis(ts_sec * 1000).unwrap(),
         };
         let ctx = query::Context {
             project_id,
@@ -510,14 +507,14 @@ impl Into<EventSegmentationRequest> for common::event_segmentation::EventSegment
             events: self.events.iter().map(|v| v.into()).collect::<Vec<_>>(),
             filters: self.filters.map(|v| {
                 let f = v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>();
-                let r = EventGroupedFilters {
+                EventGroupedFilters {
                     groups_condition: None,
                     groups: vec![EventGroupedFilterGroup {
                         filters_condition: Default::default(),
                         filters: f,
                     }],
-                };
-                r
+                }
+
             }),
             breakdowns: self.breakdowns.map_or_else(
                 || None,
@@ -546,15 +543,12 @@ pub(crate) fn validate_request(
             "group id is out of range".to_string(),
         ));
     }
-    match req.time {
-        QueryTime::Between { from, to } => {
+    if let QueryTime::Between { from, to } =req.time {
             if from > to {
                 return Err(PlatformError::BadRequest(
                     "from time must be less than to time".to_string(),
                 ));
             }
-        }
-        _ => {}
     }
 
     if req.events.is_empty() {

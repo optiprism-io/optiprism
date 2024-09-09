@@ -112,7 +112,7 @@ fn aggregate(
             .collect::<Vec<_>>(),
     };
 
-    let mut rows = if is_groups {
+    let rows = if is_groups {
         let arrs = groups.iter().map(|(a, _)| a.to_owned()).collect::<Vec<_>>();
 
         Some(row_converter.convert_columns(&arrs)?)
@@ -180,7 +180,7 @@ fn aggregate(
         } else {
             &mut single_group
         };
-        for (agg, arr) in group.aggs.iter_mut().zip(static_arrs.iter().map(|arr| arr)) {
+        for (agg, arr) in group.aggs.iter_mut().zip(static_arrs.iter()) {
             match arr {
                 StaticArray::Int64(arr) => match agg {
                     Agg::Sum(sum) => {
@@ -233,7 +233,7 @@ fn aggregate(
             .collect::<Vec<_>>();
 
         let group_col = row_converter.convert_rows(rows)?;
-        vec![group_col, cols].concat()
+        [group_col, cols].concat()
     } else {
         for (idx, agg) in single_group.aggs.iter().enumerate() {
             match &mut builders[idx] {
@@ -289,7 +289,7 @@ impl FunnelPartialExec {
     ) -> Result<Self> {
         let schema = funnel.lock().unwrap().schema();
         let segment_field = Arc::new(Field::new("segment", DataType::Int64, false)) as FieldRef;
-        let fields = vec![vec![segment_field], schema.fields().to_vec()].concat();
+        let fields = [vec![segment_field], schema.fields().to_vec()].concat();
         let schema = Arc::new(Schema::new(fields));
         let cache = Self::compute_properties(&input, schema.clone())?;
         Ok(Self {

@@ -180,7 +180,7 @@ impl FunnelNode {
     ) -> Result<Self> {
         let schema = funnel.schema(input.schema());
         let segment_field = Arc::new(Field::new("segment", DataType::Int64, false));
-        let fields = vec![vec![segment_field], schema.fields().to_vec()].concat();
+        let fields = [vec![segment_field], schema.fields().to_vec()].concat();
         let fields = fields
             .iter()
             .map(|f| (None, f.to_owned()))

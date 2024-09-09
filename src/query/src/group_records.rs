@@ -249,11 +249,7 @@ pub fn build_search_plan(
     let input = if let Some((prop, sort)) = &req.sort {
         let s = Expr::Sort(expr::Sort {
             expr: Box::new(property_col(&ctx, &metadata, prop)?),
-            asc: if *sort == SortDirection::Asc {
-                true
-            } else {
-                false
-            },
+            asc: *sort == SortDirection::Asc,
             nulls_first: false,
         });
 

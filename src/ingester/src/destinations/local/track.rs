@@ -68,7 +68,7 @@ impl Destination<Track> for Local {
             groups
         } else {
             // skip user group, i.e. skip 0
-            1..GROUPS_COUNT
+            (1..GROUPS_COUNT)
                 .map(|v| NamedValue::new(group_col(v), Value::Int64(None))) // don't use null as primary key, only zero
                 .collect::<Vec<_>>()
         };

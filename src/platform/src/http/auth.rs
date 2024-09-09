@@ -40,8 +40,7 @@ pub struct RefreshTokenRequest {
 fn set_refresh_token_cookie(cookies: &Cookies, refresh_token: &str, expires: OffsetDateTime) {
     let cookie = Cookie::build((COOKIE_NAME_REFRESH_TOKEN, refresh_token.to_owned()))
         .expires(expires)
-        .http_only(true)
-        .finish();
+        .http_only(true).build();
     cookies.add(cookie);
 }
 

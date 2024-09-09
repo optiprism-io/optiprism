@@ -34,13 +34,9 @@ impl Funnel {
         validate_request(&self.md, project_id, &req)?;
         let req = fix_request(&self.md, project_id, req.into())?;
 
-        let lreq = req.into();
         let cur_time = match query.timestamp {
             None => Utc::now(),
-            Some(ts_sec) => DateTime::from_naive_utc_and_offset(
-                chrono::NaiveDateTime::from_timestamp_millis(ts_sec * 1000).unwrap(),
-                Utc,
-            ),
+            Some(ts_sec) => DateTime::from_timestamp_millis(ts_sec * 1000).unwrap(),
         };
         let ctx = query::Context {
             project_id,
@@ -54,7 +50,7 @@ impl Funnel {
             cur_time,
         };
 
-        let qdata = self.prov.funnel(ctx, lreq).await?;
+        let qdata = self.prov.funnel(ctx, req).await?;
 
         let groups = qdata
             .groups;
@@ -69,15 +65,15 @@ impl Funnel {
                     .map(|data| {
                         FunnelStepData {
                             groups: data.groups.clone(),
-                            ts: data.ts.clone(),
-                            total: data.total.clone(),
-                            conversion_ratio: data.conversion_ratio.clone(),
-                            avg_time_to_convert: data.avg_time_to_convert.clone(),
-                            avg_time_to_convert_from_start: data.avg_time_to_convert_from_start.clone(),
-                            dropped_off: data.dropped_off.clone(),
-                            drop_off_ratio: data.drop_off_ratio.clone(),
-                            time_to_convert: data.time_to_convert.clone(),
-                            time_to_convert_from_start: data.time_to_convert_from_start.clone(),
+                            ts: data.ts,
+                            total: data.total,
+                            conversion_ratio: data.conversion_ratio,
+                            avg_time_to_convert: data.avg_time_to_convert,
+                            avg_time_to_convert_from_start: data.avg_time_to_convert_from_start,
+                            dropped_off: data.dropped_off,
+                            drop_off_ratio: data.drop_off_ratio,
+                            time_to_convert: data.time_to_convert,
+                            time_to_convert_from_start: data.time_to_convert_from_start,
                         }
                     })
                     .collect::<Vec<_>>();
@@ -103,15 +99,12 @@ pub(crate) fn validate_request(
         ));
     }
 
-    match req.time {
-        QueryTime::Between { from, to } => {
-            if from > to {
-                return Err(PlatformError::BadRequest(
-                    "from time must be less than to time".to_string(),
-                ));
-            }
+    if let QueryTime::Between{from, to} = req.time {
+        if from > to {
+            return Err(PlatformError::BadRequest(
+                "from time must be less than to time".to_string(),
+            ));
         }
-        _ => {}
     }
 
     if req.steps.is_empty() {
@@ -160,21 +153,19 @@ pub(crate) fn validate_request(
         match &step.order {
             StepOrder::Exact => {}
             StepOrder::Any { steps } => steps
-                .iter()
-                .map(|(from, to)| {
-                    if *from >= req.steps.len() {
-                        return Err(PlatformError::BadRequest(
-                            "step_order: from step index out of range".to_string(),
-                        ));
-                    }
-                    if *to >= req.steps.len() {
-                        return Err(PlatformError::BadRequest(
-                            "step_order: to step index out of range".to_string(),
-                        ));
-                    }
-                    Ok(())
-                })
-                .collect::<crate::Result<_>>()?,
+                .iter().try_for_each(|(from, to)| {
+                if *from >= req.steps.len() {
+                    return Err(PlatformError::BadRequest(
+                        "step_order: from step index out of range".to_string(),
+                    ));
+                }
+                if *to >= req.steps.len() {
+                    return Err(PlatformError::BadRequest(
+                        "step_order: to step index out of range".to_string(),
+                    ));
+                }
+                Ok(())
+            })?,
         }
     }
 
@@ -756,14 +747,13 @@ impl Into<FunnelRequest> for common::funnel::Funnel {
                 .map(|s| s.iter().map(|s| s.to_owned().into()).collect::<Vec<_>>()),
             filters: self.filters.map(|v| {
                 let f = v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>();
-                let r = EventGroupedFilters {
+                EventGroupedFilters {
                     groups_condition: None,
                     groups: vec![EventGroupedFilterGroup {
                         filters_condition: Default::default(),
                         filters: f,
                     }],
-                };
-                r
+                }
             }),
         }
     }

@@ -552,11 +552,10 @@ pub mod test_util {
 
     pub async fn events_provider(db: Arc<OptiDBImpl>, _proj_id: u64) -> Result<LogicalPlan> {
         let group_fields = (0..GROUPS_COUNT)
-            .into_iter()
             .map(|gid| Field::new(group_col(gid), DataType::Int64, false))
             .collect::<Vec<_>>();
         let schema = Schema::new(
-            vec![
+            [
                 vec![Field::new(COLUMN_PROJECT_ID, DataType::Int64, false)],
                 group_fields,
                 vec![

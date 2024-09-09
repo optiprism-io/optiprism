@@ -112,6 +112,7 @@ pub struct Account {
     pub teams: Option<Vec<(u64, Role)>>,
 }
 
+
 impl Into<Account> for metadata::accounts::Account {
     fn into(self) -> Account {
         Account {

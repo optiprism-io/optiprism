@@ -34,7 +34,6 @@ use datafusion::physical_expr::{Distribution, EquivalenceProperties};
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
 use datafusion::physical_expr::PhysicalSortRequirement;
-use datafusion::physical_optimizer::PhysicalOptimizerRule;
 use datafusion::physical_plan::aggregates::AggregateExec as DFAggregateExec;
 use datafusion::physical_plan::aggregates::AggregateMode;
 use datafusion::physical_plan::aggregates::PhysicalGroupBy;
@@ -52,7 +51,6 @@ use datafusion::physical_plan::RecordBatchStream;
 use datafusion::physical_plan::SendableRecordBatchStream;
 use datafusion::physical_plan::Statistics;
 use datafusion::prelude::SessionContext;
-use datafusion_common::config::ConfigOptions;
 use datafusion_common::Result as DFResult;
 use datafusion_common::ScalarValue;
 use futures::Stream;
@@ -335,7 +333,7 @@ struct PartialAggregateStream {
     schema: SchemaRef,
     partition_col: Column,
     named_agg_expr: Vec<NamedAggExpr>,
-    #[warn(clippy::type_complexity)]
+    #[allow(clippy::type_complexity)]
     agg_expr: Vec<Vec<Arc<Mutex<Box<dyn PartitionedAggregateExpr>>>>>,
     // single partition input
     agg_schemas: Vec<SchemaRef>,

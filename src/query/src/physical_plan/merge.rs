@@ -104,7 +104,7 @@ impl ExecutionPlan for MergeExec {
     }
 
     fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
-        self.inputs.iter().map(|i| i).collect::<Vec<_>>()
+        self.inputs.iter().collect::<Vec<_>>()
     }
 
     fn with_new_children(

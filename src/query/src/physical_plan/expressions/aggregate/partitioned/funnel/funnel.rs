@@ -139,17 +139,11 @@ impl Group {
 
     fn check_exclude(&self, exclude: &[Exclude], cur_row_id: usize) -> bool {
         for excl in exclude.iter() {
-            let mut to_check = false;
             // check if this exclude is relevant to current step
-            if let Some(steps) = &excl.steps {
-                if steps.from <= self.cur_step && steps.to >= self.cur_step {
-                    to_check = true;
-                    break;
+            if let Some(steps) = &excl.steps{
+                if steps.from <= self.cur_step && steps.to >= self.cur_step && excl.exists.value(cur_row_id) {
+                    return false;
                 }
-            }
-
-            if to_check && excl.exists.value(cur_row_id) {
-                return false;
             }
         }
 
@@ -749,7 +743,7 @@ impl Funnel {
                 .collect::<Vec<_>>();
 
             // iterate over buckets and fill values to builders
-            for (_ts, bucket) in buckets {
+            for bucket in buckets.values() {
                 for (step_id, step) in bucket.steps.iter().enumerate() {
                     step_total[step_id].append_value(step.total);
                     let mut scr = if step_id == 0 {
@@ -776,7 +770,7 @@ impl Funnel {
                             .unwrap()
                     };
                     v.rescale(DECIMAL_SCALE as u32);
-                    let mut dor = Decimal::from_f64(100.-scr.to_f64().unwrap()).unwrap();
+                    let mut dor = Decimal::from_f64(100. - scr.to_f64().unwrap()).unwrap();
                     dor.rescale(DECIMAL_SCALE as u32);
                     step_drop_off_ratio[step_id].append_value(dor.mantissa());
                     let mut v = if step_id == 0 {
@@ -944,7 +938,7 @@ mod tests {
         opts: Options,
         exp_debug: Vec<(usize, usize, DebugStep)>,
         partition_exist: HashMap<i64, (), RandomState>,
-        exp: &'static str,
+        _exp: &'static str,
     }
 
     #[traced_test]
@@ -1002,7 +996,7 @@ mod tests {
                     (0, 2, DebugStep::Complete),
                 ],
                 partition_exist: HashMap::from_iter([(1, ())]),
-                exp: r#"
+                _exp: r#"
 asd
                 "#,
             },
@@ -1054,7 +1048,7 @@ asd
                     (0, 3, DebugStep::NextRow),
                 ],
                 partition_exist: HashMap::from_iter([(1, ()), (2, ())]),
-                exp: r#"
+                _exp: r#"
 asd
                 "#,
             },
@@ -1112,7 +1106,7 @@ asd
                     (0, 5, DebugStep::Complete),
                 ],
                 partition_exist: HashMap::from_iter([(1, ()), (2, ())]),
-                exp: r#"
+                _exp: r#"
 asd
                 "#,
             },
@@ -1151,7 +1145,7 @@ asd
                     (1, 1, DebugStep::Complete),
                 ],
                 partition_exist: HashMap::from_iter([(1, ())]),
-                exp: r#"
+                _exp: r#"
             asd
             "#,
             },
@@ -1193,7 +1187,7 @@ asd
                     (0, 3, DebugStep::Complete),
                 ],
                 partition_exist: HashMap::from_iter([(1, ())]),
-                exp: r#"
+                _exp: r#"
             asd
             "#,
             },
@@ -1235,7 +1229,7 @@ asd
                     (0, 2, DebugStep::Complete),
                 ],
                 partition_exist: HashMap::from_iter([(1, ())]),
-                exp: r#"
+                _exp: r#"
             asd
             "#,
             },
@@ -1275,7 +1269,7 @@ asd
                     (0, 2, DebugStep::NextRow),
                 ],
                 partition_exist: HashMap::from_iter([(1, ())]),
-                exp: r#"
+                _exp: r#"
             asd
             "#,
             },
@@ -1324,7 +1318,7 @@ asd
                     (0, 4, DebugStep::Complete),
                 ],
                 partition_exist: HashMap::from_iter([(1, ())]),
-                exp: r#"
+                _exp: r#"
             asd
             "#,
             },
@@ -1383,7 +1377,7 @@ asd
                     (0, 6, DebugStep::Complete),
                 ],
                 partition_exist: HashMap::from_iter([(1, ())]),
-                exp: r#"
+                _exp: r#"
             asd
             "#,
             },
@@ -1477,7 +1471,7 @@ asd
                     (0, 2, DebugStep::Complete),
                 ],
                 partition_exist: HashMap::from_iter([(1, ())]),
-                exp: r#"
+                _exp: r#"
             asd
             "#,
             },
@@ -1528,7 +1522,7 @@ asd
                     (0, 5, DebugStep::Complete),
                 ],
                 partition_exist: HashMap::from_iter([(1, ()), (2, ())]),
-                exp: r#"
+                _exp: r#"
             asd
             "#,
             },
@@ -1576,7 +1570,7 @@ asd
                     (0, 5, DebugStep::Complete),
                 ],
                 partition_exist: HashMap::from_iter([(1, ()), (2, ())]),
-                exp: r#"
+                _exp: r#"
             asd
             "#,
             },
@@ -1614,7 +1608,7 @@ asd
                     (0, 2, DebugStep::NextRow),
                 ],
                 partition_exist: HashMap::from_iter([(1, ())]),
-                exp: r#"
+                _exp: r#"
             asd
             "#,
             },
@@ -1652,7 +1646,7 @@ asd
                     (0, 2, DebugStep::NextRow),
                 ],
                 partition_exist: HashMap::from_iter([(1, ())]),
-                exp: r#"
+                _exp: r#"
             asd
             "#,
             },
@@ -1724,7 +1718,7 @@ asd
             (Arc::new(expr) as PhysicalExprRef, StepOrder::Exact)
         };
 
-        let ex = {
+        let _ex = {
             let l = Column::new_with_schema("v", &schema).unwrap();
             let r = Literal::new(ScalarValue::Int64(Some(4)));
             let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));

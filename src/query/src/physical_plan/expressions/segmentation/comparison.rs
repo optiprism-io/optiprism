@@ -175,7 +175,7 @@ mod tests {
 
         let schema = Schema::new(vec![Field::new("sdf", DataType::Boolean, true)]);
         let rb = &RecordBatch::new_empty(Arc::new(schema));
-        let _res = and
+        and
             .evaluate(rb)
             .unwrap();
         dbg!(and.finalize().unwrap());

@@ -92,7 +92,7 @@ impl EventSegmentationProvider {
             .map(|x| schema.index_of(x).unwrap())
             .collect();
         let (session_ctx, state, plan) = initial_plan(&self.db, TABLE_EVENTS.to_string(), projection)?;
-        let segment_plan = if let Some(segments) = &req.segments {
+        let _segment_plan = if let Some(segments) = &req.segments {
             let segment_projection = segment_projection(&ctx, segments, req.group_id, &self.metadata)?;
             let segment_projection = segment_projection
                 .iter()
@@ -108,7 +108,6 @@ impl EventSegmentationProvider {
             ctx.clone(),
             self.metadata.clone(),
             plan,
-            segment_plan,
             req.clone(),
         )?;
 
@@ -233,7 +232,6 @@ impl LogicalPlanBuilder {
         ctx: Context,
         metadata: Arc<MetadataProvider>,
         input: LogicalPlan,
-        _segment_input: Option<LogicalPlan>,
         es: EventSegmentationRequest,
     ) -> Result<LogicalPlan> {
         let events = es.events.clone();
@@ -456,7 +454,7 @@ impl LogicalPlanBuilder {
                     &self.ctx,
                     &self.metadata,
                     TABLE_EVENTS,
-                    &property,
+                    property,
                     operation,
                     value.to_owned(),
                 )?;

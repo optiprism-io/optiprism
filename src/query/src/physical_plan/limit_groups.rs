@@ -153,14 +153,14 @@ impl Stream for AggregateAndSortColumnsStream {
                             .downcast_ref::<Int64Array>()
                             .unwrap()
                             .iter()
-                            .map(|v| Value::Int64(v))
+                            .map(Value::Int64)
                             .collect::<Vec<_>>(),
                         DataType::Decimal128(_, _) => col
                             .as_any()
                             .downcast_ref::<Decimal128Array>()
                             .unwrap()
                             .iter()
-                            .map(|v| Value::Decimal(v))
+                            .map(Value::Decimal)
                             .collect::<Vec<_>>(),
                         DataType::Utf8 => col
                             .as_any()
@@ -200,7 +200,7 @@ impl Stream for AggregateAndSortColumnsStream {
                     .map_err(|e| DataFusionError::Execution(e.to_string()))?;
                 Poll::Ready(Some(Ok(rb)))
             }
-            other => return other,
+            other => other,
         }
     }
 }

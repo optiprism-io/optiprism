@@ -136,7 +136,7 @@ impl DFExtensionPlanner for ExtensionPlanner {
         } else if let Some(node) = any.downcast_ref::<AggregateAndSortColumnsNode>() {
             let exec = AggregateAndSortColumnsExec::try_new(
                 physical_inputs[0].clone(),
-                node.groups.clone(),
+                node.groups,
             )
             .map_err(|e| DataFusionError::Plan(e.to_string()))?;
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)

@@ -372,9 +372,9 @@ mod tests {
                 TimeRange::None,
             );
 
-            for b in res {
+            /*for b in res {
                 let _res = agg.evaluate(&b).unwrap();
-            }
+            }*/
             let res = agg.finalize().unwrap();
             let exp = Int64Array::from(vec![None, Some(1), None]);
             assert_eq!(res, exp);

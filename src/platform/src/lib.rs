@@ -120,13 +120,13 @@ impl PlatformProvider {
         cfg: Config,
     ) -> Self {
         let group_properties = (0..GROUPS_COUNT)
-            .map(|gid| Arc::new(Properties::new_group(md.group_properties[gid].clone(), prop_prov.clone())))
+            .map(|gid| Arc::new(Properties::new_group(md.group_properties[gid].clone(), md.clone(),prop_prov.clone())))
             .collect::<Vec<_>>();
         Self {
             events: Arc::new(Events::new(md.events.clone())),
             custom_events: Arc::new(CustomEvents::new(md.custom_events.clone())),
             groups: Arc::new(Groups::new(md.groups.clone())),
-            event_properties: Arc::new(Properties::new_event(md.event_properties.clone(), prop_prov.clone())),
+            event_properties: Arc::new(Properties::new_event(md.event_properties.clone(), md.clone(),prop_prov.clone())),
             group_properties,
             accounts: Arc::new(Accounts::new(md.accounts.clone())),
             auth: Arc::new(Auth::new(
@@ -140,7 +140,7 @@ impl PlatformProvider {
             event_records: Arc::new(EventRecords::new(md.clone(), event_records_prov)),
             group_records: Arc::new(GroupRecords::new(md.clone(), group_records_prov)),
             projects: Arc::new(Projects::new(md.clone(), cfg.clone())),
-            organizations: Arc::new(Organizations::new(md.clone(), cfg.clone())),
+            organizations: Arc::new(Organizations::new(md.clone(), )),
             bookmarks: Arc::new(Bookmarks::new(md.bookmarks.clone())),
             backups: Arc::new(Backups::new(md.clone())),
             settings: Arc::new(SettingsProvider::new(md.settings.clone())),
@@ -539,10 +539,7 @@ impl Into<PropValueFilter> for common::query::PropValueFilter {
             } => PropValueFilter::Property {
                 property: property.to_owned().into(),
                 operation: operation.to_owned().into(),
-                value: match value {
-                    None => None,
-                    Some(v) => Some(v.iter().map(scalar_to_json_value).collect::<Vec<_>>()),
-                },
+                value: value.map(|v| v.iter().map(scalar_to_json_value).collect::<Vec<_>>()),
             },
         }
     }
@@ -1404,12 +1401,12 @@ pub fn validate_event_property(
             group,
         } => {
             md.group_properties[*group]
-                .get_by_name(project_id, &property_name)
+                .get_by_name(project_id, property_name)
                 .map_err(|err| PlatformError::BadRequest(format!("{err_prefix}: {err}")))?;
         }
         PropertyRef::Event { property_name } => {
             md.event_properties
-                .get_by_name(project_id, &property_name)
+                .get_by_name(project_id, property_name)
                 .map_err(|err| PlatformError::BadRequest(format!("{err_prefix}: {err}")))?;
         }
         _ => {
@@ -1434,11 +1431,11 @@ pub fn validate_event_filter_property(
             property_name,
             group,
         } => md.group_properties[*group]
-            .get_by_name(project_id, &property_name)
+            .get_by_name(project_id, property_name)
             .map_err(|err| PlatformError::BadRequest(format!("{err_prefix}: {err}")))?,
         PropertyRef::Event { property_name } => md
             .event_properties
-            .get_by_name(project_id, &property_name)
+            .get_by_name(project_id, property_name)
             .map_err(|err| PlatformError::BadRequest(format!("{err_prefix}: {err}")))?,
         _ => {
             return Err(PlatformError::Unimplemented(
@@ -1568,12 +1565,12 @@ pub(crate) fn validate_event(
     project_id: u64,
     event: &EventRef,
     event_id: usize,
-    err_prefix: String,
+    _err_prefix: String,
 ) -> crate::Result<()> {
     match event {
         EventRef::Regular { event_name } => {
             md.events
-                .get_by_name(project_id, &event_name)
+                .get_by_name(project_id, event_name)
                 .map_err(|err| PlatformError::BadRequest(format!("event {event_id}: {err}")))?;
         }
         EventRef::Custom { event_id } => {

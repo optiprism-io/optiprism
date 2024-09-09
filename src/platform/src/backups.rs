@@ -85,7 +85,7 @@ pub struct GCPProvider {
 pub enum Provider {
     Local(LocalProvider),
     S3(S3Provider),
-    GCP(GCPProvider),
+    Gcp(GCPProvider),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -125,16 +125,16 @@ impl From<metadata::backups::Backup> for Backup {
                     path: prov.path,
                     region: prov.region,
                 }),
-                backups::Provider::GCP(prov) => Provider::GCP(GCPProvider {
+                backups::Provider::GCP(prov) => Provider::Gcp(GCPProvider {
                     bucket: prov.bucket,
                     path: prov.path,
                 })
             },
             status: match b.status.clone() {
                 backups::Status::Idle => Status::Idle,
-                backups::Status::InProgress(p) => Status::InProgress,
+                backups::Status::InProgress(_) => Status::InProgress,
                 backups::Status::Uploading => Status::Uploading,
-                backups::Status::Failed(e) => Status::Failed,
+                backups::Status::Failed(_) => Status::Failed,
                 backups::Status::Completed => Status::Completed,
             },
             in_progress_progress: match b.status {

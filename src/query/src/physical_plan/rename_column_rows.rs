@@ -142,7 +142,7 @@ impl Stream for RenameColumnRowsStream {
                                             .find(|(from, _to)| name == from.as_str())
                                         {
                                             None => b.append_option(v),
-                                            Some((_, to)) => b.append_value(to.to_owned()),
+                                            Some((_, to)) => b.append_value(to),
                                         }
                                     }
                                 }
@@ -153,11 +153,11 @@ impl Stream for RenameColumnRowsStream {
                         }
                     })
                     .collect::<Vec<_>>();
-                return Poll::Ready(Some(Ok(RecordBatch::try_new(
+                Poll::Ready(Some(Ok(RecordBatch::try_new(
                     self.stream.schema().clone(),
                     arrs,
                 )
-                .unwrap())));
+                .unwrap())))
             }
             other => other,
         }

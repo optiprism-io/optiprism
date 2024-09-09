@@ -44,7 +44,7 @@ impl ReorderColumnsExec {
             reordered_cols.push(schema.field_with_name(group_col).unwrap().to_owned());
         }
         for field in schema.fields().iter() {
-            if !columns.contains(&field.name()) {
+            if !columns.contains(field.name()) {
                 reordered_cols.push(field.deref().to_owned());
             }
         }
@@ -135,7 +135,7 @@ impl Stream for ReorderColumnsStream {
 
                 Poll::Ready(Some(Ok(RecordBatch::try_new(self.schema.clone(), cols)?)))
             }
-            other => return other,
+            other =>  other,
         }
     }
 }

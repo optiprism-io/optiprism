@@ -133,9 +133,7 @@ impl Stream for RenameColumnsStream {
     type Item = DFResult<RecordBatch>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        return match self.stream.poll_next_unpin(cx) {
-            v => v,
-        };
+        self.stream.poll_next_unpin(cx)
     }
 }
 

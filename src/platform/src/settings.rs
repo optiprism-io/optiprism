@@ -42,7 +42,7 @@ impl SettingsProvider {
             match v {
                 BackupProvider::Local => settings.backup_provider = metadata::settings::BackupProvider::Local,
                 BackupProvider::S3 => settings.backup_provider = metadata::settings::BackupProvider::S3,
-                BackupProvider::GCP => settings.backup_provider = metadata::settings::BackupProvider::GCP,
+                BackupProvider::Gcp => settings.backup_provider = metadata::settings::BackupProvider::GCP,
             }
         }
         if let Some(v) = req.backup_provider_s3_bucket {
@@ -90,7 +90,7 @@ impl SettingsProvider {
             backup_provider: match settings.backup_provider {
                 metadata::settings::BackupProvider::Local => Some(BackupProvider::Local),
                 metadata::settings::BackupProvider::S3 => Some(BackupProvider::S3),
-                metadata::settings::BackupProvider::GCP => Some(BackupProvider::GCP),
+                metadata::settings::BackupProvider::GCP => Some(BackupProvider::Gcp),
             },
             backup_provider_s3_bucket: Some(settings.backup_provider_s3_bucket),
             backup_provider_s3_path: Some(settings.backup_provider_s3_path),
@@ -120,7 +120,7 @@ pub enum BackupProvider {
     Local,
     S3,
     #[serde(rename = "gcp")] // for some reason it is "gCP"
-    GCP,
+    Gcp,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]

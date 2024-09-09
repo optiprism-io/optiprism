@@ -15,12 +15,11 @@ mod tests {
     use datafusion_common::ScalarValue;
     use metadata::util::init_db;
     use query::error::Result;
-    use query::queries::event_records_search::build;
-    use query::queries::event_records_search::EventRecordsSearch;
     use query::test_util::create_entities;
     use query::test_util::events_provider;
     use query::test_util::run_plan;
     use query::Context;
+    use query::event_records::{build_search_plan, EventRecordsSearchRequest};
 
     #[tokio::test]
     async fn test_full() -> Result<()> {
@@ -40,7 +39,7 @@ mod tests {
         let to = DateTime::parse_from_rfc3339("2022-08-29T15:42:29.190855+00:00")
             .unwrap()
             .with_timezone(&Utc);
-        let req = EventRecordsSearch {
+        let req = EventRecordsSearchRequest {
             time: QueryTime::Between {
                 from: to.sub(Duration::days(10)),
                 to,
@@ -50,7 +49,7 @@ mod tests {
             properties: None,
         };
 
-        let plan = build(ctx, md, input, req)?;
+        let (plan,_) = build_search_plan(ctx, md, input, req)?;
         let result = run_plan(plan).await?;
         print_batches(&result)?;
         Ok(())
@@ -74,7 +73,7 @@ mod tests {
         let to = DateTime::parse_from_rfc3339("2021-09-08T15:42:29.190855+00:00")
             .unwrap()
             .with_timezone(&Utc);
-        let req = EventRecordsSearch {
+        let req = EventRecordsSearchRequest {
             time: QueryTime::Between {
                 from: to.sub(Duration::days(10)),
                 to,
@@ -92,7 +91,7 @@ mod tests {
             properties: None,
         };
 
-        let plan = build(ctx, md, input, req)?;
+        let (plan,_) = build_search_plan(ctx, md, input, req)?;
         let result = run_plan(plan).await?;
         print_batches(&result)?;
         Ok(())
@@ -116,21 +115,21 @@ mod tests {
         let to = DateTime::parse_from_rfc3339("2021-09-08T15:42:29.190855+00:00")
             .unwrap()
             .with_timezone(&Utc);
-        let req = EventRecordsSearch {
+        let req = EventRecordsSearchRequest {
             time: QueryTime::Between {
                 from: to.sub(Duration::days(10)),
                 to,
             },
             events: None,
             filters: Some(vec![PropValueFilter::Property {
-                property: PropertyRef::Group("Country".to_string()),
+                property: PropertyRef::Group("Country".to_string(),0),
                 operation: PropValueOperation::Like,
                 value: Some(vec![ScalarValue::Utf8(Some("spa%".to_string()))]),
             }]),
             properties: None,
         };
 
-        let plan = build(ctx, md, input, req)?;
+        let (plan,_) = build_search_plan(ctx, md, input, req)?;
         let result = run_plan(plan).await?;
         print_batches(&result)?;
         Ok(())
@@ -154,7 +153,7 @@ mod tests {
         let to = DateTime::parse_from_rfc3339("2021-09-08T15:42:29.190855+00:00")
             .unwrap()
             .with_timezone(&Utc);
-        let req = EventRecordsSearch {
+        let req = EventRecordsSearchRequest {
             time: QueryTime::Between {
                 from: to.sub(Duration::days(10)),
                 to,
@@ -164,7 +163,7 @@ mod tests {
             properties: Some(vec![PropertyRef::Event("Revenue".to_string())]),
         };
 
-        let plan = build(ctx, md, input, req)?;
+        let (plan,_) = build_search_plan(ctx, md, input, req)?;
         let result = run_plan(plan).await?;
 
         print_batches(&result)?;
