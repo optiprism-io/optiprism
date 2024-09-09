@@ -2,7 +2,6 @@ use std::env::temp_dir;
 use std::sync::Arc;
 
 use common::types::{DType, TABLE_EVENTS};
-use common::types::COLUMN_EVENT;
 use storage::db::OptiDBImpl;
 use storage::db::Options;
 use storage::table::Options as TableOptions;

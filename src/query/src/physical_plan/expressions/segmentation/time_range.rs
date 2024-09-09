@@ -13,10 +13,7 @@ pub enum TimeRange {
 }
 
 pub fn from_milli(m: i64) -> DateTime<Utc> {
-    DateTime::from_naive_utc_and_offset(
-        chrono::NaiveDateTime::from_timestamp_millis(m).unwrap(),
-        Utc,
-    )
+    DateTime::from_timestamp_millis(m).unwrap()
 }
 
 impl TimeRange {

@@ -6,10 +6,9 @@ use chrono::{DateTime, Utc};
 use prost::Message;
 use rocksdb::{Transaction, TransactionDB};
 use serde::{Deserialize, Serialize};
-use common::types::OptionalProperty;
-use crate::{account, backup, make_data_key, make_data_value_key, make_id_seq_key, make_index_key, Result};
+use crate::{backup, make_data_key, make_data_value_key, make_id_seq_key, Result};
 use crate::error::MetadataError;
-use crate::index::{check_insert_constraints, check_update_constraints, delete_index, get_index, insert_index, next_seq, update_index};
+use crate::index::next_seq;
 use crate::metadata::{ListResponse, ResponseMetadata};
 use crate::settings::{BackupProvider, Settings};
 
@@ -113,7 +112,7 @@ impl Backups {
         };
 
         let data = serialize(&backup)?;
-        tx.put(make_data_value_key(NAMESPACE, backup.id), &data)?;
+        tx.put(make_data_value_key(NAMESPACE, backup.id), data)?;
         tx.commit()?;
 
         Ok(backup)
@@ -157,7 +156,7 @@ impl Backups {
         backup.updated_at = Some(Utc::now());
 
         let data = serialize(&backup)?;
-        tx.put(make_data_value_key(NAMESPACE, backup.id), &data)?;
+        tx.put(make_data_value_key(NAMESPACE, backup.id), data)?;
         tx.commit()?;
         Ok(())
     }
@@ -243,7 +242,7 @@ fn serialize(b: &Backup) -> Result<Vec<u8>> {
         Status::Idle => backup::Status::Idle as i32,
         Status::InProgress(_) => backup::Status::InProgress as i32,
         Status::Uploading => backup::Status::Uploading as i32,
-        Status::Failed(e) => backup::Status::Failed as i32,
+        Status::Failed(_) => backup::Status::Failed as i32,
         Status::Completed => backup::Status::Completed as i32,
     };
 
@@ -277,7 +276,7 @@ fn serialize(b: &Backup) -> Result<Vec<u8>> {
     Ok(b.encode_to_vec())
 }
 fn deserialize(data: &[u8]) -> Result<Backup> {
-    let from = backup::Backup::decode(data.as_ref())?;
+    let from = backup::Backup::decode(data)?;
     let provider = match from.provider {
         1 => Provider::Local(PathBuf::from(from.local_path)),
         2 => Provider::S3(S3Provider {
@@ -313,7 +312,7 @@ fn deserialize(data: &[u8]) -> Result<Backup> {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
+    
     use chrono::DateTime;
     use crate::backups::S3Provider;
 

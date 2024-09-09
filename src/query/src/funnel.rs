@@ -88,7 +88,7 @@ impl FunnelProvider {
         counter!(METRIC_QUERY_QUERIES_TOTAL,"query"=>"funnel").increment(1);
         debug!("elapsed: {:?}", duration);
         let mut group_cols: Vec<StringArray> = vec![];
-        let mut ts_col = {
+        let ts_col = {
             let idx = result.schema().index_of("ts").unwrap();
             result
                 .column(idx)

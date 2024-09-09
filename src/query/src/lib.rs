@@ -1,7 +1,4 @@
 #![feature(let_chains, concat_idents)]
-#![feature(exclusive_range_pattern)]
-#![feature(slice_group_by)]
-
 extern crate core;
 
 pub use std::cmp::Ordering;
@@ -520,7 +517,6 @@ pub mod test_util {
     use arrow::datatypes::DataType;
     use arrow::datatypes::Field;
     use arrow::datatypes::Schema;
-    use arrow::datatypes::TimeUnit;
     use common::group_col;
     use common::types::{DType, TABLE_EVENTS};
     use common::types::COLUMN_CREATED_AT;
@@ -553,7 +549,6 @@ pub mod test_util {
     use metadata::properties::Type;
     use metadata::MetadataProvider;
     use storage::db::OptiDBImpl;
-
     use crate::error::Result;
     use crate::physical_plan::planner::QueryPlanner;
 

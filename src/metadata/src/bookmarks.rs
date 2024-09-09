@@ -9,11 +9,8 @@ use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
-use common::event_segmentation::EventSegmentationRequest;
-use common::funnel::Funnel;
-use crate::accounts::Account;
 use crate::error::MetadataError;
-use crate::{account, bookmark, project_ns};
+use crate::bookmark;
 use crate::reports::Query;
 use crate::Result;
 
@@ -130,7 +127,7 @@ fn deserialize(data: &Vec<u8>) -> Result<Bookmark> {
 
 #[cfg(test)]
 mod tests {
-    use chrono::{DateTime, Utc};
+    use chrono::DateTime;
     use crate::bookmarks::{Bookmark, deserialize, serialize};
 
     #[test]

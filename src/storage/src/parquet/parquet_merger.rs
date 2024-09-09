@@ -8,7 +8,7 @@ use std::io::BufWriter;
 use std::io::Read;
 use std::io::Seek;
 use std::os::unix::fs::MetadataExt;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use arrow2::array::new_null_array;
 use arrow2::array::Array;
@@ -894,9 +894,9 @@ where
                 // get descriptors of index/partition columns
 
                 if first {
-                    min = chunks[0].0.min_values.clone();
+                    min.clone_from(&chunks[0].0.min_values);
                 }
-                max = chunks.last().unwrap().0.max_values.clone();
+                max.clone_from(&chunks.last().unwrap().0.max_values);
                 first = false;
                 for col_id in 0..self.index_cols.len() {
                     for chunk in chunks.iter() {

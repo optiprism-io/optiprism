@@ -1,38 +1,25 @@
 use std::any::Any;
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
 use std::ops::Deref;
 use std::pin::Pin;
-use std::rc::Rc;
 use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
-
 use arrow::array::Array;
 use arrow::array::ArrayRef;
 use arrow::array::Decimal128Array;
-use arrow::array::Decimal128Builder;
 use arrow::array::Int64Array;
 use arrow::array::Int64Builder;
 use arrow::array::RecordBatch;
 use arrow::array::StringArray;
-use arrow::compute::sort_to_indices;
 use arrow::compute::take;
-use arrow::compute::SortOptions;
 use arrow::datatypes::DataType;
-use arrow::datatypes::Field;
-use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
-use arrow::util::pretty::print_batches;
 use async_trait::async_trait;
-use common::DECIMAL_PRECISION;
-use common::DECIMAL_SCALE;
 use datafusion::execution::RecordBatchStream;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::execution::TaskContext;
-use datafusion::physical_expr::Partitioning;
-use datafusion::physical_expr::PhysicalSortExpr;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
@@ -42,10 +29,7 @@ use datafusion_common::DataFusionError;
 use datafusion_common::Result as DFResult;
 use futures::Stream;
 use futures::StreamExt;
-use indexmap::IndexMap;
-
 use crate::error::QueryError;
-use crate::physical_plan::merge::MergeExec;
 use crate::Result;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]

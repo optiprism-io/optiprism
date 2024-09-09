@@ -94,7 +94,7 @@ impl UserDefinedLogicalNode for DbParquetNode {
     fn with_exprs_and_inputs(
         &self,
         _: Vec<Expr>,
-        inputs: Vec<LogicalPlan>,
+        _: Vec<LogicalPlan>,
     ) -> datafusion_common::Result<Arc<dyn UserDefinedLogicalNode>> {
         Ok(Arc::new(
             Self::try_new(self.db.clone(), self.table.clone(), self.projection.clone())

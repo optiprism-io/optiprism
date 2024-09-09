@@ -3,17 +3,12 @@ use std::fmt::Formatter;
 use std::hash::Hash;
 use std::hash::Hasher;
 use std::sync::Arc;
-
 use datafusion_common::Column;
-use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;
 use datafusion_expr::Expr;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::UserDefinedLogicalNode;
-use metadata::MetadataProvider;
-
 use crate::error::QueryError;
-use crate::logical_plan::merge::MergeNode;
 use crate::Result;
 
 #[derive(Hash, Eq, PartialEq)]
@@ -29,8 +24,6 @@ impl RenameColumnRowsNode {
         column: Column,
         rename: Vec<(String, String)>,
     ) -> Result<Self> {
-        let schema = input.schema();
-
         Ok(Self {
             input,
             column,

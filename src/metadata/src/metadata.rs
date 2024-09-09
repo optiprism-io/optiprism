@@ -15,7 +15,6 @@ use crate::custom_events;
 use crate::custom_events::CustomEvents;
 use crate::dashboards;
 use crate::dashboards::Dashboards;
-use crate::dictionaries;
 use crate::dictionaries::Dictionaries;
 use crate::events;
 use crate::events::Events;

@@ -89,7 +89,7 @@ impl UserDefinedLogicalNode for ReorderColumnsNode {
 
     fn with_exprs_and_inputs(
         &self,
-        exprs: Vec<Expr>,
+        _exprs: Vec<Expr>,
         inputs: Vec<LogicalPlan>,
     ) -> datafusion_common::Result<Arc<dyn UserDefinedLogicalNode>> {
         Ok(Arc::new(

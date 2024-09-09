@@ -2,11 +2,8 @@ use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::hash::Hash;
 use std::hash::Hasher;
-use std::str::from_utf8;
 use std::sync::Arc;
 
-use byteorder::ByteOrder;
-use byteorder::LittleEndian;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 
@@ -73,7 +70,7 @@ impl Dictionaries {
             None => {
                 let key = make_id_seq_key(project_ns(project_id, dict_ns(tbl_dict(table, dict).as_str()).as_slice()).as_slice());
                 let id = next_seq(
-                    &tx,
+                    tx,
                     key,
                 )?;
                 tx.put(make_key_key(project_id, tbl_dict(table, dict).as_str(), id), value.as_bytes())?;

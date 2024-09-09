@@ -19,7 +19,7 @@ use crate::index::delete_index;
 use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
-use crate::{list_data, make_data_key, organization};
+use crate::{make_data_key, organization};
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
@@ -78,7 +78,7 @@ impl Organizations {
         };
 
         let data = serialize(&org)?;
-        tx.put(make_data_value_key(NAMESPACE, id), &data)?;
+        tx.put(make_data_value_key(NAMESPACE, id), data)?;
 
         insert_index(&tx, idx_keys.as_ref(), org.id)?;
 
@@ -115,7 +115,7 @@ impl Organizations {
     }
 
     pub fn update_(&self, tx: &Transaction<TransactionDB>, id: u64, req: UpdateOrganizationRequest) -> Result<Organization> {
-        let prev_org = self.get_by_id_(&tx, id)?;
+        let prev_org = self.get_by_id_(tx, id)?;
 
         let mut org = prev_org.clone();
 
@@ -124,18 +124,18 @@ impl Organizations {
         if let OptionalProperty::Some(name) = &req.name {
             idx_keys.push(index_name_key(name.as_str()));
             idx_prev_keys.push(index_name_key(prev_org.name.as_str()));
-            org.name = name.to_owned();
+            org.name.clone_from(name);
         }
 
-        check_update_constraints(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref())?;
+        check_update_constraints(tx, idx_keys.as_ref(), idx_prev_keys.as_ref())?;
 
         org.updated_at = Some(Utc::now());
         org.updated_by = Some(req.updated_by);
 
         let data = serialize(&org)?;
-        tx.put(make_data_value_key(NAMESPACE, org.id), &data)?;
+        tx.put(make_data_value_key(NAMESPACE, org.id), data)?;
 
-        update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), org.id)?;
+        update_index(tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), org.id)?;
         Ok(org)
     }
 
@@ -158,7 +158,7 @@ impl Organizations {
 
         self.accs.add_organization_(&tx, member_id, id, role)?;
         let data = serialize(&org)?;
-        tx.put(make_data_value_key(NAMESPACE, org.id), &data)?;
+        tx.put(make_data_value_key(NAMESPACE, org.id), data)?;
         tx.commit()?;
         Ok(())
     }
@@ -175,7 +175,7 @@ impl Organizations {
 
         self.accs.remove_organization_(&tx, member_id, id)?;
         let data = serialize(&org)?;
-        tx.put(make_data_value_key(NAMESPACE, org.id), &data)?;
+        tx.put(make_data_value_key(NAMESPACE, org.id), data)?;
         tx.commit()?;
         Ok(())
     }
@@ -193,7 +193,7 @@ impl Organizations {
         }
 
         let data = serialize(&org)?;
-        tx.put(make_data_value_key(NAMESPACE, org.id), &data)?;
+        tx.put(make_data_value_key(NAMESPACE, org.id), data)?;
         tx.commit()?;
         Ok(())
     }
@@ -262,7 +262,7 @@ fn serialize(org: &Organization) -> Result<Vec<u8>> {
 
 // deserialize from protobuf
 fn deserialize(data: &[u8]) -> Result<Organization> {
-    let from = organization::Organization::decode(data.as_ref())?;
+    let from = organization::Organization::decode(data)?;
 
     Ok(Organization {
         id: from.id,
@@ -286,7 +286,7 @@ fn deserialize(data: &[u8]) -> Result<Organization> {
 
 #[cfg(test)]
 mod tests {
-    use chrono::{DateTime, Utc};
+    use chrono::DateTime;
     use common::rbac::OrganizationRole;
     use crate::organizations::{Organization, deserialize, serialize};
 

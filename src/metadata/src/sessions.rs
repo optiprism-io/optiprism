@@ -10,8 +10,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::error::MetadataError;
-use crate::{list, session};
-use crate::metadata::{ListResponse, ResponseMetadata};
+use crate::session;
 use crate::project_ns;
 use crate::Result;
 

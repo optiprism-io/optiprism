@@ -4,12 +4,10 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::pin::Pin;
-use std::result;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::task::Context;
 use std::task::Poll;
-
 use ahash::RandomState;
 use arrow::array::Array;
 use arrow::array::ArrayRef;
@@ -19,14 +17,12 @@ use arrow::array::Decimal128Builder;
 use arrow::array::Int64Array;
 use arrow::array::Int64Builder;
 use arrow::array::RecordBatch;
-use arrow::compute::cast;
 use arrow::compute::concat_batches;
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
 use arrow::datatypes::FieldRef;
 use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
-use arrow::util::pretty::print_batches;
 use arrow_row::OwnedRow;
 use arrow_row::Row;
 use arrow_row::RowConverter;
@@ -34,33 +30,19 @@ use arrow_row::SortField;
 use async_trait::async_trait;
 use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_PROJECT_ID;
-use common::types::RESERVED_COLUMN_FUNNEL_AVG_TIME_TO_CONVERT;
-use common::types::RESERVED_COLUMN_FUNNEL_COMPLETED;
-use common::types::RESERVED_COLUMN_FUNNEL_CONVERSION_RATIO;
-use common::types::RESERVED_COLUMN_FUNNEL_DROPPED_OFF;
-use common::types::RESERVED_COLUMN_FUNNEL_DROP_OFF_RATIO;
-use common::types::RESERVED_COLUMN_FUNNEL_TOTAL;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 use datafusion::execution::RecordBatchStream;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::execution::TaskContext;
 use datafusion::physical_expr::expressions::col;
-use datafusion::physical_expr::expressions::Avg;
 use datafusion::physical_expr::expressions::Column;
-use datafusion::physical_expr::expressions::Max;
 use datafusion::physical_expr::{AggregateExpr, EquivalenceProperties};
 use datafusion::physical_expr::Distribution;
-use datafusion::physical_expr::Partitioning;
 use datafusion::physical_expr::Partitioning::UnknownPartitioning;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
-use datafusion::physical_expr::PhysicalSortExpr;
 use datafusion::physical_expr::PhysicalSortRequirement;
-use datafusion::physical_plan::aggregates::AggregateExec as DFAggregateExec;
-use datafusion::physical_plan::aggregates::AggregateMode;
-use datafusion::physical_plan::aggregates::PhysicalGroupBy;
-use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
 use datafusion::physical_plan::AggregateExpr as DFAggregateExpr;
 use datafusion::physical_plan::DisplayAs;
@@ -68,13 +50,10 @@ use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::physical_plan::ExecutionPlanProperties;
 use datafusion::physical_plan::PlanProperties;
-use datafusion::prelude::SessionContext;
-use datafusion_common::DataFusionError;
 use datafusion_common::Result as DFResult;
 use datafusion_common::ScalarValue;
 use futures::Stream;
 use futures::StreamExt;
-
 use crate::error::QueryError;
 use crate::error::Result;
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Funnel;
@@ -864,7 +843,7 @@ mod tests {
             // constants: Some(vec![Column::new_with_schema("c", &schema).unwrap()]),
             count: Unique,
             filter: None,
-            touch: Touch::First,
+            touch: Some(Touch::First),
             partition_col: Arc::new(Column::new_with_schema("u", &schema).unwrap()),
             time_interval: Some(TimeIntervalUnit::Hour),
             groups: Some(groups),

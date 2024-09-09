@@ -277,7 +277,6 @@ impl Iterator for MemChunkIterator {
 type SendableChunk = Box<dyn Iterator<Item=Result<Chunk<Box<dyn Array>>>> + Send>;
 
 pub struct MergingIterator {
-    current_idx: usize,
     // list of index cols (partitions) in parquet file
     index_cols: Vec<ColumnDescriptor>,
     is_replacing: bool,
@@ -327,7 +326,6 @@ impl MergingIterator {
         }
 
         let mut mr = Self {
-            current_idx: 0,
             index_cols,
             is_replacing: opts.is_replacing,
             array_size: opts.array_size,

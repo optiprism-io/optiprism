@@ -1,30 +1,21 @@
 use std::any::Any;
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::fmt::Formatter;
-
 use ahash::RandomState;
 use arrow::array::ArrayRef;
 use arrow::array::Int64Array;
 use arrow::array::RecordBatch;
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
-use arrow_row::OwnedRow;
-use arrow_row::RowConverter;
 use arrow_row::SortField;
 use chrono::Duration;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
 use hyperloglog::HyperLogLog;
-use num_traits::Bounded;
-use num_traits::Num;
-use num_traits::NumCast;
-
 use crate::error::Result;
 use crate::physical_plan::expressions::aggregate::Groups;
 use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
-use crate::physical_plan::expressions::segmentation::aggregate::AggregateFunction;
 
 #[derive(Debug)]
 struct Group {
@@ -144,7 +135,7 @@ impl PartitionedAggregateExpr for ActiveGroups {
                 }
             }
 
-            let bucket = if let Some(groups) = &mut self.groups {
+            if let Some(groups) = &mut self.groups {
                 groups
                     .groups
                     .entry(rows.as_ref().unwrap().row(row_id).owned())
@@ -168,7 +159,7 @@ impl PartitionedAggregateExpr for ActiveGroups {
         todo!()
     }
 
-    fn merge(&mut self, other: &dyn PartitionedAggregateExpr) -> crate::Result<()> {
+    fn merge(&mut self, _other: &dyn PartitionedAggregateExpr) -> crate::Result<()> {
         todo!()
     }
 

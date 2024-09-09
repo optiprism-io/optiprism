@@ -1,20 +1,8 @@
-use std::path::PathBuf;
-use std::str::from_utf8;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
-use chrono::Utc;
+use std::sync::Arc;
 use prost::Message;
-use rocksdb::{Transaction, TransactionDB};
-use rust_decimal::Decimal;
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-use common::types::OptionalProperty;
+use rocksdb::TransactionDB;
 use crate::error::MetadataError;
-use crate::reports::{CreateReportRequest, Report, UpdateReportRequest};
-use crate::{make_data_key, make_data_value_key, make_id_seq_key, pbconfig, project_ns, Result};
-use crate::dashboards::Dashboard;
-use crate::index::next_seq;
-use crate::metadata::{ListResponse, ResponseMetadata};
+use crate::{pbconfig, Result};
 
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub enum BackupProvider {
@@ -59,7 +47,7 @@ pub struct Settings {
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings{
+        Settings {
             auth_access_token: "".to_string(),
             auth_refresh_token: "".to_string(),
             auth_admin_default_password: "".to_string(),
@@ -84,17 +72,14 @@ impl Default for Settings {
 }
 impl Settings {
     fn validate(&self) -> Result<()> {
-        if self.backup_encryption_enabled {
-            if self.backup_encryption_password.is_empty() {
-                return Err(MetadataError::BadRequest(
-                    "backup encryption password is required".to_string(),
-                ));
-            }
+        if self.backup_encryption_enabled && self.backup_encryption_password.is_empty() {
+            return Err(MetadataError::BadRequest(
+                "backup encryption password is required".to_string(),
+            ));
         }
 
         match self.backup_provider {
-            BackupProvider::Local => {
-            }
+            BackupProvider::Local => {}
             BackupProvider::S3 => {
                 if self.backup_provider_s3_bucket.is_empty() {
                     return Err(MetadataError::BadRequest(
@@ -132,7 +117,6 @@ impl Settings {
         }
 
         Ok(())
-
     }
 }
 pub struct SettingsProvider {

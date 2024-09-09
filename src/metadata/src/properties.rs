@@ -26,7 +26,6 @@ use storage::db::OptiDBImpl;
 use storage::error::StoreError;
 
 use crate::error::MetadataError;
-use crate::index::check_insert_constraints;
 use crate::index::check_update_constraints;
 use crate::index::delete_index;
 use crate::index::get_index;
@@ -34,7 +33,7 @@ use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::next_zero_seq;
 use crate::index::update_index;
-use crate::{list_data, make_data_key, property};
+use crate::{make_data_key, property};
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
@@ -64,17 +63,6 @@ fn index_name_key(project_id: u64, typ: &Type, name: &str) -> Option<Vec<u8>> {
         make_index_key(
             project_ns(project_id, typ.path().as_bytes()).as_slice(),
             IDX_NAME,
-            name,
-        )
-            .to_vec(),
-    )
-}
-
-fn index_column_name_key(project_id: u64, typ: &Type, name: &str) -> Option<Vec<u8>> {
-    Some(
-        make_index_key(
-            project_ns(project_id, "global".as_bytes()).as_slice(),
-            IDX_COLUMN_NAME,
             name,
         )
             .to_vec(),
@@ -121,8 +109,7 @@ impl Properties {
         }
     }
     pub fn new_group(db: Arc<TransactionDB>, opti_db: Arc<OptiDBImpl>) -> Vec<Arc<Self>> {
-        let props = (0..GROUPS_COUNT)
-            .into_iter()
+        (0..GROUPS_COUNT)
             .map(|gid| {
                 let id_cache = RwLock::new(LruCache::new(
                     NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
@@ -138,9 +125,7 @@ impl Properties {
                     typ: Type::Group(gid),
                 })
             })
-            .collect::<Vec<_>>();
-
-        props
+            .collect::<Vec<_>>()
     }
 
     pub fn new_event(db: Arc<TransactionDB>, opti_db: Arc<OptiDBImpl>) -> Self {
@@ -203,7 +188,7 @@ impl Properties {
             format!("property with name \"{}\" not found", name).as_str(),
         )?;
 
-        self.get_by_id_(&tx, project_id, id)
+        self.get_by_id_(tx, project_id, id)
     }
 
     fn get_by_id_(
@@ -303,7 +288,7 @@ impl Properties {
             .put((project_id, id), prop.clone());
 
         let data = serialize(&prop)?;
-        tx.put(idx_key, &data)?;
+        tx.put(idx_key, data)?;
 
         idx_keys.push(Some(
             make_index_key(
@@ -470,7 +455,7 @@ impl Properties {
                 &self.typ,
                 prev_prop.display_name,
             ));
-            prop.display_name = display_name.to_owned();
+            display_name.clone_into(&mut prop.display_name);
         }
         check_update_constraints(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref())?;
 
@@ -522,7 +507,7 @@ impl Properties {
             .put((project_id, prop.id), prop.clone());
 
         let data = serialize(&prop)?;
-        tx.put(idx_key, &data)?;
+        tx.put(idx_key, data)?;
 
         update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), property_id)?;
         tx.commit()?;
@@ -755,7 +740,7 @@ fn serialize(prop: &Property) -> Result<Vec<u8>> {
 
 // deserialize property from protobuf
 fn deserialize(data: &[u8]) -> Result<Property> {
-    let from = property::Property::decode(data.as_ref())?;
+    let from = property::Property::decode(data)?;
 
     Ok(Property {
         id: from.id,

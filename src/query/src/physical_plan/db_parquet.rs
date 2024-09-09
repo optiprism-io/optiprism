@@ -10,20 +10,16 @@ use arrow::array::RecordBatch;
 use arrow::datatypes::SchemaRef;
 use arrow2::array::Array;
 use arrow2::chunk::Chunk;
-use arrow::util::pretty::print_batches;
 use async_trait::async_trait;
 use datafusion::execution::RecordBatchStream;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::execution::TaskContext;
 use datafusion::physical_expr::EquivalenceProperties;
-use datafusion::physical_expr::Partitioning;
 use datafusion::physical_expr::Partitioning::UnknownPartitioning;
-use datafusion::physical_expr::PhysicalSortExpr;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionMode::Bounded;
 use datafusion::physical_plan::ExecutionPlan;
-use datafusion::physical_plan::ExecutionPlanProperties;
 use datafusion::physical_plan::PlanProperties;
 use datafusion_common::DataFusionError;
 use datafusion_common::Result as DFResult;
@@ -31,7 +27,6 @@ use futures::Stream;
 use futures::StreamExt;
 use storage::arrow_conversion::arrow2_to_arrow1;
 use storage::db::OptiDBImpl;
-
 use crate::error::QueryError;
 use crate::Result;
 

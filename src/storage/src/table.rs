@@ -1,7 +1,5 @@
 use std::fs::File;
 use std::io::BufWriter;
-use std::path::Path;
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use arrow2::datatypes::{DataType, Schema, TimeUnit};
@@ -13,7 +11,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
 use crate::memtable::Memtable;
-use crate::{Fs, metadata};
+use crate::metadata;
 use crate::KeyValue;
 use crate::Stats;
 use crate::Value;
@@ -59,7 +57,7 @@ impl Options {
         }
     }
 }
-pub fn print_partitions(levels: &[Level]) {
+pub(crate) fn _print_partitions(levels: &[Level]) {
     for (lid, l) in levels.iter().enumerate() {
         println!("|  +-- {}", lid);
         for part in &l.parts {
@@ -106,12 +104,6 @@ impl Level {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Partition {
-    pub(crate) id: usize,
-    pub(crate) levels: Vec<Level>,
-}
-
-#[derive(Debug, Clone)]
 pub(crate) struct Table {
     pub(crate) name: String,
     pub(crate) memtable: Arc<Mutex<Memtable>>,
@@ -144,7 +136,7 @@ pub(crate) fn serialize_table(tbl: &Table) -> SerializableTable {
     }
 }
 
-pub fn serialize_md(md: &Metadata) -> Result<Vec<u8>> {
+pub(crate) fn serialize_md(md: &Metadata) -> Result<Vec<u8>> {
     let schema = metadata::Schema {
         fields: md.schema.fields.iter().map(|f| {
             metadata::Field {
@@ -244,8 +236,8 @@ pub fn serialize_md(md: &Metadata) -> Result<Vec<u8>> {
     Ok(md.encode_to_vec())
 }
 
-pub fn deserialize_md(data: &[u8]) -> Result<Metadata> {
-    let from = metadata::Metadata::decode(data.as_ref())?;
+pub(crate) fn deserialize_md(data: &[u8]) -> Result<Metadata> {
+    let from = metadata::Metadata::decode(data)?;
 
     let md = Metadata {
         version: from.version as u64,
@@ -338,7 +330,7 @@ pub fn deserialize_md(data: &[u8]) -> Result<Metadata> {
 #[cfg(test)]
 mod tests {
     use arrow2::datatypes::{DataType, TimeUnit};
-    use chrono::{DateTime, Utc};
+    
     use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
     use crate::KeyValue;
     use crate::table::{deserialize_md, Level, Metadata, Options, Part, serialize_md};

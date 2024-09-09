@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use arrow::datatypes::DataType;
 use arrow::datatypes::Schema;
 use common::DECIMAL_PRECISION;
@@ -15,27 +13,16 @@ use datafusion_expr::Expr;
 use num_traits::Bounded;
 use num_traits::Num;
 use num_traits::NumCast;
-
 use crate::error::QueryError;
 use crate::error::Result;
 use crate::logical_plan;
 use crate::logical_plan::partitioned_aggregate::AggregateExpr;
 use crate::logical_plan::SortField;
 use crate::physical_plan::expressions::aggregate::count::Count;
-// use crate::physical_plan::expressions::aggregate::aggregate;
-// use crate::physical_plan::expressions::aggregate::aggregate::Aggregate;
-// use crate::physical_plan::expressions::aggregate::count::Count;
 use crate::physical_plan::expressions::aggregate::partitioned;
 use crate::physical_plan::expressions::aggregate::partitioned::count::PartitionedCount;
-use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel;
-use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Funnel;
-// use crate::logical_plan::_segmentation::AggregateFunction;
-// use crate::logical_plan::_segmentation::SegmentationNode;
-// use crate::logical_plan::_segmentation::TimeRange;
 use crate::physical_plan::expressions::aggregate::Aggregate;
 use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
-// use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel;
-// use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Funnel;
 use crate::physical_plan::expressions::segmentation::aggregate::AggregateFunction;
 use crate::physical_plan::planner::build_filter;
 use crate::physical_plan::planner::col;
@@ -43,7 +30,6 @@ use crate::physical_plan::planner::col;
 fn build_groups(
     groups: Option<Vec<(Expr, SortField)>>,
     dfschema: &DFSchema,
-    schema: &Schema,
     execution_props: &ExecutionProps,
 ) -> Result<Option<Vec<(PhysicalExprRef, String, arrow_row::SortField)>>> {
     let ret = groups
@@ -169,8 +155,8 @@ pub fn build_partitioned_aggregate_partial_expr(
             partition_col,
             distinct,
         } => {
-            let filter = build_filter(filter, &dfschema, schema, &execution_props)?;
-            let groups = build_groups(groups, &dfschema, schema, &execution_props)?;
+            let filter = build_filter(filter, &dfschema, &execution_props)?;
+            let groups = build_groups(groups, &dfschema, &execution_props)?;
             let predicate = col(predicate, &dfschema);
             let partition_col = col(partition_col, &dfschema);
 
@@ -206,8 +192,8 @@ pub fn build_partitioned_aggregate_partial_expr(
         } => {
             let dfschema = schema.clone().to_dfschema()?;
             let execution_props = ExecutionProps::new();
-            let filter = build_filter(filter, &dfschema, schema, &execution_props)?;
-            let groups = build_groups(groups, &dfschema, schema, &execution_props)?;
+            let filter = build_filter(filter, &dfschema, &execution_props)?;
+            let groups = build_groups(groups, &dfschema, &execution_props)?;
             let predicate = col(predicate, &dfschema);
             let partition_col = col(partition_col, &dfschema);
 
@@ -403,8 +389,8 @@ pub fn build_partitioned_aggregate_partial_expr(
             partition_col,
             distinct,
         } => {
-            let filter = build_filter(filter, &dfschema, schema, &execution_props)?;
-            let groups = build_groups(groups, &dfschema, schema, &execution_props)?;
+            let filter = build_filter(filter, &dfschema, &execution_props)?;
+            let groups = build_groups(groups, &dfschema, &execution_props)?;
             let partition_col = col(partition_col, &dfschema);
             let expr = match get_return_type(DataType::Int64, &outer_fn) {
                 DataType::Float64 => {
@@ -433,8 +419,8 @@ pub fn build_partitioned_aggregate_partial_expr(
         } => {
             let dfschema = schema.clone().to_dfschema()?;
             let execution_props = ExecutionProps::new();
-            let filter = build_filter(filter, &dfschema, schema, &execution_props)?;
-            let groups = build_groups(groups, &dfschema, schema, &execution_props)?;
+            let filter = build_filter(filter, &dfschema, &execution_props)?;
+            let groups = build_groups(groups, &dfschema, &execution_props)?;
             let predicate = col(predicate, &dfschema);
             let partition_col = col(partition_col, &dfschema);
             let ret = match predicate.data_type(schema)? {
@@ -2215,8 +2201,8 @@ pub fn build_partitioned_aggregate_final_expr(
             partition_col,
             distinct,
         } => {
-            let filter = build_filter(filter, &dfschema, schema, &execution_props)?;
-            let groups = build_groups(groups, &dfschema, schema, &execution_props)?;
+            let filter = build_filter(filter, &dfschema, &execution_props)?;
+            let groups = build_groups(groups, &dfschema, &execution_props)?;
             let predicate = col(predicate, &dfschema);
             let partition_col = col(partition_col, &dfschema);
 
@@ -2252,8 +2238,8 @@ pub fn build_partitioned_aggregate_final_expr(
         } => {
             let dfschema = schema.clone().to_dfschema()?;
             let execution_props = ExecutionProps::new();
-            let filter = build_filter(filter, &dfschema, schema, &execution_props)?;
-            let groups = build_groups(groups, &dfschema, schema, &execution_props)?;
+            let filter = build_filter(filter, &dfschema, &execution_props)?;
+            let groups = build_groups(groups, &dfschema, &execution_props)?;
             let predicate = col(predicate, &dfschema);
             let partition_col = col(partition_col, &dfschema);
 
@@ -2315,8 +2301,8 @@ pub fn build_partitioned_aggregate_final_expr(
             partition_col,
             distinct,
         } => {
-            let filter = build_filter(filter, &dfschema, schema, &execution_props)?;
-            let groups = build_groups(groups, &dfschema, schema, &execution_props)?;
+            let filter = build_filter(filter, &dfschema, &execution_props)?;
+            let groups = build_groups(groups, &dfschema, &execution_props)?;
             let partition_col = col(partition_col, &dfschema);
             let expr = match get_return_type(DataType::Int64, &outer_fn) {
                 DataType::Float64 => {
@@ -2345,8 +2331,8 @@ pub fn build_partitioned_aggregate_final_expr(
         } => {
             let dfschema = schema.clone().to_dfschema()?;
             let execution_props = ExecutionProps::new();
-            let filter = build_filter(filter, &dfschema, schema, &execution_props)?;
-            let groups = build_groups(groups, &dfschema, schema, &execution_props)?;
+            let filter = build_filter(filter, &dfschema, &execution_props)?;
+            let groups = build_groups(groups, &dfschema, &execution_props)?;
             let predicate = col(predicate, &dfschema);
             let partition_col = col(partition_col, &dfschema);
             let ret = match predicate.data_type(schema)? {
@@ -2532,6 +2518,5 @@ pub fn build_partitioned_aggregate_final_expr(
 
             Ok(ret)
         }
-        _ => unimplemented!(),
     }
 }

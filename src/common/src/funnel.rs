@@ -1,11 +1,6 @@
-use std::sync::Arc;
 
-use chrono::DateTime;
 use chrono::Duration;
-use chrono::Utc;
 use chronoutil::RelativeDuration;
-use datafusion_common::Column;
-use datafusion_expr::Expr;
 use serde::Deserialize;
 use serde::Serialize;
 

@@ -5,6 +5,7 @@ use std::fs::create_dir_all;
 use std::fs::File;
 use std::io::Cursor;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Instant;
 
 use arrow2::array::PrimitiveArray;
@@ -14,19 +15,18 @@ use arrow2::datatypes::Field;
 use arrow2::datatypes::TimeUnit;
 use arrow2::io::parquet::read;
 use arrow2::io::print;
-use storage::arrow_conversion::arrow1_to_arrow2;
 use storage::parquet::parquet_merger::merge;
 use storage::parquet::parquet_merger::Options;
 use storage::test_util::concat_chunks;
 use storage::test_util::create_parquet_from_chunk;
 use storage::test_util::create_parquet_from_chunks;
 use storage::test_util::gen_chunk_for_parquet;
-use storage::test_util::parse_markdown_tables;
 use storage::test_util::read_parquet_as_one_chunk;
 use storage::test_util::unmerge_chunk;
 use storage::test_util::PrimaryIndexType;
 use tracing::trace;
 use tracing_test::traced_test;
+use storage::Fs;
 
 #[derive(Clone)]
 struct TestCase {
@@ -69,8 +69,7 @@ fn roundtrip(tc: TestCase) -> anyhow::Result<()> {
 
     let readers = out_streams_chunks
         .into_iter()
-        .enumerate()
-        .map(|(_stream_id, chunks)| {
+        .map(|(chunks)| {
             let mut w = Cursor::new(vec![]);
             create_parquet_from_chunks(chunks, fields.clone(), &mut w, tc.gen_data_page_limit)
                 .unwrap();
@@ -93,7 +92,8 @@ fn roundtrip(tc: TestCase) -> anyhow::Result<()> {
     let start = Instant::now();
     fs::remove_dir_all("/tmp/merge_roundtrip").ok();
     fs::create_dir_all("/tmp/merge_roundtrip").unwrap();
-    merge(readers, "/tmp/merge_roundtrip".into(), 1, "t", 0, opts).unwrap();
+    let fs = Arc::new(Fs::new());
+    merge(readers, fs, "/tmp/merge_roundtrip".into(), 1, "t", 0, opts).unwrap();
     println!("merge {:?}", start.elapsed());
 
     let mut pfile = File::open("/tmp/merge_roundtrip/1.parquet").unwrap();
@@ -160,8 +160,7 @@ fn profile(tc: TestCase, case_id: usize, step: ProfileStep) {
             let start = Instant::now();
             out_streams_chunks
                 .into_iter()
-                .enumerate()
-                .for_each(|(_stream_id, chunks)| {
+                .for_each(|( chunks)| {
                     let mut w = Cursor::new(vec![]);
                     create_parquet_from_chunks(
                         chunks,
@@ -192,7 +191,7 @@ fn profile(tc: TestCase, case_id: usize, step: ProfileStep) {
 
             fs::remove_dir_all("/tmp/merge_profile").ok();
             fs::create_dir_all("/tmp/merge_profile").unwrap();
-            merge(readers, "/tmp/merge_profile".into(), 1, "t", 0, opts).unwrap();
+            merge(readers, Arc::new(Fs::new()), "/tmp/merge_profile".into(), 1, "t", 0, opts).unwrap();
         }
     }
     println!("{:?}", start.elapsed());
@@ -569,6 +568,7 @@ fn test_different_row_group_sizes() -> anyhow::Result<()> {
     fs::create_dir_all("/tmp/merge_different_row_group_sizes").unwrap();
     merge(
         readers,
+        Arc::new(Fs::new()),
         "/tmp/merge_different_row_group_sizes".into(),
         1,
         "t",
@@ -618,7 +618,7 @@ fn test_merge_with_missing_columns() -> anyhow::Result<()> {
         ],
     ];
 
-    let fields = vec![
+    let fields = [
         vec![
             Field::new("f1", DataType::Int64, false),
             Field::new("f2", DataType::Int64, true),
@@ -662,6 +662,7 @@ fn test_merge_with_missing_columns() -> anyhow::Result<()> {
     fs::create_dir_all("/tmp/merge_with_missing_columns").unwrap();
     merge(
         readers,
+        Arc::new(Fs::new()),
         "/tmp/merge_with_missing_columns".into(),
         1,
         "t",
@@ -718,7 +719,7 @@ fn test_pick_with_null_columns() -> anyhow::Result<()> {
         vec![PrimitiveArray::<i64>::from_slice([4, 5, 6]).boxed()],
     ];
 
-    let fields = vec![
+    let fields = [
         vec![
             Field::new("f1", DataType::Int64, false),
             Field::new("f2", DataType::Int64, true),
@@ -752,6 +753,7 @@ fn test_pick_with_null_columns() -> anyhow::Result<()> {
     };
     merge(
         readers,
+        Arc::new(Fs::new()),
         "/tmp/merge_pick_with_null_columns".into(),
         1,
         "t",
@@ -785,7 +787,7 @@ fn test_replacing() -> anyhow::Result<()> {
         ],
     ];
 
-    let fields = vec![
+    let fields = [
         vec![
             Field::new("f1", DataType::Int64, false),
             Field::new("f2", DataType::Int64, false),
@@ -820,7 +822,7 @@ fn test_replacing() -> anyhow::Result<()> {
         merge_max_page_size: 100,
         max_part_size_bytes: None,
     };
-    merge(readers, "/tmp/merge_replacing".into(), 1, "t", 0, opts)?;
+    merge(readers, Arc::new(Fs::new()), "/tmp/merge_replacing".into(), 1, "t", 0, opts)?;
 
     let mut pfile = File::open("/tmp/merge_replacing/1.parquet").unwrap();
     let final_chunk = read_parquet_as_one_chunk(&mut pfile);
@@ -848,7 +850,7 @@ fn test_replacing_different_parts() -> anyhow::Result<()> {
         ],
     ];
 
-    let fields = vec![
+    let fields = [
         vec![
             Field::new("f1", DataType::Int64, false),
             Field::new("f2", DataType::Int64, true),
@@ -883,7 +885,7 @@ fn test_replacing_different_parts() -> anyhow::Result<()> {
         merge_max_page_size: 100,
         max_part_size_bytes: None,
     };
-    merge(readers, "/tmp/merge_replacing".into(), 1, "t", 0, opts)?;
+    merge(readers, Arc::new(Fs::new()), "/tmp/merge_replacing".into(), 1, "t", 0, opts)?;
 
     let mut pfile = File::open("/tmp/merge_replacing/1.parquet").unwrap();
     let final_chunk = read_parquet_as_one_chunk(&mut pfile);

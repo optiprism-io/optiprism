@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use rocksdb::{ColumnFamilyDescriptor, SliceTransform};
+use rocksdb::ColumnFamilyDescriptor;
 use rocksdb::Options;
 use rocksdb::TransactionDB;
 use rocksdb::TransactionDBOptions;

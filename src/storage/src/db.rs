@@ -3,9 +3,7 @@ use std::ffi::OsStr;
 use std::{fs, io};
 use std::fs::File;
 use std::fs::OpenOptions;
-use std::hash::Hash;
-use std::hash::Hasher;
-use std::io::{BufReader, copy, Seek};
+use std::io::{BufReader, Seek};
 use std::io::BufWriter;
 use std::io::Read;
 use std::io::Write;
@@ -37,7 +35,7 @@ use arrow2::datatypes::Field;
 use arrow2::datatypes::Schema;
 use arrow2::io::parquet;
 use arrow2::io::parquet::read;
-use arrow2::io::parquet::write::{FileSink, transverse};
+use arrow2::io::parquet::write::transverse;
 use arrow_array::StringArray;
 use arrow_array::TimestampNanosecondArray;
 use bincode::deserialize;
@@ -68,12 +66,9 @@ use metrics::histogram;
 use num_traits::ToPrimitive;
 use parking_lot::Mutex;
 use parking_lot::RwLock;
-use parquet2::compression::{CompressionOptions, ZstdLevel};
-use parquet2::encoding::Encoding;
-use parquet2::write::Version;
+use parquet2::compression::ZstdLevel;
 use serde::Deserialize;
 use serde::Serialize;
-use siphasher::sip::SipHasher13;
 use tracing::{error, info, trace};
 use crate::arrow_conversion::schema2_to_schema1;
 use crate::compaction::Compactor;
@@ -81,14 +76,13 @@ use crate::compaction::CompactorMessage;
 use crate::error::Result;
 use crate::error::StoreError;
 use crate::memtable::Memtable;
-use crate::options::ReadOptions;
 use crate::options::WriteOptions;
 use crate::parquet::arrow_merger;
 use crate::parquet::arrow_merger::MemChunkIterator;
 use crate::parquet::arrow_merger::MergingIterator;
 use crate::parquet::chunk_min_max;
 use crate::table;
-use crate::table::{print_partitions, SerializableTable};
+use crate::table::SerializableTable;
 use crate::table::serialize_md;
 use crate::table::deserialize_md;
 use crate::table::Level;
@@ -99,11 +93,9 @@ use crate::Fs;
 use crate::KeyValue;
 use crate::NamedValue;
 use crate::Value;
-use std::io::prelude::*;
 use std::str::pattern::Pattern;
 use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
-use binread::{BinReaderExt, io::Cursor};
 
 // todo make semver
 const VERSION: u64 = 1;
@@ -170,7 +162,7 @@ fn gc(tables: Arc<RwLock<Vec<Table>>>, path: PathBuf, fs: Arc<Fs>) {
         thread::sleep(Duration::from_secs(1));
         let tbl = tables.read().clone();
         for tbl in tbl {
-                let md = tbl.metadata.lock().clone();
+            let md = tbl.metadata.lock().clone();
             let dir = fs::read_dir(path.join("tables").join(tbl.name.clone())).expect("read_dir failed");
             for f in dir {
                 let f = f.expect("read_dir failed");
@@ -227,12 +219,6 @@ fn hash_crc32(v: &[u8]) -> u32 {
     hasher.finalize() ^ 0xFF
 }
 
-fn siphash<T: Hash>(t: &T) -> u64 {
-    let mut h = SipHasher13::new();
-    t.hash(&mut h);
-    h.finish()
-}
-
 #[derive(Clone, Debug)]
 pub struct Options {}
 
@@ -263,7 +249,7 @@ fn log_op(op: LogOp, log: &mut File) -> Result<usize> {
     Ok(logged_size)
 }
 
-fn recover_op(op: LogOp, memtable: &mut Memtable, metadata: &mut Metadata) -> Result<()> {
+fn recover_op(op: LogOp, memtable: &mut Memtable) -> Result<()> {
     match op {
         LogOp::Insert(k, v) => {
             let kv: Vec<Value> = k.iter().map(|k| k.into()).collect::<Vec<_>>();
@@ -373,7 +359,7 @@ fn try_recover_table(path: PathBuf, name: String) -> Result<Table> {
         }
         let op = deserialize::<LogOp>(&data_b)?;
 
-        recover_op(op, &mut memtable, &mut md)?;
+        recover_op(op, &mut memtable)?;
     }
     // !@#trace!("operations recovered: {}", ops);
 
@@ -419,7 +405,7 @@ fn recover<P: AsRef<Path>>(path: P, opts: Options) -> Result<OptiDBImpl> {
 
     let lock = Arc::new(RwLock::new(()));
     let fs = Arc::new(Fs::new());
-    let compactor = Compactor::new(tables.clone(), path.clone(), fs.clone(), rx, lock.clone());
+    let compactor = Compactor::new(tables.clone(), path, fs.clone(), rx, lock.clone());
     thread::spawn(move || compactor.run());
     let tables_cloned = tables.clone();
     thread::spawn(move || collect_metrics(tables_cloned));
@@ -535,12 +521,12 @@ fn flush_log_(
         "removing previous log file {:?}",
         log_name(metadata.log_id-1)
     );
-    fs.try_remove_file(log_path(&path, &metadata.table_name, metadata.log_id - 1))?;
+    fs.try_remove_file(log_path(path, &metadata.table_name, metadata.log_id - 1))?;
     let log = OpenOptions::new()
         .create_new(true)
         .write(true)
         .read(true)
-        .open(log_path(&path, &metadata.table_name, metadata.log_id))?;
+        .open(log_path(path, &metadata.table_name, metadata.log_id))?;
     histogram!(METRIC_STORE_FLUSH_TIME_SECONDS,"table"=>metadata.table_name.clone()).record(start_time.elapsed());
     counter!(METRIC_STORE_FLUSHES_TOTAL,"table"=>metadata.table_name.clone()).increment(1);
 
@@ -557,7 +543,7 @@ pub struct ScanStream {
 }
 
 impl ScanStream {
-    pub fn new(
+    pub(crate) fn new(
         iter: Box<dyn Iterator<Item=Result<Chunk<Box<dyn Array>>>> + Send>,
         path: PathBuf,
         md: Metadata,
@@ -693,7 +679,7 @@ impl OptiDBImpl {
             Some(tbl) => tbl.to_owned(),
         };
         drop(tables);
-        let mut md = tbl.metadata.lock();
+        let md = tbl.metadata.lock();
         let metadata = md.clone();
         drop(md);
         for v in values.iter() {
@@ -877,6 +863,7 @@ impl OptiDBImpl {
 
                     let mut found = None;
                     'g: for row_group_id in 0..parquet_md.row_groups.len() {
+                        #[allow(clippy::needless_range_loop)]
                         for field_id in 0..key.len() {
                             let field = &schema.fields[field_id];
                             let statistics = read::statistics::deserialize(field, &[parquet_md
@@ -916,7 +903,7 @@ impl OptiDBImpl {
                         return Ok(None);
                     }
 
-                    let mut chunks = read::FileReader::new(
+                    let chunks = read::FileReader::new(
                         rdr,
                         vec![parquet_md.row_groups[found.unwrap()].clone()],
                         schema.clone(),
@@ -933,7 +920,7 @@ impl OptiDBImpl {
                         })
                         .collect::<Vec<_>>();
 
-                    for chunk in chunks.next() {
+                    for chunk in chunks {
                         let chunk = chunk?;
 
                         let mut idx_cols = vec![];
@@ -1354,7 +1341,7 @@ impl OptiDBImpl {
         }
         drop(lock);
         // version
-        writer.write(VERSION.to_le_bytes().as_slice())?;
+        writer.write_all(VERSION.to_le_bytes().as_slice())?;
 
         // tables
         let tbls = tables.iter().map(table::serialize_table).collect::<Vec<_>>();
@@ -1367,8 +1354,8 @@ impl OptiDBImpl {
             ).sum::<u64>();
 
         let data = serialize(&tbls)?;
-        writer.write((data.len() as u64).to_le_bytes().as_slice())?;
-        writer.write(data.as_slice())?;
+        writer.write_all((data.len() as u64).to_le_bytes().as_slice())?;
+        writer.write_all(data.as_slice())?;
 
         // table
         for tbl in tbls {
@@ -1380,7 +1367,7 @@ impl OptiDBImpl {
             let mut log = OpenOptions::new()
                 .read(true)
                 .open(&log_bak_path).unwrap();
-            writer.write(log.metadata()?.size().to_le_bytes().as_slice())?;
+            writer.write_all(log.metadata()?.size().to_le_bytes().as_slice())?;
             io::copy(&mut log, writer)?;
             drop(log);
             fs::remove_file(&log_bak_path)?;
@@ -1398,7 +1385,7 @@ impl OptiDBImpl {
                 }
             }
         }
-        writer.write(&BACKUP_MAGIC)?;
+        writer.write_all(&BACKUP_MAGIC)?;
         for md in mds.iter() {
             for (lid, lvl) in md.levels.iter().enumerate() {
                 for part in &lvl.parts {
@@ -1429,15 +1416,15 @@ impl OptiDBImpl {
         let path = self.path.clone();
         // version
         let mut version_b = [0u8; mem::size_of::<u64>()];
-        reader.read(&mut version_b)?;
+        reader.read_exact(&mut version_b)?;
         let version = u64::from_le_bytes(version_b);
         // tables len
         let mut tbl_len_b = [0u8; mem::size_of::<u64>()];
-        reader.read(&mut tbl_len_b)?;
+        reader.read_exact(&mut tbl_len_b)?;
         let tbl_len = u64::from_le_bytes(tbl_len_b);
         let mut tbl_buf = vec![0; tbl_len as usize];
-        reader.read(&mut tbl_buf)?;
-        let mut tables: Vec<SerializableTable> = deserialize(&tbl_buf)?;
+        reader.read_exact(&mut tbl_buf)?;
+        let tables: Vec<SerializableTable> = deserialize(&tbl_buf)?;
         for tbl in tables {
             fs::create_dir_all(path.join(format!("tables/{}", tbl.name)))?;
             // md
@@ -1445,11 +1432,12 @@ impl OptiDBImpl {
             let mut md_w = File::create(md_path)?;
             let mut md = tbl.metadata.clone();
             md.log_id = 0;
+            md.version = version;
             write_metadata(&mut md_w, &mut md)?;
 
             // log
             let mut log_len_b = [0u8; mem::size_of::<u64>()];
-            reader.read(&mut log_len_b)?;
+            reader.read_exact(&mut log_len_b)?;
             let log_len = u64::from_le_bytes(log_len_b);
 
             let mut log_rdr = reader.take(log_len);
@@ -1475,7 +1463,7 @@ impl OptiDBImpl {
         }
 
         let mut footer = [0; 8];
-        reader.read(&mut footer)?;
+        reader.read_exact(&mut footer)?;
         if footer != BACKUP_MAGIC {
             return Err(StoreError::InvalidBackupMagicNumber);
         }
@@ -1513,15 +1501,14 @@ impl Drop for OptiDBImpl {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, thread};
+    use std::fs;
     use std::path::PathBuf;
-    use std::sync::Arc;
-    use std::time::Instant;
+
     use arrow2::array::Array;
     use arrow2::array::Int64Array;
     use arrow2::chunk::Chunk;
     use common::types::DType;
-    use common::types::TABLE_EVENTS;
+
 
     use crate::db::OptiDBImpl;
     use crate::db::Options;
@@ -1598,10 +1585,6 @@ mod tests {
         ])
             .unwrap();
 
-        let res = db
-            .get_cas("t1", vec![KeyValue::Int64(1), KeyValue::Int64(1)])
-            .unwrap();
-
         db.replace("t1", vec![
             NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
             NamedValue::new("f2".to_string(), Value::Int64(Some(1))),
@@ -1609,19 +1592,11 @@ mod tests {
         ])
             .unwrap();
 
-        let res = db
-            .get_cas("t1", vec![KeyValue::Int64(1), KeyValue::Int64(2)])
-            .unwrap();
-
         db.replace("t1", vec![
             NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
             NamedValue::new("f2".to_string(), Value::Int64(Some(2))),
             NamedValue::new("f3".to_string(), Value::Int64(Some(3))),
         ])
-            .unwrap();
-
-        let res = db
-            .get_cas("t1", vec![KeyValue::Int64(1), KeyValue::Int64(2)])
             .unwrap();
 
         let r = db.replace("t1", vec![
@@ -1936,11 +1911,11 @@ mod tests {
 
         let mut stream = db.scan("t1", vec![0, 1]).unwrap();
 
-        let exp = Chunk::new(vec![
+        let _exp = Chunk::new(vec![
             Box::new(Int64Array::from_vec(vec![1])) as Box<dyn Array>,
             Box::new(Int64Array::from_vec(vec![4])) as Box<dyn Array>,
         ]);
-        let res = stream.iter.next().unwrap().unwrap();
+        let _res = stream.iter.next().unwrap().unwrap();
     }
     #[test]
     fn test_schema_evolution() {
@@ -2043,7 +2018,6 @@ mod tests {
 
     #[test]
     fn test_backup_restore() {
-        let s = Instant::now();
         let path = PathBuf::from("/tmp").join("recovery");
         fs::remove_dir_all(&path).unwrap();
         let opts = Options {};
@@ -2098,10 +2072,10 @@ mod tests {
             ])
                 .unwrap();
         }
-        db.full_backup_local("/tmp/db.bak",|c|{}).unwrap();
+        db.full_backup_local("/tmp/db.bak", |_| {}).unwrap();
         db.full_restore_local("/tmp/db.bak").unwrap();
 
-        let mut scan = db.scan("0", vec![0]).unwrap();
+        let scan = db.scan("0", vec![0]).unwrap();
         let mut res = vec![];
         for i in scan.iter {
             res.push(i.unwrap());

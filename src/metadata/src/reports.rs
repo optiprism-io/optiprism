@@ -1,15 +1,12 @@
 use std::str::from_utf8;
 use std::str::pattern::Pattern;
 use std::sync::Arc;
-
-use bincode::deserialize;
-use bincode::serialize;
+use bincode::{deserialize, serialize};
 use chrono::DateTime;
 use chrono::Utc;
-use datafusion::parquet::data_type::AsBytes;
 use prost::Message;
 use common::types::OptionalProperty;
-use rocksdb::{Direction, IteratorMode, Transaction};
+use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
@@ -18,7 +15,7 @@ use common::funnel::Funnel;
 
 use crate::error::MetadataError;
 use crate::index::next_seq;
-use crate::{list_data, make_data_key, report, reports};
+use crate::{make_data_key, report};
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::metadata::{ListResponse, ResponseMetadata};
@@ -48,7 +45,7 @@ impl Reports {
             None => Err(MetadataError::NotFound(
                 format!("report {id} not found").to_string(),
             )),
-            Some(value) => Ok(deserialize(&value)?),
+            Some(value) => Ok(deserialize_report(&value)?),
         }
     }
 
@@ -74,7 +71,7 @@ impl Reports {
             typ: req.typ,
             query: req.query,
         };
-        let data = serialize(&report)?;
+        let data = serialize_report(&report)?;
         tx.put(
             make_data_value_key(project_ns(project_id, NAMESPACE).as_slice(), report.id),
             data,
@@ -103,7 +100,7 @@ impl Reports {
             if !from_utf8(&prefix).unwrap().is_prefix_of(from_utf8(&key).unwrap()) {
                 break;
             }
-            list.push(deserialize(&value)?);
+            list.push(deserialize_report(&value)?);
         }
 
         Ok(ListResponse {
@@ -137,7 +134,7 @@ impl Reports {
             report.query = query;
         }
 
-        let data = serialize(&report)?;
+        let data = serialize_report(&report)?;
         tx.put(
             make_data_value_key(project_ns(project_id, NAMESPACE).as_slice(), report.id),
             data,
@@ -232,7 +229,7 @@ fn serialize_report(r: &Report) -> Result<Vec<u8>> {
 
 // deserialize report from protobuf
 fn deserialize_report(data: &[u8]) -> Result<Report> {
-    let from = report::Report::decode(data.as_ref())?;
+    let from = report::Report::decode(data)?;
 
     Ok(Report {
         id: from.id,

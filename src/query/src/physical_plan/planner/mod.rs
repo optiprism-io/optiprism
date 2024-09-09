@@ -74,7 +74,6 @@ use crate::physical_plan::unpivot::UnpivotExec;
 fn build_filter(
     filter: Option<Expr>,
     dfschema: &DFSchema,
-    schema: &Schema,
     execution_props: &ExecutionProps,
 ) -> Result<Option<Arc<dyn PhysicalExpr>>> {
     let ret = filter

@@ -243,11 +243,11 @@ pub fn build_segment_expr(
             time_range,
             op,
             right,
-            time_window,
+            time_window:_
         } => {
             let dfschema = schema.clone().to_dfschema()?;
             let execution_props = ExecutionProps::new();
-            let filter = build_filter(Some(filter), &dfschema, schema, &execution_props)?.unwrap();
+            let filter = build_filter(Some(filter), &dfschema, &execution_props)?.unwrap();
             let ts_col = col(ts_col, &dfschema);
             let partition_col = col(partition_col, &dfschema);
             let time_range = build_time_range(time_range);
@@ -282,11 +282,11 @@ pub fn build_segment_expr(
             agg,
             op,
             right,
-            time_window,
+            time_window:_,
         } => {
             let dfschema = schema.clone().to_dfschema()?;
             let execution_props = ExecutionProps::new();
-            let filter = build_filter(Some(filter), &dfschema, schema, &execution_props)?.unwrap();
+            let filter = build_filter(Some(filter), &dfschema, &execution_props)?.unwrap();
             let ts_col = col(ts_col, &dfschema);
             let partition_col = col(partition_col, &dfschema);
             let predicate_col = col(predicate, &dfschema);

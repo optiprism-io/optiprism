@@ -9,7 +9,6 @@ use metadata::{MetadataProvider, properties, reports};
 use metadata::accounts::CreateAccountRequest;
 use metadata::custom_events::{CreateCustomEventRequest, Event};
 use metadata::dashboards::CreateDashboardRequest;
-use metadata::groups::{PropertyValue, Value};
 use metadata::organizations::CreateOrganizationRequest;
 use metadata::projects::CreateProjectRequest;
 use metadata::properties::CreatePropertyRequest;
@@ -54,7 +53,7 @@ fn test_list() {
         custom_properties: None,
     }).unwrap();
 
-    let proj1 = md.projects.create(CreateProjectRequest {
+    md.projects.create(CreateProjectRequest {
         created_by: 0,
         organization_id: 1,
         name: "p11sdfsdfsdfsdfsdfsdfsdfsdfsdddfsdfsdfsdfsdfdsfdsfsdf".to_string(),
@@ -63,7 +62,7 @@ fn test_list() {
         token: "t1".to_string(),
         session_duration_seconds: 0,
     }).unwrap();
-    let proj2 = md.projects.create(CreateProjectRequest {
+    md.projects.create(CreateProjectRequest {
         created_by: 0,
         organization_id: 2,
         name: "p2".to_string(),
@@ -73,7 +72,7 @@ fn test_list() {
         session_duration_seconds: 0,
     }).unwrap();
 
-    let eprop1 = md.event_properties.create(1, CreatePropertyRequest {
+    md.event_properties.create(1, CreatePropertyRequest {
         created_by: 0,
         tags: None,
         name: "e1".to_string(),
@@ -90,7 +89,7 @@ fn test_list() {
         dictionary_type: None,
     }).unwrap();
 
-    let eprop2 = md.event_properties.create(1, CreatePropertyRequest {
+    md.event_properties.create(1, CreatePropertyRequest {
         created_by: 0,
         tags: None,
         name: "e2".to_string(),
@@ -107,7 +106,7 @@ fn test_list() {
         dictionary_type: None,
     }).unwrap();
 
-    let gprop1 = md.group_properties[0].create(1, CreatePropertyRequest {
+    md.group_properties[0].create(1, CreatePropertyRequest {
         created_by: 0,
         tags: None,
         name: "g1".to_string(),
@@ -124,7 +123,7 @@ fn test_list() {
         dictionary_type: None,
     }).unwrap();
 
-    let acc1 = md.accounts.create(CreateAccountRequest {
+    md.accounts.create(CreateAccountRequest {
         created_by: 0,
         password_hash: "".to_string(),
         email: "e1".to_string(),
@@ -137,7 +136,7 @@ fn test_list() {
         teams: None,
     }).unwrap();
 
-    let acc2 = md.accounts.create(CreateAccountRequest {
+    md.accounts.create(CreateAccountRequest {
         created_by: 0,
         password_hash: "".to_string(),
         email: "e2".to_string(),
@@ -150,15 +149,15 @@ fn test_list() {
         teams: None,
     }).unwrap();
 
-    let org1 = md.organizations.create(CreateOrganizationRequest { created_by: 1, name: "org1".to_string() }).unwrap();
-    let org2 = md.organizations.create(CreateOrganizationRequest { created_by: 2, name: "org2".to_string() }).unwrap();
+    md.organizations.create(CreateOrganizationRequest { created_by: 1, name: "org1".to_string() }).unwrap();
+    md.organizations.create(CreateOrganizationRequest { created_by: 2, name: "org2".to_string() }).unwrap();
 
 
-    let g1 = md.groups.get_or_create_group(1, "1".to_string(), "1".to_string()).unwrap();
-    let g1 = md.groups.get_or_create_group(1, "2".to_string(), "1".to_string()).unwrap();
+    md.groups.get_or_create_group(1, "1".to_string(), "1".to_string()).unwrap();
+    md.groups.get_or_create_group(1, "2".to_string(), "1".to_string()).unwrap();
 
 
-    let dash1 = md.dashboards.create(1, CreateDashboardRequest {
+    md.dashboards.create(1, CreateDashboardRequest {
         created_by: 0,
         tags: None,
         name: "d1".to_string(),
@@ -166,7 +165,7 @@ fn test_list() {
         panels: vec![],
     }).unwrap();
 
-    let dash2 = md.dashboards.create(1, CreateDashboardRequest {
+    md.dashboards.create(1, CreateDashboardRequest {
         created_by: 0,
         tags: None,
         name: "d2".to_string(),
@@ -174,7 +173,7 @@ fn test_list() {
         panels: vec![],
     }).unwrap();
 
-    let report1 = md.reports.create(1, CreateReportRequest {
+   md.reports.create(1, CreateReportRequest {
         created_by: 0,
         tags: None,
         name: "r1".to_string(),
@@ -192,9 +191,9 @@ fn test_list() {
             breakdowns: None,
             segments: None,
         }),
-    });
+    }).unwrap();
 
-    let report2 = md.reports.create(1, CreateReportRequest {
+     md.reports.create(1, CreateReportRequest {
         created_by: 0,
         tags: None,
         name: "r233".to_string(),
@@ -212,7 +211,7 @@ fn test_list() {
             breakdowns: None,
             segments: None,
         }),
-    });
+    }).unwrap();
 
     md.custom_events.create(1, CreateCustomEventRequest {
         created_by: 0,
@@ -221,7 +220,7 @@ fn test_list() {
         description: None,
         status: Default::default(),
         is_system: false,
-        events: vec![Event{ event: EventRef::Regular(1), filters: None }],
+        events: vec![Event { event: EventRef::Regular(1), filters: None }],
     }).unwrap();
     md.custom_events.create(1, CreateCustomEventRequest {
         created_by: 0,
@@ -230,7 +229,7 @@ fn test_list() {
         description: None,
         status: Default::default(),
         is_system: false,
-        events: vec![Event{ event: EventRef::Regular(1), filters: None }],
+        events: vec![Event { event: EventRef::Regular(1), filters: None }],
     }).unwrap();
 
     let l = md.events.list(1).unwrap();

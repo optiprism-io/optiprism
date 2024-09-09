@@ -381,7 +381,7 @@ impl Value {
                 DataType::Timestamp(_tu, _tz) => {
                     let v: i64 = data.parse().or_else(|_v| {
                         NaiveDateTime::parse_from_str(data, "%Y-%m-%d %H:%M:%S")
-                            .map(|v| v.timestamp_millis())
+                            .map(|v| v.and_utc().timestamp_millis())
                     })?;
                     Value::Int64(Some(v))
                 }

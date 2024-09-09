@@ -1,19 +1,15 @@
 use std::marker::PhantomData;
 use std::sync::Mutex;
-
 use arrow::array::Array;
 use arrow::array::ArrayBuilder;
 use arrow::array::BooleanArray;
 use arrow::array::Int64Array;
 use arrow::array::Int64Builder;
 use arrow::array::TimestampMillisecondArray;
-use arrow::buffer::ScalarBuffer;
 use arrow::record_batch::RecordBatch;
-use chrono::Duration;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
-
 use crate::error::Result;
 use crate::physical_plan::expressions::check_filter;
 use crate::physical_plan::expressions::segmentation::boolean_op::ComparisonOp;
@@ -160,9 +156,6 @@ where
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
-
-    use arrow::array::Array;
-    use arrow::array::Int64Array;
     use datafusion::physical_expr::expressions::BinaryExpr;
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_expr::expressions::Literal;
@@ -170,7 +163,6 @@ mod tests {
     use datafusion_common::ScalarValue;
     use datafusion_expr::Operator;
     use storage::test_util::parse_markdown_tables;
-
     use crate::physical_plan::expressions::segmentation::boolean_op;
     use crate::physical_plan::expressions::segmentation::count::Count;
     use crate::physical_plan::expressions::segmentation::time_range::TimeRange;

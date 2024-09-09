@@ -3,31 +3,20 @@ use std::net::IpAddr;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::time::Instant;
-
 use axum::extract::ConnectInfo;
 use axum::extract::Path;
 use axum::http::StatusCode;
-use axum::middleware;
 use axum::routing;
 use axum::Extension;
 use axum::Router;
 use axum_macros::debug_handler;
 use chrono::DateTime;
 use chrono::Utc;
-use common::http::{measure_request_response, print_request_response};
-use common::types::{EVENT_CLICK, METRIC_INGESTER_TRACK_TIME_SECONDS, METRIC_INGESTER_TRACKED_TOTAL};
-use common::types::EVENT_PAGE;
-use common::types::EVENT_SCREEN;
-use metrics::counter;
-use metrics::histogram;
 use rust_decimal::Decimal;
 use serde::Deserialize;
-use tower::ServiceBuilder;
 use tower_http::cors::Any;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
-
 use crate::error::Result;
 use crate::executor::Executor;
 use crate::RequestContext;
@@ -168,7 +157,7 @@ impl App {
                 url: page.url.clone(),
             }),
             user_agent: req.context.user_agent.clone(),
-            ip: req.context.ip.unwrap_or_else(|| ctx.client_ip.clone()),
+            ip: req.context.ip.unwrap_or_else(|| ctx.client_ip),
             campaign: req.context.campaign.map(|cmp| crate::Campaign {
                 source: cmp.source.clone(),
                 medium: cmp.medium.clone(),
@@ -215,7 +204,7 @@ impl App {
                 url: page.url.clone(),
             }),
             user_agent: req.context.user_agent.clone(),
-            ip: req.context.ip.unwrap_or_else(|| ctx.client_ip.clone()),
+            ip: req.context.ip.unwrap_or_else(|| ctx.client_ip),
             campaign: req.context.campaign.map(|cmp| crate::Campaign {
                 // todo do we need to add utm to user profiles?
                 campaign: cmp.campaign.clone(),

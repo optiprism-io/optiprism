@@ -1,4 +1,3 @@
-use std::io::BufReader;
 use std::str::from_utf8;
 use std::str::pattern::Pattern;
 use std::sync::Arc;
@@ -22,7 +21,7 @@ use crate::index::get_index;
 use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
-use crate::{account, list_data, make_data_key};
+use crate::{account, make_data_key};
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
@@ -70,7 +69,7 @@ impl Accounts {
         let account = req.into_account(id, created_at);
 
         let data = serialize(&account)?;
-        tx.put(make_data_value_key(NAMESPACE, account.id), &data)?;
+        tx.put(make_data_value_key(NAMESPACE, account.id), data)?;
 
         insert_index(&tx, idx_keys.as_ref(), account.id)?;
         tx.commit()?;
@@ -124,7 +123,7 @@ impl Accounts {
         if let OptionalProperty::Some(email) = &req.email {
             idx_keys.push(index_email_key(email.as_str()));
             idx_prev_keys.push(index_email_key(prev_account.email.as_str()));
-            account.email = email.to_owned();
+            account.email.clone_from(email);
         }
 
         check_update_constraints(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref())?;
@@ -154,7 +153,7 @@ impl Accounts {
         }
 
         let data = serialize(&account)?;
-        tx.put(make_data_value_key(NAMESPACE, account.id), &data)?;
+        tx.put(make_data_value_key(NAMESPACE, account.id), data)?;
 
         update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), account_id)?;
         tx.commit()?;
@@ -172,39 +171,39 @@ impl Accounts {
     }
 
     pub(crate) fn add_organization_(&self, tx: &Transaction<TransactionDB>, member_id: u64, org_id: u64, role: OrganizationRole) -> Result<()> {
-        let mut account = self.get_by_id_(&tx, member_id)?;
+        let mut account = self.get_by_id_(tx, member_id)?;
         let orgs = account.organizations.get_or_insert(Vec::new());
         if orgs.iter().any(|(id, _)| *id == org_id) {
             return Err(MetadataError::AlreadyExists(format!("member {member_id} already in organization {org_id}").to_string()));
         }
         orgs.push((org_id, role));
         let data = serialize(&account)?;
-        tx.put(make_data_value_key(NAMESPACE, account.id), &data)?;
+        tx.put(make_data_value_key(NAMESPACE, account.id), data)?;
 
         Ok(())
     }
 
     pub(crate) fn remove_organization_(&self, tx: &Transaction<TransactionDB>, member_id: u64, org_id: u64) -> Result<()> {
-        let mut account = self.get_by_id_(&tx, member_id)?;
+        let mut account = self.get_by_id_(tx, member_id)?;
         let orgs = account.organizations.get_or_insert(Vec::new());
         if orgs.iter().all(|(id, _)| *id != org_id) {
             return Err(MetadataError::NotFound(format!("member {member_id} not found in organization {org_id}").to_string()));
         }
         orgs.retain(|(id, _)| *id != org_id);
         let data = serialize(&account)?;
-        tx.put(make_data_value_key(NAMESPACE, account.id), &data)?;
+        tx.put(make_data_value_key(NAMESPACE, account.id), data)?;
 
         Ok(())
     }
 
     pub(crate) fn change_organization_role_(&self, tx: &Transaction<TransactionDB>, member_id: u64, org_id: u64, role: OrganizationRole) -> Result<()> {
-        let mut account = self.get_by_id_(&tx, member_id)?;
+        let mut account = self.get_by_id_(tx, member_id)?;
         let orgs = account.organizations.get_or_insert(Vec::new());
         for (id, r) in orgs.iter_mut() {
             if *id == org_id {
                 *r = role;
                 let data = serialize(&account)?;
-                tx.put(make_data_value_key(NAMESPACE, account.id), &data)?;
+                tx.put(make_data_value_key(NAMESPACE, account.id), data)?;
                 return Ok(());
             }
         }
@@ -350,7 +349,7 @@ fn serialize(acc: &Account) -> Result<Vec<u8>> {
 }
 
 fn deserialize(data: &[u8]) -> Result<Account> {
-    let from = account::Account::decode(data.as_ref())?;
+    let from = account::Account::decode(data)?;
     let role = if let Some(role) = &from.role {
         match role {
             1 => Some(Role::Admin),

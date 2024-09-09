@@ -6,7 +6,6 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
-
 use arrow::array::ArrayRef;
 use arrow::array::UInt64Array;
 use arrow::datatypes::DataType;
@@ -16,7 +15,6 @@ use arrow::record_batch::RecordBatch;
 use axum::async_trait;
 use datafusion::execution::context::TaskContext;
 use datafusion::physical_expr::{EquivalenceProperties, PhysicalExpr};
-use datafusion::physical_plan::expressions::PhysicalSortExpr;
 use datafusion::physical_plan::hash_utils::create_hashes;
 use datafusion::physical_plan::metrics::BaselineMetrics;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
@@ -25,7 +23,6 @@ use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::physical_plan::ExecutionPlanProperties;
-use datafusion::physical_plan::Partitioning;
 use datafusion::physical_plan::PlanProperties;
 use datafusion::physical_plan::RecordBatchStream;
 use datafusion::physical_plan::SendableRecordBatchStream;
@@ -33,7 +30,6 @@ use datafusion::physical_plan::Statistics;
 use datafusion_common::{Result as DFResult, ToDFSchema};
 use futures::Stream;
 use futures::StreamExt;
-
 use crate::error::QueryError;
 use crate::Result;
 
@@ -54,7 +50,6 @@ impl PartitionExec {
         partition_col_name: String,
     ) -> Result<Self> {
         let field = Field::new(partition_col_name.clone(), DataType::UInt64, false);
-        let a = input.schema();
         let mut schema = (*input.schema()).clone();
 
         schema.fields = [vec![Arc::new(field)], schema.fields.to_vec()]

@@ -12,7 +12,6 @@ use std::thread;
 #[cfg(not(test))]
 use std::time::Duration;
 use std::time::Instant;
-use chrono::Utc;
 use log::trace;
 use metrics::counter;
 use metrics::histogram;
@@ -35,7 +34,7 @@ pub enum CompactorMessage {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-struct ToCompact {
+pub struct ToCompact {
     level: usize,
     part: usize,
 }
@@ -47,7 +46,7 @@ impl ToCompact {
 }
 
 #[derive(Debug, Clone)]
-struct CompactResult {
+pub struct CompactResult {
     l0_remove: Vec<usize>,
     levels: Vec<Level>,
     fs_ops: Vec<FsOp>,
@@ -218,7 +217,6 @@ pub(crate) fn determine_compaction(
                         to_compact.push(ToCompact::new(level_id, part.id));
                     }
                 }
-                break;
                 to_compact.push(ToCompact::new(level_id, part.id));
             }
         }
@@ -331,7 +329,6 @@ fn compact(
                     merge_max_page_size: opts.merge_max_page_size,
                     max_part_size_bytes: Some(max_part_size_bytes),
                 };
-                let ms = Instant::now();
                 let merge_result =
                     merge(rdrs, fs.clone(), out_path, out_part_id, tbl_name, level_id, merger_opts)?;
                 counter!(METRIC_STORE_MERGES_TOTAL,"table"=>tbl_name.to_string()).increment(1);
@@ -393,17 +390,6 @@ mod test {
 
     #[test]
     fn test_compaction() {
-        let l0 = Level {
-            part_id: 1,
-            parts: vec![Part {
-                id: 1,
-                size_bytes: 100,
-                values: 100,
-                min: vec![KeyValue::Int64(1)],
-                max: vec![KeyValue::Int64(10)],
-            }],
-        };
-
         let l1 = Level {
             part_id: 2,
             parts: vec![Part {

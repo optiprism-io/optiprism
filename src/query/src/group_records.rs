@@ -120,7 +120,7 @@ impl GroupRecordsProvider {
                         let a = col.as_any().downcast_ref::<Decimal128Array>().unwrap();
                         ScalarValue::Decimal128(Some(a.value(0)), DECIMAL_PRECISION, DECIMAL_SCALE)
                     }
-                    DataType::Timestamp(tu, v) => {
+                    DataType::Timestamp(_, _) => {
                         let a = col.as_any().downcast_ref::<TimestampMillisecondArray>().unwrap();
                         ScalarValue::TimestampMillisecond(Some(a.value(0)), None).to_owned()
                     }

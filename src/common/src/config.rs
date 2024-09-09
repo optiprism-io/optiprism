@@ -4,7 +4,6 @@ use std::str::FromStr;
 
 use chrono::Duration;
 use serde::Deserialize;
-use tracing::Level;
 use tracing::level_filters::LevelFilter;
 
 #[derive(Debug, Clone)]

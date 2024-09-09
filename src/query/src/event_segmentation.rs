@@ -467,7 +467,7 @@ impl LogicalPlanBuilder {
                 SegmentExpr::Count {
                     filter,
                     ts_col: Column::from_qualified_name(COLUMN_CREATED_AT),
-                    partition_col: col(group_col(group_id)).try_into_col()?,
+                    partition_col: col(group_col(group_id)).try_as_col().unwrap().to_owned(),
                     time_range: time.into(),
                     op: segment::Operator::GtEq,
                     right: 1,
@@ -496,7 +496,7 @@ impl LogicalPlanBuilder {
                     } => SegmentExpr::Count {
                         filter: event_expr,
                         ts_col: Column::from_qualified_name(COLUMN_CREATED_AT),
-                        partition_col: col(group_col(group_id)).try_into_col()?,
+                        partition_col: col(group_col(group_id)).try_as_col().unwrap().to_owned(),
                         time_range: time.into(),
                         op: operation.into(),
                         right: *value,
@@ -512,9 +512,9 @@ impl LogicalPlanBuilder {
                     } => SegmentExpr::Aggregate {
                         filter: event_expr,
                         predicate: property_col(&self.ctx, &self.metadata, property)?
-                            .try_into_col()?,
+                            .try_as_col().unwrap().clone(),
                         ts_col: Column::from_qualified_name(COLUMN_CREATED_AT),
-                        partition_col: col(group_col(group_id)).try_into_col()?,
+                        partition_col: col(group_col(group_id)).try_as_col().unwrap().clone(),
                         time_range: time.into(),
                         agg: aggregate.into(),
                         op: operation.into(),
@@ -863,8 +863,8 @@ impl LogicalPlanBuilder {
                 Query::CountEvents => AggregateExpr::Count {
                     filter: None,
                     groups: Some(group_expr.clone()),
-                    predicate: col(COLUMN_EVENT).try_into_col()?,
-                    partition_col: col(group_col(group_id)).try_into_col()?,
+                    predicate: col(COLUMN_EVENT).try_as_col().unwrap().clone(),
+                    partition_col: col(group_col(group_id)).try_as_col().unwrap().clone(),
                     distinct: false,
                 },
                 Query::CountUniqueGroups | Query::DailyActiveGroups => {
@@ -872,7 +872,7 @@ impl LogicalPlanBuilder {
                         filter: None,
                         outer_fn: partitioned_aggregate::AggregateFunction::Count,
                         groups: Some(group_expr.clone()),
-                        partition_col: col(group_col(group_id)).try_into_col()?,
+                        partition_col: col(group_col(group_id)).try_as_col().unwrap().clone(),
                         distinct: true,
                     }
                 }
@@ -882,7 +882,7 @@ impl LogicalPlanBuilder {
                     filter: None,
                     outer_fn: aggregate.into(),
                     groups: Some(group_expr.clone()),
-                    partition_col: col(group_col(group_id)).try_into_col()?,
+                    partition_col: col(group_col(group_id)).try_as_col().unwrap().clone(),
                     distinct: false,
                 },
                 Query::AggregatePropertyPerGroup {
@@ -893,9 +893,9 @@ impl LogicalPlanBuilder {
                     filter: None,
                     inner_fn: aggregate_per_group.into(),
                     outer_fn: aggregate.into(),
-                    predicate: property_col(&self.ctx, &self.metadata, property)?.try_into_col()?,
+                    predicate: property_col(&self.ctx, &self.metadata, property)?.try_as_col().unwrap().clone(),
                     groups: Some(group_expr.clone()),
-                    partition_col: col(group_col(group_id)).try_into_col()?,
+                    partition_col: col(group_col(group_id)).try_as_col().unwrap().clone(),
                 },
                 Query::AggregateProperty {
                     property,
@@ -903,8 +903,8 @@ impl LogicalPlanBuilder {
                 } => AggregateExpr::Aggregate {
                     filter: None,
                     groups: Some(group_expr.clone()),
-                    partition_col: col(group_col(group_id)).try_into_col()?,
-                    predicate: property_col(&self.ctx, &self.metadata, property)?.try_into_col()?,
+                    partition_col: col(group_col(group_id)).try_as_col().unwrap().clone(),
+                    predicate: property_col(&self.ctx, &self.metadata, property)?.try_as_col().unwrap().clone(),
                     agg: aggregate.into(),
                 },
                 Query::QueryFormula { .. } => unimplemented!(),

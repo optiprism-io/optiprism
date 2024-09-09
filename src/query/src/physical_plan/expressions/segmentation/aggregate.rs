@@ -308,8 +308,6 @@ agg!(Decimal128Array, Decimal128Array, i128);
 mod tests {
     use std::str::FromStr;
     use std::sync::Arc;
-
-    use arrow::array::Array;
     use arrow::array::Int64Array;
     use arrow::record_batch::RecordBatch;
     use datafusion::physical_expr::expressions::BinaryExpr;
@@ -321,7 +319,6 @@ mod tests {
     use rust_decimal::Decimal;
     use common::DECIMAL_SCALE;
     use storage::test_util::parse_markdown_tables;
-
     use crate::physical_plan::expressions::segmentation::aggregate::Aggregate;
     use crate::physical_plan::expressions::segmentation::aggregate::AggregateFunction;
     use crate::physical_plan::expressions::segmentation::boolean_op;

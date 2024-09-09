@@ -27,7 +27,6 @@ use std::fmt::Debug;
 use ::rocksdb::Transaction;
 use ::rocksdb::TransactionDB;
 use bincode::deserialize;
-use datafusion::parquet::data_type::AsBytes;
 pub use error::Result;
 use serde::de::DeserializeOwned;
 use crate::metadata::ListResponse;

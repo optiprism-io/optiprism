@@ -7,7 +7,6 @@ use std::sync::Arc;
 
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
-use arrow::datatypes::FieldRef;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 use datafusion_common::DFSchema;
@@ -115,7 +114,7 @@ impl UserDefinedLogicalNode for UnpivotNode {
 
     fn with_exprs_and_inputs(
         &self,
-        exprs: Vec<Expr>,
+        _exprs: Vec<Expr>,
         inputs: Vec<LogicalPlan>,
     ) -> datafusion_common::Result<Arc<dyn UserDefinedLogicalNode>> {
         Ok(Arc::new(

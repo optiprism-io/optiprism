@@ -23,7 +23,6 @@ use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 use error::Result;
 use get_size::GetSize;
-use parking_lot::Mutex;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -128,8 +127,14 @@ pub struct Stats {
 }
 
 #[derive(Debug)]
-pub(crate) struct Fs {
+pub struct Fs {
     count: Arc<RwLock<HashMap<String, usize>>>,
+}
+
+impl Default for Fs {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Fs {
@@ -171,7 +176,7 @@ impl Fs {
         Ok(fs::remove_file(path)?)
     }
 
-    pub fn try_rename<P: AsRef<Path>>(&self, from: P, to: P) -> Result<()> {
+    pub fn _try_rename<P: AsRef<Path>>(&self, from: P, to: P) -> Result<()> {
         if !self.is_opened(&from) && !self.is_opened(&to) {
             return Ok(fs::rename(from, to)?);
         }

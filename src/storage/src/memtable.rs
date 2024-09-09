@@ -4,13 +4,11 @@ use arrow2::array::MutableArray;
 use arrow2::array::MutableBooleanArray;
 use arrow2::array::MutablePrimitiveArray;
 use arrow2::array::MutableUtf8Array;
-use arrow2::array::PrimitiveArray;
 use arrow2::chunk::Chunk;
 use arrow2::compute::merge_sort::SortOptions;
 use arrow2::compute::sort::lexsort_to_indices;
 use arrow2::compute::sort::SortColumn;
 use arrow2::compute::take;
-use arrow2::compute::take::take;
 use arrow2::datatypes::DataType;
 use arrow2::datatypes::TimeUnit;
 use common::types::DType;
@@ -209,6 +207,7 @@ impl Memtable {
     pub(crate) fn push_value(&mut self, col: usize, val: Value) {
         self.cols[col].values.push(val);
     }
+    #[allow(dead_code)]
     pub(crate) fn push_row(&mut self, val: Vec<Value>) {
         for (idx, v) in val.iter().enumerate() {
             self.cols[idx].values.push(v.clone());
@@ -216,11 +215,10 @@ impl Memtable {
     }
 
     pub(crate) fn get(&self, key: &[KeyValue]) -> Option<Vec<Value>> {
-        let key = key.iter().map(|k| Value::from(k)).collect::<Vec<_>>();
-        let mut found = false;
+        let key = key.iter().map( Value::from).collect::<Vec<_>>();
         let mut last_idx = None;
         for idx in 0..self.len() {
-            found = true;
+            let mut found = true;
             for (kid, k) in key.iter().enumerate() {
                 if &self.cols[kid].values[idx] != k {
                     found = false;
@@ -277,8 +275,8 @@ pub(crate) struct Memtable {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-    use arrow2::array::{Array, Int64Array};
+    
+    use arrow2::array::Int64Array;
     use arrow2::chunk::Chunk;
     use common::types::DType;
 

@@ -589,7 +589,7 @@ impl<R: Read + Seek> CompressedPageIterator<R> {
     }
 
     pub fn next_page(&mut self, col_path: &ColumnPath) -> Result<Option<CompressedPage>> {
-        if self.chunk_buffer.get(col_path).is_none() {
+        if !self.chunk_buffer.contains_key(col_path) {
             return Ok(None);
         }
 

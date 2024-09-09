@@ -4,7 +4,6 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 use std::time::Instant;
 use async_trait::async_trait;
-use axum::body::HttpBody;
 use axum::extract::rejection::JsonRejection;
 use axum::extract::FromRequest;
 use axum::http;
@@ -12,16 +11,10 @@ use axum::http::{HeaderMap, Method};
 use axum::http::HeaderValue;
 use axum::http::StatusCode;
 use axum::middleware::Next;
-use axum::middleware::{self};
-use axum::response::Html;
 use axum::response::IntoResponse;
-use axum::routing::post;
-use axum::Router;
-use axum_core::body;
 use axum_core::body::Body;
 use axum_core::extract::Request;
 use axum_core::response::Response;
-use axum_core::BoxError;
 use bytes::Bytes;
 use http_body_util::BodyExt;
 use lazy_static::lazy_static;
@@ -31,11 +24,8 @@ use regex::Regex;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde::Serializer;
-use serde_json::Value;
 use thiserror::Error;
 
-use crate::error::CommonError;
-use crate::error::Result;
 use crate::types::{METRIC_HTTP_REQUEST_TIME_SECONDS, METRIC_HTTP_REQUESTS_TOTAL};
 
 #[derive(Error, Serialize, Debug, Clone)]

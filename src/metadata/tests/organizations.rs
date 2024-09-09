@@ -1,12 +1,6 @@
 use std::env::temp_dir;
 use std::sync::Arc;
 
-use common::types::OptionalProperty;
-use metadata::error::Result;
-use metadata::events::CreateEventRequest;
-use metadata::events::Events;
-use metadata::events::Status;
-use metadata::events::UpdateEventRequest;
 use uuid::Uuid;
 use common::rbac::OrganizationRole;
 use metadata::accounts::CreateAccountRequest;
@@ -34,7 +28,7 @@ fn test_organizations() {
         teams: None,
     };
 
-    let acc = accs.create(req).unwrap();
+     accs.create(req).unwrap();
     let req = CreateOrganizationRequest { created_by: 1, name: "org1".to_string() };
     let org = orgs.create(req).unwrap();
 

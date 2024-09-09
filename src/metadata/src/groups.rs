@@ -1,8 +1,6 @@
 use std::str::from_utf8;
 use std::str::pattern::Pattern;
 use std::sync::Arc;
-use byteorder::ByteOrder;
-use byteorder::LittleEndian;
 use prost::Message;
 use common::GROUPS_COUNT;
 use rocksdb::Transaction;
@@ -11,20 +9,14 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::error::MetadataError;
-use crate::events::Event;
 use crate::index::next_seq;
 use crate::index::next_zero_seq;
-use crate::{group, list_data};
-use crate::make_data_value_key;
+use crate::group;
 use crate::make_id_seq_key;
 use crate::metadata::ListResponse;
 use crate::metadata::ResponseMetadata;
 use crate::project_ns;
 use crate::Result;
-
-const NAMESPACE: &[u8] = b"groups";
-const REAL_NAMESPACE: &[u8] = b"groups/real";
-const ANONYMOUS_NAMESPACE: &[u8] = b"groups/anonymous";
 
 pub struct Groups {
     db: Arc<TransactionDB>,
@@ -43,11 +35,11 @@ impl Groups {
         anon_key: &str,
     ) -> Result<u64> {
         let key = format!("projects/{project_id}/groups/{group_id}/anonymous/keys/{anon_key}");
-        let res = match tx.get(key.as_bytes())? {
+        match tx.get(key.as_bytes())? {
             None => {
                 let group_key = format!("groups/{group_id}");
                 let id = next_seq(
-                    &tx,
+                    tx,
                     make_id_seq_key(project_ns(project_id, group_key.as_bytes()).as_slice()),
                 )?;
                 tx.put(key.as_bytes(), id.to_le_bytes())?;
@@ -55,8 +47,7 @@ impl Groups {
                 Ok(id)
             }
             Some(key) => Ok(u64::from_le_bytes(key.try_into().unwrap()))
-        };
-        res
+        }
     }
 
     // get anonymous id by key or create one
@@ -92,7 +83,7 @@ impl Groups {
                 let group_key = format!("groups/{group_id}");
                 let seq_key =
                     make_id_seq_key(project_ns(project_id, group_key.as_bytes()).as_slice());
-                tx.put(&seq_key, anonymous_id.to_string().as_bytes())?;
+                tx.put(seq_key, anonymous_id.to_string().as_bytes())?;
                 let group = GroupValues {
                     id: anonymous_id,
                     values,
@@ -117,22 +108,20 @@ impl Groups {
         values: Vec<PropertyValue>,
     ) -> Result<GroupValues> {
         let key = format!("projects/{project_id}/groups/{group_id}/real/keys/{key}");
-        let res = match tx.get(key.as_bytes())? {
+        match tx.get(key.as_bytes())? {
             None => {
                 let group_key = format!("groups/{group_id}");
                 let id = next_seq(
-                    &tx,
+                    tx,
                     make_id_seq_key(project_ns(project_id, group_key.as_bytes()).as_slice()),
                 )?;
                 let group = GroupValues { id, values };
                 tx.put(key.as_bytes(), serialize_group_values(&group)?)?;
 
-                group
+                Ok(group)
             }
-            Some(value) => deserialize_group_values(&value)?,
-        };
-
-        Ok(res)
+            Some(value) => Ok(deserialize_group_values(&value)?),
+        }
     }
 
     // get anonymous id by key or create one

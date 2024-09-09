@@ -15,13 +15,12 @@ use crate::index::delete_index;
 use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
-use crate::{list_data, project_ns, report, team};
+use crate::team;
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
 use crate::metadata::{ListResponse, ResponseMetadata};
 use crate::org_ns;
-use crate::reports::{Report, Type};
 use crate::Result;
 
 const NAMESPACE: &[u8] = b"teams";
@@ -92,7 +91,7 @@ impl Teams {
         let data = serialize(&team)?;
         tx.put(
             make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), team.id),
-            &data,
+            data,
         )?;
 
         insert_index(&tx, idx_keys.as_ref(), team.id)?;
@@ -145,7 +144,7 @@ impl Teams {
         if let OptionalProperty::Some(name) = &req.name {
             idx_keys.push(index_name_key(organization_id, name.as_str()));
             idx_prev_keys.push(index_name_key(organization_id, prev_team.name.as_str()));
-            team.name = name.to_owned();
+            team.name.clone_from(name);
         }
 
         check_update_constraints(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref())?;
@@ -156,7 +155,7 @@ impl Teams {
         let data = serialize(&team)?;
         tx.put(
             make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), team_id),
-            &data,
+            data,
         )?;
 
         update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), team_id)?;
@@ -219,7 +218,7 @@ fn serialize(team: &Team) -> Result<Vec<u8>> {
 }
 
 fn deserialize(data: &[u8]) -> Result<Team> {
-    let from = team::Team::decode(data.as_ref())?;
+    let from = team::Team::decode(data)?;
 
     Ok(Team {
         id: from.id,
@@ -236,7 +235,7 @@ fn deserialize(data: &[u8]) -> Result<Team> {
 mod tests {
     #[test]
     fn test_roundtrip() {
-        use chrono::{DateTime, Utc};
+        use chrono::DateTime;
         use crate::teams::{Team, deserialize, serialize};
 
         let team = Team {

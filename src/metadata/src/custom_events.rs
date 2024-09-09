@@ -6,7 +6,7 @@ use chrono::DateTime;
 use chrono::Utc;
 use datafusion_common::ScalarValue;
 use prost::Message;
-use common::query::{EventRef, Operator, PropertyRef, PropValueOperation};
+use common::query::{EventRef, PropertyRef, PropValueOperation};
 use common::query::PropValueFilter;
 use common::types::OptionalProperty;
 use rocksdb::Transaction;
@@ -14,7 +14,6 @@ use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
 use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
-use crate::bookmarks::Bookmark;
 use crate::error::MetadataError;
 use crate::events::Events;
 use crate::index::check_insert_constraints;
@@ -24,13 +23,12 @@ use crate::index::get_index;
 use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
-use crate::{bookmark, custom_event, list_data, make_data_key};
+use crate::{custom_event, make_data_key};
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
 use crate::metadata::{ListResponse, ResponseMetadata};
 use crate::project_ns;
-use crate::projects::Project;
 use crate::Result;
 
 const NAMESPACE: &[u8] = b"custom_events";
@@ -158,7 +156,7 @@ impl CustomEvents {
         let data = serialize(&event)?;
         self.db.put(
             make_data_value_key(project_ns(project_id, NAMESPACE).as_slice(), event.id),
-            &data,
+            data,
         )?;
 
         insert_index(&tx, idx_keys.as_ref(), event.id)?;
@@ -221,7 +219,7 @@ impl CustomEvents {
         if let OptionalProperty::Some(name) = &req.name {
             idx_keys.push(index_name_key(project_id, name.as_str()));
             idx_prev_keys.push(index_name_key(project_id, prev_event.name.as_str()));
-            event.name = name.to_owned();
+            event.name.clone_from(name);
         }
 
         check_update_constraints(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref())?;
@@ -255,7 +253,7 @@ impl CustomEvents {
         let data = serialize(&event)?;
         tx.put(
             make_data_value_key(project_ns(project_id, NAMESPACE).as_slice(), event.id),
-            &data,
+            data,
         )?;
 
         update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), event_id)?;
@@ -493,7 +491,7 @@ fn serialize(v: &CustomEvent) -> Result<Vec<u8>> {
         tags.to_vec()
     } else { vec![] };
     let ce = custom_event::CustomEvent {
-        id: v.id.clone(),
+        id: v.id,
         created_at: v.created_at.timestamp(),
         created_by: v.created_by,
         updated_at: v.updated_at.map(|t| t.timestamp()),
@@ -511,7 +509,7 @@ fn serialize(v: &CustomEvent) -> Result<Vec<u8>> {
 }
 
 fn deserialize(data: &[u8]) -> Result<CustomEvent> {
-    let from = custom_event::CustomEvent::decode(data.as_ref())?;
+    let from = custom_event::CustomEvent::decode(data)?;
 
     let mut events = vec![];
 
@@ -624,7 +622,7 @@ mod tests {
         let event = CustomEvent {
             id: 1,
             created_at: DateTime::from_timestamp(1, 0).unwrap(),
-            updated_at: Some(DateTime::from_timestamp(2, 0)).unwrap(),
+            updated_at: DateTime::from_timestamp(2, 0),
             created_by: 1,
             updated_by: Some(2),
             project_id: 3,

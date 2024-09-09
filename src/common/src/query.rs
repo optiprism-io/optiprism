@@ -91,7 +91,7 @@ impl From<AggregateFunction> for DFAggregateFunction {
             AggregateFunction::Min => DFAggregateFunction::Min,
             AggregateFunction::Max => DFAggregateFunction::Max,
             AggregateFunction::Avg => DFAggregateFunction::Avg,
-            _=>unimplemented!()
+            _ => unimplemented!()
         }
     }
 }
@@ -252,13 +252,11 @@ pub enum PropValueOperation {
 
 impl PropValueOperation {
     pub fn is_without_value(&self) -> bool {
-        match self {
+        matches!(self,
             PropValueOperation::True
             | PropValueOperation::False
             | PropValueOperation::Exists
-            | PropValueOperation::Empty => true,
-            _ => false,
-        }
+            | PropValueOperation::Empty)
     }
 }
 impl From<PropValueOperation> for Operator {

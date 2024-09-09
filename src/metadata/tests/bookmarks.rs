@@ -3,12 +3,8 @@ use std::sync::Arc;
 
 use common::query::QueryTime;
 use common::query::TimeIntervalUnit;
-use common::types::OptionalProperty;
 use metadata::error::Result;
-use metadata::reports::{CreateReportRequest, Query};
-use metadata::reports::Reports;
-use metadata::reports::Type;
-use metadata::reports::UpdateReportRequest;
+use metadata::reports::{Query};
 use uuid::Uuid;
 use metadata::bookmarks::{Bookmarks, CreateBookmarkRequest};
 use common::event_segmentation::{Analysis, ChartType, EventSegmentationRequest};

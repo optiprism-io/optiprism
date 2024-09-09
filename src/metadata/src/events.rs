@@ -11,7 +11,6 @@ use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
-use crate::dashboards::{Dashboard, Panel, Type};
 use crate::dictionaries::Dictionaries;
 use crate::error::MetadataError;
 use crate::index::check_insert_constraints;
@@ -21,7 +20,7 @@ use crate::index::get_index;
 use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
-use crate::{dashboard, event, list_data, make_data_key};
+use crate::{event, make_data_key};
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
@@ -174,7 +173,7 @@ impl Events {
         let data = serialize(&event)?;
         tx.put(
             make_data_value_key(project_ns(project_id, NAMESPACE).as_slice(), event.id),
-            &data,
+            data,
         )?;
 
         insert_index(tx, idx_keys.as_ref(), event.id)?;
@@ -196,7 +195,7 @@ impl Events {
             format!("event with name \"{}\" not found", name).as_str(),
         )?;
 
-        self.get_by_id_(&tx, project_id, id)
+        self.get_by_id_(tx, project_id, id)
     }
 
     pub fn create(&self, project_id: u64, req: CreateEventRequest) -> Result<Event> {
@@ -263,12 +262,12 @@ impl Events {
         if let OptionalProperty::Some(name) = &req.name {
             idx_keys.push(index_name_key(project_id, name.as_str()));
             idx_prev_keys.push(index_name_key(project_id, prev_event.name.as_str()));
-            event.name = name.to_owned();
+            event.name.clone_from(name);
         }
         if let OptionalProperty::Some(display_name) = &req.display_name {
             idx_keys.push(index_display_name_key(project_id, display_name.to_owned()));
             idx_prev_keys.push(index_display_name_key(project_id, prev_event.display_name));
-            event.display_name = display_name.to_owned();
+            event.display_name.clone_from(display_name);
         }
         check_update_constraints(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref())?;
         event.updated_at = Some(Utc::now());
@@ -298,7 +297,7 @@ impl Events {
         let data = serialize(&event)?;
         tx.put(
             make_data_value_key(project_ns(project_id, NAMESPACE).as_slice(), event.id),
-            &data,
+            data,
         )?;
 
         update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), event_id)?;
@@ -483,7 +482,7 @@ fn serialize(v: &Event) -> Result<Vec<u8>> {
 }
 
 fn deserialize(data: &[u8]) -> Result<Event> {
-    let from = event::Event::decode(data.as_ref())?;
+    let from = event::Event::decode(data)?;
 
     Ok(
         Event{
@@ -519,7 +518,7 @@ mod tests {
         let event = super::Event {
             id: 1,
             created_at: DateTime::from_timestamp(1, 0).unwrap(),
-            updated_at: Some(DateTime::from_timestamp(2, 0)).unwrap(),
+            updated_at: DateTime::from_timestamp(2, 0),
             created_by: 1,
             updated_by: Some(1),
             project_id: 1,

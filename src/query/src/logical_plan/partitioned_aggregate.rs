@@ -10,10 +10,6 @@ use arrow::datatypes::DataType::Decimal128;
 use arrow::datatypes::Field;
 use arrow::datatypes::FieldRef;
 use arrow::datatypes::Fields;
-use arrow::datatypes::TimeUnit;
-use chrono::DateTime;
-use chrono::Duration;
-use chrono::Utc;
 use common::query;
 use common::query::PartitionedAggregateFunction;
 use common::types::RESERVED_COLUMN_AGG;
@@ -438,7 +434,7 @@ impl UserDefinedLogicalNodeCore for PartitionedAggregatePartialNode {
 
     fn with_exprs_and_inputs(
         &self,
-        exprs: Vec<Expr>,
+        _exprs: Vec<Expr>,
         inputs: Vec<LogicalPlan>,
     ) -> datafusion_common::Result<Self> {
         Ok(PartitionedAggregatePartialNode::try_new(
@@ -550,7 +546,7 @@ impl UserDefinedLogicalNode
 
     fn with_exprs_and_inputs(
         &self,
-        exprs: Vec<Expr>,
+        _exprs: Vec<Expr>,
         inputs: Vec<LogicalPlan>,
     ) -> datafusion_common::Result<Arc<dyn UserDefinedLogicalNode>> {
         let node =

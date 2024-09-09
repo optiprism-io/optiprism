@@ -1,8 +1,6 @@
-use std::sync::Arc;
 
 use chrono::DateTime;
 use chrono::Utc;
-use datafusion_common::ScalarValue;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -12,12 +10,10 @@ use crate::query::Breakdown;
 use crate::query::EventRef;
 use crate::query::PartitionedAggregateFunction;
 use crate::query::PropValueFilter;
-use crate::query::PropValueOperation;
 use crate::query::PropertyRef;
 use crate::query::QueryTime;
 use crate::query::Segment;
 use crate::query::TimeIntervalUnit;
-use crate::scalar::ScalarValueRef;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum ChartType {

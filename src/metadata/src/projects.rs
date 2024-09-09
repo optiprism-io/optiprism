@@ -5,9 +5,6 @@ use chrono::DateTime;
 use chrono::Utc;
 use prost::Message;
 use common::types::OptionalProperty;
-use rand::distributions::Alphanumeric;
-use rand::distributions::DistString;
-use rand::thread_rng;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
@@ -22,7 +19,7 @@ use crate::index::get_index;
 use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
-use crate::{list_data, project};
+use crate::project;
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
@@ -87,7 +84,7 @@ impl Projects {
             events_count: 0,
         };
         let data = serialize(&project)?;
-        tx.put(make_data_value_key(NAMESPACE, project.id), &data)?;
+        tx.put(make_data_value_key(NAMESPACE, project.id), data)?;
 
         insert_index(&tx, idx_keys.as_ref(), project.id)?;
         tx.commit()?;
@@ -141,12 +138,12 @@ impl Projects {
         if let OptionalProperty::Some(name) = &req.name {
             idx_keys.push(index_name_key(name.as_str()));
             idx_prev_keys.push(index_name_key(prev_project.name.as_str()));
-            project.name = name.to_owned();
+            project.name.clone_from(name);
         }
         if let OptionalProperty::Some(token) = &req.token {
             idx_keys.push(index_token_key(token.as_str()));
             idx_prev_keys.push(index_token_key(prev_project.token.as_str()));
-            project.token = token.to_owned();
+            project.token.clone_from(token)
         }
         check_update_constraints(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref())?;
 
@@ -164,7 +161,7 @@ impl Projects {
         }
 
         let data = serialize(&project)?;
-        tx.put(make_data_value_key(NAMESPACE, project_id), &data)?;
+        tx.put(make_data_value_key(NAMESPACE, project_id), data)?;
 
         update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), project_id)?;
         tx.commit()?;
@@ -260,7 +257,7 @@ fn serialize(project: &Project) -> Result<Vec<u8>> {
 
 // deserialize project from protobuf
 fn deserialize(data: &[u8]) -> Result<Project> {
-    let from = project::Project::decode(data.as_ref())?;
+    let from = project::Project::decode(data)?;
 
     Ok(Project {
         id: from.id,

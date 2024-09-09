@@ -10,10 +10,9 @@ use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
-use crate::bookmarks::Bookmark;
 use crate::error::MetadataError;
 use crate::index::next_seq;
-use crate::{bookmark, dashboard, list_data, make_data_key};
+use crate::{dashboard, make_data_key};
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::metadata::{ListResponse, ResponseMetadata};
@@ -238,7 +237,7 @@ fn serialize(v: &Dashboard) -> Result<Vec<u8>> {
 }
 
 fn deserialize(data: &[u8]) -> Result<Dashboard> {
-    let from = dashboard::Dashboard::decode(data.as_ref())?;
+    let from = dashboard::Dashboard::decode(data)?;
 
     Ok(Dashboard {
         id: from.id,
@@ -266,7 +265,7 @@ fn deserialize(data: &[u8]) -> Result<Dashboard> {
 
 #[cfg(test)]
 mod tests {
-    use chrono::{DateTime, Utc};
+    use chrono::DateTime;
     use crate::dashboards::{Dashboard, deserialize, serialize};
 
     #[test]
@@ -274,7 +273,7 @@ mod tests {
         let d = Dashboard {
             id: 1,
             created_at: DateTime::from_timestamp(1, 0).unwrap(),
-            updated_at: Some(DateTime::from_timestamp(2, 0)).unwrap(),
+            updated_at: DateTime::from_timestamp(2, 0),
             created_by: 1,
             updated_by: Some(2),
             project_id: 3,

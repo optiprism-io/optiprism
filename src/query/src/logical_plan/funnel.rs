@@ -57,7 +57,7 @@ impl Funnel {
         if let Some(groups) = &self.groups {
             let group_fields = groups
                 .iter()
-                .map(|(expr, name, sort_field)| {
+                .map(|(expr, name, _sort_field)| {
                     let f = schema.field_with_name(None, name.as_str()).unwrap();
                     Field::new(name, f.data_type().to_owned(), f.is_nullable())
                 })
@@ -244,7 +244,7 @@ impl UserDefinedLogicalNode for FunnelNode {
 
     fn with_exprs_and_inputs(
         &self,
-        exprs: Vec<Expr>,
+        _exprs: Vec<Expr>,
         inputs: Vec<LogicalPlan>,
     ) -> datafusion_common::Result<Arc<dyn UserDefinedLogicalNode>> {
         Ok(Arc::new(

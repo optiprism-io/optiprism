@@ -1,16 +1,9 @@
 use std::any::Any;
-use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::hash::Hash;
 use std::hash::Hasher;
 use std::sync::Arc;
-
-use arrow::datatypes::DataType;
-use arrow::datatypes::Field;
-use common::DECIMAL_PRECISION;
-use common::DECIMAL_SCALE;
-use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;
 use datafusion_expr::Expr;
 use datafusion_expr::LogicalPlan;

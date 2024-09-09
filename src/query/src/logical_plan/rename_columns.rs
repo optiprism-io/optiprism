@@ -11,10 +11,7 @@ use datafusion_common::DFSchemaRef;
 use datafusion_expr::Expr;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::UserDefinedLogicalNode;
-use metadata::MetadataProvider;
-
 use crate::error::QueryError;
-use crate::logical_plan::merge::MergeNode;
 use crate::Result;
 
 #[derive(Hash, Eq, PartialEq)]
@@ -97,7 +94,7 @@ impl UserDefinedLogicalNode for RenameColumnsNode {
 
     fn with_exprs_and_inputs(
         &self,
-        exprs: Vec<Expr>,
+        _exprs: Vec<Expr>,
         inputs: Vec<LogicalPlan>,
     ) -> datafusion_common::Result<Arc<dyn UserDefinedLogicalNode>> {
         Ok(Arc::new(

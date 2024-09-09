@@ -1,10 +1,8 @@
-use std::any::Any;
 use std::collections::HashMap;
 use std::result;
 use std::sync::Arc;
-
 use ahash::RandomState;
-use arrow::array::{ArrayBuilder, TimestampMillisecondBuilder};
+use arrow::array::{ArrayBuilder};
 use arrow::array::ArrayRef;
 use arrow::array::Decimal128Builder;
 use arrow::array::Int64Array;
@@ -15,28 +13,22 @@ use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
 use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
-use arrow::datatypes::TimeUnit;
 use arrow::record_batch::RecordBatch;
-use arrow::util::pretty::print_batches;
 use arrow_row::SortField;
 use chrono::DateTime;
 use chrono::Duration;
 use chrono::DurationRound;
-use chrono::NaiveDateTime;
 use chrono::Utc;
 use common::query::date_trunc;
 use common::query::TimeIntervalUnit;
 use common::types::TIME_UNIT;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
-use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
-use datafusion::sql::sqlparser::keywords::Keyword::DESC;
 use datafusion_common::ScalarValue;
 use num_traits::{FromPrimitive, ToPrimitive};
 use rust_decimal::Decimal;
-
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::evaluate_batch;
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::Batch;
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::Count;
@@ -766,7 +758,7 @@ impl Funnel {
                 .collect::<Vec<_>>();
 
             // iterate over buckets and fill values to builders
-            for (ts, bucket) in buckets {
+            for (_ts, bucket) in buckets {
                 for (step_id, step) in bucket.steps.iter().enumerate() {
                     step_total[step_id].append_value(step.total);
                     let mut scr = if step_id == 0 {
