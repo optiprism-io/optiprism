@@ -293,6 +293,7 @@ pub struct Step {
     pub order: StepOrder,
 }
 
+#[allow(clippy::all)]
 impl Into<common::funnel::Step> for Step {
     fn into(self) -> common::funnel::Step {
         common::funnel::Step {
@@ -306,6 +307,7 @@ impl Into<common::funnel::Step> for Step {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<Step> for common::funnel::Step {
     fn into(self) -> Step {
         Step {
@@ -325,6 +327,7 @@ pub enum Order {
     Exact,
 }
 
+#[allow(clippy::all)]
 impl Into<common::funnel::Order> for Order {
     fn into(self) -> common::funnel::Order {
         match self {
@@ -334,6 +337,7 @@ impl Into<common::funnel::Order> for Order {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<Order> for common::funnel::Order {
     fn into(self) -> Order {
         match self {
@@ -350,6 +354,7 @@ pub struct Event {
     pub filters: Option<Vec<PropValueFilter>>,
 }
 
+#[allow(clippy::all)]
 impl Into<common::funnel::Event> for Event {
     fn into(self) -> common::funnel::Event {
         common::funnel::Event {
@@ -361,6 +366,7 @@ impl Into<common::funnel::Event> for Event {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<Event> for common::funnel::Event {
     fn into(self) -> Event {
         Event {
@@ -378,6 +384,7 @@ pub struct TimeWindow {
     pub unit: TimeIntervalUnitSession,
 }
 
+#[allow(clippy::all)]
 impl Into<common::funnel::TimeWindow> for TimeWindow {
     fn into(self) -> common::funnel::TimeWindow {
         common::funnel::TimeWindow {
@@ -387,6 +394,7 @@ impl Into<common::funnel::TimeWindow> for TimeWindow {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<TimeWindow> for common::funnel::TimeWindow {
     fn into(self) -> TimeWindow {
         TimeWindow {
@@ -406,6 +414,7 @@ pub enum TimeIntervalUnitSession {
     Session,
 }
 
+#[allow(clippy::all)]
 impl Into<common::funnel::TimeIntervalUnitSession> for TimeIntervalUnitSession {
     fn into(self) -> common::funnel::TimeIntervalUnitSession {
         match self {
@@ -421,6 +430,7 @@ impl Into<common::funnel::TimeIntervalUnitSession> for TimeIntervalUnitSession {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<TimeIntervalUnitSession> for common::funnel::TimeIntervalUnitSession {
     fn into(self) -> TimeIntervalUnitSession {
         match self {
@@ -442,6 +452,7 @@ pub enum StepOrder {
     Any { steps: Vec<(usize, usize)> }, // any of the steps
 }
 
+#[allow(clippy::all)]
 impl Into<common::funnel::StepOrder> for StepOrder {
     fn into(self) -> common::funnel::StepOrder {
         match self {
@@ -451,6 +462,7 @@ impl Into<common::funnel::StepOrder> for StepOrder {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<StepOrder> for common::funnel::StepOrder {
     fn into(self) -> StepOrder {
         match self {
@@ -466,6 +478,7 @@ pub enum ExcludeSteps {
     Between { from: usize, to: usize },
 }
 
+#[allow(clippy::all)]
 impl Into<common::funnel::ExcludeSteps> for ExcludeSteps {
     fn into(self) -> common::funnel::ExcludeSteps {
         match self {
@@ -477,6 +490,7 @@ impl Into<common::funnel::ExcludeSteps> for ExcludeSteps {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<ExcludeSteps> for common::funnel::ExcludeSteps {
     fn into(self) -> ExcludeSteps {
         match self {
@@ -496,6 +510,7 @@ pub enum Count {
     Session,
 }
 
+#[allow(clippy::all)]
 impl Into<common::funnel::Count> for Count {
     fn into(self) -> common::funnel::Count {
         match self {
@@ -506,6 +521,7 @@ impl Into<common::funnel::Count> for Count {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<Count> for common::funnel::Count {
     fn into(self) -> Count {
         match self {
@@ -525,6 +541,7 @@ pub struct Exclude {
     pub steps: Option<ExcludeSteps>,
 }
 
+#[allow(clippy::all)]
 impl Into<common::funnel::Exclude> for Exclude {
     fn into(self) -> common::funnel::Exclude {
         common::funnel::Exclude {
@@ -535,6 +552,7 @@ impl Into<common::funnel::Exclude> for Exclude {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<Exclude> for common::funnel::Exclude {
     fn into(self) -> Exclude {
         Exclude {
@@ -555,6 +573,7 @@ pub enum Filter {
     TimeToConvert { from: i64, to: i64 }, // conversion should be within certain window
 }
 
+#[allow(clippy::all)]
 impl Into<common::funnel::Filter> for Filter {
     fn into(self) -> common::funnel::Filter {
         match self {
@@ -567,6 +586,7 @@ impl Into<common::funnel::Filter> for Filter {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<Filter> for common::funnel::Filter {
     fn into(self) -> Filter {
         match self {
@@ -587,6 +607,7 @@ pub enum Touch {
     Step { step: usize },
 }
 
+#[allow(clippy::all)]
 impl Into<common::funnel::Touch> for Touch {
     fn into(self) -> common::funnel::Touch {
         match self {
@@ -597,6 +618,7 @@ impl Into<common::funnel::Touch> for Touch {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<Touch> for common::funnel::Touch {
     fn into(self) -> Touch {
         match self {
@@ -634,6 +656,7 @@ impl ChartType {
         }
     }
 }
+#[allow(clippy::all)]
 impl Into<common::funnel::ChartType> for ChartType {
     fn into(self) -> common::funnel::ChartType {
         match self {
@@ -657,6 +680,7 @@ impl Into<common::funnel::ChartType> for ChartType {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<ChartType> for common::funnel::ChartType {
     fn into(self) -> ChartType {
         match self {
@@ -680,6 +704,7 @@ impl Into<ChartType> for common::funnel::ChartType {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<common::funnel::Funnel> for FunnelRequest {
     fn into(self) -> common::funnel::Funnel {
         common::funnel::Funnel {
@@ -718,6 +743,7 @@ impl Into<common::funnel::Funnel> for FunnelRequest {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<FunnelRequest> for common::funnel::Funnel {
     fn into(self) -> FunnelRequest {
         FunnelRequest {

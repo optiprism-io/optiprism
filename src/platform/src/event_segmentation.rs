@@ -95,6 +95,7 @@ pub enum ChartType {
     Pie,
 }
 
+#[allow(clippy::all)]
 impl Into<common::event_segmentation::ChartType> for ChartType {
     fn into(self) -> common::event_segmentation::ChartType {
         match self {
@@ -105,6 +106,7 @@ impl Into<common::event_segmentation::ChartType> for ChartType {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<ChartType> for common::event_segmentation::ChartType {
     fn into(self) -> ChartType {
         match self {
@@ -127,6 +129,7 @@ pub enum Analysis {
     Cumulative,
 }
 
+#[allow(clippy::all)]
 impl Into<common::event_segmentation::Analysis> for Analysis {
     fn into(self) -> common::event_segmentation::Analysis {
         match self {
@@ -143,6 +146,7 @@ impl Into<common::event_segmentation::Analysis> for Analysis {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<Analysis> for common::event_segmentation::Analysis {
     fn into(self) -> Analysis {
         match self {
@@ -166,6 +170,7 @@ pub struct Compare {
     pub unit: TimeIntervalUnit,
 }
 
+#[allow(clippy::all)]
 impl Into<common::event_segmentation::Compare> for Compare {
     fn into(self) -> common::event_segmentation::Compare {
         common::event_segmentation::Compare {
@@ -175,6 +180,7 @@ impl Into<common::event_segmentation::Compare> for Compare {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<Compare> for common::event_segmentation::Compare {
     fn into(self) -> Compare {
         Compare {
@@ -196,6 +202,7 @@ pub enum QueryAggregatePerGroup {
     DistinctCount,
 }
 
+#[allow(clippy::all)]
 impl Into<common::event_segmentation::QueryAggregatePerGroup> for QueryAggregatePerGroup {
     fn into(self) -> common::event_segmentation::QueryAggregatePerGroup {
         match self {
@@ -227,6 +234,7 @@ pub enum QueryPerGroup {
     CountEvents,
 }
 
+#[allow(clippy::all)]
 impl Into<common::event_segmentation::QueryPerGroup> for QueryPerGroup {
     fn into(self) -> common::event_segmentation::QueryPerGroup {
         match self {
@@ -266,6 +274,7 @@ pub enum Query {
     },
 }
 
+#[allow(clippy::all)]
 impl Into<common::event_segmentation::Query> for &Query {
     fn into(self) -> common::event_segmentation::Query {
         match self {
@@ -306,6 +315,7 @@ impl Into<common::event_segmentation::Query> for &Query {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<Query> for common::event_segmentation::Query {
     fn into(self) -> Query {
         match self {
@@ -365,6 +375,7 @@ pub struct Event {
     pub queries: Vec<Query>,
 }
 
+#[allow(clippy::all)]
 impl Into<common::event_segmentation::Event> for &Event {
     fn into(self) -> common::event_segmentation::Event {
         common::event_segmentation::Event {
@@ -402,6 +413,7 @@ impl Into<common::event_segmentation::Event> for &Event {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<Event> for &common::event_segmentation::Event {
     fn into(self) -> Event {
         Event {
@@ -454,6 +466,7 @@ pub struct EventSegmentationRequest {
     pub segments: Option<Vec<Segment>>,
 }
 
+#[allow(clippy::all)]
 impl Into<common::event_segmentation::EventSegmentationRequest> for EventSegmentationRequest {
     fn into(self) -> common::event_segmentation::EventSegmentationRequest {
         common::event_segmentation::EventSegmentationRequest {
@@ -495,6 +508,7 @@ impl Into<common::event_segmentation::EventSegmentationRequest> for EventSegment
     }
 }
 
+#[allow(clippy::all)]
 impl Into<EventSegmentationRequest> for common::event_segmentation::EventSegmentationRequest {
     fn into(self) -> EventSegmentationRequest {
         EventSegmentationRequest {

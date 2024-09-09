@@ -113,6 +113,7 @@ pub struct Account {
 }
 
 
+#[allow(clippy::all)]
 impl Into<Account> for metadata::accounts::Account {
     fn into(self) -> Account {
         Account {
@@ -133,6 +134,7 @@ impl Into<Account> for metadata::accounts::Account {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<Profile> for Account {
     fn into(self) -> Profile {
         Profile {

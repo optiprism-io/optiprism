@@ -1,5 +1,5 @@
 mod accounts;
-mod auth;
+pub mod auth;
 mod custom_events;
 mod dashboards;
 mod event_records;

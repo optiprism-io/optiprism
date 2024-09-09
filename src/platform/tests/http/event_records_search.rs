@@ -2,12 +2,10 @@
 mod tests {
     use chrono::DateTime;
     use chrono::Utc;
-    use common::GROUP_USER_ID;
-    use platform::queries::event_records_search::EventRecordsSearchRequest;
-    use platform::queries::QueryTime;
     use reqwest::Client;
     use reqwest::StatusCode;
-
+    use platform::event_records::EventRecordsSearchRequest;
+    use platform::QueryTime;
     use crate::assert_response_status_eq;
     use crate::http::tests::create_admin_acc_and_login;
     use crate::http::tests::run_http_service;
@@ -30,7 +28,6 @@ mod tests {
             events: None,
             filters: None,
             properties: None,
-            group: GROUP_USER_ID,
         };
 
         let resp = cl

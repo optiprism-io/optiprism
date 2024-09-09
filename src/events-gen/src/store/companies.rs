@@ -1,6 +1,5 @@
 use std::io;
 
-use rand::prelude::*;
 use rand::rngs::ThreadRng;
 use rand::seq::SliceRandom;
 use serde::Deserialize;

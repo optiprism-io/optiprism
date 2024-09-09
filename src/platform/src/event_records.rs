@@ -89,12 +89,14 @@ pub struct EventRecord {
     pub properties: Vec<PropertyAndValue>,
 }
 
+#[allow(clippy::all)]
 impl Into<EventRecord> for query::event_records::EventRecord {
     fn into(self) -> EventRecord {
         EventRecord { properties: self.properties.iter().map(|p| p.to_owned().into()).collect::<Vec<_>>() }
     }
 }
 
+#[allow(clippy::all)]
 impl Into<PropertyAndValue> for query::PropertyAndValue {
     fn into(self) -> PropertyAndValue {
         let value = scalar_to_json(&self.value);
@@ -119,6 +121,7 @@ pub struct EventRecordsSearchRequest {
     pub properties: Option<Vec<PropertyRef>>,
 }
 
+#[allow(clippy::all)]
 impl Into<event_records::Event> for Event {
     fn into(self) -> event_records::Event {
         event_records::Event {
@@ -133,6 +136,7 @@ impl Into<event_records::Event> for Event {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<event_records::EventRecordsSearchRequest> for EventRecordsSearchRequest {
     fn into(self) -> event_records::EventRecordsSearchRequest {
         event_records::EventRecordsSearchRequest {

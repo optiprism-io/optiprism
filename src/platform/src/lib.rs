@@ -285,6 +285,7 @@ where
     pub meta: ResponseMetadata,
 }
 
+#[allow(clippy::all)]
 impl<A, B> Into<ListResponse<A>> for metadata::metadata::ListResponse<B>
 where
     A: Debug,
@@ -344,6 +345,7 @@ pub enum PropValueOperation {
     NotRegex,
 }
 
+#[allow(clippy::all)]
 impl Into<common::query::PropValueOperation> for PropValueOperation {
     fn into(self) -> common::query::PropValueOperation {
         match self {
@@ -365,6 +367,7 @@ impl Into<common::query::PropValueOperation> for PropValueOperation {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<PropValueOperation> for common::query::PropValueOperation {
     fn into(self) -> PropValueOperation {
         match self {
@@ -415,6 +418,7 @@ impl From<EventRef> for common::query::EventRef {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<EventRef> for common::query::EventRef {
     fn into(self) -> EventRef {
         match self {
@@ -457,6 +461,7 @@ pub enum SortablePropertyRef {
     },
 }
 
+#[allow(clippy::all)]
 impl Into<common::query::PropertyRef> for PropertyRef {
     fn into(self) -> common::query::PropertyRef {
         match self {
@@ -472,6 +477,7 @@ impl Into<common::query::PropertyRef> for PropertyRef {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<PropertyRef> for common::query::PropertyRef {
     fn into(self) -> PropertyRef {
         match self {
@@ -504,6 +510,7 @@ pub enum PropValueFilter {
     // Group { group_id: u64 },
 }
 
+#[allow(clippy::all)]
 impl Into<common::query::PropValueFilter> for PropValueFilter {
     fn into(self) -> common::query::PropValueFilter {
         match self {
@@ -529,6 +536,7 @@ impl Into<common::query::PropValueFilter> for PropValueFilter {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<PropValueFilter> for common::query::PropValueFilter {
     fn into(self) -> PropValueFilter {
         match self {
@@ -720,6 +728,7 @@ pub enum QueryTime {
     },
 }
 
+#[allow(clippy::all)]
 impl Into<common::query::QueryTime> for QueryTime {
     fn into(self) -> common::query::QueryTime {
         match self {
@@ -733,6 +742,7 @@ impl Into<common::query::QueryTime> for QueryTime {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<QueryTime> for common::query::QueryTime {
     fn into(self) -> QueryTime {
         match self {
@@ -756,6 +766,7 @@ pub enum TimeIntervalUnit {
     Year,
 }
 
+#[allow(clippy::all)]
 impl Into<common::query::TimeIntervalUnit> for TimeIntervalUnit {
     fn into(self) -> common::query::TimeIntervalUnit {
         match self {
@@ -768,6 +779,7 @@ impl Into<common::query::TimeIntervalUnit> for TimeIntervalUnit {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<TimeIntervalUnit> for common::query::TimeIntervalUnit {
     fn into(self) -> TimeIntervalUnit {
         match self {
@@ -789,6 +801,7 @@ pub enum Breakdown {
     },
 }
 
+#[allow(clippy::all)]
 impl Into<common::query::Breakdown> for Breakdown {
     fn into(self) -> common::query::Breakdown {
         match self {
@@ -799,6 +812,7 @@ impl Into<common::query::Breakdown> for Breakdown {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<Breakdown> for common::query::Breakdown {
     fn into(self) -> Breakdown {
         match self {
@@ -876,6 +890,7 @@ pub enum DidEventAggregate {
     },
 }
 
+#[allow(clippy::all)]
 impl Into<common::query::DidEventAggregate> for DidEventAggregate {
     fn into(self) -> common::query::DidEventAggregate {
         match self {
@@ -956,6 +971,7 @@ pub enum SegmentTime {
     },
 }
 
+#[allow(clippy::all)]
 impl Into<common::query::SegmentTime> for SegmentTime {
     fn into(self) -> common::query::SegmentTime {
         match self {
@@ -1013,6 +1029,7 @@ pub struct Segment {
     conditions: Vec<Vec<SegmentCondition>>,
 }
 
+#[allow(clippy::all)]
 impl Into<common::query::SegmentCondition> for SegmentCondition {
     fn into(self) -> common::query::SegmentCondition {
         match self {
@@ -1068,6 +1085,7 @@ impl Into<common::query::SegmentCondition> for SegmentCondition {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<SegmentTime> for common::query::SegmentTime {
     fn into(self) -> SegmentTime {
         match self {
@@ -1095,6 +1113,7 @@ impl Into<SegmentTime> for common::query::SegmentTime {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<DidEventAggregate> for common::query::DidEventAggregate {
     fn into(self) -> DidEventAggregate {
         match self {
@@ -1153,6 +1172,7 @@ impl Into<DidEventAggregate> for common::query::DidEventAggregate {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<SegmentCondition> for common::query::SegmentCondition {
     fn into(self) -> SegmentCondition {
         match self {
@@ -1216,6 +1236,7 @@ impl Into<SegmentCondition> for common::query::SegmentCondition {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<common::query::Segment> for Segment {
     fn into(self) -> common::query::Segment {
         common::query::Segment {
@@ -1229,6 +1250,7 @@ impl Into<common::query::Segment> for Segment {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<Segment> for common::query::Segment {
     fn into(self) -> Segment {
         Segment {
@@ -1242,6 +1264,7 @@ impl Into<Segment> for common::query::Segment {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<common::query::AggregateFunction> for &AggregateFunction {
     fn into(self) -> common::query::AggregateFunction {
         match self {
@@ -1255,6 +1278,7 @@ impl Into<common::query::AggregateFunction> for &AggregateFunction {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<AggregateFunction> for common::query::AggregateFunction {
     fn into(self) -> AggregateFunction {
         match self {
@@ -1283,6 +1307,7 @@ pub enum PartitionedAggregateFunction {
     // Percentile99,
 }
 
+#[allow(clippy::all)]
 impl Into<common::query::PartitionedAggregateFunction> for &PartitionedAggregateFunction {
     fn into(self) -> common::query::PartitionedAggregateFunction {
         match self {
@@ -1297,6 +1322,7 @@ impl Into<common::query::PartitionedAggregateFunction> for &PartitionedAggregate
     }
 }
 
+#[allow(clippy::all)]
 impl Into<PartitionedAggregateFunction> for common::query::PartitionedAggregateFunction {
     fn into(self) -> PartitionedAggregateFunction {
         match self {
@@ -1326,6 +1352,7 @@ pub enum QueryAggregate {
     Percentile99,
 }
 
+#[allow(clippy::all)]
 impl Into<common::query::QueryAggregate> for QueryAggregate {
     fn into(self) -> common::query::QueryAggregate {
         match self {
@@ -1353,6 +1380,7 @@ impl Into<common::query::QueryAggregate> for QueryAggregate {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<QueryAggregate> for common::query::QueryAggregate {
     fn into(self) -> QueryAggregate {
         match self {

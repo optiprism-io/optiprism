@@ -69,7 +69,7 @@ impl SettingsProvider {
 
         self.prov.save(&settings)?;
 
-        Ok(self.get(ctx).await?)
+        self.get(ctx).await
     }
 
     pub async fn get(&self, ctx: Context) -> Result<Settings> {

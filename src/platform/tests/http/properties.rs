@@ -111,9 +111,7 @@ async fn test_event_properties() {
             dictionary_type: prop1
                 .dictionary_type
                 .clone()
-                .map(|v| v.try_into())
-                .transpose()
-                .unwrap(),
+                .map(|v| v.into()),
             is_system: false,
             hidden: false,
         };

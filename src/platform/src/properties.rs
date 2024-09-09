@@ -177,6 +177,7 @@ pub enum DictionaryType {
     Int64,
 }
 
+#[allow(clippy::all)]
 impl Into<properties::DictionaryType> for DictionaryType {
     fn into(self) -> properties::DictionaryType {
         match self {
@@ -188,6 +189,7 @@ impl Into<properties::DictionaryType> for DictionaryType {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<DictionaryType> for properties::DictionaryType {
     fn into(self) -> DictionaryType {
         match self {
@@ -227,6 +229,7 @@ pub struct Property {
     pub dictionary_type: Option<DictionaryType>,
 }
 
+#[allow(clippy::all)]
 impl Into<metadata::properties::Property> for Property {
     fn into(self) -> metadata::properties::Property {
         let typ = if let Some(gid) = self.group_id {
@@ -262,6 +265,7 @@ impl Into<metadata::properties::Property> for Property {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<Property> for metadata::properties::Property {
     fn into(self) -> Property {
         let (typ, group_id) = match self.typ {
@@ -326,6 +330,7 @@ pub struct ListPropertyValuesRequest {
     pub filter: Option<Filter>,
 }
 
+#[allow(clippy::all)]
 impl Into<query::properties::PropertyValues> for ListPropertyValuesRequest {
     fn into(self) -> PropertyValues {
         query::properties::PropertyValues {
@@ -336,6 +341,7 @@ impl Into<query::properties::PropertyValues> for ListPropertyValuesRequest {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<query::properties::Filter> for Filter {
     fn into(self) -> query::properties::Filter {
         query::properties::Filter {
@@ -347,6 +353,7 @@ impl Into<query::properties::Filter> for Filter {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<ListResponse<Value>> for ArrayRef {
     fn into(self) -> ListResponse<Value> {
         ListResponse {

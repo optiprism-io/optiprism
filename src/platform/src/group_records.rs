@@ -86,6 +86,7 @@ impl GroupRecords {
 }
 
 
+#[allow(clippy::all)]
 impl Into<group_records::GroupRecordsSearchRequest> for GroupRecordsSearchRequest {
     fn into(self) -> group_records::GroupRecordsSearchRequest {
         group_records::GroupRecordsSearchRequest {
@@ -114,15 +115,12 @@ pub(crate) fn validate_search_request(
     project_id: u64,
     req: &GroupRecordsSearchRequest,
 ) -> Result<()> {
-    match &req.time {
-        None => {}
-        Some(time) => if let QueryTime::Between { from, to }= time {
-                if from > to {
-                    return Err(PlatformError::BadRequest(
-                        "from time must be less than to time".to_string(),
-                    ));
-                }
-        }
+    if let  Some(QueryTime::Between { from, to })=&req.time {
+            if from > to {
+                return Err(PlatformError::BadRequest(
+                    "from time must be less than to time".to_string(),
+                ));
+            }
     }
 
     match &req.filters {
@@ -198,6 +196,7 @@ pub struct GroupRecord {
     pub properties: Vec<PropertyAndValue>,
 }
 
+#[allow(clippy::all)]
 impl Into<GroupRecord> for query::group_records::GroupRecord {
     fn into(self) -> GroupRecord {
         GroupRecord { properties: self.properties.iter().map(|p| p.to_owned().into()).collect::<Vec<_>>() }

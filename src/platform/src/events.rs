@@ -204,6 +204,7 @@ pub struct Event {
     pub user_properties: Option<Vec<u64>>,
 }
 
+#[allow(clippy::all)]
 impl Into<metadata::events::Event> for Event {
     fn into(self) -> metadata::events::Event {
         metadata::events::Event {
@@ -226,6 +227,7 @@ impl Into<metadata::events::Event> for Event {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<Event> for metadata::events::Event {
     fn into(self) -> Event {
         Event {

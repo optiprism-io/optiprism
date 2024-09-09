@@ -1,4 +1,3 @@
-use axum::http;
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::types::OptionalProperty;
@@ -9,14 +8,13 @@ use platform::auth::provider::TokensResponse;
 use platform::auth::provider::UpdateEmailRequest;
 use platform::auth::provider::UpdateNameRequest;
 use platform::auth::provider::UpdatePasswordRequest;
-use platform::http::auth::RefreshTokenRequest;
 use reqwest::header::HeaderMap;
 use reqwest::header::HeaderValue;
 use reqwest::header::AUTHORIZATION;
 use reqwest::header::CONTENT_TYPE;
 use reqwest::Client;
 use reqwest::StatusCode;
-
+use platform::http::auth::RefreshTokenRequest;
 use crate::assert_response_json_eq;
 use crate::assert_response_status_eq;
 use crate::http::tests::create_admin_acc_and_login;
@@ -63,6 +61,8 @@ async fn test_auth() {
                 password_hash: OptionalProperty::None,
                 email: OptionalProperty::None,
                 name: OptionalProperty::None,
+                force_update_password: Default::default(),
+                force_update_email: Default::default(),
                 role: OptionalProperty::None,
                 organizations: OptionalProperty::Some(Some(vec![(1, OrganizationRole::Member)])),
                 projects: OptionalProperty::Some(Some(vec![(1, ProjectRole::Reader)])),
