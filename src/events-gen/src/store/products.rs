@@ -1,9 +1,7 @@
 use std::collections::HashSet;
 use std::io;
-use std::sync::Arc;
 
 use common::DECIMAL_SCALE;
-use metadata::dictionaries::Dictionaries;
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
 use rand::rngs::ThreadRng;

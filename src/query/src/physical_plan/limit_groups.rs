@@ -1,7 +1,6 @@
 use std::any::Any;
 use std::collections::HashMap;
 use std::fmt;
-use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Context;
@@ -223,7 +222,7 @@ mod tests {
     use datafusion::prelude::SessionContext;
     use storage::test_util::parse_markdown_tables;
 
-    use crate::physical_plan::aggregate_and_sort_columns::AggregateAndSortColumnsExec;
+    
     use crate::physical_plan::limit_groups::LimitGroupsExec;
 
     #[tokio::test]

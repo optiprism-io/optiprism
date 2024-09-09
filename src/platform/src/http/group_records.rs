@@ -6,12 +6,9 @@ use axum::routing;
 use axum::Router;
 use common::http::Json;
 
-use crate::{group_records, QueryParams, QueryResponse};
+use crate::{QueryParams, QueryResponse};
 use crate::group_records::{GroupRecord, GroupRecords, GroupRecordsSearchRequest};
-use crate::group_records::UpdateGroupRecordRequest;
 use crate::Context;
-use crate::event_records::{EventRecords, EventRecordsSearchRequest};
-use crate::ListResponse;
 use crate::Result;
 
 async fn get_by_id(

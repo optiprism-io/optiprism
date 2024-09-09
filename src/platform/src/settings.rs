@@ -77,7 +77,7 @@ impl SettingsProvider {
             Permission::ManageServer,
         )?;
 
-        let mut settings = self.prov.load()?;
+        let settings = self.prov.load()?;
 
         let ret = Settings {
             auth_access_token: None,

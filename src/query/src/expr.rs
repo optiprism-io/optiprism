@@ -2,8 +2,6 @@ use std::sync::Arc;
 
 use arrow::datatypes::DataType;
 use chrono::DateTime;
-use chrono::NaiveDateTime;
-use chrono::TimeZone;
 use chrono::Utc;
 use common::query::Breakdown;
 use common::query::EventRef;

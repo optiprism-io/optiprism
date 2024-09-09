@@ -4,10 +4,9 @@ use axum::extract::{Extension, Query};
 use axum::extract::Path;
 use axum::routing;
 use axum::Router;
-use serde::{Deserialize, Serialize};
 use common::http::Json;
 
-use crate::{event_records, PropertyRef, QueryParams, QueryResponse};
+use crate::{QueryParams, QueryResponse};
 use crate::event_records::{EventRecord, EventRecords, EventRecordsSearchRequest};
 use crate::Context;
 use crate::Result;

@@ -3,7 +3,6 @@ use std::sync::Mutex;
 
 use arrow::array::Int64Array;
 use arrow::array::Int64Builder;
-use arrow::buffer::ScalarBuffer;
 use arrow::record_batch::RecordBatch;
 
 use crate::error::Result;
@@ -112,7 +111,7 @@ mod tests {
     use std::sync::Arc;
 
     use arrow::array::Int64Array;
-    use arrow::buffer::ScalarBuffer;
+    
     use arrow::datatypes::DataType;
     use arrow::datatypes::Field;
     use arrow::datatypes::Schema;
@@ -176,7 +175,7 @@ mod tests {
 
         let schema = Schema::new(vec![Field::new("sdf", DataType::Boolean, true)]);
         let rb = &RecordBatch::new_empty(Arc::new(schema));
-        let res = and
+        let _res = and
             .evaluate(rb)
             .unwrap();
         dbg!(and.finalize().unwrap());

@@ -56,14 +56,12 @@ use datafusion::physical_plan::display::DisplayableExecutionPlan;
 use datafusion::prelude::{SessionConfig, SessionContext};
 use datafusion_common::ScalarValue;
 use datafusion_expr::{Extension, LogicalPlan};
-use common::query::{Breakdown, PropertyRef, PropValueFilter, PropValueOperation, Segment, SegmentCondition};
+use common::query::{PropertyRef, PropValueFilter, PropValueOperation, Segment, SegmentCondition};
 pub use context::Context;
 pub use error::Result;
-use indexmap::IndexMap;
 use tracing::debug;
-use common::event_segmentation::{EventSegmentationRequest, Query};
 use common::group_col;
-use common::types::{COLUMN_CREATED_AT, COLUMN_EVENT, COLUMN_PROJECT_ID, DType, TABLE_EVENTS};
+use common::types::{COLUMN_CREATED_AT, COLUMN_PROJECT_ID, DType, TABLE_EVENTS};
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
 use storage::db::OptiDBImpl;
@@ -615,10 +613,7 @@ pub mod test_util {
         let prop = match req.typ {
             Type::Event => md.event_properties.create(proj_id, req)?,
             Type::Group(gid) => md.group_properties[gid].create(proj_id, req)?,
-            _ => unimplemented!(),
         };
-
-        // db.add_field("events", prop.column_name().as_str(), prop.data_type.clone().into(), prop.nullable)?;
 
         Ok(prop)
     }

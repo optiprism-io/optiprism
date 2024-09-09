@@ -1,6 +1,5 @@
 use std::any::Any;
 use std::fmt;
-use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Context;
@@ -35,21 +34,6 @@ use futures::Stream;
 use futures::StreamExt;
 use crate::error::QueryError;
 use crate::Result;
-
-#[derive(Debug, Clone)]
-enum Agg {
-    Sum(i128),
-    Avg(i128, i128),
-}
-
-impl Agg {
-    pub fn result(&self) -> i128 {
-        match self {
-            Agg::Sum(sum) => *sum,
-            Agg::Avg(sum, count) => *sum / *count,
-        }
-    }
-}
 
 #[derive(Debug)]
 pub struct AggregateAndSortColumnsExec {

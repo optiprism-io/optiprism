@@ -1,21 +1,11 @@
 use std::io;
 use std::net::IpAddr;
-use std::sync::Arc;
 
-use common::types::EVENT_PROPERTY_CITY;
-use common::types::EVENT_PROPERTY_COUNTRY;
-use common::types::EVENT_PROPERTY_DEVICE_MODEL;
-use common::types::EVENT_PROPERTY_OS;
-use common::types::EVENT_PROPERTY_OS_FAMILY;
-use common::types::EVENT_PROPERTY_OS_VERSION_MAJOR;
 use fake::faker::internet::en::FreeEmail;
 use fake::faker::internet::en::IP;
 use fake::faker::name::en::FirstName;
 use fake::faker::name::en::LastName;
-use fake::faker::name::en::Name;
-use fake::locales::EN;
 use fake::Fake;
-use metadata::dictionaries::Dictionaries;
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
 use rand::rngs::ThreadRng;

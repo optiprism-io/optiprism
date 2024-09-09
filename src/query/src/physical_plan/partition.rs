@@ -1,7 +1,6 @@
 use std::any::Any;
 use std::fmt;
 use std::fmt::Debug;
-use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Context;
@@ -27,7 +26,7 @@ use datafusion::physical_plan::PlanProperties;
 use datafusion::physical_plan::RecordBatchStream;
 use datafusion::physical_plan::SendableRecordBatchStream;
 use datafusion::physical_plan::Statistics;
-use datafusion_common::{Result as DFResult, ToDFSchema};
+use datafusion_common::Result as DFResult;
 use futures::Stream;
 use futures::StreamExt;
 use crate::error::QueryError;

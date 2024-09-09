@@ -1,7 +1,5 @@
 use std::sync::Arc;
 
-use chrono::DateTime;
-use chrono::Utc;
 use common::rbac::ProjectPermission;
 use metadata::groups::Groups as MDGroups;
 use serde::Deserialize;

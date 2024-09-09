@@ -8,7 +8,6 @@ use std::sync::Arc;
 
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
-use arrow::datatypes::FieldRef;
 use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;
 use datafusion_expr::Expr;

@@ -15,7 +15,6 @@ mod funnel;
 mod bookmarks;
 mod backups;
 mod settings;
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::middleware;
@@ -24,14 +23,12 @@ use axum::Router;
 use common::config::Config;
 use common::http::{measure_request_response, print_request_response};
 use metadata::MetadataProvider;
-use tower::ServiceBuilder;
 use tower_cookies::CookieManagerLayer;
 use tower_http::cors::Any;
 use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
 use tower_http::services::ServeFile;
 use tower_http::trace::TraceLayer;
-use tracing::info;
 
 use crate::properties::Properties;
 use crate::PlatformProvider;

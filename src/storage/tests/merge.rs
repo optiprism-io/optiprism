@@ -69,7 +69,7 @@ fn roundtrip(tc: TestCase) -> anyhow::Result<()> {
 
     let readers = out_streams_chunks
         .into_iter()
-        .map(|(chunks)| {
+        .map(|chunks| {
             let mut w = Cursor::new(vec![]);
             create_parquet_from_chunks(chunks, fields.clone(), &mut w, tc.gen_data_page_limit)
                 .unwrap();
@@ -160,7 +160,7 @@ fn profile(tc: TestCase, case_id: usize, step: ProfileStep) {
             let start = Instant::now();
             out_streams_chunks
                 .into_iter()
-                .for_each(|( chunks)| {
+                .for_each(|chunks| {
                     let mut w = Cursor::new(vec![]);
                     create_parquet_from_chunks(
                         chunks,

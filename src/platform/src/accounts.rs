@@ -15,7 +15,6 @@ use crate::auth::password::make_password_hash;
 use crate::auth::provider::Profile;
 use crate::Context;
 use crate::ListResponse;
-use crate::PlatformError;
 use crate::Result;
 
 pub struct Accounts {

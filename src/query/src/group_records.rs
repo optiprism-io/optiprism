@@ -1,18 +1,14 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
-use arrow::array::{Array, BooleanArray, Decimal128Array, Int16Array, Int32Array, Int64Array, Int8Array, StringArray, TimestampMillisecondArray, TimestampMillisecondBuilder};
+use arrow::array::{Array, BooleanArray, Decimal128Array, Int16Array, Int32Array, Int64Array, Int8Array, StringArray, TimestampMillisecondArray};
 use arrow::datatypes::DataType;
-use arrow::util::pretty::print_batches;
 
-use common::query::EventRef;
 use common::query::PropValueFilter;
 use common::query::PropertyRef;
 use common::query::QueryTime;
-use common::types::{COLUMN_CREATED_AT, COLUMN_EVENT, GROUP_COLUMN_CREATED_AT, GROUP_COLUMN_ID, GROUP_COLUMN_PROJECT_ID, GROUP_COLUMN_VERSION, METRIC_QUERY_EXECUTION_TIME_SECONDS, METRIC_QUERY_QUERIES_TOTAL, SortDirection, TABLE_EVENTS};
-use common::types::COLUMN_EVENT_ID;
-use common::types::COLUMN_PROJECT_ID;
-use common::{DECIMAL_PRECISION, DECIMAL_SCALE, group_col, GROUPS_COUNT};
+use common::types::{GROUP_COLUMN_CREATED_AT, GROUP_COLUMN_ID, GROUP_COLUMN_PROJECT_ID, GROUP_COLUMN_VERSION, METRIC_QUERY_EXECUTION_TIME_SECONDS, METRIC_QUERY_QUERIES_TOTAL, SortDirection};
+use common::{DECIMAL_PRECISION, DECIMAL_SCALE, group_col};
 use datafusion_common::Column;
 use datafusion_common::ScalarValue;
 use datafusion_expr::and;
@@ -37,12 +33,11 @@ use storage::db::OptiDBImpl;
 
 use crate::error::QueryError;
 use crate::error::Result;
-use crate::expr::{event_expression, property_col};
+use crate::expr::property_col;
 use crate::expr::event_filters_expression;
 use crate::expr::time_expression;
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::logical_plan::expr::multi_and;
-use crate::logical_plan::expr::multi_or;
 use crate::logical_plan::rename_columns::RenameColumnsNode;
 use crate::{col_name, ColumnType, Context, ColumnarDataTable, decode_filter_single_dictionary, execute, initial_plan, PropertyAndValue, fix_filter};
 
@@ -346,7 +341,7 @@ pub fn build_get_by_id_plan(
 ) -> Result<LogicalPlan> {
     let id_prop = metadata.group_properties[group_id].get_by_name(ctx.project_id, GROUP_COLUMN_ID)?;
     let id_int = metadata.dictionaries.get_key(ctx.project_id, group_col(group_id).as_str(), id_prop.column_name().as_str(), id.as_str())?;
-    let mut filter_exprs = vec![
+    let filter_exprs = vec![
         binary_expr(
             col(GROUP_COLUMN_PROJECT_ID),
             Operator::Eq,

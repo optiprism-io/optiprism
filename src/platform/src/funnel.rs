@@ -54,7 +54,7 @@ impl Funnel {
             cur_time,
         };
 
-        let mut qdata = self.prov.funnel(ctx, lreq).await?;
+        let qdata = self.prov.funnel(ctx, lreq).await?;
 
         let groups = qdata
             .groups;

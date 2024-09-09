@@ -10,7 +10,6 @@ use serde::Serialize;
 
 use crate::Context;
 use crate::ListResponse;
-use crate::PlatformError;
 use crate::Result;
 
 pub struct Events {

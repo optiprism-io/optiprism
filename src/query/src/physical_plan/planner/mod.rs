@@ -1,7 +1,6 @@
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use arrow::datatypes::Schema;
 use async_trait::async_trait;
 use datafusion::execution::context::SessionState;
 use datafusion::physical_expr::create_physical_expr;

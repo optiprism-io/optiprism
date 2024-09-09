@@ -139,7 +139,7 @@ impl Stream for RenameColumnRowsStream {
                                         match self
                                             .rename
                                             .iter()
-                                            .find(|(from, to)| name == from.as_str())
+                                            .find(|(from, _to)| name == from.as_str())
                                         {
                                             None => b.append_option(v),
                                             Some((_, to)) => b.append_value(to.to_owned()),

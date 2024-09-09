@@ -117,25 +117,6 @@ macro_rules! combine_results {
         $res_batches.push(result);
     }};
 }
-struct SegmentedAggregatePartialOptimizationRule {}
-
-impl PhysicalOptimizerRule for SegmentedAggregatePartialOptimizationRule {
-    fn optimize(
-        &self,
-        _plan: Arc<dyn ExecutionPlan>,
-        _config: &ConfigOptions,
-    ) -> DFResult<Arc<dyn ExecutionPlan>> {
-        todo!()
-    }
-
-    fn name(&self) -> &str {
-        "PartitionedAggregatePartial"
-    }
-
-    fn schema_check(&self) -> bool {
-        todo!()
-    }
-}
 
 type NamedAggExpr = (Arc<Mutex<Box<dyn PartitionedAggregateExpr>>>, String);
 

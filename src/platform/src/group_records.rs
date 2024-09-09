@@ -1,23 +1,19 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use axum::async_trait;
 use chrono::{DateTime, Utc};
-use common::query::Segment;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
 use common::rbac::ProjectPermission;
 use metadata::MetadataProvider;
 use query::context::Format;
-use query::{event_records, group_records};
+use query::group_records;
 use query::group_records::fix_search_request;
 use query::group_records::GroupRecordsProvider;
 
-use crate::{Context, PlatformError, PropertyAndValue, PropertyRef, PropValueFilter, QueryParams, QueryResponse, QueryResponseFormat, QueryTime, SortablePropertyRef, validate_event, validate_event_filter};
-use crate::event_records::{EventRecord, EventRecordsSearchRequest};
+use crate::{Context, PlatformError, PropertyAndValue, PropertyRef, QueryParams, QueryResponse, QueryResponseFormat, QueryTime, SortablePropertyRef, validate_event_filter};
 use crate::EventGroupedFilters;
-use crate::ListResponse;
 use crate::Result;
 
 pub struct GroupRecords {
@@ -42,7 +38,7 @@ impl GroupRecords {
             cur_time: Utc::now(),
         };
 
-        let mut data = self.prov.get_by_id(ctx, group_id, id).await?;
+        let data = self.prov.get_by_id(ctx, group_id, id).await?;
 
         Ok(data.into())
     }

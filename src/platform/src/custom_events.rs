@@ -11,7 +11,6 @@ use serde::Serialize;
 use crate::Context;
 use crate::EventRef;
 use crate::ListResponse;
-use crate::PlatformError;
 use crate::PropValueFilter;
 use crate::Result;
 

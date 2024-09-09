@@ -12,7 +12,7 @@ fn test_sessions() {
     let db = Arc::new(metadata::rocksdb::new(path).unwrap());
     let sessions = Box::new(Sessions::new(db.clone()));
 
-    sessions.check_for_deletion(1, |s| {
+    sessions.check_for_deletion(1, |_s| {
         Ok(true)
     }).unwrap();
 

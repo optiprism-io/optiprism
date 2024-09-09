@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::result;
 use std::sync::Arc;
 use ahash::RandomState;
-use arrow::array::{ArrayBuilder};
 use arrow::array::ArrayRef;
 use arrow::array::Decimal128Builder;
 use arrow::array::Int64Array;
@@ -17,14 +16,12 @@ use arrow::record_batch::RecordBatch;
 use arrow_row::SortField;
 use chrono::DateTime;
 use chrono::Duration;
-use chrono::DurationRound;
 use chrono::Utc;
 use common::query::date_trunc;
 use common::query::TimeIntervalUnit;
 use common::types::TIME_UNIT;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
-use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
 use datafusion_common::ScalarValue;
 use num_traits::{FromPrimitive, ToPrimitive};
@@ -38,7 +35,6 @@ use crate::physical_plan::expressions::aggregate::partitioned::funnel::Filter;
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::StepOrder;
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::Touch;
 use crate::physical_plan::expressions::aggregate::Groups;
-use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
 use crate::StaticArray;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -150,9 +146,6 @@ impl Group {
                     to_check = true;
                     break;
                 }
-            } else {
-                // check anyway
-                to_check = true;
             }
 
             if to_check && excl.exists.value(cur_row_id) {
@@ -241,17 +234,15 @@ struct Dbg {
 }
 
 impl Dbg {
+    #[allow(dead_code)]
     fn new() -> Self {
         Self {
             inner: Vec::with_capacity(100),
         }
     }
+    #[allow(dead_code)]
     fn push(&mut self, batch_id: usize, row_id: usize, step: DebugStep) {
         self.inner.push((batch_id, row_id, step));
-    }
-
-    fn inner(&self) -> &Vec<(usize, usize, DebugStep)> {
-        &self.inner
     }
 }
 
@@ -945,8 +936,6 @@ mod tests {
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::Filter;
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::StepOrder;
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::StepOrder::Any;
-    use crate::physical_plan::expressions::aggregate::partitioned::funnel::Touch;
-    use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
 
     #[derive(Debug, Clone)]
     struct TestCase {
@@ -1688,7 +1677,7 @@ asd
             }
             let res = f.finalize()?;
             let rb = RecordBatch::try_new(f.schema(), res).unwrap();
-            let res = pretty_format_batches(&[rb]).unwrap();
+            let _res = pretty_format_batches(&[rb]).unwrap();
             assert_eq!(f.debug.inner, case.exp_debug);
             // assert_eq!(format!("{}", res), case.exp);
             println!("PASSED");

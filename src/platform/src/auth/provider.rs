@@ -1,11 +1,8 @@
 use std::sync::Arc;
 
-use chrono::Duration;
 use common::config::Config;
 use common::types::OptionalProperty;
 use common::ADMIN_ID;
-use common::GROUP_USER_ID;
-use metadata::accounts::Accounts;
 use metadata::accounts::CreateAccountRequest;
 use metadata::accounts::UpdateAccountRequest;
 use metadata::error::MetadataError;
@@ -23,10 +20,8 @@ use super::token::parse_refresh_token;
 use crate::accounts::Account;
 use crate::error::AuthError;
 use crate::Context;
-use crate::organizations::Organizations;
 use crate::PlatformError;
 use crate::Result;
-use metadata::organizations::Organizations as MDOrganizations;
 
 #[derive(Clone)]
 pub struct Auth {

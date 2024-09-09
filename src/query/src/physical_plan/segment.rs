@@ -5,7 +5,6 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
-use arrow::array::Array;
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
 use arrow::datatypes::Schema;
@@ -15,7 +14,7 @@ use axum::async_trait;
 use datafusion::execution::context::TaskContext;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::Partitioning::UnknownPartitioning;
-use datafusion::physical_expr::{EquivalenceProperties, PhysicalExpr};
+use datafusion::physical_expr::{EquivalenceProperties};
 use datafusion::physical_plan::metrics::BaselineMetrics;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
 use datafusion::physical_plan::metrics::MetricsSet;
@@ -120,7 +119,6 @@ impl ExecutionPlan for SegmentExec {
         let _baseline_metrics = BaselineMetrics::new(&self.metrics, partition);
         Ok(Box::pin(SegmentStream {
             stream,
-            partition_col: self.partition_col.clone(),
             expr: self.expr.clone(),
             schema: self.schema.clone(),
             is_ended: false,
@@ -139,7 +137,6 @@ impl ExecutionPlan for SegmentExec {
 
 struct SegmentStream {
     stream: SendableRecordBatchStream,
-    partition_col: Column,
     expr: Arc<dyn SegmentExpr>,
     schema: SchemaRef,
     is_ended: bool,

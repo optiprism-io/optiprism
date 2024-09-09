@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use axum::extract::Extension;
 use axum::extract::Path;
 use axum::routing;

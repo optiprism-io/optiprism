@@ -1,21 +1,16 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
-use axum::async_trait;
 use chrono::{DateTime, Utc};
-use datafusion_common::ScalarValue;
 use serde::Deserialize;
 use serde::Serialize;
-use serde_json::{json, Value};
 use common::rbac::ProjectPermission;
 use metadata::MetadataProvider;
 use query::context::Format;
-use query::{event_records, fix_filter};
+use query::event_records;
 use query::event_records::fix_search_request;
 use crate::{Context, PlatformError, PropertyAndValue, PropertyRef, QueryParams, QueryResponse, QueryResponseFormat, QueryTime, scalar_to_json, validate_event, validate_event_filter};
 use crate::EventGroupedFilters;
 use crate::EventRef;
-use crate::ListResponse;
 use crate::PropValueFilter;
 use crate::Result;
 
@@ -41,7 +36,7 @@ impl EventRecords {
             cur_time: Utc::now(),
         };
 
-        let mut data = self.prov.get_by_id(ctx, id).await?;
+        let data = self.prov.get_by_id(ctx, id).await?;
 
         Ok(data.into())
     }

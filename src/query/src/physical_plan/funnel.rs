@@ -11,7 +11,6 @@ use std::task::Poll;
 use ahash::RandomState;
 use arrow::array::Array;
 use arrow::array::ArrayRef;
-use arrow::array::Datum;
 use arrow::array::Decimal128Array;
 use arrow::array::Decimal128Builder;
 use arrow::array::Int64Array;
@@ -37,14 +36,13 @@ use datafusion::execution::SendableRecordBatchStream;
 use datafusion::execution::TaskContext;
 use datafusion::physical_expr::expressions::col;
 use datafusion::physical_expr::expressions::Column;
-use datafusion::physical_expr::{AggregateExpr, EquivalenceProperties};
+use datafusion::physical_expr::{EquivalenceProperties};
 use datafusion::physical_expr::Distribution;
 use datafusion::physical_expr::Partitioning::UnknownPartitioning;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
 use datafusion::physical_expr::PhysicalSortRequirement;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
-use datafusion::physical_plan::AggregateExpr as DFAggregateExpr;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
@@ -89,7 +87,7 @@ enum StaticArrayBuilder {
 
 fn aggregate(
     batch: &RecordBatch,
-    mut groups: Vec<(PhysicalExprRef, SortField)>,
+    groups: Vec<(PhysicalExprRef, SortField)>,
     aggs: Vec<(PhysicalExprRef, Agg)>,
 ) -> Result<Vec<ArrayRef>> {
     let is_groups = !groups.is_empty();
@@ -124,7 +122,7 @@ fn aggregate(
 
     let arrs = aggs
         .iter()
-        .map(|(arr, agg)| {
+        .map(|(arr, _agg)| {
             arr.evaluate(batch)
                 .unwrap()
                 .into_array(batch.num_rows())
@@ -132,7 +130,7 @@ fn aggregate(
         })
         .collect::<Vec<_>>();
     // avoid downcast on each row
-    let mut static_arrs = arrs
+    let static_arrs = arrs
         .iter()
         .map(|arr| match arr.data_type() {
             DataType::Int64 => StaticArray::Int64(
@@ -206,7 +204,7 @@ fn aggregate(
         }
     }
 
-    let cols = if let Some(rows) = &mut rows {
+    let cols = if rows.is_some() {
         let mut rows: Vec<Row> = Vec::with_capacity(groups_hash.len());
         for (row, group) in groups_hash.iter_mut() {
             rows.push(row.row());
@@ -279,7 +277,7 @@ pub struct FunnelPartialExec {
     expr: Arc<Mutex<Funnel>>,
     schema: SchemaRef,
     cache: PlanProperties,
-    metrics: ExecutionPlanMetricsSet,
+    _metrics: ExecutionPlanMetricsSet,
 }
 
 impl FunnelPartialExec {
@@ -301,7 +299,7 @@ impl FunnelPartialExec {
             expr: funnel,
             schema,
             cache,
-            metrics: ExecutionPlanMetricsSet::new(),
+            _metrics: ExecutionPlanMetricsSet::new(),
         })
     }
 
@@ -316,7 +314,7 @@ impl FunnelPartialExec {
 }
 
 impl DisplayAs for FunnelPartialExec {
-    fn fmt_as(&self, t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "FunnelExec")
     }
 }
@@ -563,7 +561,7 @@ pub struct FunnelFinalExec {
     groups: usize,
     steps: usize,
     cache: PlanProperties,
-    metrics: ExecutionPlanMetricsSet,
+    _metrics: ExecutionPlanMetricsSet,
 }
 
 impl FunnelFinalExec {
@@ -574,7 +572,7 @@ impl FunnelFinalExec {
             groups,
             steps,
             cache,
-            metrics: ExecutionPlanMetricsSet::new(),
+            _metrics: ExecutionPlanMetricsSet::new(),
         })
     }
 
@@ -590,7 +588,7 @@ impl FunnelFinalExec {
 }
 
 impl DisplayAs for FunnelFinalExec {
-    fn fmt_as(&self, t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "FunnelFinalExec")
     }
 }
@@ -737,11 +735,11 @@ impl RecordBatchStream for FinalFunnelStream {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    
     use std::sync::Arc;
     use std::sync::Mutex;
 
-    use arrow::array::RecordBatch;
+    
     use arrow::datatypes::DataType;
     use arrow::util::pretty::print_batches;
     use arrow_row::SortField;
@@ -848,7 +846,7 @@ mod tests {
             time_interval: Some(TimeIntervalUnit::Hour),
             groups: Some(groups),
         };
-        let mut f = Funnel::try_new(opts).unwrap();
+        let f = Funnel::try_new(opts).unwrap();
 
         let exec = FunnelPartialExec::try_new(
             Arc::new(input),

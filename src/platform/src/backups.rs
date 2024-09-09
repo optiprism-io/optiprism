@@ -1,16 +1,13 @@
-use std::fs::Metadata;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use chrono::DateTime;
 use chrono::Utc;
-use common::rbac::{Permission, ProjectPermission};
-use common::types::OptionalProperty;
-use metadata::backups::{Backups as MDBackups, CreateBackupRequest};
+use common::rbac::Permission;
+use metadata::backups::CreateBackupRequest;
 use serde::Deserialize;
 use serde::Serialize;
 use metadata::{backups, MetadataProvider};
-use metadata::settings::BackupProvider;
 use crate::{Context, PlatformError};
 use crate::ListResponse;
 use crate::Result;

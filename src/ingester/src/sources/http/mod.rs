@@ -157,7 +157,7 @@ impl App {
                 url: page.url.clone(),
             }),
             user_agent: req.context.user_agent.clone(),
-            ip: req.context.ip.unwrap_or_else(|| ctx.client_ip),
+            ip: req.context.ip.unwrap_or(ctx.client_ip),
             campaign: req.context.campaign.map(|cmp| crate::Campaign {
                 source: cmp.source.clone(),
                 medium: cmp.medium.clone(),
@@ -204,7 +204,7 @@ impl App {
                 url: page.url.clone(),
             }),
             user_agent: req.context.user_agent.clone(),
-            ip: req.context.ip.unwrap_or_else(|| ctx.client_ip),
+            ip: req.context.ip.unwrap_or(ctx.client_ip),
             campaign: req.context.campaign.map(|cmp| crate::Campaign {
                 // todo do we need to add utm to user profiles?
                 campaign: cmp.campaign.clone(),

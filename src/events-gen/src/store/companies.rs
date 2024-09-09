@@ -1,19 +1,11 @@
-use std::collections::HashSet;
 use std::io;
-use std::sync::Arc;
 
-use common::DECIMAL_SCALE;
-use metadata::dictionaries::Dictionaries;
-use rand::distributions::WeightedIndex;
 use rand::prelude::*;
 use rand::rngs::ThreadRng;
 use rand::seq::SliceRandom;
-use rust_decimal::Decimal;
 use serde::Deserialize;
 
-use crate::error::EventsGenError;
 use crate::error::Result;
-use crate::probability;
 
 #[derive(Debug, Clone, Deserialize, Default)]
 #[serde(default)]
@@ -40,7 +32,7 @@ impl CompanyProvider {
         let mut rdr = csv::Reader::from_reader(rdr);
         let mut companies = Vec::with_capacity(1000);
         for res in rdr.deserialize() {
-            let mut rec: CSVCompany = res?;
+            let rec: CSVCompany = res?;
 
             let company = Company {
                 name: rec.name,

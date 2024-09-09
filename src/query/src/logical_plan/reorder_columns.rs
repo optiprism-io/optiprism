@@ -11,7 +11,6 @@ use datafusion_expr::LogicalPlan;
 use datafusion_expr::UserDefinedLogicalNode;
 
 use crate::error::QueryError;
-use crate::logical_plan::merge::MergeNode;
 use crate::Result;
 
 #[derive(Hash, Eq, PartialEq)]
@@ -32,7 +31,7 @@ impl ReorderColumnsNode {
             ));
         }
         for field in schema.fields().iter() {
-            if !columns.contains(&field.name()) {
+            if !columns.contains(field.name()) {
                 reordered_cols.push(field.clone());
             }
         }

@@ -43,7 +43,6 @@ use arrow::array::UInt16Array;
 use arrow::array::UInt32Array;
 use arrow::array::UInt64Array;
 use arrow::array::UInt8Array;
-use arrow::datatypes::TimeUnit;
 use chrono::{DateTime, Utc};
 use common::config::Config;
 use common::types::DType;

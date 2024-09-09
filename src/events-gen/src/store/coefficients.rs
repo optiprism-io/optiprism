@@ -1,4 +1,3 @@
-use enum_iterator::Sequence;
 use strum_macros::Display;
 
 use crate::store::intention::Intention;

@@ -1,4 +1,3 @@
-use std::num::ParseIntError;
 use std::sync::Arc;
 
 use axum::extract::{Extension, Path};
@@ -16,7 +15,6 @@ use time::OffsetDateTime;
 use tower_cookies::Cookie;
 use tower_cookies::Cookies;
 
-use crate::accounts::Account;
 use crate::auth::provider::{LogInRequest, SetEmailRequest};
 use crate::auth::provider::Profile;
 use crate::auth::provider::SetPasswordRequest;

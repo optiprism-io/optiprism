@@ -30,7 +30,7 @@ impl RenameColumnsNode {
             .iter()
             .map(|v| {
                 for col in columns.iter() {
-                    if v.name().to_string() == col.0 {
+                    if *v.name() == col.0 {
                         return FieldRef::new(Field::new(
                             &col.1,
                             v.data_type().clone(),
@@ -38,7 +38,7 @@ impl RenameColumnsNode {
                         ));
                     }
                 }
-                return v.to_owned();
+                v.to_owned()
             })
             .collect::<Vec<_>>();
 

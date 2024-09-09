@@ -117,7 +117,7 @@ impl ExecutionPlan for RenameColumnsExec {
         let stream = self.input.execute(partition, context)?;
         Ok(Box::pin(RenameColumnsStream {
             stream,
-            columns: self.columns.clone(),
+            _columns: self.columns.clone(),
             schema: self.schema.clone(),
         }))
     }
@@ -125,7 +125,7 @@ impl ExecutionPlan for RenameColumnsExec {
 
 struct RenameColumnsStream {
     stream: SendableRecordBatchStream,
-    columns: Vec<(String, String)>,
+    _columns: Vec<(String, String)>,
     schema: SchemaRef,
 }
 

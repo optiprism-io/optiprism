@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
-use arrow::array::{Array, BooleanArray, Decimal128Array, Int16Array, Int32Array, Int64Array, Int8Array, StringArray, TimestampMillisecondArray, TimestampMillisecondBuilder};
+use arrow::array::{Array, BooleanArray, Decimal128Array, Int16Array, Int32Array, Int64Array, Int8Array, StringArray, TimestampMillisecondArray};
 use arrow::datatypes::DataType;
 
 use common::query::EventRef;
@@ -402,7 +402,7 @@ pub fn build_get_by_id_plan(
     input: LogicalPlan,
     id: u64,
 ) -> Result<LogicalPlan> {
-    let mut filter_exprs = vec![
+    let filter_exprs = vec![
         binary_expr(
             col(COLUMN_PROJECT_ID),
             Operator::Eq,

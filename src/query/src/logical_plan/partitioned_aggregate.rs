@@ -47,7 +47,6 @@ impl From<&query::AggregateFunction> for AggregateFunction {
             query::AggregateFunction::Min => AggregateFunction::Min,
             query::AggregateFunction::Max => AggregateFunction::Max,
             query::AggregateFunction::Avg => AggregateFunction::Avg,
-            _ => panic!("Unsupported aggregate function: {:?}", value),
         }
     }
 }
@@ -437,13 +436,13 @@ impl UserDefinedLogicalNodeCore for PartitionedAggregatePartialNode {
         _exprs: Vec<Expr>,
         inputs: Vec<LogicalPlan>,
     ) -> datafusion_common::Result<Self> {
-        Ok(PartitionedAggregatePartialNode::try_new(
+        PartitionedAggregatePartialNode::try_new(
             inputs[0].clone(),
             self.partition_inputs.clone(),
             self.partition_col.clone(),
             self.agg_expr.clone(),
         )
-        .map_err(QueryError::into_datafusion_plan_error)?)
+        .map_err(QueryError::into_datafusion_plan_error)
     }
 }
 

@@ -3,14 +3,11 @@ use std::sync::Arc;
 use chrono::DateTime;
 use chrono::Utc;
 use common::rbac::ProjectPermission;
-use common::types::OptionalProperty;
 use metadata::bookmarks::Bookmarks as MDBookmarks;
 use serde::Deserialize;
 use serde::Serialize;
 
 use crate::{Context, Result};
-use crate::event_segmentation::EventSegmentationRequest;
-use crate::funnel::FunnelRequest;
 use crate::reports::Query;
 
 pub struct Bookmarks {

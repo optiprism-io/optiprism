@@ -5,33 +5,20 @@ use arrow::array::{Array, Decimal128Array, Int64Array, StringArray, StringBuilde
 use arrow::compute::cast;
 use arrow::datatypes::DataType;
 
-use chrono::DateTime;
-use chrono::Duration;
-use chrono::Utc;
 use common::{DECIMAL_SCALE, group_col};
 // use std::time::Duration;
 use common::query::Breakdown;
 use common::query::EventRef;
 use common::query::PropValueFilter;
 use common::query::PropertyRef;
-use common::query::QueryTime;
 use common::types::{COLUMN_CREATED_AT, COLUMN_EVENT, METRIC_QUERY_EXECUTION_TIME_SECONDS, METRIC_QUERY_QUERIES_TOTAL, ROUND_DIGITS, TABLE_EVENTS};
 use common::types::COLUMN_PROJECT_ID;
 use datafusion_common::Column;
-use datafusion_common::ScalarValue;
 use datafusion_expr::and;
-use datafusion_expr::binary_expr;
 use datafusion_expr::col;
-use datafusion_expr::expr;
-use datafusion_expr::lit;
-use datafusion_expr::Expr;
 use datafusion_expr::Extension;
 use datafusion_expr::Filter as PlanFilter;
-use datafusion_expr::Limit;
 use datafusion_expr::LogicalPlan;
-use datafusion_expr::Operator;
-use datafusion_expr::Projection;
-use datafusion_expr::Sort;
 use metrics::{counter, histogram};
 use num_traits::ToPrimitive;
 use metadata::dictionaries::SingleDictionaryProvider;
@@ -39,7 +26,6 @@ use metadata::MetadataProvider;
 use rust_decimal::Decimal;
 use tracing::debug;
 use common::funnel::{Count, ExcludeSteps, Filter, Funnel, StepOrder, TimeWindow, Touch};
-use metadata::properties::Property;
 use storage::db::OptiDBImpl;
 
 use crate::{breakdowns_to_dicts, col_name, decode_filter_single_dictionary, execute, fix_filter, initial_plan};
@@ -53,7 +39,6 @@ use crate::logical_plan;
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::logical_plan::expr::multi_or;
 use crate::logical_plan::funnel::FunnelNode;
-use crate::logical_plan::rename_columns::RenameColumnsNode;
 use crate::logical_plan::SortField;
 use crate::Context;
 
@@ -226,18 +211,13 @@ impl FunnelProvider {
 pub fn build(
     ctx: Context,
     metadata: Arc<MetadataProvider>,
-    mut input: LogicalPlan,
+    input: LogicalPlan,
     req: Funnel,
 ) -> Result<LogicalPlan> {
     let mut cols_hash: HashMap<String, ()> = HashMap::new();
     let input = decode_filter_dictionaries(&ctx, &metadata, &req, input, &mut cols_hash)?;
 
-    let mut expr = col(Column {
-        relation: None,
-        name: COLUMN_PROJECT_ID.to_string(),
-    });
-
-    expr = time_expression(COLUMN_CREATED_AT, input.schema(), &req.time, ctx.cur_time)?;
+    let mut expr = time_expression(COLUMN_CREATED_AT, input.schema(), &req.time, ctx.cur_time)?;
     if let Some(filters) = &req.filters {
         expr = and(expr, event_filters_expression(&ctx, &metadata, filters)?)
     }

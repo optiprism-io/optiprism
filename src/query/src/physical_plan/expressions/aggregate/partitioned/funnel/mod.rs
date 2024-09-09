@@ -8,7 +8,6 @@ use arrow::record_batch::RecordBatch;
 use chrono::Duration;
 use datafusion::physical_expr::expressions::BinaryExpr;
 use datafusion::physical_expr::expressions::Column;
-use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
 use datafusion::physical_plan::expressions::Literal;
 use datafusion_common::ScalarValue;

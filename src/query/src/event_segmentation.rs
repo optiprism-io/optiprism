@@ -11,17 +11,15 @@ use common::query::Breakdown;
 use common::query::DidEventAggregate;
 use common::query::PropertyRef;
 use common::query::SegmentCondition;
-use common::types::{COLUMN_CREATED_AT, COLUMN_IP, GROUP_COLUMN_ID, METRIC_QUERY_EXECUTION_TIME_SECONDS, METRIC_QUERY_QUERIES_TOTAL, TABLE_EVENTS};
+use common::types::{COLUMN_CREATED_AT, METRIC_QUERY_EXECUTION_TIME_SECONDS, METRIC_QUERY_QUERIES_TOTAL, TABLE_EVENTS};
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_PROJECT_ID;
 use common::types::COLUMN_SEGMENT;
 use datafusion::functions::datetime::date_trunc::DateTruncFunc;
-use datafusion::functions::math::trunc::TruncFunc;
 use datafusion_common::Column;
 use datafusion_common::ScalarValue;
 use datafusion_expr::binary_expr;
 use datafusion_expr::col;
-use datafusion_expr::expr;
 use datafusion_expr::expr::Alias;
 use datafusion_expr::expr::ScalarFunction;
 use datafusion_expr::expr_fn::and;
@@ -33,7 +31,6 @@ use datafusion_expr::Filter;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::Operator;
 use datafusion_expr::ScalarUDF;
-use datafusion_expr::Sort;
 use metrics::{counter, histogram};
 use tracing::debug;
 use metadata::dictionaries::SingleDictionaryProvider;
@@ -236,7 +233,7 @@ impl LogicalPlanBuilder {
         ctx: Context,
         metadata: Arc<MetadataProvider>,
         input: LogicalPlan,
-        segment_input: Option<LogicalPlan>,
+        _segment_input: Option<LogicalPlan>,
         es: EventSegmentationRequest,
     ) -> Result<LogicalPlan> {
         let events = es.events.clone();
@@ -333,7 +330,7 @@ impl LogicalPlanBuilder {
             }
         };
 
-        input = builder.decode_breakdowns_dictionaries(input, TABLE_EVENTS, &mut cols_hash)?;
+        input = builder.decode_breakdowns_dictionaries(input, &mut cols_hash)?;
 
         if ctx.format == Format::Compact {
             return Ok(input);
@@ -576,7 +573,6 @@ impl LogicalPlanBuilder {
     fn decode_breakdowns_dictionaries(
         &self,
         input: LogicalPlan,
-        tbl: &str,
         cols_hash: &mut HashMap<String, ()>,
     ) -> Result<LogicalPlan> {
         let mut decode_cols: Vec<(Column, Arc<SingleDictionaryProvider>)> = Vec::new();
@@ -607,7 +603,7 @@ impl LogicalPlanBuilder {
         segment_inputs: Option<Vec<LogicalPlan>>,
     ) -> Result<LogicalPlan> {
         let input =
-            self.build_filter_logical_plan(input.clone(), &self.es.events[event_id], group_id)?;
+            self.build_filter_logical_plan(input.clone(), &self.es.events[event_id])?;
 
         let (mut input, group_expr) = self.build_aggregate_logical_plan(
             input,
@@ -725,7 +721,6 @@ impl LogicalPlanBuilder {
         &self,
         input: LogicalPlan,
         event: &Event,
-        group_id: usize,
     ) -> Result<LogicalPlan> {
         let cur_time = self.ctx.cur_time;
         // todo add project_id filtering

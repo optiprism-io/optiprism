@@ -3,33 +3,28 @@ use std::sync::Arc;
 use chrono::DateTime;
 use chrono::Utc;
 use common::event_segmentation::NamedQuery;
-use common::types::DType;
 use common::GROUPS_COUNT;
-use datafusion_common::ScalarValue;
 use metadata::MetadataProvider;
 use serde::Deserialize;
 use serde::Serialize;
-use serde_json::Value;
 use common::rbac::ProjectPermission;
 use query::context::Format;
 use query::event_segmentation::{EventSegmentationProvider, fix_request};
 
 use crate::error::Result;
-use crate::{json_value_to_scalar, QueryParams, QueryResponse, QueryResponseFormat, SegmentCondition, validate_event, validate_event_filter, validate_event_property};
+use crate::{QueryParams, QueryResponse, QueryResponseFormat, validate_event, validate_event_filter, validate_event_property};
 use crate::AggregateFunction;
 use crate::Breakdown;
 use crate::PartitionedAggregateFunction;
 use crate::QueryTime;
 use crate::Segment;
 use crate::TimeIntervalUnit;
-use crate::scalar_to_json_value;
 use crate::Context;
 use crate::EventGroupedFilterGroup;
 use crate::EventGroupedFilters;
 use crate::EventRef;
 use crate::PlatformError;
 use crate::PropValueFilter;
-use crate::PropValueOperation;
 use crate::PropertyRef;
 
 pub struct EventSegmentation {
@@ -655,7 +650,7 @@ mod tests {
     use crate::event_segmentation::ChartType;
     use crate::event_segmentation::Compare;
     use crate::event_segmentation::Event;
-    use crate::event_segmentation::EventSegmentation;
+    
     use crate::event_segmentation::PartitionedAggregateFunction;
     use crate::event_segmentation::PropValueFilter;
     use crate::event_segmentation::Query;

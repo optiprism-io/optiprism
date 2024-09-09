@@ -68,8 +68,7 @@ impl Destination<Track> for Local {
             groups
         } else {
             // skip user group, i.e. skip 0
-            (1..GROUPS_COUNT)
-                .into_iter()
+            1..GROUPS_COUNT
                 .map(|v| NamedValue::new(group_col(v), Value::Int64(None))) // don't use null as primary key, only zero
                 .collect::<Vec<_>>()
         };
@@ -267,7 +266,7 @@ impl Destination<Track> for Local {
 
         let event_id = req.resolved_event.as_ref().unwrap().id;
 
-        let values = vec![
+        let values = [
             vec![
                 NamedValue::new(
                     COLUMN_PROJECT_ID.to_string(),

@@ -2,7 +2,6 @@ use std::marker::PhantomData;
 use std::sync::Mutex;
 
 use arrow::array::Array;
-use arrow::array::ArrayBuilder;
 use arrow::array::BooleanArray;
 use arrow::array::Decimal128Array;
 use arrow::array::Float32Array;
@@ -17,9 +16,7 @@ use arrow::array::UInt16Array;
 use arrow::array::UInt32Array;
 use arrow::array::UInt64Array;
 use arrow::array::UInt8Array;
-use arrow::buffer::ScalarBuffer;
 use arrow::record_batch::RecordBatch;
-use chrono::Duration;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
