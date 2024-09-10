@@ -1,8 +1,9 @@
 use std::sync::Arc;
+
 use chrono::DateTime;
 use chrono::Utc;
-use prost::Message;
 use common::types::OptionalProperty;
+use prost::Message;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
@@ -15,12 +16,13 @@ use crate::index::delete_index;
 use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
-use crate::team;
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
-use crate::metadata::{ListResponse, ResponseMetadata};
+use crate::metadata::ListResponse;
+use crate::metadata::ResponseMetadata;
 use crate::org_ns;
+use crate::team;
 use crate::Result;
 
 const NAMESPACE: &[u8] = b"teams";
@@ -37,7 +39,7 @@ fn index_name_key(organization_id: u64, name: &str) -> Option<Vec<u8>> {
             IDX_NAME,
             name,
         )
-            .to_vec(),
+        .to_vec(),
     )
 }
 
@@ -223,7 +225,9 @@ fn deserialize(data: &[u8]) -> Result<Team> {
     Ok(Team {
         id: from.id,
         created_at: chrono::DateTime::from_timestamp(from.created_at, 0).unwrap(),
-        updated_at: from.updated_at.map(|t| chrono::DateTime::from_timestamp(t, 0).unwrap()),
+        updated_at: from
+            .updated_at
+            .map(|t| chrono::DateTime::from_timestamp(t, 0).unwrap()),
         created_by: from.created_by,
         updated_by: from.updated_by,
         organization_id: from.organization_id,
@@ -236,7 +240,10 @@ mod tests {
     #[test]
     fn test_roundtrip() {
         use chrono::DateTime;
-        use crate::teams::{Team, deserialize, serialize};
+
+        use crate::teams::deserialize;
+        use crate::teams::serialize;
+        use crate::teams::Team;
 
         let team = Team {
             id: 1,

@@ -1,12 +1,17 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
-use arrow::array::ArrayRef;
 
+use arrow::array::ArrayRef;
+use common::group_col;
 use common::query::EventRef;
 use common::query::PropValueOperation;
 use common::query::PropertyRef;
-use common::types::{COLUMN_EVENT, COLUMN_PROJECT_ID, METRIC_QUERY_EXECUTION_TIME_SECONDS, METRIC_QUERY_QUERIES_TOTAL, TABLE_EVENTS};
+use common::types::COLUMN_EVENT;
+use common::types::COLUMN_PROJECT_ID;
+use common::types::METRIC_QUERY_EXECUTION_TIME_SECONDS;
+use common::types::METRIC_QUERY_QUERIES_TOTAL;
+use common::types::TABLE_EVENTS;
 use datafusion_common::Column;
 use datafusion_common::DFSchema;
 use datafusion_common::ScalarValue;
@@ -24,19 +29,22 @@ use datafusion_expr::Limit;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::Operator;
 use datafusion_expr::Sort;
-use metrics::{counter, histogram};
-use tracing::debug;
-use common::group_col;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
+use metrics::counter;
+use metrics::histogram;
 use storage::db::OptiDBImpl;
+use tracing::debug;
 
+use crate::col_name;
 use crate::error::QueryError;
 use crate::error::Result;
+use crate::execute;
 use crate::expr::event_expression;
 use crate::expr::property_expression;
+use crate::initial_plan;
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
-use crate::{col_name, Context, execute, initial_plan};
+use crate::Context;
 
 pub struct PropertiesProvider {
     metadata: Arc<MetadataProvider>,
@@ -56,19 +64,16 @@ impl PropertiesProvider {
             .iter()
             .map(|x| schema.index_of(x).unwrap())
             .collect();
-        let (session_ctx, state, plan) = initial_plan(&self.db, TABLE_EVENTS.to_string(), projection)?;
-        let plan = LogicalPlanBuilder::build(
-            ctx,
-            self.metadata.clone(),
-            plan,
-            req.clone(),
-        )?;
+        let (session_ctx, state, plan) =
+            initial_plan(&self.db, TABLE_EVENTS.to_string(), projection)?;
+        let plan = LogicalPlanBuilder::build(ctx, self.metadata.clone(), plan, req.clone())?;
 
         let res = execute(session_ctx, state, plan).await?;
         let duration = start.elapsed();
         debug!("elapsed: {:?}", duration);
         let elapsed = start.elapsed();
-        histogram!(METRIC_QUERY_EXECUTION_TIME_SECONDS, "query"=>"properties_search").record(elapsed);
+        histogram!(METRIC_QUERY_EXECUTION_TIME_SECONDS, "query"=>"properties_search")
+            .record(elapsed);
         counter!(METRIC_QUERY_QUERIES_TOTAL,"query"=>"properties_search").increment(1);
         debug!("elapsed: {:?}", elapsed);
 
@@ -134,14 +139,20 @@ impl LogicalPlanBuilder {
                 let prop =
                     metadata.group_properties[*group].get_by_name(ctx.project_id, prop_name)?;
                 let col_name = prop.column_name();
-                (property_col!(ctx, metadata, group_col(*group),input, prop), col_name)
+                (
+                    property_col!(ctx, metadata, group_col(*group), input, prop),
+                    col_name,
+                )
             }
             PropertyRef::Event(prop_name) => {
                 let prop = metadata
                     .event_properties
                     .get_by_name(ctx.project_id, prop_name)?;
                 let col_name = prop.column_name();
-                (property_col!(ctx, metadata, TABLE_EVENTS.to_string(),input, prop), col_name)
+                (
+                    property_col!(ctx, metadata, TABLE_EVENTS.to_string(), input, prop),
+                    col_name,
+                )
             }
             _ => {
                 return Err(QueryError::Unimplemented(

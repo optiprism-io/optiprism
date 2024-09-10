@@ -9,7 +9,7 @@ use std::time::Duration as StdDuration;
 use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
-use common::{types};
+use common::types;
 use common::DECIMAL_SCALE;
 use common::GROUP_USER;
 use crossbeam_channel::tick;
@@ -287,11 +287,7 @@ impl Scenario {
                         }
                         (Some(Action::ViewIndexPromotions), Action::ViewProduct, _) => {
                             let sp = self.products.promoted_product_sample(&mut self.rng);
-                            if state
-                                .products_viewed
-                                .iter()
-                                .any(|(p, _)| p.name == sp.name)
-                            {
+                            if state.products_viewed.iter().any(|(p, _)| p.name == sp.name) {
                                 action = Action::EndSession;
                                 continue;
                             }
@@ -351,7 +347,7 @@ impl Scenario {
                                     timestamp: DateTime::from_timestamp_millis(
                                         state.cur_timestamp * 10i64.pow(3),
                                     )
-                                        .unwrap(),
+                                    .unwrap(),
                                     context: context.clone(),
                                     group: GROUP_USER.to_string(),
                                     group_id: 0,
@@ -383,17 +379,15 @@ impl Scenario {
                                     .products_bought
                                     .iter_mut()
                                     .find(|(p, _)| p.name == product.name)
-                                { *v += 1 }
+                                {
+                                    *v += 1
+                                }
                                 state.spent_total += product.final_price();
                             }
                         }
                         (Some(Action::ViewDeals), Action::ViewProduct, _) => {
                             let sp = self.products.deal_product_sample(&mut self.rng);
-                            if state
-                                .products_viewed
-                                .iter()
-                                .any(|(p, _)| p.name == sp.name)
-                            {
+                            if state.products_viewed.iter().any(|(p, _)| p.name == sp.name) {
                                 action = Action::EndSession;
                                 continue;
                             }
@@ -402,7 +396,10 @@ impl Scenario {
                             if let Some((_, v)) = state
                                 .products_viewed
                                 .iter_mut()
-                                .find(|(p, _)| p.name == state.selected_product.unwrap().name) {  *v += 1 }
+                                .find(|(p, _)| p.name == state.selected_product.unwrap().name)
+                            {
+                                *v += 1
+                            }
                         }
                         (_, Action::ViewRelatedProduct, _) => {
                             let product = &state.selected_product.unwrap();
@@ -419,7 +416,10 @@ impl Scenario {
                             if let Some((_, v)) = state
                                 .products_viewed
                                 .iter_mut()
-                                .find(|(p, _)| p.name == state.selected_product.unwrap().name) { *v+=1 }
+                                .find(|(p, _)| p.name == state.selected_product.unwrap().name)
+                            {
+                                *v += 1
+                            }
                         }
                         (
                             Some(Action::ViewOrders),
@@ -718,10 +718,7 @@ impl Scenario {
                 .map(|p| p.discount_price.unwrap_or(p.price))
                 .sum();
 
-            properties.insert(
-                "Cart Amount".to_string(),
-                PropValue::Number(cart_amount_),
-            );
+            properties.insert("Cart Amount".to_string(), PropValue::Number(cart_amount_));
             cart_amount = Some(cart_amount_);
         }
 

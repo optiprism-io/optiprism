@@ -3,6 +3,8 @@
 extern crate core;
 
 pub mod accounts;
+pub mod backups;
+pub mod bookmarks;
 pub mod custom_events;
 pub mod dashboards;
 pub mod dictionaries;
@@ -17,18 +19,18 @@ pub mod properties;
 pub mod reports;
 pub mod rocksdb;
 pub mod sessions;
+pub mod settings;
 pub mod teams;
 pub mod util;
-pub mod bookmarks;
-pub mod settings;
-pub mod backups;
 
 use std::fmt::Debug;
+
 use ::rocksdb::Transaction;
 use ::rocksdb::TransactionDB;
 use bincode::deserialize;
 pub use error::Result;
 use serde::de::DeserializeOwned;
+
 use crate::metadata::ListResponse;
 pub use crate::metadata::MetadataProvider;
 use crate::metadata::ResponseMetadata;
@@ -100,7 +102,7 @@ pub fn org_ns(organization_id: u64, ns: &[u8]) -> Vec<u8> {
         b"/",
         ns,
     ]
-        .concat()
+    .concat()
 }
 
 pub fn make_data_value_key(ns: &[u8], id: u64) -> Vec<u8> {
@@ -120,9 +122,7 @@ pub fn make_id_seq_key(ns: &[u8]) -> Vec<u8> {
 }
 
 pub fn list_data<T>(tx: &Transaction<TransactionDB>, ns: &[u8]) -> Result<ListResponse<T>>
-where
-    T: DeserializeOwned + Debug,
-{
+where T: DeserializeOwned + Debug {
     let prefix = make_data_key(ns);
 
     let list = tx
@@ -144,9 +144,7 @@ where
 }
 
 pub fn list<T>(tx: &Transaction<TransactionDB>, path: &[u8]) -> Result<ListResponse<T>>
-where
-    T: DeserializeOwned + Debug,
-{
+where T: DeserializeOwned + Debug {
     let prefix = path;
 
     let list = tx

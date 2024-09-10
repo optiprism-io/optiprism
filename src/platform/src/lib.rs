@@ -7,9 +7,13 @@ pub mod context;
 pub mod custom_events;
 pub mod dashboards;
 // pub mod datatype;
+mod backups;
+mod bookmarks;
 pub mod error;
 pub mod event_records;
+pub mod event_segmentation;
 pub mod events;
+mod funnel;
 mod group_records;
 mod groups;
 pub mod http;
@@ -17,11 +21,7 @@ pub mod organizations;
 pub mod projects;
 pub mod properties;
 pub mod reports;
-pub mod event_segmentation;
-mod funnel;
-mod bookmarks;
 mod settings;
-mod backups;
 // pub mod stub;
 
 use std::fmt::Debug;
@@ -43,7 +43,8 @@ use arrow::array::UInt16Array;
 use arrow::array::UInt32Array;
 use arrow::array::UInt64Array;
 use arrow::array::UInt8Array;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use common::config::Config;
 use common::types::DType;
 use common::types::SortDirection;
@@ -59,6 +60,9 @@ use datafusion_common::ScalarValue;
 pub use error::PlatformError;
 pub use error::Result;
 use metadata::MetadataProvider;
+use query::event_records::EventRecordsProvider;
+use query::group_records::GroupRecordsProvider;
+use query::properties::PropertiesProvider;
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use serde::Deserialize;
@@ -66,9 +70,6 @@ use serde::Serialize;
 use serde_json::json;
 use serde_json::Number;
 use serde_json::Value;
-use query::event_records::EventRecordsProvider;
-use query::group_records::GroupRecordsProvider;
-use query::properties::PropertiesProvider;
 
 use crate::accounts::Accounts;
 use crate::auth::Auth;
@@ -77,7 +78,7 @@ use crate::bookmarks::Bookmarks;
 use crate::custom_events::CustomEvents;
 use crate::dashboards::Dashboards;
 use crate::event_records::EventRecords;
-use crate::event_segmentation::{EventSegmentation};
+use crate::event_segmentation::EventSegmentation;
 use crate::events::Events;
 use crate::funnel::Funnel;
 use crate::group_records::GroupRecords;
@@ -120,19 +121,26 @@ impl PlatformProvider {
         cfg: Config,
     ) -> Self {
         let group_properties = (0..GROUPS_COUNT)
-            .map(|gid| Arc::new(Properties::new_group(md.group_properties[gid].clone(), md.clone(),prop_prov.clone())))
+            .map(|gid| {
+                Arc::new(Properties::new_group(
+                    md.group_properties[gid].clone(),
+                    md.clone(),
+                    prop_prov.clone(),
+                ))
+            })
             .collect::<Vec<_>>();
         Self {
             events: Arc::new(Events::new(md.events.clone())),
             custom_events: Arc::new(CustomEvents::new(md.custom_events.clone())),
             groups: Arc::new(Groups::new(md.groups.clone())),
-            event_properties: Arc::new(Properties::new_event(md.event_properties.clone(), md.clone(),prop_prov.clone())),
+            event_properties: Arc::new(Properties::new_event(
+                md.event_properties.clone(),
+                md.clone(),
+                prop_prov.clone(),
+            )),
             group_properties,
             accounts: Arc::new(Accounts::new(md.accounts.clone())),
-            auth: Arc::new(Auth::new(
-                md.clone(),
-                cfg.clone(),
-            )),
+            auth: Arc::new(Auth::new(md.clone(), cfg.clone())),
             event_segmentation: Arc::new(EventSegmentation::new(md.clone(), es_prov)),
             funnel: Arc::new(Funnel::new(md.clone(), funnel_prov)),
             dashboards: Arc::new(Dashboards::new(md.dashboards.clone())),
@@ -140,7 +148,7 @@ impl PlatformProvider {
             event_records: Arc::new(EventRecords::new(md.clone(), event_records_prov)),
             group_records: Arc::new(GroupRecords::new(md.clone(), group_records_prov)),
             projects: Arc::new(Projects::new(md.clone(), cfg.clone())),
-            organizations: Arc::new(Organizations::new(md.clone(), )),
+            organizations: Arc::new(Organizations::new(md.clone())),
             bookmarks: Arc::new(Bookmarks::new(md.bookmarks.clone())),
             backups: Arc::new(Backups::new(md.clone())),
             settings: Arc::new(SettingsProvider::new(md.settings.clone())),
@@ -168,7 +176,6 @@ macro_rules! int_arr_to_json_values {
             .collect()
     }};
 }
-
 
 pub fn scalar_to_json(v: &ScalarValue) -> Value {
     if v.is_null() {
@@ -199,7 +206,7 @@ pub fn scalar_to_json(v: &ScalarValue) -> Value {
         ScalarValue::Int64(Some(v)) => Value::Number(Number::from(*v)),
         ScalarValue::Utf8(Some(v)) => Value::String(v.to_owned()),
         ScalarValue::TimestampMillisecond(Some(v), _) => Value::Number(Number::from(*v)),
-        _ => unimplemented!()
+        _ => unimplemented!(),
     }
 }
 pub fn array_ref_to_json_values(arr: &ArrayRef) -> Vec<Value> {
@@ -278,8 +285,7 @@ impl From<metadata::metadata::ResponseMetadata> for ResponseMetadata {
 #[derive(Serialize, Deserialize, Default, Debug, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ListResponse<T>
-where
-    T: Debug,
+where T: Debug
 {
     pub data: Vec<T>,
     pub meta: ResponseMetadata,
@@ -695,9 +701,7 @@ pub struct EventGroupedFilters {
     pub groups: Vec<EventGroupedFilterGroup>,
 }
 
-
 // queries
-
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -1089,9 +1093,7 @@ impl Into<common::query::SegmentCondition> for SegmentCondition {
 impl Into<SegmentTime> for common::query::SegmentTime {
     fn into(self) -> SegmentTime {
         match self {
-            common::query::SegmentTime::Between { from, to } => {
-                SegmentTime::Between { from, to }
-            }
+            common::query::SegmentTime::Between { from, to } => SegmentTime::Between { from, to },
             common::query::SegmentTime::From(from) => SegmentTime::From(from),
             common::query::SegmentTime::Last { n, unit } => SegmentTime::Last {
                 last: n,
@@ -1103,12 +1105,10 @@ impl Into<SegmentTime> for common::query::SegmentTime {
                     unit: unit.into(),
                 }
             }
-            common::query::SegmentTime::Each { n, unit } => {
-                SegmentTime::WindowEach {
-                    unit: unit.into(),
-                    n,
-                }
-            }
+            common::query::SegmentTime::Each { n, unit } => SegmentTime::WindowEach {
+                unit: unit.into(),
+                n,
+            },
         }
     }
 }
@@ -1361,21 +1361,11 @@ impl Into<common::query::QueryAggregate> for QueryAggregate {
             QueryAggregate::Sum => common::query::QueryAggregate::Sum,
             QueryAggregate::Avg => common::query::QueryAggregate::Avg,
             QueryAggregate::Median => common::query::QueryAggregate::Median,
-            QueryAggregate::DistinctCount => {
-                common::query::QueryAggregate::DistinctCount
-            }
-            QueryAggregate::Percentile25 => {
-                common::query::QueryAggregate::Percentile25th
-            }
-            QueryAggregate::Percentile75 => {
-                common::query::QueryAggregate::Percentile75th
-            }
-            QueryAggregate::Percentile90 => {
-                common::query::QueryAggregate::Percentile90th
-            }
-            QueryAggregate::Percentile99 => {
-                common::query::QueryAggregate::Percentile99th
-            }
+            QueryAggregate::DistinctCount => common::query::QueryAggregate::DistinctCount,
+            QueryAggregate::Percentile25 => common::query::QueryAggregate::Percentile25th,
+            QueryAggregate::Percentile75 => common::query::QueryAggregate::Percentile75th,
+            QueryAggregate::Percentile90 => common::query::QueryAggregate::Percentile90th,
+            QueryAggregate::Percentile99 => common::query::QueryAggregate::Percentile99th,
         }
     }
 }
@@ -1389,25 +1379,14 @@ impl Into<QueryAggregate> for common::query::QueryAggregate {
             common::query::QueryAggregate::Sum => QueryAggregate::Sum,
             common::query::QueryAggregate::Avg => QueryAggregate::Avg,
             common::query::QueryAggregate::Median => QueryAggregate::Median,
-            common::query::QueryAggregate::DistinctCount => {
-                QueryAggregate::DistinctCount
-            }
-            common::query::QueryAggregate::Percentile25th => {
-                QueryAggregate::Percentile25
-            }
-            common::query::QueryAggregate::Percentile75th => {
-                QueryAggregate::Percentile75
-            }
-            common::query::QueryAggregate::Percentile90th => {
-                QueryAggregate::Percentile90
-            }
-            common::query::QueryAggregate::Percentile99th => {
-                QueryAggregate::Percentile99
-            }
+            common::query::QueryAggregate::DistinctCount => QueryAggregate::DistinctCount,
+            common::query::QueryAggregate::Percentile25th => QueryAggregate::Percentile25,
+            common::query::QueryAggregate::Percentile75th => QueryAggregate::Percentile75,
+            common::query::QueryAggregate::Percentile90th => QueryAggregate::Percentile90,
+            common::query::QueryAggregate::Percentile99th => QueryAggregate::Percentile99,
         }
     }
 }
-
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]

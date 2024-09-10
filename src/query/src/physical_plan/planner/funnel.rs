@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use std::sync::Mutex;
+
 use arrow_row::SortField;
 use datafusion::execution::context::ExecutionProps;
 use datafusion::physical_expr::create_physical_expr;
@@ -7,6 +8,7 @@ use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion_common::ToDFSchema;
 use datafusion_expr::LogicalPlan;
+
 use crate::error::Result;
 use crate::logical_plan;
 use crate::logical_plan::funnel::FunnelNode;

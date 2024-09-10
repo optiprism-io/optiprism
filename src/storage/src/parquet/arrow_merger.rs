@@ -4,6 +4,7 @@ use std::collections::BinaryHeap;
 use std::collections::VecDeque;
 use std::fs::File;
 use std::io::BufReader;
+
 use arrow2::array::growable::make_growable;
 use arrow2::array::new_null_array;
 use arrow2::array::Array;
@@ -274,7 +275,7 @@ impl Iterator for MemChunkIterator {
     }
 }
 
-type SendableChunk = Box<dyn Iterator<Item=Result<Chunk<Box<dyn Array>>>> + Send>;
+type SendableChunk = Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>;
 
 pub struct MergingIterator {
     // list of index cols (partitions) in parquet file
@@ -316,13 +317,13 @@ impl MergingIterator {
             .into_iter()
             .map(|v| {
                 Box::new(ArrowIteratorImpl::new(v, opts.fields.clone(), opts.chunk_size).unwrap())
-                    as Box<dyn Iterator<Item=Result<Chunk<Box<dyn Array>>>> + Send>
+                    as Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>
             })
             .collect::<Vec<_>>();
 
         if mem_chunk.is_some() {
             arrow_streams.push(Box::new(MemChunkIterator::new(mem_chunk))
-                as Box<dyn Iterator<Item=Result<Chunk<Box<dyn Array>>>> + Send>);
+                as Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>);
         }
 
         let mut mr = Self {

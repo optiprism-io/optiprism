@@ -7,11 +7,12 @@ use axum::routing;
 use axum::Router;
 use common::http::Json;
 
-use crate::{Context, QueryParams};
-use crate::funnel::{Funnel, FunnelRequest};
+use crate::funnel::Funnel;
+use crate::funnel::FunnelRequest;
+use crate::Context;
 use crate::FunnelResponse;
+use crate::QueryParams;
 use crate::Result;
-
 
 async fn funnel(
     ctx: Context,
@@ -25,14 +26,9 @@ async fn funnel(
     ))
 }
 
-
 pub fn attach_routes(router: Router) -> Router {
     router.nest(
         "/api/v1/projects/:project_id",
-        Router::new()
-            .route(
-                "/queries/funnel",
-                routing::post(funnel),
-            )
+        Router::new().route("/queries/funnel", routing::post(funnel)),
     )
 }

@@ -32,8 +32,7 @@ use crate::physical_plan::expressions::segmentation::SegmentExpr;
 
 #[derive(Debug, Clone)]
 pub enum AggregateFunction<T>
-where
-    T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display,
+where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
 {
     Sum(T),
     Min(T),
@@ -43,8 +42,7 @@ where
 }
 
 impl<T> AggregateFunction<T>
-where
-    T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display,
+where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
 {
     pub fn new_sum() -> Self {
         AggregateFunction::Sum(T::zero())
@@ -140,8 +138,7 @@ where
 
 #[derive(Debug)]
 struct Inner<T>
-where
-    T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display,
+where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
 {
     agg: AggregateFunction<T>,
     last_partition: i64,
@@ -151,8 +148,7 @@ where
 
 #[derive(Debug)]
 pub struct Aggregate<T, OT, Op>
-where
-    OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display,
+where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
 {
     filter: PhysicalExprRef,
     predicate: Column,
@@ -166,8 +162,7 @@ where
 }
 #[allow(clippy::too_many_arguments)]
 impl<T, OT, Op> Aggregate<T, OT, Op>
-where
-    OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display,
+where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
 {
     pub fn new(
         filter: PhysicalExprRef,
@@ -203,10 +198,7 @@ macro_rules! agg {
         impl<Op> SegmentExpr for Aggregate<$ty, $acc_ty, Op>
         where Op: ComparisonOp<$acc_ty>
         {
-            fn evaluate(
-                &self,
-                batch: &RecordBatch,
-            ) -> Result<()> {
+            fn evaluate(&self, batch: &RecordBatch) -> Result<()> {
                 let ts = self
                     .ts_col
                     .evaluate(batch)?
@@ -234,12 +226,15 @@ macro_rules! agg {
                     .unwrap()
                     .clone();
 
-                    let mut inner = self.inner.lock().unwrap();
-                    let partition = self.partition_col.evaluate(batch)?.into_array(batch.num_rows())?
-                                    .as_any()
-                                    .downcast_ref::<Int64Array>()
-                                    .unwrap()
-                                    .clone();
+                let mut inner = self.inner.lock().unwrap();
+                let partition = self
+                    .partition_col
+                    .evaluate(batch)?
+                    .into_array(batch.num_rows())?
+                    .as_any()
+                    .downcast_ref::<Int64Array>()
+                    .unwrap()
+                    .clone();
                 for (row_id, partition) in partition.into_iter().enumerate() {
                     if inner.first {
                         inner.first = false;
@@ -305,8 +300,10 @@ agg!(Decimal128Array, Decimal128Array, i128);
 mod tests {
     use std::str::FromStr;
     use std::sync::Arc;
+
     use arrow::array::Int64Array;
     use arrow::record_batch::RecordBatch;
+    use common::DECIMAL_SCALE;
     use datafusion::physical_expr::expressions::BinaryExpr;
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_expr::expressions::Literal;
@@ -314,8 +311,8 @@ mod tests {
     use datafusion_common::ScalarValue;
     use datafusion_expr::Operator;
     use rust_decimal::Decimal;
-    use common::DECIMAL_SCALE;
     use storage::test_util::parse_markdown_tables;
+
     use crate::physical_plan::expressions::segmentation::aggregate::Aggregate;
     use crate::physical_plan::expressions::segmentation::aggregate::AggregateFunction;
     use crate::physical_plan::expressions::segmentation::boolean_op;
@@ -372,9 +369,9 @@ mod tests {
                 TimeRange::None,
             );
 
-            /*for b in res {
-                let _res = agg.evaluate(&b).unwrap();
-            }*/
+            // for b in res {
+            // let _res = agg.evaluate(&b).unwrap();
+            // }
             let res = agg.finalize().unwrap();
             let exp = Int64Array::from(vec![None, Some(1), None]);
             assert_eq!(res, exp);

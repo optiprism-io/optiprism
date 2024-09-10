@@ -6,6 +6,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
+
 use arrow::array::new_null_array;
 use arrow::array::ArrayRef;
 use arrow::datatypes::DataType;
@@ -63,7 +64,7 @@ impl MergeExec {
             Arc::new(schema)
         };
 
-        let cache = Self::compute_properties(&inputs[0],schema.clone())?;
+        let cache = Self::compute_properties(&inputs[0], schema.clone())?;
         Ok(Self {
             inputs,
             names,
@@ -73,7 +74,10 @@ impl MergeExec {
         })
     }
 
-    fn compute_properties(input: &Arc<dyn ExecutionPlan>,schema:SchemaRef) -> Result<PlanProperties> {
+    fn compute_properties(
+        input: &Arc<dyn ExecutionPlan>,
+        schema: SchemaRef,
+    ) -> Result<PlanProperties> {
         let eq_properties = EquivalenceProperties::new(schema);
         Ok(PlanProperties::new(
             eq_properties,

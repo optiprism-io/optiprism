@@ -4,13 +4,14 @@ use std::sync::Arc;
 
 use chrono::DateTime;
 use chrono::Utc;
-use prost::Message;
+use common::rbac::OrganizationRole;
 use common::types::OptionalProperty;
+use prost::Message;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
-use common::rbac::OrganizationRole;
+
 use crate::accounts::Accounts;
 use crate::error::MetadataError;
 use crate::index::check_insert_constraints;
@@ -19,11 +20,13 @@ use crate::index::delete_index;
 use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
-use crate::{make_data_key, organization};
+use crate::make_data_key;
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
-use crate::metadata::{ListResponse, ResponseMetadata};
+use crate::metadata::ListResponse;
+use crate::metadata::ResponseMetadata;
+use crate::organization;
 use crate::Result;
 
 const NAMESPACE: &[u8] = b"organizations";
@@ -82,7 +85,8 @@ impl Organizations {
 
         insert_index(&tx, idx_keys.as_ref(), org.id)?;
 
-        self.accs.add_organization_(&tx, req.created_by, id, OrganizationRole::Owner)?;
+        self.accs
+            .add_organization_(&tx, req.created_by, id, OrganizationRole::Owner)?;
         tx.commit()?;
         Ok(org)
     }
@@ -102,7 +106,10 @@ impl Organizations {
         for kv in iter {
             let (key, value) = kv?;
             // check if key contains the prefix
-            if !from_utf8(&prefix).unwrap().is_prefix_of(from_utf8(&key).unwrap()) {
+            if !from_utf8(&prefix)
+                .unwrap()
+                .is_prefix_of(from_utf8(&key).unwrap())
+            {
                 break;
             }
             list.push(deserialize(&value)?);
@@ -114,7 +121,12 @@ impl Organizations {
         })
     }
 
-    pub fn update_(&self, tx: &Transaction<TransactionDB>, id: u64, req: UpdateOrganizationRequest) -> Result<Organization> {
+    pub fn update_(
+        &self,
+        tx: &Transaction<TransactionDB>,
+        id: u64,
+        req: UpdateOrganizationRequest,
+    ) -> Result<Organization> {
         let prev_org = self.get_by_id_(tx, id)?;
 
         let mut org = prev_org.clone();
@@ -180,12 +192,18 @@ impl Organizations {
         Ok(())
     }
 
-    pub fn change_member_role(&self, id: u64, member_id: u64, role: OrganizationRole) -> Result<()> {
+    pub fn change_member_role(
+        &self,
+        id: u64,
+        member_id: u64,
+        role: OrganizationRole,
+    ) -> Result<()> {
         let tx = self.db.transaction();
         let mut org = self.get_by_id_(&tx, id)?;
         if let Some(member) = org.members.iter_mut().find(|(id, _)| *id == member_id) {
             member.1 = role.clone();
-            self.accs.change_organization_role_(&tx, member_id, id, role)?;
+            self.accs
+                .change_organization_role_(&tx, member_id, id, role)?;
         } else {
             return Err(MetadataError::NotFound(
                 format!("member {member_id} not found").to_string(),
@@ -268,18 +286,22 @@ fn deserialize(data: &[u8]) -> Result<Organization> {
         id: from.id,
         created_at: chrono::DateTime::from_timestamp(from.created_at, 0).unwrap(),
         created_by: from.created_by,
-        updated_at: from.updated_at.map(|t| chrono::DateTime::from_timestamp(t, 0).unwrap()),
+        updated_at: from
+            .updated_at
+            .map(|t| chrono::DateTime::from_timestamp(t, 0).unwrap()),
         updated_by: from.updated_by,
         name: from.name,
         members: from
             .members
             .iter()
-            .map(|m| (m.id, match m.role {
-                1 => OrganizationRole::Owner,
-                2 => OrganizationRole::Admin,
-                3 => OrganizationRole::Member,
-                _ => unreachable!()
-            }))
+            .map(|m| {
+                (m.id, match m.role {
+                    1 => OrganizationRole::Owner,
+                    2 => OrganizationRole::Admin,
+                    3 => OrganizationRole::Member,
+                    _ => unreachable!(),
+                })
+            })
             .collect(),
     })
 }
@@ -288,7 +310,10 @@ fn deserialize(data: &[u8]) -> Result<Organization> {
 mod tests {
     use chrono::DateTime;
     use common::rbac::OrganizationRole;
-    use crate::organizations::{Organization, deserialize, serialize};
+
+    use crate::organizations::deserialize;
+    use crate::organizations::serialize;
+    use crate::organizations::Organization;
 
     #[test]
     fn test_roundtrip() {

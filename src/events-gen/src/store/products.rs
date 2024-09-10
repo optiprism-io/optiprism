@@ -100,7 +100,9 @@ impl ProductProvider {
 
         let deal_products = products
             .iter()
-            .filter(|p| p.discount_price.is_some()).cloned().collect::<Vec<_>>();
+            .filter(|p| p.discount_price.is_some())
+            .cloned()
+            .collect::<Vec<_>>();
         let deal_product_weight_idx = WeightedIndex::new([1., 0.3, 0.2, 0.1, 0.1]).unwrap();
 
         let mut categories = products

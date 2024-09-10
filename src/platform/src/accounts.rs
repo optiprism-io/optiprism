@@ -112,7 +112,6 @@ pub struct Account {
     pub teams: Option<Vec<(u64, Role)>>,
 }
 
-
 #[allow(clippy::all)]
 impl Into<Account> for metadata::accounts::Account {
     fn into(self) -> Account {

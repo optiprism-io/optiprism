@@ -9,11 +9,13 @@ mod tests {
     use datafusion_common::ScalarValue;
     use metadata::util::init_db;
     use query::error::Result;
+    use query::properties::Filter;
+    use query::properties::LogicalPlanBuilder;
+    use query::properties::PropertyValues;
     use query::test_util::create_entities;
     use query::test_util::events_provider;
     use query::test_util::run_plan;
     use query::Context;
-    use query::properties::{Filter, LogicalPlanBuilder, PropertyValues};
 
     #[tokio::test]
     async fn test_bool() -> Result<()> {

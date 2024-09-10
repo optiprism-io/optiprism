@@ -134,11 +134,9 @@ impl DFExtensionPlanner for ExtensionPlanner {
                 .map_err(|e| DataFusionError::Plan(e.to_string()))?;
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<AggregateAndSortColumnsNode>() {
-            let exec = AggregateAndSortColumnsExec::try_new(
-                physical_inputs[0].clone(),
-                node.groups,
-            )
-            .map_err(|e| DataFusionError::Plan(e.to_string()))?;
+            let exec =
+                AggregateAndSortColumnsExec::try_new(physical_inputs[0].clone(), node.groups)
+                    .map_err(|e| DataFusionError::Plan(e.to_string()))?;
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<LimitGroupsNode>() {
             let exec = LimitGroupsExec::try_new(
@@ -163,8 +161,12 @@ impl DFExtensionPlanner for ExtensionPlanner {
             .map_err(|e| DataFusionError::Plan(e.to_string()))?;
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<DbParquetNode>() {
-            let exec = DBParquetExec::try_new(node.db.clone(), node.table.clone(),node.projection.clone())
-                .map_err(|err| DataFusionError::Plan(err.to_string()))?;
+            let exec = DBParquetExec::try_new(
+                node.db.clone(),
+                node.table.clone(),
+                node.projection.clone(),
+            )
+            .map_err(|err| DataFusionError::Plan(err.to_string()))?;
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<UnpivotNode>() {
             let exec = UnpivotExec::try_new(
@@ -265,13 +267,10 @@ impl DFExtensionPlanner for ExtensionPlanner {
             );
             let segment_expr = build_segment_expr(node.expr.clone(), &physical_inputs[0].schema())
                 .map_err(|err| DataFusionError::Plan(err.to_string()))?;
-            let exec = SegmentExec::try_new(
-                physical_inputs[0].clone(),
-                segment_expr,
-                partition_col,
-            )
-            .map_err(|err| DataFusionError::Plan(err.to_string()))
-            .map_err(|err| DataFusionError::Plan(err.to_string()))?;
+            let exec =
+                SegmentExec::try_new(physical_inputs[0].clone(), segment_expr, partition_col)
+                    .map_err(|err| DataFusionError::Plan(err.to_string()))
+                    .map_err(|err| DataFusionError::Plan(err.to_string()))?;
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else {
             None

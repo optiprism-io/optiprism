@@ -5,6 +5,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
+
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
 use arrow::datatypes::Schema;
@@ -13,8 +14,8 @@ use arrow::record_batch::RecordBatch;
 use axum::async_trait;
 use datafusion::execution::context::TaskContext;
 use datafusion::physical_expr::expressions::Column;
+use datafusion::physical_expr::EquivalenceProperties;
 use datafusion::physical_expr::Partitioning::UnknownPartitioning;
-use datafusion::physical_expr::{EquivalenceProperties};
 use datafusion::physical_plan::metrics::BaselineMetrics;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
 use datafusion::physical_plan::metrics::MetricsSet;
@@ -29,6 +30,7 @@ use datafusion::physical_plan::Statistics;
 use datafusion_common::Result as DFResult;
 use futures::Stream;
 use futures::StreamExt;
+
 use crate::error::QueryError;
 use crate::physical_plan::expressions::segmentation::SegmentExpr;
 use crate::Result;
@@ -61,7 +63,10 @@ impl SegmentExec {
             cache,
         })
     }
-    fn compute_properties(input: &Arc<dyn ExecutionPlan>, schema: SchemaRef) -> Result<PlanProperties> {
+    fn compute_properties(
+        input: &Arc<dyn ExecutionPlan>,
+        schema: SchemaRef,
+    ) -> Result<PlanProperties> {
         let eq_properties = EquivalenceProperties::new(schema);
         Ok(PlanProperties::new(
             eq_properties,
@@ -105,7 +110,7 @@ impl ExecutionPlan for SegmentExec {
                 self.expr.clone(),
                 self.partition_col.clone(),
             )
-                .map_err(QueryError::into_datafusion_execution_error)?,
+            .map_err(QueryError::into_datafusion_execution_error)?,
         ))
     }
 

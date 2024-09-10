@@ -4,15 +4,18 @@ use std::sync::Arc;
 
 use chrono::DateTime;
 use chrono::Utc;
-use prost::Message;
-use common::types::{OptionalProperty, TABLE_EVENTS};
+use common::types::OptionalProperty;
 use common::types::COLUMN_EVENT;
+use common::types::TABLE_EVENTS;
+use prost::Message;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
+
 use crate::dictionaries::Dictionaries;
 use crate::error::MetadataError;
+use crate::event;
 use crate::index::check_insert_constraints;
 use crate::index::check_update_constraints;
 use crate::index::delete_index;
@@ -20,11 +23,12 @@ use crate::index::get_index;
 use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
-use crate::{event, make_data_key};
+use crate::make_data_key;
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
-use crate::metadata::{ListResponse, ResponseMetadata};
+use crate::metadata::ListResponse;
+use crate::metadata::ResponseMetadata;
 use crate::project_ns;
 use crate::Result;
 
@@ -38,7 +42,7 @@ fn index_keys(project_id: u64, name: &str, display_name: Option<String>) -> Vec<
         index_name_key(project_id, name),
         index_display_name_key(project_id, display_name),
     ]
-        .to_vec()
+    .to_vec()
 }
 
 fn index_name_key(project_id: u64, name: &str) -> Option<Vec<u8>> {
@@ -52,7 +56,7 @@ fn index_display_name_key(project_id: u64, display_name: Option<String>) -> Opti
             IDX_DISPLAY_NAME,
             v.as_str(),
         )
-            .to_vec()
+        .to_vec()
     })
 }
 
@@ -178,8 +182,13 @@ impl Events {
 
         insert_index(tx, idx_keys.as_ref(), event.id)?;
 
-        self.dicts
-            ._get_key_or_create(tx, project_id, TABLE_EVENTS, COLUMN_EVENT, event.name.as_str())?;
+        self.dicts._get_key_or_create(
+            tx,
+            project_id,
+            TABLE_EVENTS,
+            COLUMN_EVENT,
+            event.name.as_str(),
+        )?;
         Ok(event)
     }
 
@@ -238,12 +247,14 @@ impl Events {
         for kv in iter {
             let (key, value) = kv?;
             // check if key contains the prefix
-            if !from_utf8(&prefix).unwrap().is_prefix_of(from_utf8(&key).unwrap()) {
+            if !from_utf8(&prefix)
+                .unwrap()
+                .is_prefix_of(from_utf8(&key).unwrap())
+            {
                 break;
             }
             list.push(deserialize(&value)?);
         }
-
 
         Ok(ListResponse {
             data: list,
@@ -458,9 +469,11 @@ pub struct UpdateEventRequest {
 fn serialize(v: &Event) -> Result<Vec<u8>> {
     let tags = if let Some(tags) = &v.tags {
         tags.to_vec()
-    } else { vec![] };
+    } else {
+        vec![]
+    };
 
-    let d = event::Event{
+    let d = event::Event {
         id: v.id,
         created_at: v.created_at.timestamp(),
         created_by: v.created_by,
@@ -484,29 +497,33 @@ fn serialize(v: &Event) -> Result<Vec<u8>> {
 fn deserialize(data: &[u8]) -> Result<Event> {
     let from = event::Event::decode(data)?;
 
-    Ok(
-        Event{
-            id: from.id,
-            created_at: chrono::DateTime::from_timestamp(from.created_at, 0).unwrap(),
-            created_by: from.created_by,
-            updated_at: from.updated_at.map(|t| chrono::DateTime::from_timestamp(t, 0).unwrap()),
-            updated_by: from.updated_by,
-            project_id: from.project_id,
-            tags: if from.tags.is_empty() { None } else { Some(from.tags) },
-            name: from.name,
-            display_name: from.display_name,
-            description: from.description,
-            status: match from.status {
-                1 => Status::Enabled,
-                2 => Status::Disabled,
-                _ => unreachable!(),
-            },
-            is_system: from.is_system,
-            event_properties: None,
-            user_properties: None,
-            custom_properties: None,
-        }
-    )
+    Ok(Event {
+        id: from.id,
+        created_at: chrono::DateTime::from_timestamp(from.created_at, 0).unwrap(),
+        created_by: from.created_by,
+        updated_at: from
+            .updated_at
+            .map(|t| chrono::DateTime::from_timestamp(t, 0).unwrap()),
+        updated_by: from.updated_by,
+        project_id: from.project_id,
+        tags: if from.tags.is_empty() {
+            None
+        } else {
+            Some(from.tags)
+        },
+        name: from.name,
+        display_name: from.display_name,
+        description: from.description,
+        status: match from.status {
+            1 => Status::Enabled,
+            2 => Status::Disabled,
+            _ => unreachable!(),
+        },
+        is_system: from.is_system,
+        event_properties: None,
+        user_properties: None,
+        custom_properties: None,
+    })
 }
 
 #[cfg(test)]

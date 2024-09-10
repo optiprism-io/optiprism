@@ -8,6 +8,12 @@ mod tests {
     use chrono::DateTime;
     use chrono::Duration;
     use chrono::Utc;
+    use common::event_segmentation::Analysis;
+    use common::event_segmentation::ChartType;
+    use common::event_segmentation::Event;
+    use common::event_segmentation::EventSegmentationRequest;
+    use common::event_segmentation::NamedQuery;
+    use common::event_segmentation::Query;
     use common::query::AggregateFunction;
     use common::query::Breakdown;
     use common::query::EventRef;
@@ -17,20 +23,19 @@ mod tests {
     use common::query::PropertyRef;
     use common::query::QueryTime;
     use common::query::TimeIntervalUnit;
+    use common::GROUP_USER_ID;
     use datafusion_common::ScalarValue;
     use metadata::custom_events;
     use metadata::custom_events::CreateCustomEventRequest;
     use metadata::util::init_db;
     use query::error::Result;
+    use query::event_segmentation::LogicalPlanBuilder;
     use query::test_util::create_entities;
     use query::test_util::events_provider;
     use query::test_util::run_plan;
     use query::Context;
     use tracing_test::traced_test;
     use uuid::Uuid;
-    use common::event_segmentation::{Analysis, ChartType, Event, EventSegmentationRequest, NamedQuery, Query};
-    use common::GROUP_USER_ID;
-    use query::event_segmentation::LogicalPlanBuilder;
 
     #[traced_test]
     #[tokio::test]
@@ -52,12 +57,13 @@ mod tests {
                 Event::new(
                     EventRef::RegularName("View Product".to_string()),
                     Some(vec![PropValueFilter::Property {
-                        property: PropertyRef::Group("Is Premium".to_string(),0),
+                        property: PropertyRef::Group("Is Premium".to_string(), 0),
                         operation: PropValueOperation::Eq,
                         value: Some(vec![ScalarValue::Boolean(Some(true))]),
                     }]),
                     Some(vec![Breakdown::Property(PropertyRef::Group(
-                        "Device".to_string(),0
+                        "Device".to_string(),
+                        0,
                     ))]),
                     vec![NamedQuery::new(
                         Query::CountEvents,
@@ -82,12 +88,12 @@ mod tests {
                             ]),
                         },
                         PropValueFilter::Property {
-                            property: PropertyRef::Group("Country".to_string(),0),
+                            property: PropertyRef::Group("Country".to_string(), 0),
                             operation: PropValueOperation::Empty,
                             value: None,
                         },
                         PropValueFilter::Property {
-                            property: PropertyRef::Group("Country".to_string(),0),
+                            property: PropertyRef::Group("Country".to_string(), 0),
                             operation: PropValueOperation::Eq,
                             value: Some(vec![
                                 ScalarValue::Utf8(Some("Spain".to_string())),
@@ -130,18 +136,19 @@ mod tests {
             ],
             filters: Some(vec![
                 PropValueFilter::Property {
-                    property: PropertyRef::Group("Device".to_string(),0),
+                    property: PropertyRef::Group("Device".to_string(), 0),
                     operation: PropValueOperation::Eq,
                     value: Some(vec![ScalarValue::Utf8(Some("Iphone".to_string()))]),
                 },
                 PropValueFilter::Property {
-                    property: PropertyRef::Group("Is Premium".to_string(),0),
+                    property: PropertyRef::Group("Is Premium".to_string(), 0),
                     operation: PropValueOperation::Eq,
                     value: Some(vec![ScalarValue::Decimal128(Some(1), 1, 0)]),
                 },
             ]),
             breakdowns: Some(vec![Breakdown::Property(PropertyRef::Group(
-                "Device".to_string(),0,
+                "Device".to_string(),
+                0,
             ))]),
             segments: None,
         };
@@ -259,7 +266,8 @@ mod tests {
             ],
             filters: None,
             breakdowns: Some(vec![Breakdown::Property(PropertyRef::Group(
-                "Country".to_string(),0,
+                "Country".to_string(),
+                0,
             ))]),
             // breakdowns: None,
             segments: None,
@@ -309,12 +317,12 @@ mod tests {
                         event: EventRef::RegularName("View Product".to_string()),
                         filters: Some(vec![
                             PropValueFilter::Property {
-                                property: PropertyRef::Group("Is Premium".to_string(),0),
+                                property: PropertyRef::Group("Is Premium".to_string(), 0),
                                 operation: PropValueOperation::Eq,
                                 value: Some(vec![ScalarValue::Boolean(Some(true))]),
                             },
                             PropValueFilter::Property {
-                                property: PropertyRef::Group("Country".to_string(),0),
+                                property: PropertyRef::Group("Country".to_string(), 0),
                                 operation: PropValueOperation::Eq,
                                 value: Some(vec![
                                     ScalarValue::Utf8(Some("spain".to_string())),
@@ -351,7 +359,8 @@ mod tests {
                 EventRef::Custom(custom_event.id),
                 None,
                 Some(vec![Breakdown::Property(PropertyRef::Group(
-                    "Device".to_string(),0,
+                    "Device".to_string(),
+                    0,
                 ))]),
                 vec![NamedQuery::new(
                     Query::CountEvents,
@@ -360,7 +369,8 @@ mod tests {
             )],
             filters: None,
             breakdowns: Some(vec![Breakdown::Property(PropertyRef::Group(
-                "Country".to_string(),0,
+                "Country".to_string(),
+                0,
             ))]),
             segments: None,
         };

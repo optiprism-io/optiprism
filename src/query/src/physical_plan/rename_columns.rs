@@ -13,7 +13,7 @@ use async_trait::async_trait;
 use datafusion::execution::RecordBatchStream;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::execution::TaskContext;
-use datafusion::physical_expr::{EquivalenceProperties};
+use datafusion::physical_expr::EquivalenceProperties;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
@@ -55,8 +55,8 @@ impl RenameColumnsExec {
                 return f.deref().clone();
             })
             .collect::<Vec<_>>();
-        let schema= Arc::new(Schema::new(fields));
-        let cache = Self::compute_properties(&input,schema.clone())?;
+        let schema = Arc::new(Schema::new(fields));
+        let cache = Self::compute_properties(&input, schema.clone())?;
         Ok(Self {
             input,
             columns,
@@ -65,7 +65,10 @@ impl RenameColumnsExec {
         })
     }
 
-    fn compute_properties(input: &Arc<dyn ExecutionPlan>, schema:SchemaRef) -> Result<PlanProperties> {
+    fn compute_properties(
+        input: &Arc<dyn ExecutionPlan>,
+        schema: SchemaRef,
+    ) -> Result<PlanProperties> {
         let eq_properties = EquivalenceProperties::new(schema);
 
         Ok(PlanProperties::new(

@@ -27,6 +27,7 @@ use futures::Stream;
 use futures::StreamExt;
 use storage::arrow_conversion::arrow2_to_arrow1;
 use storage::db::OptiDBImpl;
+
 use crate::error::QueryError;
 use crate::Result;
 
@@ -107,8 +108,8 @@ impl ExecutionPlan for DBParquetExec {
         Ok(Box::pin(ParquetStream {
             stream: Pin::new(Box::new(stream))
                 as Pin<
-                Box<dyn Stream<Item=storage::error::Result<Chunk<Box<dyn Array>>>> + Send>,
-            >,
+                    Box<dyn Stream<Item = storage::error::Result<Chunk<Box<dyn Array>>>> + Send>,
+                >,
             schema: self.schema.clone(),
         }))
     }
@@ -116,7 +117,7 @@ impl ExecutionPlan for DBParquetExec {
 
 struct ParquetStream {
     #[allow(clippy::type_complexity)]
-    stream: Pin<Box<dyn Stream<Item=storage::error::Result<Chunk<Box<dyn Array>>>> + Send>>,
+    stream: Pin<Box<dyn Stream<Item = storage::error::Result<Chunk<Box<dyn Array>>>> + Send>>,
     schema: SchemaRef,
 }
 

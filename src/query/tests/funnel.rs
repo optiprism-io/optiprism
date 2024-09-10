@@ -6,16 +6,25 @@ mod tests {
     use chrono::DateTime;
     use chrono::Duration;
     use chrono::Utc;
+    use common::funnel::ChartType;
+    use common::funnel::Count;
+    use common::funnel::Event;
+    use common::funnel::Funnel;
+    use common::funnel::Step;
+    use common::funnel::StepOrder;
+    use common::funnel::TimeIntervalUnitSession;
+    use common::funnel::TimeWindow;
+    use common::funnel::Touch;
     use common::query::Breakdown;
     use common::query::EventRef;
     use common::query::PropertyRef;
     use common::query::QueryTime;
-    use common::funnel::{ChartType, Count, Event, Funnel, Step, StepOrder, TimeIntervalUnitSession, TimeWindow, Touch};
     use metadata::util::init_db;
+    use query::funnel;
     use query::test_util::create_entities;
     use query::test_util::events_provider;
     use query::test_util::run_plan;
-    use query::{Context, funnel};
+    use query::Context;
 
     #[tokio::test]
     async fn test_full() {
@@ -72,7 +81,8 @@ mod tests {
                                       * steps: None,
                                       * }]) */
             breakdowns: Some(vec![Breakdown::Property(PropertyRef::Group(
-                "Device".to_string(),0
+                "Device".to_string(),
+                0,
             ))]),
             segments: None,
             filters: None, /* Some(vec![EventFilter::Property {

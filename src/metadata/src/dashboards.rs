@@ -4,18 +4,21 @@ use std::sync::Arc;
 
 use chrono::DateTime;
 use chrono::Utc;
-use prost::Message;
 use common::types::OptionalProperty;
+use prost::Message;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
+
+use crate::dashboard;
 use crate::error::MetadataError;
 use crate::index::next_seq;
-use crate::{dashboard, make_data_key};
+use crate::make_data_key;
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
-use crate::metadata::{ListResponse, ResponseMetadata};
+use crate::metadata::ListResponse;
+use crate::metadata::ResponseMetadata;
 use crate::project_ns;
 use crate::Result;
 
@@ -92,12 +95,14 @@ impl Dashboards {
         for kv in iter {
             let (key, value) = kv?;
             // check if key contains the prefix
-            if !from_utf8(&prefix).unwrap().is_prefix_of(from_utf8(&key).unwrap()) {
+            if !from_utf8(&prefix)
+                .unwrap()
+                .is_prefix_of(from_utf8(&key).unwrap())
+            {
                 break;
             }
             list.push(deserialize(&value)?);
         }
-
 
         Ok(ListResponse {
             data: list,
@@ -208,18 +213,24 @@ pub struct UpdateDashboardRequest {
 fn serialize(v: &Dashboard) -> Result<Vec<u8>> {
     let tags = if let Some(tags) = &v.tags {
         tags.to_vec()
-    } else { vec![] };
+    } else {
+        vec![]
+    };
 
-    let panels = v.panels.iter().map(|p| dashboard::Panel {
-        r#type: match p.typ {
-            Type::Report => 1,
-        },
-        report_id: p.report_id,
-        x: p.x as u32,
-        y: p.y as u32,
-        w: p.w as u32,
-        h: p.h as u32,
-    }).collect::<Vec<_>>();
+    let panels = v
+        .panels
+        .iter()
+        .map(|p| dashboard::Panel {
+            r#type: match p.typ {
+                Type::Report => 1,
+            },
+            report_id: p.report_id,
+            x: p.x as u32,
+            y: p.y as u32,
+            w: p.w as u32,
+            h: p.h as u32,
+        })
+        .collect::<Vec<_>>();
 
     let d = dashboard::Dashboard {
         id: v.id,
@@ -243,30 +254,43 @@ fn deserialize(data: &[u8]) -> Result<Dashboard> {
         id: from.id,
         created_at: chrono::DateTime::from_timestamp(from.created_at, 0).unwrap(),
         created_by: from.created_by,
-        updated_at: from.updated_at.map(|t| chrono::DateTime::from_timestamp(t, 0).unwrap()),
+        updated_at: from
+            .updated_at
+            .map(|t| chrono::DateTime::from_timestamp(t, 0).unwrap()),
         updated_by: from.updated_by,
         project_id: from.project_id,
-        tags: if from.tags.is_empty() { None } else { Some(from.tags) },
+        tags: if from.tags.is_empty() {
+            None
+        } else {
+            Some(from.tags)
+        },
         name: from.name,
         description: from.description,
-        panels: from.panels.iter().map(|p| Panel {
-            typ: match p.r#type {
-                1 => Type::Report,
-                _ => unreachable!(),
-            },
-            report_id: p.report_id,
-            x: p.x as usize,
-            y: p.y as usize,
-            w: p.w as usize,
-            h: p.h as usize,
-        }).collect::<Vec<_>>(),
+        panels: from
+            .panels
+            .iter()
+            .map(|p| Panel {
+                typ: match p.r#type {
+                    1 => Type::Report,
+                    _ => unreachable!(),
+                },
+                report_id: p.report_id,
+                x: p.x as usize,
+                y: p.y as usize,
+                w: p.w as usize,
+                h: p.h as usize,
+            })
+            .collect::<Vec<_>>(),
     })
 }
 
 #[cfg(test)]
 mod tests {
     use chrono::DateTime;
-    use crate::dashboards::{Dashboard, deserialize, serialize};
+
+    use crate::dashboards::deserialize;
+    use crate::dashboards::serialize;
+    use crate::dashboards::Dashboard;
 
     #[test]
     fn test_roundtrip() {
@@ -280,16 +304,14 @@ mod tests {
             tags: Some(vec!["tag1".to_string(), "tag2".to_string()]),
             name: "test".to_string(),
             description: Some("test description".to_string()),
-            panels: vec![
-                crate::dashboards::Panel {
-                    typ: crate::dashboards::Type::Report,
-                    report_id: 1,
-                    x: 1,
-                    y: 2,
-                    w: 3,
-                    h: 4,
-                },
-            ],
+            panels: vec![crate::dashboards::Panel {
+                typ: crate::dashboards::Type::Report,
+                report_id: 1,
+                x: 1,
+                y: 2,
+                w: 3,
+                h: 4,
+            }],
         };
 
         let data = serialize(&d).unwrap();

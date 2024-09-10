@@ -24,9 +24,9 @@ use storage::test_util::gen_chunk_for_parquet;
 use storage::test_util::read_parquet_as_one_chunk;
 use storage::test_util::unmerge_chunk;
 use storage::test_util::PrimaryIndexType;
+use storage::Fs;
 use tracing::trace;
 use tracing_test::traced_test;
-use storage::Fs;
 
 #[derive(Clone)]
 struct TestCase {
@@ -158,18 +158,11 @@ fn profile(tc: TestCase, case_id: usize, step: ProfileStep) {
             println!("unmerge {:?}", start.elapsed());
 
             let start = Instant::now();
-            out_streams_chunks
-                .into_iter()
-                .for_each(|chunks| {
-                    let mut w = Cursor::new(vec![]);
-                    create_parquet_from_chunks(
-                        chunks,
-                        fields.clone(),
-                        &mut w,
-                        tc.gen_data_page_limit,
-                    )
-                        .unwrap();
-                });
+            out_streams_chunks.into_iter().for_each(|chunks| {
+                let mut w = Cursor::new(vec![]);
+                create_parquet_from_chunks(chunks, fields.clone(), &mut w, tc.gen_data_page_limit)
+                    .unwrap();
+            });
             println!("create parquets {:?}", start.elapsed());
         }
         ProfileStep::Merge => {
@@ -191,7 +184,16 @@ fn profile(tc: TestCase, case_id: usize, step: ProfileStep) {
 
             fs::remove_dir_all("/tmp/merge_profile").ok();
             fs::create_dir_all("/tmp/merge_profile").unwrap();
-            merge(readers, Arc::new(Fs::new()), "/tmp/merge_profile".into(), 1, "t", 0, opts).unwrap();
+            merge(
+                readers,
+                Arc::new(Fs::new()),
+                "/tmp/merge_profile".into(),
+                1,
+                "t",
+                0,
+                opts,
+            )
+            .unwrap();
         }
     }
     println!("{:?}", start.elapsed());
@@ -547,7 +549,7 @@ fn test_different_row_group_sizes() -> anyhow::Result<()> {
                 Some(2),
                 (stream_id + 1) * (stream_id + 1),
             )
-                .unwrap();
+            .unwrap();
 
             w
         })
@@ -575,7 +577,7 @@ fn test_different_row_group_sizes() -> anyhow::Result<()> {
         0,
         opts,
     )
-        .unwrap();
+    .unwrap();
 
     let mut pfile = File::open("/tmp/merge_different_row_group_sizes/1.parquet").unwrap();
     let final_chunk = read_parquet_as_one_chunk(&mut pfile);
@@ -685,7 +687,7 @@ fn test_merge_with_missing_columns() -> anyhow::Result<()> {
             Some(8),
             None,
         ])
-            .boxed(),
+        .boxed(),
         PrimitiveArray::<i64>::from(vec![
             Some(1),
             None,
@@ -697,7 +699,7 @@ fn test_merge_with_missing_columns() -> anyhow::Result<()> {
             None,
             Some(9),
         ])
-            .boxed(),
+        .boxed(),
     ];
 
     let exp = Chunk::new(exp);
@@ -822,7 +824,15 @@ fn test_replacing() -> anyhow::Result<()> {
         merge_max_page_size: 100,
         max_part_size_bytes: None,
     };
-    merge(readers, Arc::new(Fs::new()), "/tmp/merge_replacing".into(), 1, "t", 0, opts)?;
+    merge(
+        readers,
+        Arc::new(Fs::new()),
+        "/tmp/merge_replacing".into(),
+        1,
+        "t",
+        0,
+        opts,
+    )?;
 
     let mut pfile = File::open("/tmp/merge_replacing/1.parquet").unwrap();
     let final_chunk = read_parquet_as_one_chunk(&mut pfile);
@@ -885,7 +895,15 @@ fn test_replacing_different_parts() -> anyhow::Result<()> {
         merge_max_page_size: 100,
         max_part_size_bytes: None,
     };
-    merge(readers, Arc::new(Fs::new()), "/tmp/merge_replacing".into(), 1, "t", 0, opts)?;
+    merge(
+        readers,
+        Arc::new(Fs::new()),
+        "/tmp/merge_replacing".into(),
+        1,
+        "t",
+        0,
+        opts,
+    )?;
 
     let mut pfile = File::open("/tmp/merge_replacing/1.parquet").unwrap();
     let final_chunk = read_parquet_as_one_chunk(&mut pfile);

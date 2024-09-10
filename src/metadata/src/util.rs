@@ -1,12 +1,15 @@
 use std::env::temp_dir;
 use std::sync::Arc;
 
-use common::types::{DType, TABLE_EVENTS};
+use common::group_col;
+use common::types::DType;
+use common::types::TABLE_EVENTS;
+use common::GROUPS_COUNT;
 use storage::db::OptiDBImpl;
 use storage::db::Options;
 use storage::table::Options as TableOptions;
 use uuid::Uuid;
-use common::{group_col, GROUPS_COUNT};
+
 use crate::events;
 use crate::events::Event;
 use crate::properties;
@@ -24,9 +27,10 @@ pub fn init_db() -> anyhow::Result<(Arc<MetadataProvider>, Arc<OptiDBImpl>)> {
 
     let db = Arc::new(OptiDBImpl::open(path.join("db"), Options {})?);
     let opts = TableOptions::test(false);
-    db.create_table(TABLE_EVENTS.to_string(), opts.clone()).unwrap();
+    db.create_table(TABLE_EVENTS.to_string(), opts.clone())
+        .unwrap();
     for i in 0..GROUPS_COUNT {
-        db.create_table(group_col(i),opts.clone()).unwrap()
+        db.create_table(group_col(i), opts.clone()).unwrap()
     }
     Ok((Arc::new(MetadataProvider::try_new(store, db.clone())?), db))
 }

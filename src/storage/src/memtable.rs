@@ -173,7 +173,6 @@ impl Memtable {
                     .downcast_ref::<arrow2::array::Int64Array>()
                     .unwrap();
 
-
                 let mut last = None;
                 for row_id in 0..arrs[0].len() {
                     if last.is_none() {
@@ -215,7 +214,7 @@ impl Memtable {
     }
 
     pub(crate) fn get(&self, key: &[KeyValue]) -> Option<Vec<Value>> {
-        let key = key.iter().map( Value::from).collect::<Vec<_>>();
+        let key = key.iter().map(Value::from).collect::<Vec<_>>();
         let mut last_idx = None;
         for idx in 0..self.len() {
             let mut found = true;
@@ -275,7 +274,7 @@ pub(crate) struct Memtable {
 
 #[cfg(test)]
 mod tests {
-    
+
     use arrow2::array::Int64Array;
     use arrow2::chunk::Chunk;
     use common::types::DType;
@@ -323,7 +322,14 @@ mod tests {
         );
 
         let res = mt.chunk(None, 2, true).unwrap();
-        assert_eq!(res.unwrap(), Chunk::new(vec![Int64Array::from(vec![Some(1), Some(2)]).boxed(), Int64Array::from(vec![Some(2), Some(2)]).boxed(), Int64Array::from(vec![Some(2), Some(4)]).boxed()]));
+        assert_eq!(
+            res.unwrap(),
+            Chunk::new(vec![
+                Int64Array::from(vec![Some(1), Some(2)]).boxed(),
+                Int64Array::from(vec![Some(2), Some(2)]).boxed(),
+                Int64Array::from(vec![Some(2), Some(4)]).boxed()
+            ])
+        );
     }
 
     #[test]
@@ -350,9 +356,13 @@ mod tests {
 
         let res = mt.chunk(None, 2, true).unwrap();
 
-        assert_eq!(res.unwrap(), Chunk::new(vec![
-            Int64Array::from(vec![Some(1), Some(1)]).boxed(),
-            Int64Array::from(vec![Some(1), Some(2)]).boxed(),
-            Int64Array::from(vec![Some(2), Some(1)]).boxed()]));
+        assert_eq!(
+            res.unwrap(),
+            Chunk::new(vec![
+                Int64Array::from(vec![Some(1), Some(1)]).boxed(),
+                Int64Array::from(vec![Some(1), Some(2)]).boxed(),
+                Int64Array::from(vec![Some(2), Some(1)]).boxed()
+            ])
+        );
     }
 }

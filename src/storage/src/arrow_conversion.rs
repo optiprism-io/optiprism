@@ -19,8 +19,11 @@ pub fn arrow2_to_arrow1(
     let arr2_ffi = arrow2::ffi::export_array_to_c(arr2);
     let schema2_ffi = arrow2::ffi::export_field_to_c(&field);
 
-    let arr1_ffi = unsafe { mem::transmute::<arrow2::ffi::ArrowArray, arrow::ffi::FFI_ArrowArray>(arr2_ffi) }; // todo get rid of transmute?
-    let schema1_ffi = unsafe { mem::transmute::<arrow2::ffi::ArrowSchema, arrow::ffi::FFI_ArrowSchema>(schema2_ffi) };
+    let arr1_ffi =
+        unsafe { mem::transmute::<arrow2::ffi::ArrowArray, arrow::ffi::FFI_ArrowArray>(arr2_ffi) }; // todo get rid of transmute?
+    let schema1_ffi = unsafe {
+        mem::transmute::<arrow2::ffi::ArrowSchema, arrow::ffi::FFI_ArrowSchema>(schema2_ffi)
+    };
     let data = unsafe { from_ffi(arr1_ffi, &schema1_ffi)? };
 
     let arr = make_array(data);
@@ -119,8 +122,12 @@ pub mod arrow2_to_arrow1 {
         let arr2_ffi = arrow2::ffi::export_array_to_c(arr2);
         let schema2_ffi = arrow2::ffi::export_field_to_c(&field);
 
-        let arr1_ffi = unsafe { mem::transmute::<arrow2::ffi::ArrowArray, arrow::ffi::FFI_ArrowArray>(arr2_ffi) }; // todo get rid of transmute?
-        let schema1_ffi = unsafe { mem::transmute::<arrow2::ffi::ArrowSchema, arrow::ffi::FFI_ArrowSchema>(schema2_ffi) };
+        let arr1_ffi = unsafe {
+            mem::transmute::<arrow2::ffi::ArrowArray, arrow::ffi::FFI_ArrowArray>(arr2_ffi)
+        }; // todo get rid of transmute?
+        let schema1_ffi = unsafe {
+            mem::transmute::<arrow2::ffi::ArrowSchema, arrow::ffi::FFI_ArrowSchema>(schema2_ffi)
+        };
 
         let data = unsafe { from_ffi(arr1_ffi, &schema1_ffi)? };
         let arr = make_array(data);
@@ -143,7 +150,9 @@ pub mod arrow1_to_arrow2 {
     pub fn convert(arr: ArrayRef) -> Result<Box<dyn Array>> {
         let arr1_ffi = FFI_ArrowArray::new(&arr.to_data());
 
-        let arr2_ffi = unsafe { mem::transmute::<arrow::ffi::FFI_ArrowArray, arrow2::ffi::ArrowArray>(arr1_ffi) };
+        let arr2_ffi = unsafe {
+            mem::transmute::<arrow::ffi::FFI_ArrowArray, arrow2::ffi::ArrowArray>(arr1_ffi)
+        };
 
         let data_type = match arr.data_type() {
             arrow::datatypes::DataType::Int64 => DataType::Int64,

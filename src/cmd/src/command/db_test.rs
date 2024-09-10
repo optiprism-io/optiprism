@@ -1,20 +1,31 @@
 use std::fmt::Write;
-use std::{fs, thread};
+use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::thread;
+
 use clap::Parser;
-use indicatif::{ProgressBar, ProgressState, ProgressStyle};
-use rand::thread_rng;
-use rand::prelude::SliceRandom;
-use tokio::time::Instant;
 use common::config::Config;
-use common::{DATA_PATH_METADATA, DATA_PATH_STORAGE};
 use common::types::DType;
-use metadata::MetadataProvider;
+use common::DATA_PATH_METADATA;
+use common::DATA_PATH_STORAGE;
+use indicatif::ProgressBar;
+use indicatif::ProgressState;
+use indicatif::ProgressStyle;
 use metadata::settings::BackupScheduleInterval;
-use storage::db::{OptiDBImpl, Options};
-use storage::{NamedValue, table, Value};
-use crate::{backup, init_fs, init_metrics};
+use metadata::MetadataProvider;
+use rand::prelude::SliceRandom;
+use rand::thread_rng;
+use storage::db::OptiDBImpl;
+use storage::db::Options;
+use storage::table;
+use storage::NamedValue;
+use storage::Value;
+use tokio::time::Instant;
+
+use crate::backup;
+use crate::init_fs;
+use crate::init_metrics;
 #[derive(Parser, Clone)]
 pub struct Gen {
     #[arg(long)]
@@ -37,12 +48,15 @@ pub struct DbTest {
     pub cmd: Commands,
 }
 
-pub async fn gen(args: &DbTest, gen: &Gen,cfg: Config) -> crate::error::Result<()> {
+pub async fn gen(args: &DbTest, gen: &Gen, cfg: Config) -> crate::error::Result<()> {
     init_metrics();
     fs::remove_dir_all(&args.path)?;
     init_fs(&cfg)?;
     let rocks = Arc::new(metadata::rocksdb::new(args.path.join(DATA_PATH_METADATA))?);
-    let db = Arc::new(OptiDBImpl::open(args.path.join(DATA_PATH_STORAGE), Options {})?);
+    let db = Arc::new(OptiDBImpl::open(
+        args.path.join(DATA_PATH_STORAGE),
+        Options {},
+    )?);
     let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
     let topts = table::Options {
         levels: 7,
@@ -71,7 +85,6 @@ pub async fn gen(args: &DbTest, gen: &Gen,cfg: Config) -> crate::error::Result<(
     db.add_field("t1", "f7", DType::Boolean, true).unwrap();
     db.add_field("t1", "f8", DType::Timestamp, true).unwrap();
 
-
     let pb = ProgressBar::new(gen.records as u64);
     pb.set_style(
         ProgressStyle::with_template(
@@ -96,32 +109,30 @@ pub async fn gen(args: &DbTest, gen: &Gen,cfg: Config) -> crate::error::Result<(
     let mut cfg = Config::default();
     cfg.data.path.clone_from(&args.path);
     backup::init(md.clone(), db.clone(), cfg).await?;
-    /*thread::spawn(move || {
-        loop {
-            db_cloned.full_backup_local("/tmp/bak",|pct|{
-                dbg!(pct);
-            }).unwrap();
-            thread::sleep(Duration::from_secs(1));
-        }
-    });*/
-    /*
-        let db_cloned = db.clone();
-        thread::spawn(move || {
-            loop {
-                db_cloned.flush("t1").unwrap();
-                thread::sleep(Duration::from_secs(1));
-            }
-        });
-    */
+    // thread::spawn(move || {
+    // loop {
+    // db_cloned.full_backup_local("/tmp/bak",|pct|{
+    // dbg!(pct);
+    // }).unwrap();
+    // thread::sleep(Duration::from_secs(1));
+    // }
+    // });
+    // let db_cloned = db.clone();
+    // thread::spawn(move || {
+    // loop {
+    // db_cloned.flush("t1").unwrap();
+    // thread::sleep(Duration::from_secs(1));
+    // }
+    // });
 
-    /*    let db_cloned = db.clone();
-        thread::spawn(move || {
-            loop {
-                db_cloned.full_restore_local("/tmp/bak").unwrap();
-                thread::sleep(Duration::from_secs(1));
-                println!("restore");
-            }
-        });*/
+    //    let db_cloned = db.clone();
+    // thread::spawn(move || {
+    // loop {
+    // db_cloned.full_restore_local("/tmp/bak").unwrap();
+    // thread::sleep(Duration::from_secs(1));
+    // println!("restore");
+    // }
+    // });
     let recs = gen.records;
     let mut hnd = vec![];
     for i in 0..=0 {
@@ -136,9 +147,8 @@ pub async fn gen(args: &DbTest, gen: &Gen,cfg: Config) -> crate::error::Result<(
                 // if j % 3 != i {
                 //     continue;
                 // }
-                db_cloned.insert(
-                    "t1",
-                    vec![
+                db_cloned
+                    .insert("t1", vec![
                         NamedValue::new("f1".to_string(), Value::Int64(Some(vals[i] as i64))),
                         // NamedValue::new("f1".to_string(), Value::Int64(Some(recs as i64 - i as i64))),
                         // NamedValue::new("f1".to_string(), Value::Int64(Some(i as i64))),
@@ -150,8 +160,8 @@ pub async fn gen(args: &DbTest, gen: &Gen,cfg: Config) -> crate::error::Result<(
                         NamedValue::new("f6".to_string(), Value::Decimal(Some(i as i128))),
                         NamedValue::new("f7".to_string(), Value::Boolean(Some(i % 2 == 0))),
                         NamedValue::new("f8".to_string(), Value::Timestamp(Some(i as i64))),
-                    ],
-                ).unwrap();
+                    ])
+                    .unwrap();
                 pb_cloned.inc(1);
             }
         });
@@ -164,19 +174,21 @@ pub async fn gen(args: &DbTest, gen: &Gen,cfg: Config) -> crate::error::Result<(
 }
 
 pub async fn query(args: &DbTest, _q: &Query) -> crate::error::Result<()> {
-    /*
-        let a = Instant::now();
-        let i = ArrowIteratorImpl::new(BufReader::new(File::open("/tmp/storage/data/tables/t1/levels/1/31.parquet").unwrap()), vec!["f1".to_string()], 10000).unwrap();
-        let mut c = 0;
-        for v in i {
-            println!("!");
-            let v=v.unwrap();
-            c+=v.len();
-        }
-        println!("{c}");
-        println!("{:?}", a.elapsed());
-        panic!();*/
-    let db = Arc::new(OptiDBImpl::open(args.path.join(DATA_PATH_STORAGE), Options {})?);
+    // let a = Instant::now();
+    // let i = ArrowIteratorImpl::new(BufReader::new(File::open("/tmp/storage/data/tables/t1/levels/1/31.parquet").unwrap()), vec!["f1".to_string()], 10000).unwrap();
+    // let mut c = 0;
+    // for v in i {
+    // println!("!");
+    // let v=v.unwrap();
+    // c+=v.len();
+    // }
+    // println!("{c}");
+    // println!("{:?}", a.elapsed());
+    // panic!();
+    let db = Arc::new(OptiDBImpl::open(
+        args.path.join(DATA_PATH_STORAGE),
+        Options {},
+    )?);
 
     let s = Instant::now();
     let mut v = 0;
@@ -189,21 +201,20 @@ pub async fn query(args: &DbTest, _q: &Query) -> crate::error::Result<()> {
     let s = Instant::now();
     let v = 0;
     let i = 0;
-    /*loop {
-        match scan.next().await {
-            None => {
-                break;
-            }
-            Some(Ok(chunk)) => {
-                // v += chunk.len();
-                let arr = chunk.arrays()[0].as_any().downcast_ref::<Int64Array>().unwrap();
-                i = arr.value(arr.len() - 1);
-            }
-
-            Some(Err(e)) => { return Err(e.into()) }
-        }
-    }
-*/
+    // loop {
+    // match scan.next().await {
+    // None => {
+    // break;
+    // }
+    // Some(Ok(chunk)) => {
+    // v += chunk.len();
+    // let arr = chunk.arrays()[0].as_any().downcast_ref::<Int64Array>().unwrap();
+    // i = arr.value(arr.len() - 1);
+    // }
+    //
+    // Some(Err(e)) => { return Err(e.into()) }
+    // }
+    // }
     dbg!(s.elapsed());
     dbg!(v);
     dbg!(i + 1);

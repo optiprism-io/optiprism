@@ -1,17 +1,21 @@
 use std::collections::BinaryHeap;
 use std::ffi::OsStr;
-use std::{fs, io};
+use std::fs;
 use std::fs::File;
 use std::fs::OpenOptions;
-use std::io::{BufReader, Seek};
+use std::io;
+use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::Read;
+use std::io::Seek;
 use std::io::Write;
 use std::mem;
 use std::num::NonZeroUsize;
 use std::os::unix::fs::MetadataExt;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::path::PathBuf;
 use std::pin::Pin;
+use std::str::pattern::Pattern;
 use std::sync::mpsc;
 use std::sync::mpsc::Sender;
 use std::sync::Arc;
@@ -40,24 +44,28 @@ use arrow_array::StringArray;
 use arrow_array::TimestampNanosecondArray;
 use bincode::deserialize;
 use bincode::serialize;
-use flate2::Compression;
-use common::types::{METRIC_BACKUP_TIME_SECONDS, METRIC_BACKUPS_TOTAL, METRIC_STORE_FLUSH_TIME_SECONDS};
 use common::types::DType;
+use common::types::METRIC_BACKUPS_TOTAL;
+use common::types::METRIC_BACKUP_TIME_SECONDS;
 use common::types::METRIC_STORE_FLUSHES_TOTAL;
-use common::types::METRIC_STORE_INSERT_TIME_SECONDS;
+use common::types::METRIC_STORE_FLUSH_TIME_SECONDS;
 use common::types::METRIC_STORE_INSERTS_TOTAL;
+use common::types::METRIC_STORE_INSERT_TIME_SECONDS;
 use common::types::METRIC_STORE_MEMTABLE_ROWS;
-use common::types::METRIC_STORE_PART_SIZE_BYTES;
-use common::types::METRIC_STORE_PART_VALUES;
 use common::types::METRIC_STORE_PARTS;
 use common::types::METRIC_STORE_PARTS_SIZE_BYTES;
 use common::types::METRIC_STORE_PARTS_VALUES;
+use common::types::METRIC_STORE_PART_SIZE_BYTES;
+use common::types::METRIC_STORE_PART_VALUES;
 use common::types::METRIC_STORE_RECOVERY_TIME_SECONDS;
+use common::types::METRIC_STORE_SCANS_TOTAL;
 use common::types::METRIC_STORE_SCAN_MEMTABLE_SECONDS;
 use common::types::METRIC_STORE_SCAN_PARTS;
 use common::types::METRIC_STORE_SCAN_TIME_SECONDS;
-use common::types::METRIC_STORE_SCANS_TOTAL;
 use common::types::METRIC_STORE_TABLE_FIELDS;
+use flate2::read::ZlibDecoder;
+use flate2::write::ZlibEncoder;
+use flate2::Compression;
 use futures::Stream;
 use lru::LruCache;
 use metrics::counter;
@@ -69,7 +77,10 @@ use parking_lot::RwLock;
 use parquet2::compression::ZstdLevel;
 use serde::Deserialize;
 use serde::Serialize;
-use tracing::{error, info, trace};
+use tracing::error;
+use tracing::info;
+use tracing::trace;
+
 use crate::arrow_conversion::schema2_to_schema1;
 use crate::compaction::Compactor;
 use crate::compaction::CompactorMessage;
@@ -82,20 +93,17 @@ use crate::parquet::arrow_merger::MemChunkIterator;
 use crate::parquet::arrow_merger::MergingIterator;
 use crate::parquet::chunk_min_max;
 use crate::table;
-use crate::table::SerializableTable;
-use crate::table::serialize_md;
 use crate::table::deserialize_md;
+use crate::table::serialize_md;
 use crate::table::Level;
 use crate::table::Metadata;
 use crate::table::Part;
+use crate::table::SerializableTable;
 use crate::table::Table;
 use crate::Fs;
 use crate::KeyValue;
 use crate::NamedValue;
 use crate::Value;
-use std::str::pattern::Pattern;
-use flate2::read::ZlibDecoder;
-use flate2::write::ZlibEncoder;
 
 // todo make semver
 const VERSION: u64 = 1;
@@ -113,12 +121,7 @@ pub(crate) fn log_name(log_id: u64) -> String {
 }
 
 pub(crate) fn log_path(path: &Path, tbl_name: &str, log_id: u64) -> PathBuf {
-    path.join(
-        format!(
-            "tables/{}/{:016}.log",
-            tbl_name,
-            log_id
-        ))
+    path.join(format!("tables/{}/{:016}.log", tbl_name, log_id))
 }
 fn collect_metrics(tables: Arc<RwLock<Vec<Table>>>) {
     loop {
@@ -163,14 +166,21 @@ fn gc(tables: Arc<RwLock<Vec<Table>>>, path: PathBuf, fs: Arc<Fs>) {
         let tbl = tables.read().clone();
         for tbl in tbl {
             let md = tbl.metadata.lock().clone();
-            let dir = fs::read_dir(path.join("tables").join(tbl.name.clone())).expect("read_dir failed");
+            let dir =
+                fs::read_dir(path.join("tables").join(tbl.name.clone())).expect("read_dir failed");
             for f in dir {
                 let f = f.expect("read_dir failed");
                 let fname = f.file_name().to_os_string().into_string().unwrap();
                 if ".log".is_suffix_of(&fname) {
-                    let log_id = fname.split(".").next().unwrap().parse::<u64>().expect("parse failed");
+                    let log_id = fname
+                        .split(".")
+                        .next()
+                        .unwrap()
+                        .parse::<u64>()
+                        .expect("parse failed");
                     if log_id < md.log_id {
-                        match fs.try_remove_file(f.path()) { // try to remove log. It may be removed during flush_op
+                        match fs.try_remove_file(f.path()) {
+                            // try to remove log. It may be removed during flush_op
                             Ok(_) => {}
                             Err(err) => {
                                 error!("remove failed: {}", err);
@@ -186,7 +196,12 @@ fn gc(tables: Arc<RwLock<Vec<Table>>>, path: PathBuf, fs: Arc<Fs>) {
                         let f = f.expect("read_dir failed");
                         let fname = f.file_name().to_os_string().into_string().unwrap();
                         if ".parquet".is_suffix_of(&fname) {
-                            let part_id = fname.split(".").next().unwrap().parse::<u64>().expect("parse failed");
+                            let part_id = fname
+                                .split(".")
+                                .next()
+                                .unwrap()
+                                .parse::<u64>()
+                                .expect("parse failed");
                             let mut found = false;
                             for part in md.levels[lvl].parts.iter() {
                                 if part.id == part_id as usize {
@@ -260,7 +275,6 @@ fn recover_op(op: LogOp, memtable: &mut Memtable) -> Result<()> {
         }
     }
 
-
     Ok(())
 }
 
@@ -283,7 +297,10 @@ pub(crate) fn write_metadata(manifest: &mut File, metadata: &mut Metadata) -> Re
 
 fn try_recover_table(path: PathBuf, name: String) -> Result<Table> {
     let start_time = Instant::now();
-    let mut mdf = OpenOptions::new().read(true).write(true).open(path.join("metadata"))?;
+    let mut mdf = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(path.join("metadata"))?;
     let mut crc_b = [0u8; mem::size_of::<u32>()];
     let read_bytes = mdf.read(&mut crc_b)?;
     if read_bytes == 0 {
@@ -505,10 +522,7 @@ fn flush_log_(
     metadata.log_id += 1;
 
     // create new log
-    trace!(
-        "creating new log file {:?}",
-        log_name(metadata.log_id)
-    );
+    trace!("creating new log file {:?}", log_name(metadata.log_id));
 
     let mut manifest = OpenOptions::new()
         .write(true)
@@ -519,7 +533,7 @@ fn flush_log_(
 
     trace!(
         "removing previous log file {:?}",
-        log_name(metadata.log_id-1)
+        log_name(metadata.log_id - 1)
     );
     fs.try_remove_file(log_path(path, &metadata.table_name, metadata.log_id - 1))?;
     let log = OpenOptions::new()
@@ -527,14 +541,15 @@ fn flush_log_(
         .write(true)
         .read(true)
         .open(log_path(path, &metadata.table_name, metadata.log_id))?;
-    histogram!(METRIC_STORE_FLUSH_TIME_SECONDS,"table"=>metadata.table_name.clone()).record(start_time.elapsed());
+    histogram!(METRIC_STORE_FLUSH_TIME_SECONDS,"table"=>metadata.table_name.clone())
+        .record(start_time.elapsed());
     counter!(METRIC_STORE_FLUSHES_TOTAL,"table"=>metadata.table_name.clone()).increment(1);
 
     Ok(log)
 }
 
 pub struct ScanStream {
-    pub iter: Box<dyn Iterator<Item=Result<Chunk<Box<dyn Array>>>> + Send>,
+    pub iter: Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>,
     start_time: Instant,
     path: PathBuf,
     md: Metadata,
@@ -544,7 +559,7 @@ pub struct ScanStream {
 
 impl ScanStream {
     pub(crate) fn new(
-        iter: Box<dyn Iterator<Item=Result<Chunk<Box<dyn Array>>>> + Send>,
+        iter: Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>,
         path: PathBuf,
         md: Metadata,
         fs: Arc<Fs>,
@@ -640,11 +655,10 @@ impl OptiDBImpl {
                 rdrs.push(rdr);
             }
         }
-        gauge!(METRIC_STORE_SCAN_PARTS, "table"=>tbl_name.to_string())
-            .set(rdrs.len() as f64);
+        gauge!(METRIC_STORE_SCAN_PARTS, "table"=>tbl_name.to_string()).set(rdrs.len() as f64);
         let iter = if rdrs.is_empty() {
             Box::new(MemChunkIterator::new(maybe_chunk))
-                as Box<dyn Iterator<Item=Result<Chunk<Box<dyn Array>>>> + Send>
+                as Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>
         } else {
             let opts = arrow_merger::Options {
                 index_cols: metadata.opts.index_cols,
@@ -662,10 +676,16 @@ impl OptiDBImpl {
                 maybe_chunk,
                 Schema::from(projected_fields),
                 opts,
-            )?) as Box<dyn Iterator<Item=Result<Chunk<Box<dyn Array>>>> + Send>
+            )?) as Box<dyn Iterator<Item = Result<Chunk<Box<dyn Array>>>> + Send>
         };
         counter!(METRIC_STORE_SCANS_TOTAL, "table"=>tbl_name.to_string()).increment(1);
-        Ok(ScanStream::new(iter, self.path.clone(), metadata.clone(), self.fs.clone(), tbl_name.to_string()))
+        Ok(ScanStream::new(
+            iter,
+            self.path.clone(),
+            metadata.clone(),
+            self.fs.clone(),
+            tbl_name.to_string(),
+        ))
     }
 
     // #[instrument(level = "trace", skip(self))]
@@ -1344,14 +1364,20 @@ impl OptiDBImpl {
         writer.write_all(VERSION.to_le_bytes().as_slice())?;
 
         // tables
-        let tbls = tables.iter().map(table::serialize_table).collect::<Vec<_>>();
+        let tbls = tables
+            .iter()
+            .map(table::serialize_table)
+            .collect::<Vec<_>>();
         let parts_size = tbls
             .iter()
-            .map(|tbl| tbl.metadata.levels.iter().map(|l| l.parts.iter()
-                .map(|p| p.size_bytes)
-                .sum::<u64>())
-                .sum::<u64>()
-            ).sum::<u64>();
+            .map(|tbl| {
+                tbl.metadata
+                    .levels
+                    .iter()
+                    .map(|l| l.parts.iter().map(|p| p.size_bytes).sum::<u64>())
+                    .sum::<u64>()
+            })
+            .sum::<u64>();
 
         let data = serialize(&tbls)?;
         writer.write_all((data.len() as u64).to_le_bytes().as_slice())?;
@@ -1361,12 +1387,13 @@ impl OptiDBImpl {
         for tbl in tbls {
             // log
             let log_path = log_path(&self.path, &tbl.name, tbl.metadata.log_id);
-            let log_bak_path = format!("{}.bak", log_path.clone().into_os_string().into_string().unwrap());
+            let log_bak_path = format!(
+                "{}.bak",
+                log_path.clone().into_os_string().into_string().unwrap()
+            );
             fs::copy(&log_path, &log_bak_path)?;
             self.fs.close(&log_path)?;
-            let mut log = OpenOptions::new()
-                .read(true)
-                .open(&log_bak_path).unwrap();
+            let mut log = OpenOptions::new().read(true).open(&log_bak_path).unwrap();
             writer.write_all(log.metadata()?.size().to_le_bytes().as_slice())?;
             io::copy(&mut log, writer)?;
             drop(log);
@@ -1444,18 +1471,13 @@ impl OptiDBImpl {
             let mut log = File::create(log_path(path.as_ref(), &tbl.name, 0))?;
             io::copy(&mut log_rdr, &mut &mut log)?;
 
-            fs::create_dir(path.join(format!(
-                "tables/{}/levels",
-                tbl.name
-            )))?;
+            fs::create_dir(path.join(format!("tables/{}/levels", tbl.name)))?;
             for (lvl_id, lvl) in tbl.metadata.levels.iter().enumerate() {
-                fs::create_dir(path.join(format!(
-                    "tables/{}/levels/{}",
-                    tbl.name, lvl_id
-                )))?;
+                fs::create_dir(path.join(format!("tables/{}/levels/{}", tbl.name, lvl_id)))?;
 
                 for part in lvl.parts.iter() {
-                    let mut part_w = File::create(part_path(path.as_ref(), &tbl.name, lvl_id, part.id))?;
+                    let mut part_w =
+                        File::create(part_path(path.as_ref(), &tbl.name, lvl_id, part.id))?;
                     let mut part_rdr = reader.take(part.size_bytes);
                     io::copy(&mut part_rdr, &mut part_w)?;
                 }
@@ -1508,7 +1530,6 @@ mod tests {
     use arrow2::array::Int64Array;
     use arrow2::chunk::Chunk;
     use common::types::DType;
-
 
     use crate::db::OptiDBImpl;
     use crate::db::Options;
@@ -1583,21 +1604,21 @@ mod tests {
             NamedValue::new("f2".to_string(), Value::Int64(Some(1))),
             NamedValue::new("f3".to_string(), Value::Int64(Some(1))),
         ])
-            .unwrap();
+        .unwrap();
 
         db.replace("t1", vec![
             NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
             NamedValue::new("f2".to_string(), Value::Int64(Some(1))),
             NamedValue::new("f3".to_string(), Value::Int64(Some(2))),
         ])
-            .unwrap();
+        .unwrap();
 
         db.replace("t1", vec![
             NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
             NamedValue::new("f2".to_string(), Value::Int64(Some(2))),
             NamedValue::new("f3".to_string(), Value::Int64(Some(3))),
         ])
-            .unwrap();
+        .unwrap();
 
         let r = db.replace("t1", vec![
             NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
@@ -1641,21 +1662,21 @@ mod tests {
             NamedValue::new("f2".to_string(), Value::Int64(Some(1))),
             NamedValue::new("f3".to_string(), Value::Int64(Some(1))),
         ])
-            .unwrap();
+        .unwrap();
 
         db.insert("t1", vec![
             NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
             NamedValue::new("f2".to_string(), Value::Int64(Some(2))),
             NamedValue::new("f3".to_string(), Value::Int64(Some(2))),
         ])
-            .unwrap();
+        .unwrap();
 
         db.insert("t1", vec![
             NamedValue::new("f1".to_string(), Value::Int64(Some(2))),
             NamedValue::new("f2".to_string(), Value::Int64(Some(1))),
             NamedValue::new("f3".to_string(), Value::Int64(Some(3))),
         ])
-            .unwrap();
+        .unwrap();
 
         // get from memtable
         let res = db.get_cas("t1", vec![KeyValue::Int64(1)]).unwrap();
@@ -1703,7 +1724,7 @@ mod tests {
                 NamedValue::new("f1".to_string(), Value::Int64(Some(i))),
                 NamedValue::new("f2".to_string(), Value::Int64(Some(i))),
             ])
-                .unwrap();
+            .unwrap();
 
             if i % 150 == 0 {
                 db.flush("t1").unwrap();
@@ -1754,25 +1775,25 @@ mod tests {
             NamedValue::new("f2".to_string(), Value::Int64(Some(1))), // version
             NamedValue::new("f3".to_string(), Value::Int64(Some(1))), // counter
         ])
-            .unwrap();
+        .unwrap();
         db.insert("t1", vec![
             NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
             NamedValue::new("f2".to_string(), Value::Int64(Some(2))),
             NamedValue::new("f3".to_string(), Value::Int64(Some(2))),
         ])
-            .unwrap();
+        .unwrap();
         db.insert("t1", vec![
             NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
             NamedValue::new("f2".to_string(), Value::Int64(Some(3))),
             NamedValue::new("f3".to_string(), Value::Int64(Some(3))),
         ])
-            .unwrap();
+        .unwrap();
         db.insert("t1", vec![
             NamedValue::new("f1".to_string(), Value::Int64(Some(2))),
             NamedValue::new("f2".to_string(), Value::Int64(Some(1))),
             NamedValue::new("f3".to_string(), Value::Int64(Some(1))),
         ])
-            .unwrap();
+        .unwrap();
 
         let r = db.get("t1", vec![KeyValue::Int64(1)]).unwrap();
         assert!(r.is_some());
@@ -1813,7 +1834,7 @@ mod tests {
             NamedValue::new("f2".to_string(), Value::Int64(Some(4))),
             NamedValue::new("f3".to_string(), Value::Int64(Some(4))),
         ])
-            .unwrap();
+        .unwrap();
 
         db.flush("t1").unwrap();
 
@@ -1822,7 +1843,7 @@ mod tests {
             NamedValue::new("f2".to_string(), Value::Int64(Some(5))),
             NamedValue::new("f3".to_string(), Value::Int64(Some(5))),
         ])
-            .unwrap();
+        .unwrap();
         db.flush("t1").unwrap();
 
         db.insert("t1", vec![
@@ -1830,7 +1851,7 @@ mod tests {
             NamedValue::new("f2".to_string(), Value::Int64(Some(2))),
             NamedValue::new("f3".to_string(), Value::Int64(Some(2))),
         ])
-            .unwrap();
+        .unwrap();
 
         db.flush("t1").unwrap();
 
@@ -1839,7 +1860,7 @@ mod tests {
             NamedValue::new("f2".to_string(), Value::Int64(Some(3))),
             NamedValue::new("f3".to_string(), Value::Int64(Some(3))),
         ])
-            .unwrap();
+        .unwrap();
 
         db.flush("t1").unwrap();
         db.compact();
@@ -1886,7 +1907,7 @@ mod tests {
             NamedValue::new("f1".to_string(), Value::Int64(Some(1))), // pk
             NamedValue::new("f2".to_string(), Value::Int64(Some(1))), // version
         ])
-            .unwrap();
+        .unwrap();
 
         db.flush("t1").unwrap();
 
@@ -1894,7 +1915,7 @@ mod tests {
             NamedValue::new("f1".to_string(), Value::Int64(Some(1))), // pk
             NamedValue::new("f2".to_string(), Value::Int64(Some(2))), // version
         ])
-            .unwrap();
+        .unwrap();
 
         db.flush("t1").unwrap();
 
@@ -1902,12 +1923,12 @@ mod tests {
             NamedValue::new("f1".to_string(), Value::Int64(Some(1))), // pk
             NamedValue::new("f2".to_string(), Value::Int64(Some(3))), // version
         ])
-            .unwrap();
+        .unwrap();
         db.insert("t1", vec![
             NamedValue::new("f1".to_string(), Value::Int64(Some(1))), // pk
             NamedValue::new("f2".to_string(), Value::Int64(Some(4))), // version
         ])
-            .unwrap();
+        .unwrap();
 
         let mut stream = db.scan("t1", vec![0, 1]).unwrap();
 
@@ -1950,7 +1971,7 @@ mod tests {
             NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
             NamedValue::new("f2".to_string(), Value::Int64(Some(1))),
         ])
-            .unwrap();
+        .unwrap();
         db.add_field("t1", "f3", DType::Int64, false).unwrap();
 
         db.insert("t1", vec![
@@ -1958,7 +1979,7 @@ mod tests {
             NamedValue::new("f2".to_string(), Value::Int64(Some(2))),
             NamedValue::new("f3".to_string(), Value::Int64(Some(2))),
         ])
-            .unwrap();
+        .unwrap();
 
         db.flush("t1").unwrap();
     }
@@ -1995,10 +2016,11 @@ mod tests {
         // check if log saves properly after record adding
         let db = open_db("recovery", true);
         db.add_field("t1", "f1", DType::Int64, false).unwrap();
-        db.insert("t1", vec![
-            NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
-        ])
-            .unwrap();
+        db.insert("t1", vec![NamedValue::new(
+            "f1".to_string(),
+            Value::Int64(Some(1)),
+        )])
+        .unwrap();
         let db2 = open_db("recovery", false);
         let r = db2.get("t1", vec![KeyValue::Int64(1)]).unwrap();
         assert_eq!(r, Some(vec![Value::Int64(Some(1))]));
@@ -2006,10 +2028,11 @@ mod tests {
         // check if log saves properly after record adding
         let db = open_db("recovery", true);
         db.add_field("t1", "f1", DType::Int64, false).unwrap();
-        db.insert("t1", vec![
-            NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
-        ])
-            .unwrap();
+        db.insert("t1", vec![NamedValue::new(
+            "f1".to_string(),
+            Value::Int64(Some(1)),
+        )])
+        .unwrap();
         let db2 = open_db("recovery", false);
         db2.flush("t1").unwrap();
         let r = db2.get("t1", vec![KeyValue::Int64(1)]).unwrap();
@@ -2045,32 +2068,36 @@ mod tests {
             db.create_table(tn.clone(), topts).unwrap();
             db.add_field(&tn, "f1", DType::Int64, false).unwrap();
 
-            db.insert(&tn, vec![
-                NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
-            ])
-                .unwrap();
+            db.insert(&tn, vec![NamedValue::new(
+                "f1".to_string(),
+                Value::Int64(Some(1)),
+            )])
+            .unwrap();
             // write first part
             db.flush(&tn).unwrap();
 
-            db.insert(&tn, vec![
-                NamedValue::new("f1".to_string(), Value::Int64(Some(2))),
-            ])
-                .unwrap();
+            db.insert(&tn, vec![NamedValue::new(
+                "f1".to_string(),
+                Value::Int64(Some(2)),
+            )])
+            .unwrap();
             // write second part. this way we got part in l1
             db.flush(&tn).unwrap();
             db.compact();
-            db.insert(&tn, vec![
-                NamedValue::new("f1".to_string(), Value::Int64(Some(3))),
-            ])
-                .unwrap();
+            db.insert(&tn, vec![NamedValue::new(
+                "f1".to_string(),
+                Value::Int64(Some(3)),
+            )])
+            .unwrap();
             // write third part. this will go to l0
             db.flush(&tn).unwrap();
 
             // insert into binlog
-            db.insert(&tn, vec![
-                NamedValue::new("f1".to_string(), Value::Int64(Some(4))),
-            ])
-                .unwrap();
+            db.insert(&tn, vec![NamedValue::new(
+                "f1".to_string(),
+                Value::Int64(Some(4)),
+            )])
+            .unwrap();
         }
         db.full_backup_local("/tmp/db.bak", |_| {}).unwrap();
         db.full_restore_local("/tmp/db.bak").unwrap();

@@ -8,6 +8,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::task::Context;
 use std::task::Poll;
+
 use ahash::RandomState;
 use arrow::array::Array;
 use arrow::array::ArrayRef;
@@ -36,8 +37,8 @@ use datafusion::execution::SendableRecordBatchStream;
 use datafusion::execution::TaskContext;
 use datafusion::physical_expr::expressions::col;
 use datafusion::physical_expr::expressions::Column;
-use datafusion::physical_expr::{EquivalenceProperties};
 use datafusion::physical_expr::Distribution;
+use datafusion::physical_expr::EquivalenceProperties;
 use datafusion::physical_expr::Partitioning::UnknownPartitioning;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
@@ -52,6 +53,7 @@ use datafusion_common::Result as DFResult;
 use datafusion_common::ScalarValue;
 use futures::Stream;
 use futures::StreamExt;
+
 use crate::error::QueryError;
 use crate::error::Result;
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Funnel;
@@ -303,7 +305,10 @@ impl FunnelPartialExec {
         })
     }
 
-    fn compute_properties(input: &Arc<dyn ExecutionPlan>, schema: SchemaRef) -> Result<PlanProperties> {
+    fn compute_properties(
+        input: &Arc<dyn ExecutionPlan>,
+        schema: SchemaRef,
+    ) -> Result<PlanProperties> {
         let eq_properties = EquivalenceProperties::new(schema);
         Ok(PlanProperties::new(
             eq_properties,
@@ -380,7 +385,7 @@ impl ExecutionPlan for FunnelPartialExec {
                 self.partition_col.clone(),
                 self.expr.clone(),
             )
-                .map_err(QueryError::into_datafusion_execution_error)?,
+            .map_err(QueryError::into_datafusion_execution_error)?,
         ))
     }
 
@@ -505,7 +510,7 @@ impl Stream for PartialFunnelStream {
                                     &batch,
                                     Some(&self.segment_partitions.borrow()[segment]),
                                 )
-                                    .map_err(QueryError::into_datafusion_execution_error)?;
+                                .map_err(QueryError::into_datafusion_execution_error)?;
                             } else {
                                 agg.evaluate(&batch, None)
                                     .map_err(QueryError::into_datafusion_execution_error)?;
@@ -735,11 +740,10 @@ impl RecordBatchStream for FinalFunnelStream {
 
 #[cfg(test)]
 mod tests {
-    
+
     use std::sync::Arc;
     use std::sync::Mutex;
 
-    
     use arrow::datatypes::DataType;
     use arrow::util::pretty::print_batches;
     use arrow_row::SortField;
@@ -854,7 +858,7 @@ mod tests {
             Column::new_with_schema("u", &schema).unwrap(),
             Arc::new(Mutex::new(f)),
         )
-            .unwrap();
+        .unwrap();
         let session_ctx = SessionContext::new();
         let task_ctx = session_ctx.task_ctx();
         let stream = exec.execute(0, task_ctx).unwrap();

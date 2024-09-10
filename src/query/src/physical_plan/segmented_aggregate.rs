@@ -30,7 +30,8 @@ use datafusion::execution::context::TaskContext;
 use datafusion::physical_expr::expressions::col;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::expressions::Max;
-use datafusion::physical_expr::{Distribution, EquivalenceProperties};
+use datafusion::physical_expr::Distribution;
+use datafusion::physical_expr::EquivalenceProperties;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
 use datafusion::physical_expr::PhysicalSortRequirement;
@@ -55,6 +56,7 @@ use datafusion_common::Result as DFResult;
 use datafusion_common::ScalarValue;
 use futures::Stream;
 use futures::StreamExt;
+
 use crate::error::QueryError;
 use crate::physical_plan::expressions::aggregate;
 use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
@@ -180,7 +182,7 @@ impl SegmentedAggregatePartialExec {
         let group_fields = [vec![segment_field], group_fields].concat();
         let fields: Vec<FieldRef> = [group_fields.clone(), agg_result_fields].concat();
         let schema = Arc::new(Schema::new(fields));
-        let cache = Self::compute_properties(&input,schema.clone())?;
+        let cache = Self::compute_properties(&input, schema.clone())?;
         Ok(Self {
             input,
             segment_inputs: partition_inputs,
@@ -193,7 +195,10 @@ impl SegmentedAggregatePartialExec {
         })
     }
 
-    fn compute_properties(input: &Arc<dyn ExecutionPlan>,schema:SchemaRef) -> Result<PlanProperties> {
+    fn compute_properties(
+        input: &Arc<dyn ExecutionPlan>,
+        schema: SchemaRef,
+    ) -> Result<PlanProperties> {
         let eq_properties = EquivalenceProperties::new(schema);
         Ok(PlanProperties::new(
             eq_properties,

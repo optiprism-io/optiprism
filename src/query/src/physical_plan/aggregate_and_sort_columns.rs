@@ -4,6 +4,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
+
 use arrow::array::Array;
 use arrow::array::ArrayRef;
 use arrow::array::Decimal128Array;
@@ -22,7 +23,7 @@ use common::DECIMAL_SCALE;
 use datafusion::execution::RecordBatchStream;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::execution::TaskContext;
-use datafusion::physical_expr::{EquivalenceProperties};
+use datafusion::physical_expr::EquivalenceProperties;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
@@ -32,6 +33,7 @@ use datafusion_common::DataFusionError;
 use datafusion_common::Result as DFResult;
 use futures::Stream;
 use futures::StreamExt;
+
 use crate::error::QueryError;
 use crate::Result;
 
@@ -61,7 +63,7 @@ impl AggregateAndSortColumnsExec {
             }
         }
         let schema = Arc::new(Schema::new(cols));
-        let cache = Self::compute_properties(&input,schema.clone())?;
+        let cache = Self::compute_properties(&input, schema.clone())?;
 
         Ok(Self {
             input,
@@ -71,7 +73,10 @@ impl AggregateAndSortColumnsExec {
         })
     }
 
-    fn compute_properties(input: &Arc<dyn ExecutionPlan>,schema:SchemaRef) -> Result<PlanProperties> {
+    fn compute_properties(
+        input: &Arc<dyn ExecutionPlan>,
+        schema: SchemaRef,
+    ) -> Result<PlanProperties> {
         let eq_properties = EquivalenceProperties::new(schema);
         Ok(PlanProperties::new(
             eq_properties,
@@ -188,7 +193,7 @@ impl Stream for AggregateAndSortColumnsStream {
 
                 Poll::Ready(Some(Ok(rb)))
             }
-            other=>other,
+            other => other,
         }
     }
 }

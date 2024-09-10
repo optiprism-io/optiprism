@@ -11,6 +11,7 @@ use datafusion_common::DFSchemaRef;
 use datafusion_expr::Expr;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::UserDefinedLogicalNode;
+
 use crate::error::QueryError;
 use crate::Result;
 

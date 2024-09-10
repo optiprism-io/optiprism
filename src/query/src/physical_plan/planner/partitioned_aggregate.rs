@@ -13,6 +13,7 @@ use datafusion_expr::Expr;
 use num_traits::Bounded;
 use num_traits::Num;
 use num_traits::NumCast;
+
 use crate::error::QueryError;
 use crate::error::Result;
 use crate::logical_plan;

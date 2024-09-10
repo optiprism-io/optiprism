@@ -10,8 +10,8 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::error::MetadataError;
-use crate::session;
 use crate::project_ns;
+use crate::session;
 use crate::Result;
 
 const NAMESPACE: &[u8] = b"sessions";
@@ -22,7 +22,7 @@ fn make_data_key(project_id: u64, user_id: u64) -> Vec<u8> {
         b"/data".as_slice(),
         user_id.to_string().as_bytes(),
     ]
-        .concat()
+    .concat()
 }
 
 pub struct Sessions {
@@ -54,7 +54,10 @@ impl Sessions {
         for kv in iter {
             let (key, value) = kv?;
             // check if key contains the prefix
-            if !from_utf8(&prefix).unwrap().is_prefix_of(from_utf8(&key).unwrap()) {
+            if !from_utf8(&prefix)
+                .unwrap()
+                .is_prefix_of(from_utf8(&key).unwrap())
+            {
                 break;
             }
             list.push(deserialize(&value)?);
@@ -157,7 +160,9 @@ fn deserialize(data: &[u8]) -> Result<Session> {
 #[cfg(test)]
 mod tests {
     use chrono::DateTime;
-    use crate::sessions::{deserialize, serialize};
+
+    use crate::sessions::deserialize;
+    use crate::sessions::serialize;
 
     #[test]
     fn test_roundtrip() {

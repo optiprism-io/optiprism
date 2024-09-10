@@ -1,17 +1,29 @@
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
-use serde::Deserialize;
-use serde::Serialize;
+use chrono::DateTime;
+use chrono::Utc;
 use common::rbac::ProjectPermission;
 use metadata::MetadataProvider;
 use query::context::Format;
 use query::event_records;
 use query::event_records::fix_search_request;
-use crate::{Context, PlatformError, PropertyAndValue, PropertyRef, QueryParams, QueryResponse, QueryResponseFormat, QueryTime, scalar_to_json, validate_event, validate_event_filter};
+use serde::Deserialize;
+use serde::Serialize;
+
+use crate::scalar_to_json;
+use crate::validate_event;
+use crate::validate_event_filter;
+use crate::Context;
 use crate::EventGroupedFilters;
 use crate::EventRef;
+use crate::PlatformError;
 use crate::PropValueFilter;
+use crate::PropertyAndValue;
+use crate::PropertyRef;
+use crate::QueryParams;
+use crate::QueryResponse;
+use crate::QueryResponseFormat;
+use crate::QueryTime;
 use crate::Result;
 
 pub struct EventRecords {
@@ -41,7 +53,13 @@ impl EventRecords {
         Ok(data.into())
     }
 
-    pub async fn search(&self, ctx: Context, project_id: u64, req: EventRecordsSearchRequest, query: QueryParams) -> Result<QueryResponse> {
+    pub async fn search(
+        &self,
+        ctx: Context,
+        project_id: u64,
+        req: EventRecordsSearchRequest,
+        query: QueryParams,
+    ) -> Result<QueryResponse> {
         ctx.check_project_permission(
             ctx.organization_id,
             project_id,
@@ -92,7 +110,13 @@ pub struct EventRecord {
 #[allow(clippy::all)]
 impl Into<EventRecord> for query::event_records::EventRecord {
     fn into(self) -> EventRecord {
-        EventRecord { properties: self.properties.iter().map(|p| p.to_owned().into()).collect::<Vec<_>>() }
+        EventRecord {
+            properties: self
+                .properties
+                .iter()
+                .map(|p| p.to_owned().into())
+                .collect::<Vec<_>>(),
+        }
     }
 }
 
@@ -101,7 +125,10 @@ impl Into<PropertyAndValue> for query::PropertyAndValue {
     fn into(self) -> PropertyAndValue {
         let value = scalar_to_json(&self.value);
 
-        PropertyAndValue { property: self.property.into(), value }
+        PropertyAndValue {
+            property: self.property.into(),
+            value,
+        }
     }
 }
 
@@ -147,13 +174,22 @@ impl Into<event_records::EventRecordsSearchRequest> for EventRecordsSearchReques
                     .map(|event| event.into())
                     .collect::<Vec<_>>()
             }),
-            filters: self.filters.map_or_else(|| None, |v| {
-                if v.groups[0].filters.is_empty() {
-                    None
-                } else {
-                    Some(v.groups[0].filters.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>())
-                }
-            }),
+            filters: self.filters.map_or_else(
+                || None,
+                |v| {
+                    if v.groups[0].filters.is_empty() {
+                        None
+                    } else {
+                        Some(
+                            v.groups[0]
+                                .filters
+                                .iter()
+                                .map(|v| v.to_owned().into())
+                                .collect::<Vec<_>>(),
+                        )
+                    }
+                },
+            ),
             properties: self.properties.map(|props| {
                 props
                     .iter()
@@ -176,7 +212,6 @@ pub(crate) fn validate_search_request(
             ));
         }
     }
-
 
     if let Some(events) = &req.events {
         if events.is_empty() {

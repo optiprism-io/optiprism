@@ -1,25 +1,29 @@
 use std::str::from_utf8;
 use std::str::pattern::Pattern;
 use std::sync::Arc;
-use bincode::{deserialize, serialize};
+
+use bincode::deserialize;
+use bincode::serialize;
 use chrono::DateTime;
 use chrono::Utc;
-use prost::Message;
+use common::event_segmentation::EventSegmentationRequest;
+use common::funnel::Funnel;
 use common::types::OptionalProperty;
+use prost::Message;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
-use common::event_segmentation::EventSegmentationRequest;
-use common::funnel::Funnel;
 
 use crate::error::MetadataError;
 use crate::index::next_seq;
-use crate::{make_data_key, report};
+use crate::make_data_key;
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
-use crate::metadata::{ListResponse, ResponseMetadata};
+use crate::metadata::ListResponse;
+use crate::metadata::ResponseMetadata;
 use crate::project_ns;
+use crate::report;
 use crate::Result;
 
 const NAMESPACE: &[u8] = b"reports";
@@ -97,7 +101,10 @@ impl Reports {
         for kv in iter {
             let (key, value) = kv?;
             // check if key contains the prefix
-            if !from_utf8(&prefix).unwrap().is_prefix_of(from_utf8(&key).unwrap()) {
+            if !from_utf8(&prefix)
+                .unwrap()
+                .is_prefix_of(from_utf8(&key).unwrap())
+            {
                 break;
             }
             list.push(deserialize_report(&value)?);
@@ -234,7 +241,9 @@ fn deserialize_report(data: &[u8]) -> Result<Report> {
     Ok(Report {
         id: from.id,
         created_at: chrono::DateTime::from_timestamp(from.created_at, 0).unwrap(),
-        updated_at: from.updated_at.map(|t| chrono::DateTime::from_timestamp(t, 0).unwrap()),
+        updated_at: from
+            .updated_at
+            .map(|t| chrono::DateTime::from_timestamp(t, 0).unwrap()),
         created_by: from.created_by,
         updated_by: from.updated_by,
         project_id: from.project_id,
@@ -257,9 +266,17 @@ fn deserialize_report(data: &[u8]) -> Result<Report> {
 #[cfg(test)]
 mod tests {
     use chrono::DateTime;
-    use common::event_segmentation::{Analysis, ChartType, EventSegmentationRequest};
-    use common::query::{QueryTime, TimeIntervalUnit};
-    use crate::reports::{deserialize_report, Query, Report, serialize_report, Type};
+    use common::event_segmentation::Analysis;
+    use common::event_segmentation::ChartType;
+    use common::event_segmentation::EventSegmentationRequest;
+    use common::query::QueryTime;
+    use common::query::TimeIntervalUnit;
+
+    use crate::reports::deserialize_report;
+    use crate::reports::serialize_report;
+    use crate::reports::Query;
+    use crate::reports::Report;
+    use crate::reports::Type;
 
     #[test]
     fn test_roundtrip() {
@@ -275,7 +292,10 @@ mod tests {
             description: Some("description".to_string()),
             typ: Type::EventSegmentation,
             query: Query::EventSegmentation(EventSegmentationRequest {
-                time: QueryTime::Last { last: 1, unit: TimeIntervalUnit::Day },
+                time: QueryTime::Last {
+                    last: 1,
+                    unit: TimeIntervalUnit::Day,
+                },
                 group_id: 0,
                 interval_unit: TimeIntervalUnit::Hour,
                 chart_type: ChartType::Line,

@@ -20,6 +20,7 @@ mod tests {
 
     use axum::Router;
     use chrono::Duration;
+    use common::config;
     use common::config::Config;
     use common::rbac::OrganizationRole;
     use lazy_static::lazy_static;
@@ -29,6 +30,11 @@ mod tests {
     use platform::auth::provider::LogInRequest;
     use platform::auth::Auth;
     use platform::http::attach_routes;
+    use query::event_records::EventRecordsProvider;
+    use query::event_segmentation::EventSegmentationProvider;
+    use query::funnel::FunnelProvider;
+    use query::group_records::GroupRecordsProvider;
+    use query::properties::PropertiesProvider;
     use query::test_util::create_entities;
     use reqwest::header::HeaderMap;
     use reqwest::header::HeaderValue;
@@ -40,26 +46,61 @@ mod tests {
     use tokio::time::sleep;
     use tracing::level_filters::LevelFilter;
     use uuid::Uuid;
-    use common::config;
-    use query::event_records::EventRecordsProvider;
-    use query::event_segmentation::EventSegmentationProvider;
-    use query::funnel::FunnelProvider;
-    use query::group_records::GroupRecordsProvider;
-    use query::properties::PropertiesProvider;
 
     lazy_static! {
         pub static ref EMPTY_LIST: serde_json::Value = json!({"data":[],"meta":{"next":null}});
         pub static ref AUTH_CFG: Config = Config {
-            server: config::Server { host: SocketAddr::from_str(":8080").unwrap()},
+            server: config::Server {
+                host: SocketAddr::from_str(":8080").unwrap()
+            },
             data: config::Data {
- path: Default::default(),ua_db_path: Default::default(),geo_city_path: Default::default(),ui_path: Default::default(),},
-            auth: config::Auth { access_token_duration: Duration::days(1),refresh_token_duration: Duration::days(1)},
-            misc: config::Misc { session_cleaner_interval: Default::default(),project_default_session_duration: Default::default()},
+                path: Default::default(),
+                ua_db_path: Default::default(),
+                geo_city_path: Default::default(),
+                ui_path: Default::default(),
+            },
+            auth: config::Auth {
+                access_token_duration: Duration::days(1),
+                refresh_token_duration: Duration::days(1)
+            },
+            misc: config::Misc {
+                session_cleaner_interval: Default::default(),
+                project_default_session_duration: Default::default()
+            },
             events_table: config::Table {
- levels: 0,l0_max_parts: 0,l1_max_size_bytes: 0,level_size_multiplier: 0,max_log_length_bytes: 0,merge_max_l1_part_size_bytes: 0,merge_part_size_multiplier: 0,merge_data_page_size_limit_bytes: 0,merge_row_group_values_limit: 0,merge_array_size: 0,merge_chunk_size: 0,merge_array_page_size: 0,merge_max_page_size: 0,},
+                levels: 0,
+                l0_max_parts: 0,
+                l1_max_size_bytes: 0,
+                level_size_multiplier: 0,
+                max_log_length_bytes: 0,
+                merge_max_l1_part_size_bytes: 0,
+                merge_part_size_multiplier: 0,
+                merge_data_page_size_limit_bytes: 0,
+                merge_row_group_values_limit: 0,
+                merge_array_size: 0,
+                merge_chunk_size: 0,
+                merge_array_page_size: 0,
+                merge_max_page_size: 0,
+            },
             group_table: config::Table {
- levels: 0,l0_max_parts: 0,l1_max_size_bytes: 0,level_size_multiplier: 0,max_log_length_bytes: 0,merge_max_l1_part_size_bytes: 0,merge_part_size_multiplier: 0,merge_data_page_size_limit_bytes: 0,merge_row_group_values_limit: 0,merge_array_size: 0,merge_chunk_size: 0,merge_array_page_size: 0,merge_max_page_size: 0,},
-        log: config::Log { level: LevelFilter::INFO},};
+                levels: 0,
+                l0_max_parts: 0,
+                l1_max_size_bytes: 0,
+                level_size_multiplier: 0,
+                max_log_length_bytes: 0,
+                merge_max_l1_part_size_bytes: 0,
+                merge_part_size_multiplier: 0,
+                merge_data_page_size_limit_bytes: 0,
+                merge_row_group_values_limit: 0,
+                merge_array_size: 0,
+                merge_chunk_size: 0,
+                merge_array_page_size: 0,
+                merge_max_page_size: 0,
+            },
+            log: config::Log {
+                level: LevelFilter::INFO
+            },
+        };
     }
     static HTTP_PORT: AtomicU16 = AtomicU16::new(8080);
 
@@ -83,10 +124,13 @@ mod tests {
         })?;
 
         let tokens = auth
-            .log_in(LogInRequest {
-                email: admin.email,
-                password: pwd.to_string(),
-            },None)
+            .log_in(
+                LogInRequest {
+                    email: admin.email,
+                    password: pwd.to_string(),
+                },
+                None,
+            )
             .await?;
         let mut headers = HeaderMap::new();
         headers.insert(CONTENT_TYPE, HeaderValue::from_str("application/json")?);

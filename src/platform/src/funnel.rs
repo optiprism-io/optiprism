@@ -1,13 +1,36 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use common::GROUPS_COUNT;
+
+use chrono::DateTime;
+use chrono::Utc;
 use common::rbac::ProjectPermission;
+use common::GROUPS_COUNT;
 use metadata::MetadataProvider;
 use query::context::Format;
-use query::funnel::{fix_request, FunnelProvider};
-use crate::{Breakdown, Context, EventGroupedFilterGroup, EventGroupedFilters, EventRef, FunnelResponse, FunnelStep, FunnelStepData, PlatformError, PropertyRef, PropValueFilter, QueryParams, QueryResponseFormat, QueryTime, Segment, TimeIntervalUnit, validate_event, validate_event_filter, validate_event_property};
+use query::funnel::fix_request;
+use query::funnel::FunnelProvider;
+use serde::Deserialize;
+use serde::Serialize;
+
+use crate::validate_event;
+use crate::validate_event_filter;
+use crate::validate_event_property;
+use crate::Breakdown;
+use crate::Context;
+use crate::EventGroupedFilterGroup;
+use crate::EventGroupedFilters;
+use crate::EventRef;
+use crate::FunnelResponse;
+use crate::FunnelStep;
+use crate::FunnelStepData;
+use crate::PlatformError;
+use crate::PropValueFilter;
+use crate::PropertyRef;
+use crate::QueryParams;
+use crate::QueryResponseFormat;
+use crate::QueryTime;
+use crate::Segment;
+use crate::TimeIntervalUnit;
 
 pub struct Funnel {
     md: Arc<MetadataProvider>,
@@ -52,8 +75,7 @@ impl Funnel {
 
         let qdata = self.prov.funnel(ctx, req).await?;
 
-        let groups = qdata
-            .groups;
+        let groups = qdata.groups;
 
         let steps = qdata
             .steps
@@ -62,19 +84,17 @@ impl Funnel {
                 let data = step
                     .data
                     .iter()
-                    .map(|data| {
-                        FunnelStepData {
-                            groups: data.groups.clone(),
-                            ts: data.ts,
-                            total: data.total,
-                            conversion_ratio: data.conversion_ratio,
-                            avg_time_to_convert: data.avg_time_to_convert,
-                            avg_time_to_convert_from_start: data.avg_time_to_convert_from_start,
-                            dropped_off: data.dropped_off,
-                            drop_off_ratio: data.drop_off_ratio,
-                            time_to_convert: data.time_to_convert,
-                            time_to_convert_from_start: data.time_to_convert_from_start,
-                        }
+                    .map(|data| FunnelStepData {
+                        groups: data.groups.clone(),
+                        ts: data.ts,
+                        total: data.total,
+                        conversion_ratio: data.conversion_ratio,
+                        avg_time_to_convert: data.avg_time_to_convert,
+                        avg_time_to_convert_from_start: data.avg_time_to_convert_from_start,
+                        dropped_off: data.dropped_off,
+                        drop_off_ratio: data.drop_off_ratio,
+                        time_to_convert: data.time_to_convert,
+                        time_to_convert_from_start: data.time_to_convert_from_start,
                     })
                     .collect::<Vec<_>>();
                 FunnelStep {
@@ -99,7 +119,7 @@ pub(crate) fn validate_request(
         ));
     }
 
-    if let QueryTime::Between{from, to} = req.time {
+    if let QueryTime::Between { from, to } = req.time {
         if from > to {
             return Err(PlatformError::BadRequest(
                 "from time must be less than to time".to_string(),
@@ -152,8 +172,7 @@ pub(crate) fn validate_request(
 
         match &step.order {
             StepOrder::Exact => {}
-            StepOrder::Any { steps } => steps
-                .iter().try_for_each(|(from, to)| {
+            StepOrder::Any { steps } => steps.iter().try_for_each(|(from, to)| {
                 if *from >= req.steps.len() {
                     return Err(PlatformError::BadRequest(
                         "step_order: from step index out of range".to_string(),
@@ -423,9 +442,7 @@ impl Into<common::funnel::TimeIntervalUnitSession> for TimeIntervalUnitSession {
             TimeIntervalUnitSession::Week => common::funnel::TimeIntervalUnitSession::Week,
             TimeIntervalUnitSession::Month => common::funnel::TimeIntervalUnitSession::Month,
             TimeIntervalUnitSession::Year => common::funnel::TimeIntervalUnitSession::Year,
-            TimeIntervalUnitSession::Session => {
-                common::funnel::TimeIntervalUnitSession::Session
-            }
+            TimeIntervalUnitSession::Session => common::funnel::TimeIntervalUnitSession::Session,
         }
     }
 }
@@ -439,9 +456,7 @@ impl Into<TimeIntervalUnitSession> for common::funnel::TimeIntervalUnitSession {
             common::funnel::TimeIntervalUnitSession::Week => TimeIntervalUnitSession::Week,
             common::funnel::TimeIntervalUnitSession::Month => TimeIntervalUnitSession::Month,
             common::funnel::TimeIntervalUnitSession::Year => TimeIntervalUnitSession::Year,
-            common::funnel::TimeIntervalUnitSession::Session => {
-                TimeIntervalUnitSession::Session
-            }
+            common::funnel::TimeIntervalUnitSession::Session => TimeIntervalUnitSession::Session,
         }
     }
 }
@@ -495,9 +510,7 @@ impl Into<ExcludeSteps> for common::funnel::ExcludeSteps {
     fn into(self) -> ExcludeSteps {
         match self {
             common::funnel::ExcludeSteps::All => ExcludeSteps::All,
-            common::funnel::ExcludeSteps::Between(from, to) => {
-                ExcludeSteps::Between { from, to }
-            }
+            common::funnel::ExcludeSteps::Between(from, to) => ExcludeSteps::Between { from, to },
         }
     }
 }
@@ -546,7 +559,9 @@ impl Into<common::funnel::Exclude> for Exclude {
     fn into(self) -> common::funnel::Exclude {
         common::funnel::Exclude {
             event: self.event.into(),
-            filters: self.filters.map(|v| v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>()),
+            filters: self
+                .filters
+                .map(|v| v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>()),
             steps: self.steps.map(|s| s.into()),
         }
     }
@@ -557,7 +572,9 @@ impl Into<Exclude> for common::funnel::Exclude {
     fn into(self) -> Exclude {
         Exclude {
             event: self.event.into(),
-            filters: self.filters.map(|v| v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>()),
+            filters: self
+                .filters
+                .map(|v| v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>()),
             steps: self.steps.map(|s| s.into()),
         }
     }
@@ -579,9 +596,7 @@ impl Into<common::funnel::Filter> for Filter {
         match self {
             Filter::DropOffOnAnyStep => common::funnel::Filter::DropOffOnAnyStep,
             Filter::DropOffOnStep { step } => common::funnel::Filter::DropOffOnStep(step),
-            Filter::TimeToConvert { from, to } => {
-                common::funnel::Filter::TimeToConvert(from, to)
-            }
+            Filter::TimeToConvert { from, to } => common::funnel::Filter::TimeToConvert(from, to),
         }
     }
 }
@@ -592,9 +607,7 @@ impl Into<Filter> for common::funnel::Filter {
         match self {
             common::funnel::Filter::DropOffOnAnyStep => Filter::DropOffOnAnyStep,
             common::funnel::Filter::DropOffOnStep(step) => Filter::DropOffOnStep { step },
-            common::funnel::Filter::TimeToConvert(from, to) => {
-                Filter::TimeToConvert { from, to }
-            }
+            common::funnel::Filter::TimeToConvert(from, to) => Filter::TimeToConvert { from, to },
         }
     }
 }

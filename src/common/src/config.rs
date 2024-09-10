@@ -72,16 +72,18 @@ impl Default for Config {
                 path: Default::default(),
                 ua_db_path: Default::default(),
                 geo_city_path: Default::default(),
-                ui_path: Default::default()
+                ui_path: Default::default(),
             },
             auth: Auth {
                 access_token_duration: Default::default(),
                 refresh_token_duration: Default::default(),
             },
-            log: Log { level: LevelFilter::INFO },
+            log: Log {
+                level: LevelFilter::INFO,
+            },
             misc: Misc {
                 session_cleaner_interval: Default::default(),
-                project_default_session_duration: Default::default()
+                project_default_session_duration: Default::default(),
             },
             events_table: Table {
                 levels: 0,

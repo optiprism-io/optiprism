@@ -8,13 +8,14 @@ use platform::auth::provider::TokensResponse;
 use platform::auth::provider::UpdateEmailRequest;
 use platform::auth::provider::UpdateNameRequest;
 use platform::auth::provider::UpdatePasswordRequest;
+use platform::http::auth::RefreshTokenRequest;
 use reqwest::header::HeaderMap;
 use reqwest::header::HeaderValue;
 use reqwest::header::AUTHORIZATION;
 use reqwest::header::CONTENT_TYPE;
 use reqwest::Client;
 use reqwest::StatusCode;
-use platform::http::auth::RefreshTokenRequest;
+
 use crate::assert_response_json_eq;
 use crate::assert_response_status_eq;
 use crate::http::tests::create_admin_acc_and_login;

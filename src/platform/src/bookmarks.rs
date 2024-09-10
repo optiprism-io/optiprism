@@ -7,8 +7,9 @@ use metadata::bookmarks::Bookmarks as MDBookmarks;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::{Context, Result};
 use crate::reports::Query;
+use crate::Context;
+use crate::Result;
 
 pub struct Bookmarks {
     prov: Arc<MDBookmarks>,
@@ -30,12 +31,12 @@ impl Bookmarks {
             ProjectPermission::ExploreReports,
         )?;
 
-        let bookmark = self
-            .prov
-            .create(project_id, metadata::bookmarks::CreateBookmarkRequest {
-                created_by: ctx.account_id,
-                query: request.query.map(|q|q.into()),
-            })?;
+        let bookmark =
+            self.prov
+                .create(project_id, metadata::bookmarks::CreateBookmarkRequest {
+                    created_by: ctx.account_id,
+                    query: request.query.map(|q| q.into()),
+                })?;
 
         Ok(bookmark.into())
     }
@@ -58,7 +59,7 @@ impl From<metadata::bookmarks::Bookmark> for Bookmark {
             created_at: value.created_at,
             created_by: value.created_by,
             project_id: value.project_id,
-            query: value.query.map(|q|q.into()),
+            query: value.query.map(|q| q.into()),
         }
     }
 }

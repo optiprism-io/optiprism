@@ -4,12 +4,15 @@ use std::sync::Arc;
 use chrono::DateTime;
 use chrono::Utc;
 use common::rbac::Permission;
+use metadata::backups;
 use metadata::backups::CreateBackupRequest;
+use metadata::MetadataProvider;
 use serde::Deserialize;
 use serde::Serialize;
-use metadata::{backups, MetadataProvider};
-use crate::{Context, PlatformError};
+
+use crate::Context;
 use crate::ListResponse;
+use crate::PlatformError;
 use crate::Result;
 
 pub struct Backups {
@@ -21,13 +24,8 @@ impl Backups {
         Self { prov }
     }
 
-    pub async fn backup(
-        &self,
-        ctx: Context,
-    ) -> Result<Backup> {
-        ctx.check_permission(
-            Permission::ManageServer,
-        )?;
+    pub async fn backup(&self, ctx: Context) -> Result<Backup> {
+        ctx.check_permission(Permission::ManageServer)?;
 
         let settings = self.prov.settings.load()?;
         if !settings.backup_enabled {
@@ -40,17 +38,13 @@ impl Backups {
     }
 
     pub async fn get_by_id(&self, ctx: Context, id: u64) -> Result<Backup> {
-        ctx.check_permission(
-            Permission::ManageServer,
-        )?;
+        ctx.check_permission(Permission::ManageServer)?;
 
         Ok(self.prov.backups.get_by_id(id)?.into())
     }
 
     pub async fn list(&self, ctx: Context) -> Result<ListResponse<Backup>> {
-        ctx.check_permission(
-            Permission::ManageServer,
-        )?;
+        ctx.check_permission(Permission::ManageServer)?;
 
         let resp = self.prov.backups.list()?;
         Ok(ListResponse {
@@ -128,7 +122,7 @@ impl From<metadata::backups::Backup> for Backup {
                 backups::Provider::GCP(prov) => Provider::Gcp(GCPProvider {
                     bucket: prov.bucket,
                     path: prov.path,
-                })
+                }),
             },
             status: match b.status.clone() {
                 backups::Status::Idle => Status::Idle,

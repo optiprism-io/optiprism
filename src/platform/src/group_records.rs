@@ -1,20 +1,30 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
-use serde::Deserialize;
-use serde::Serialize;
-use serde_json::Value;
+use chrono::DateTime;
+use chrono::Utc;
 use common::rbac::ProjectPermission;
 use metadata::MetadataProvider;
 use query::context::Format;
 use query::group_records;
 use query::group_records::fix_search_request;
 use query::group_records::GroupRecordsProvider;
+use serde::Deserialize;
+use serde::Serialize;
+use serde_json::Value;
 
-use crate::{Context, PlatformError, PropertyAndValue, PropertyRef, QueryParams, QueryResponse, QueryResponseFormat, QueryTime, SortablePropertyRef, validate_event_filter};
+use crate::validate_event_filter;
+use crate::Context;
 use crate::EventGroupedFilters;
+use crate::PlatformError;
+use crate::PropertyAndValue;
+use crate::PropertyRef;
+use crate::QueryParams;
+use crate::QueryResponse;
+use crate::QueryResponseFormat;
+use crate::QueryTime;
 use crate::Result;
+use crate::SortablePropertyRef;
 
 pub struct GroupRecords {
     md: Arc<MetadataProvider>,
@@ -26,7 +36,13 @@ impl GroupRecords {
         Self { md, prov }
     }
 
-    pub async fn get_by_id(&self, ctx: Context, project_id: u64, group_id: usize, id: String) -> Result<GroupRecord> {
+    pub async fn get_by_id(
+        &self,
+        ctx: Context,
+        project_id: u64,
+        group_id: usize,
+        id: String,
+    ) -> Result<GroupRecord> {
         ctx.check_project_permission(
             ctx.organization_id,
             project_id,
@@ -43,7 +59,13 @@ impl GroupRecords {
         Ok(data.into())
     }
 
-    pub async fn search(&self, ctx: Context, project_id: u64, req: GroupRecordsSearchRequest, query: QueryParams) -> Result<QueryResponse> {
+    pub async fn search(
+        &self,
+        ctx: Context,
+        project_id: u64,
+        req: GroupRecordsSearchRequest,
+        query: QueryParams,
+    ) -> Result<QueryResponse> {
         ctx.check_project_permission(
             ctx.organization_id,
             project_id,
@@ -85,20 +107,28 @@ impl GroupRecords {
     }
 }
 
-
 #[allow(clippy::all)]
 impl Into<group_records::GroupRecordsSearchRequest> for GroupRecordsSearchRequest {
     fn into(self) -> group_records::GroupRecordsSearchRequest {
         group_records::GroupRecordsSearchRequest {
             time: self.time.map(|t| t.into()),
             group_id: self.group,
-            filters: self.filters.map_or_else(|| None, |v| {
-                if v.groups[0].filters.is_empty() {
-                    None
-                } else {
-                    Some(v.groups[0].filters.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>())
-                }
-            }),
+            filters: self.filters.map_or_else(
+                || None,
+                |v| {
+                    if v.groups[0].filters.is_empty() {
+                        None
+                    } else {
+                        Some(
+                            v.groups[0]
+                                .filters
+                                .iter()
+                                .map(|v| v.to_owned().into())
+                                .collect::<Vec<_>>(),
+                        )
+                    }
+                },
+            ),
             properties: self.properties.map(|props| {
                 props
                     .iter()
@@ -115,12 +145,12 @@ pub(crate) fn validate_search_request(
     project_id: u64,
     req: &GroupRecordsSearchRequest,
 ) -> Result<()> {
-    if let  Some(QueryTime::Between { from, to })=&req.time {
-            if from > to {
-                return Err(PlatformError::BadRequest(
-                    "from time must be less than to time".to_string(),
-                ));
-            }
+    if let Some(QueryTime::Between { from, to }) = &req.time {
+        if from > to {
+            return Err(PlatformError::BadRequest(
+                "from time must be less than to time".to_string(),
+            ));
+        }
     }
 
     match &req.filters {
@@ -199,7 +229,13 @@ pub struct GroupRecord {
 #[allow(clippy::all)]
 impl Into<GroupRecord> for query::group_records::GroupRecord {
     fn into(self) -> GroupRecord {
-        GroupRecord { properties: self.properties.iter().map(|p| p.to_owned().into()).collect::<Vec<_>>() }
+        GroupRecord {
+            properties: self
+                .properties
+                .iter()
+                .map(|p| p.to_owned().into())
+                .collect::<Vec<_>>(),
+        }
     }
 }
 

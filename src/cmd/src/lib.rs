@@ -2,11 +2,15 @@
 
 extern crate core;
 
+use std::fs;
 use std::fs::File;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::IpAddr;
+use std::net::Ipv4Addr;
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::{fs, thread};
+use std::thread;
+use std::time::Duration as StdDuration;
 
 use ::storage::db::OptiDBImpl;
 use ::storage::error::StoreError;
@@ -14,22 +18,54 @@ use ::storage::table::Options as TableOptions;
 use ::storage::NamedValue;
 use ::storage::Value;
 use axum::Router;
-use std::time::Duration as StdDuration;
 use chrono::Utc;
 use common::config::Config;
-use common::{DATA_PATH_BACKUP_TMP, DATA_PATH_BACKUPS, DATA_PATH_METADATA, DATA_PATH_RECOVERS, DATA_PATH_STORAGE, group_col};
+use common::group_col;
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::rbac::Role;
-use common::types::{ METRIC_HTTP_REQUEST_TIME_SECONDS, METRIC_HTTP_REQUESTS_TOTAL, METRIC_INGESTER_IDENTIFIED_TOTAL, METRIC_INGESTER_IDENTIFY_TIME_SECONDS, METRIC_INGESTER_TRACK_TIME_SECONDS, METRIC_INGESTER_TRACKED_TOTAL, METRIC_QUERY_EXECUTION_TIME_SECONDS, METRIC_QUERY_QUERIES_TOTAL, METRIC_STORE_COMPACTION_TIME_SECONDS, METRIC_STORE_COMPACTIONS_TOTAL, METRIC_STORE_FLUSH_TIME_SECONDS, METRIC_STORE_FLUSHES_TOTAL, METRIC_STORE_INSERT_TIME_SECONDS, METRIC_STORE_INSERTS_TOTAL, METRIC_STORE_LEVEL_COMPACTION_TIME_SECONDS, METRIC_STORE_MEMTABLE_ROWS, METRIC_STORE_MERGE_TIME_SECONDS, METRIC_STORE_MERGES_TOTAL, METRIC_STORE_PART_SIZE_BYTES, METRIC_STORE_PART_VALUES, METRIC_STORE_PARTS, METRIC_STORE_PARTS_SIZE_BYTES, METRIC_STORE_PARTS_VALUES, METRIC_STORE_RECOVERY_TIME_SECONDS, METRIC_STORE_SCAN_MEMTABLE_SECONDS, METRIC_STORE_SCAN_PARTS, METRIC_STORE_SCAN_TIME_SECONDS, METRIC_STORE_SCANS_TOTAL, METRIC_STORE_TABLE_FIELDS};
 use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_EVENT_ID;
 use common::types::COLUMN_PROJECT_ID;
 use common::types::EVENT_PROPERTY_SESSION_LENGTH;
 use common::types::EVENT_SESSION_END;
+use common::types::METRIC_HTTP_REQUESTS_TOTAL;
+use common::types::METRIC_HTTP_REQUEST_TIME_SECONDS;
+use common::types::METRIC_INGESTER_IDENTIFIED_TOTAL;
+use common::types::METRIC_INGESTER_IDENTIFY_TIME_SECONDS;
+use common::types::METRIC_INGESTER_TRACKED_TOTAL;
+use common::types::METRIC_INGESTER_TRACK_TIME_SECONDS;
+use common::types::METRIC_QUERY_EXECUTION_TIME_SECONDS;
+use common::types::METRIC_QUERY_QUERIES_TOTAL;
+use common::types::METRIC_STORE_COMPACTIONS_TOTAL;
+use common::types::METRIC_STORE_COMPACTION_TIME_SECONDS;
+use common::types::METRIC_STORE_FLUSHES_TOTAL;
+use common::types::METRIC_STORE_FLUSH_TIME_SECONDS;
+use common::types::METRIC_STORE_INSERTS_TOTAL;
+use common::types::METRIC_STORE_INSERT_TIME_SECONDS;
+use common::types::METRIC_STORE_LEVEL_COMPACTION_TIME_SECONDS;
+use common::types::METRIC_STORE_MEMTABLE_ROWS;
+use common::types::METRIC_STORE_MERGES_TOTAL;
+use common::types::METRIC_STORE_MERGE_TIME_SECONDS;
+use common::types::METRIC_STORE_PARTS;
+use common::types::METRIC_STORE_PARTS_SIZE_BYTES;
+use common::types::METRIC_STORE_PARTS_VALUES;
+use common::types::METRIC_STORE_PART_SIZE_BYTES;
+use common::types::METRIC_STORE_PART_VALUES;
+use common::types::METRIC_STORE_RECOVERY_TIME_SECONDS;
+use common::types::METRIC_STORE_SCANS_TOTAL;
+use common::types::METRIC_STORE_SCAN_MEMTABLE_SECONDS;
+use common::types::METRIC_STORE_SCAN_PARTS;
+use common::types::METRIC_STORE_SCAN_TIME_SECONDS;
+use common::types::METRIC_STORE_TABLE_FIELDS;
 use common::types::TABLE_EVENTS;
 use common::ADMIN_ID;
+use common::DATA_PATH_BACKUPS;
+use common::DATA_PATH_BACKUP_TMP;
+use common::DATA_PATH_METADATA;
+use common::DATA_PATH_RECOVERS;
+use common::DATA_PATH_STORAGE;
 use common::GROUPS_COUNT;
 use common::GROUP_USER_ID;
 use ingester::executor::Executor;
@@ -40,35 +76,39 @@ use ingester::Identify;
 use ingester::Track;
 use ingester::Transformer;
 use metadata::accounts::CreateAccountRequest;
+use metadata::error::MetadataError;
 use metadata::organizations::CreateOrganizationRequest;
 use metadata::projects::CreateProjectRequest;
 use metadata::projects::Project;
 use metadata::MetadataProvider;
-use metrics::{describe_counter, describe_gauge};
+use metrics::describe_counter;
+use metrics::describe_gauge;
 use metrics::describe_histogram;
 use metrics::Unit;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use metrics_util::MetricKindMask;
 use platform::auth::password::make_password_hash;
 use platform::PlatformProvider;
-use rand::distributions::Alphanumeric;
-use rand::distributions::DistString;
-use rand::{Rng, SeedableRng, thread_rng};
-use rand::rngs::StdRng;
-use tracing::info;
-use uaparser::UserAgentParser;
-use metadata::error::MetadataError;
 use query::event_records::EventRecordsProvider;
 use query::event_segmentation::EventSegmentationProvider;
 use query::funnel::FunnelProvider;
 use query::group_records::GroupRecordsProvider;
 use query::properties::PropertiesProvider;
-use crate::error::Result;
+use rand::distributions::Alphanumeric;
+use rand::distributions::DistString;
+use rand::rngs::StdRng;
+use rand::thread_rng;
+use rand::Rng;
+use rand::SeedableRng;
+use tracing::info;
+use uaparser::UserAgentParser;
+
 use crate::error::Error;
-pub mod error;
-pub mod config;
-pub mod command;
+use crate::error::Result;
 pub mod backup;
+pub mod command;
+pub mod config;
+pub mod error;
 
 pub fn init_metrics() {
     PrometheusBuilder::new()
@@ -76,14 +116,16 @@ pub fn init_metrics() {
             MetricKindMask::COUNTER | MetricKindMask::HISTOGRAM | MetricKindMask::GAUGE,
             Some(StdDuration::from_secs(10)),
         )
-        .with_http_listener(SocketAddr::new(
-            IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
-            9102,
-        )).install()
+        .with_http_listener(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 9102))
+        .install()
         .expect("failed to install Prometheus recorder");
 
     describe_counter!(METRIC_STORE_INSERTS_TOTAL, "number of inserts processed");
-    describe_histogram!(METRIC_STORE_INSERT_TIME_SECONDS, Unit::Seconds, "insert time");
+    describe_histogram!(
+        METRIC_STORE_INSERT_TIME_SECONDS,
+        Unit::Seconds,
+        "insert time"
+    );
     describe_counter!(METRIC_STORE_SCANS_TOTAL, "number of scans processed");
     describe_histogram!(METRIC_STORE_SCAN_TIME_SECONDS, Unit::Seconds, "scan time");
     describe_gauge!(METRIC_STORE_SCAN_PARTS, "number of scans parts");
@@ -118,13 +160,28 @@ pub fn init_metrics() {
         "recovery time"
     );
 
-    describe_histogram!(METRIC_STORE_FLUSH_TIME_SECONDS, Unit::Seconds, "recovery time");
+    describe_histogram!(
+        METRIC_STORE_FLUSH_TIME_SECONDS,
+        Unit::Seconds,
+        "recovery time"
+    );
     describe_counter!(METRIC_STORE_FLUSHES_TOTAL, "number of flushes");
 
     describe_counter!(METRIC_INGESTER_TRACKED_TOTAL, "total number of tracks");
-    describe_histogram!(METRIC_INGESTER_TRACK_TIME_SECONDS, Unit::Seconds, "ingester track time");
-    describe_counter!(METRIC_INGESTER_IDENTIFIED_TOTAL, "total number of identifies");
-    describe_histogram!(METRIC_INGESTER_IDENTIFY_TIME_SECONDS, Unit::Seconds, "ingester identify time");
+    describe_histogram!(
+        METRIC_INGESTER_TRACK_TIME_SECONDS,
+        Unit::Seconds,
+        "ingester track time"
+    );
+    describe_counter!(
+        METRIC_INGESTER_IDENTIFIED_TOTAL,
+        "total number of identifies"
+    );
+    describe_histogram!(
+        METRIC_INGESTER_IDENTIFY_TIME_SECONDS,
+        Unit::Seconds,
+        "ingester identify time"
+    );
 
     describe_counter!(METRIC_QUERY_QUERIES_TOTAL, "total number of queries");
     describe_histogram!(
@@ -207,7 +264,9 @@ pub async fn init_system(
             l0_max_parts: cfg.group_table.l0_max_parts,
             max_log_length_bytes: cfg.group_table.max_log_length_bytes,
             merge_array_page_size: cfg.group_table.merge_array_page_size,
-            merge_data_page_size_limit_bytes: Some(cfg.group_table.merge_data_page_size_limit_bytes),
+            merge_data_page_size_limit_bytes: Some(
+                cfg.group_table.merge_data_page_size_limit_bytes,
+            ),
             merge_max_l1_part_size_bytes: cfg.group_table.merge_max_l1_part_size_bytes,
             merge_part_size_multiplier: cfg.group_table.merge_part_size_multiplier,
             merge_row_group_values_limit: cfg.group_table.merge_row_group_values_limit,
@@ -258,12 +317,7 @@ fn init_platform(
     ));
 
     info!("attaching platform routes...");
-    let router = platform::http::attach_routes(
-        router,
-        &md,
-        &platform_provider,
-        cfg,
-    );
+    let router = platform::http::attach_routes(router, &md, &platform_provider, cfg);
 
     Ok(router)
 }
@@ -374,7 +428,7 @@ fn init_session_cleaner(
                                 ),
                             ],
                         ]
-                            .concat();
+                        .concat();
 
                         db.insert(TABLE_EVENTS, values).unwrap();
 
@@ -458,11 +512,22 @@ fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<P
         Ok(proj) => proj,
         Err(_err) => md.projects.get_by_id(1)?,
     };
-    md.dictionaries.create_key(proj.id, TABLE_EVENTS, "project_id", proj.id, proj.name.as_str())?;
+    md.dictionaries.create_key(
+        proj.id,
+        TABLE_EVENTS,
+        "project_id",
+        proj.id,
+        proj.name.as_str(),
+    )?;
     for g in 0..GROUPS_COUNT {
-        md.dictionaries.create_key(proj.id, group_col(g).as_str(), "project_id", proj.id, proj.name.as_str())?;
+        md.dictionaries.create_key(
+            proj.id,
+            group_col(g).as_str(),
+            "project_id",
+            proj.id,
+            proj.name.as_str(),
+        )?;
     }
-
 
     info!("project token: {}", proj.token);
     let _user = match md.accounts.create(CreateAccountRequest {

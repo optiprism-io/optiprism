@@ -1,8 +1,11 @@
 use std::sync::Arc;
+
 use prost::Message;
 use rocksdb::TransactionDB;
+
 use crate::error::MetadataError;
-use crate::{pbconfig, Result};
+use crate::pbconfig;
+use crate::Result;
 
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub enum BackupProvider {
@@ -128,16 +131,12 @@ impl SettingsProvider {
         SettingsProvider { db }
     }
 
-    pub fn load(
-        &self,
-    ) -> Result<Settings> {
+    pub fn load(&self) -> Result<Settings> {
         let tx = self.db.transaction();
         let key = "config";
 
         match tx.get(key)? {
-            None => Err(MetadataError::NotFound(
-                "config not found".to_string(),
-            )),
+            None => Err(MetadataError::NotFound("config not found".to_string())),
             Some(value) => Ok(deserialize(&value)?),
         }
     }
@@ -147,10 +146,7 @@ impl SettingsProvider {
         let tx = self.db.transaction();
         let key = "config";
         let data = serialize(settings)?;
-        tx.put(
-            key,
-            data,
-        )?;
+        tx.put(key, data)?;
 
         tx.commit()?;
         Ok(())
@@ -207,7 +203,7 @@ fn deserialize(data: &[u8]) -> Result<Settings> {
             1 => BackupProvider::Local,
             2 => BackupProvider::S3,
             3 => BackupProvider::GCP,
-            _ => panic!("Invalid backup provider")
+            _ => panic!("Invalid backup provider"),
         },
         backup_provider_local_path: c.backup_provider_local,
         backup_provider_s3_bucket: c.backup_provider_s3_bucket,
@@ -224,7 +220,7 @@ fn deserialize(data: &[u8]) -> Result<Settings> {
             3 => BackupScheduleInterval::Weekly,
             4 => BackupScheduleInterval::Monthly,
             5 => BackupScheduleInterval::Yearly,
-            _ => panic!("Invalid backup schedule interval")
+            _ => panic!("Invalid backup schedule interval"),
         },
         backup_schedule_start_hour: c.backup_schedule_start_hour as usize,
     })
@@ -232,7 +228,9 @@ fn deserialize(data: &[u8]) -> Result<Settings> {
 
 #[cfg(test)]
 mod tests {
-    use crate::settings::{BackupProvider, BackupScheduleInterval, Settings};
+    use crate::settings::BackupProvider;
+    use crate::settings::BackupScheduleInterval;
+    use crate::settings::Settings;
 
     #[test]
     fn test_roundtrip() {

@@ -4,15 +4,17 @@ use std::sync::Arc;
 
 use chrono::DateTime;
 use chrono::Utc;
-use prost::Message;
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::rbac::Role;
 use common::types::OptionalProperty;
+use prost::Message;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
+
+use crate::account;
 use crate::error::MetadataError;
 use crate::index::check_insert_constraints;
 use crate::index::check_update_constraints;
@@ -21,11 +23,12 @@ use crate::index::get_index;
 use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
-use crate::{account, make_data_key};
+use crate::make_data_key;
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
-use crate::metadata::{ListResponse, ResponseMetadata};
+use crate::metadata::ListResponse;
+use crate::metadata::ResponseMetadata;
 use crate::Result;
 
 const NAMESPACE: &[u8] = b"accounts";
@@ -100,7 +103,10 @@ impl Accounts {
         for kv in iter {
             let (key, value) = kv?;
             // check if key contains the prefix
-            if !from_utf8(&prefix).unwrap().is_prefix_of(from_utf8(&key).unwrap()) {
+            if !from_utf8(&prefix)
+                .unwrap()
+                .is_prefix_of(from_utf8(&key).unwrap())
+            {
                 break;
             }
             list.push(deserialize(&value)?);
@@ -170,11 +176,19 @@ impl Accounts {
         Ok(account)
     }
 
-    pub(crate) fn add_organization_(&self, tx: &Transaction<TransactionDB>, member_id: u64, org_id: u64, role: OrganizationRole) -> Result<()> {
+    pub(crate) fn add_organization_(
+        &self,
+        tx: &Transaction<TransactionDB>,
+        member_id: u64,
+        org_id: u64,
+        role: OrganizationRole,
+    ) -> Result<()> {
         let mut account = self.get_by_id_(tx, member_id)?;
         let orgs = account.organizations.get_or_insert(Vec::new());
         if orgs.iter().any(|(id, _)| *id == org_id) {
-            return Err(MetadataError::AlreadyExists(format!("member {member_id} already in organization {org_id}").to_string()));
+            return Err(MetadataError::AlreadyExists(
+                format!("member {member_id} already in organization {org_id}").to_string(),
+            ));
         }
         orgs.push((org_id, role));
         let data = serialize(&account)?;
@@ -183,11 +197,18 @@ impl Accounts {
         Ok(())
     }
 
-    pub(crate) fn remove_organization_(&self, tx: &Transaction<TransactionDB>, member_id: u64, org_id: u64) -> Result<()> {
+    pub(crate) fn remove_organization_(
+        &self,
+        tx: &Transaction<TransactionDB>,
+        member_id: u64,
+        org_id: u64,
+    ) -> Result<()> {
         let mut account = self.get_by_id_(tx, member_id)?;
         let orgs = account.organizations.get_or_insert(Vec::new());
         if orgs.iter().all(|(id, _)| *id != org_id) {
-            return Err(MetadataError::NotFound(format!("member {member_id} not found in organization {org_id}").to_string()));
+            return Err(MetadataError::NotFound(
+                format!("member {member_id} not found in organization {org_id}").to_string(),
+            ));
         }
         orgs.retain(|(id, _)| *id != org_id);
         let data = serialize(&account)?;
@@ -196,7 +217,13 @@ impl Accounts {
         Ok(())
     }
 
-    pub(crate) fn change_organization_role_(&self, tx: &Transaction<TransactionDB>, member_id: u64, org_id: u64, role: OrganizationRole) -> Result<()> {
+    pub(crate) fn change_organization_role_(
+        &self,
+        tx: &Transaction<TransactionDB>,
+        member_id: u64,
+        org_id: u64,
+        role: OrganizationRole,
+    ) -> Result<()> {
         let mut account = self.get_by_id_(tx, member_id)?;
         let orgs = account.organizations.get_or_insert(Vec::new());
         for (id, r) in orgs.iter_mut() {
@@ -207,7 +234,9 @@ impl Accounts {
                 return Ok(());
             }
         }
-        Err(MetadataError::NotFound(format!("member {member_id} not found in organization {org_id}").to_string()))
+        Err(MetadataError::NotFound(
+            format!("member {member_id} not found in organization {org_id}").to_string(),
+        ))
     }
 }
 
@@ -283,26 +312,28 @@ fn serialize(acc: &Account) -> Result<Vec<u8>> {
         match role {
             Role::Admin => Some(account::Role::Admin as i32),
         }
-    } else { None };
+    } else {
+        None
+    };
 
     let orgs = if let Some(orgs) = &acc.organizations {
-        orgs.iter().map(|(id, role)| {
-            account::Organization {
+        orgs.iter()
+            .map(|(id, role)| account::Organization {
                 id: *id,
                 role: match role {
                     OrganizationRole::Owner => account::OrganizationRole::Owner as i32,
                     OrganizationRole::Admin => account::OrganizationRole::Admin as i32,
                     OrganizationRole::Member => account::OrganizationRole::Member as i32,
                 },
-            }
-        }).collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>()
     } else {
         vec![]
     };
 
     let proj = if let Some(proj) = &acc.projects {
-        proj.iter().map(|(id, role)| {
-            account::Project {
+        proj.iter()
+            .map(|(id, role)| account::Project {
                 id: *id,
                 role: match role {
                     ProjectRole::Owner => account::ProjectRole::Owner as i32,
@@ -310,21 +341,22 @@ fn serialize(acc: &Account) -> Result<Vec<u8>> {
                     ProjectRole::Member => account::ProjectRole::Member as i32,
                     ProjectRole::Reader => account::ProjectRole::Reader as i32,
                 },
-            }
-        }).collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>()
     } else {
         vec![]
     };
 
     let teams = if let Some(teams) = &acc.teams {
-        teams.iter().map(|(id, role)| {
-            account::Team {
+        teams
+            .iter()
+            .map(|(id, role)| account::Team {
                 id: *id,
                 role: match role {
                     Role::Admin => account::Role::Admin as i32,
                 },
-            }
-        }).collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>()
     } else {
         vec![]
     };
@@ -353,43 +385,56 @@ fn deserialize(data: &[u8]) -> Result<Account> {
     let role = if let Some(role) = &from.role {
         match role {
             1 => Some(Role::Admin),
-            _ => panic!("invalid role")
+            _ => panic!("invalid role"),
         }
     } else {
         None
     };
 
-
-    let orgs = from.organizations.iter().map(|org| {
-        (org.id, match org.role {
-            1 => OrganizationRole::Owner,
-            2 => OrganizationRole::Admin,
-            3 => OrganizationRole::Member,
-            _ => panic!("invalid role")
+    let orgs = from
+        .organizations
+        .iter()
+        .map(|org| {
+            (org.id, match org.role {
+                1 => OrganizationRole::Owner,
+                2 => OrganizationRole::Admin,
+                3 => OrganizationRole::Member,
+                _ => panic!("invalid role"),
+            })
         })
-    }).collect::<Vec<_>>();
+        .collect::<Vec<_>>();
 
-    let proj = from.projects.iter().map(|proj| {
-        (proj.id, match proj.role {
-            1 => ProjectRole::Owner,
-            2 => ProjectRole::Admin,
-            3 => ProjectRole::Member,
-            4 => ProjectRole::Reader,
-            _ => panic!("invalid role")
+    let proj = from
+        .projects
+        .iter()
+        .map(|proj| {
+            (proj.id, match proj.role {
+                1 => ProjectRole::Owner,
+                2 => ProjectRole::Admin,
+                3 => ProjectRole::Member,
+                4 => ProjectRole::Reader,
+                _ => panic!("invalid role"),
+            })
         })
-    }).collect::<Vec<_>>();
+        .collect::<Vec<_>>();
 
-    let teams = from.teams.iter().map(|team| {
-        (team.id, match team.role {
-            1 => Role::Admin,
-            _ => panic!("invalid role")
+    let teams = from
+        .teams
+        .iter()
+        .map(|team| {
+            (team.id, match team.role {
+                1 => Role::Admin,
+                _ => panic!("invalid role"),
+            })
         })
-    }).collect::<Vec<_>>();
+        .collect::<Vec<_>>();
     let to = Account {
         id: from.id,
         created_at: chrono::DateTime::from_timestamp(from.created_at, 0).unwrap(),
         created_by: from.created_by,
-        updated_at: from.updated_at.map(|t| chrono::DateTime::from_timestamp(t, 0).unwrap()),
+        updated_at: from
+            .updated_at
+            .map(|t| chrono::DateTime::from_timestamp(t, 0).unwrap()),
         updated_by: from.updated_by,
         password_hash: from.password_hash,
         email: from.email,
@@ -408,8 +453,13 @@ fn deserialize(data: &[u8]) -> Result<Account> {
 #[cfg(test)]
 mod tests {
     use chrono::DateTime;
-    use common::rbac::{OrganizationRole, ProjectRole, Role};
-    use crate::accounts::{Account, deserialize, serialize};
+    use common::rbac::OrganizationRole;
+    use common::rbac::ProjectRole;
+    use common::rbac::Role;
+
+    use crate::accounts::deserialize;
+    use crate::accounts::serialize;
+    use crate::accounts::Account;
 
     #[test]
     fn test_proto_roundtrip() {

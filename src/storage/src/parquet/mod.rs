@@ -37,7 +37,8 @@ use arrow2::io::parquet::write::array_to_columns;
 use arrow2::io::parquet::write::WriteOptions;
 use arrow2::offset::OffsetsBuffer;
 use ordered_float::OrderedFloat;
-use parquet2::compression::{CompressionOptions, ZstdLevel};
+use parquet2::compression::CompressionOptions;
+use parquet2::compression::ZstdLevel;
 use parquet2::encoding::Encoding;
 use parquet2::metadata::ColumnDescriptor;
 use parquet2::metadata::FileMetaData;
@@ -456,7 +457,13 @@ pub fn array_to_pages_simple(
         .unwrap();
     let compressed = pages
         .into_iter()
-        .map(|page| compress(page.unwrap(), vec![], CompressionOptions::Zstd(Some(ZstdLevel::try_new(1).unwrap()))))
+        .map(|page| {
+            compress(
+                page.unwrap(),
+                vec![],
+                CompressionOptions::Zstd(Some(ZstdLevel::try_new(1).unwrap())),
+            )
+        })
         .collect::<std::result::Result<Vec<CompressedPage>, _>>()?;
 
     Ok(compressed)

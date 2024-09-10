@@ -21,6 +21,7 @@ use metadata::MetadataProvider;
 use storage::db::OptiDBImpl;
 use storage::NamedValue;
 use storage::Value;
+
 use crate::error::Result;
 use crate::property_to_value;
 use crate::Destination;
@@ -254,7 +255,7 @@ impl Destination<Track> for Local {
                 ],
                 prop_values.clone(),
             ]
-                .concat();
+            .concat();
 
             self.db.insert(TABLE_EVENTS, values)?;
         }
@@ -294,7 +295,7 @@ impl Destination<Track> for Local {
             ],
             prop_values.clone(),
         ]
-            .concat();
+        .concat();
 
         self.db.insert(TABLE_EVENTS, values)?;
         Ok(())

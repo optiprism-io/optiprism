@@ -3,15 +3,25 @@ mod tests {
     use chrono::DateTime;
     use chrono::Utc;
     use common::GROUP_USER_ID;
-    use platform::{AggregateFunction, Breakdown, EventRef, PartitionedAggregateFunction, QueryTime, TimeIntervalUnit};
+    use platform::event_segmentation::Analysis;
+    use platform::event_segmentation::ChartType;
+    use platform::event_segmentation::Event;
+    use platform::event_segmentation::EventSegmentationRequest;
+    use platform::event_segmentation::Query;
+    use platform::AggregateFunction;
+    use platform::Breakdown;
+    use platform::EventRef;
+    use platform::PartitionedAggregateFunction;
     use platform::PropValueFilter;
     use platform::PropValueOperation;
     use platform::PropertyRef;
+    use platform::QueryTime;
+    use platform::TimeIntervalUnit;
     use reqwest::Client;
     use reqwest::StatusCode;
     use serde_json::Value;
     use tracing::debug;
-    use platform::event_segmentation::{Analysis, ChartType, Event, EventSegmentationRequest, Query};
+
     use crate::assert_response_status_eq;
     use crate::http::tests::create_admin_acc_and_login;
     use crate::http::tests::run_http_service;

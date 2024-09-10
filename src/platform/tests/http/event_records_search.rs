@@ -2,10 +2,11 @@
 mod tests {
     use chrono::DateTime;
     use chrono::Utc;
-    use reqwest::Client;
-    use reqwest::StatusCode;
     use platform::event_records::EventRecordsSearchRequest;
     use platform::QueryTime;
+    use reqwest::Client;
+    use reqwest::StatusCode;
+
     use crate::assert_response_status_eq;
     use crate::http::tests::create_admin_acc_and_login;
     use crate::http::tests::run_http_service;

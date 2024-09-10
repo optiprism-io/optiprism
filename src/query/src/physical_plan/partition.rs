@@ -5,6 +5,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
+
 use arrow::array::ArrayRef;
 use arrow::array::UInt64Array;
 use arrow::datatypes::DataType;
@@ -13,7 +14,8 @@ use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use axum::async_trait;
 use datafusion::execution::context::TaskContext;
-use datafusion::physical_expr::{EquivalenceProperties, PhysicalExpr};
+use datafusion::physical_expr::EquivalenceProperties;
+use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_plan::hash_utils::create_hashes;
 use datafusion::physical_plan::metrics::BaselineMetrics;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
@@ -29,6 +31,7 @@ use datafusion::physical_plan::Statistics;
 use datafusion_common::Result as DFResult;
 use futures::Stream;
 use futures::StreamExt;
+
 use crate::error::QueryError;
 use crate::Result;
 
@@ -55,7 +58,7 @@ impl PartitionExec {
             .concat()
             .into();
         let schema = Arc::new(schema);
-        let cache = Self::compute_properties(&input,schema.clone())?;
+        let cache = Self::compute_properties(&input, schema.clone())?;
         Ok(Self {
             input,
             partition_expr,
@@ -66,7 +69,10 @@ impl PartitionExec {
         })
     }
 
-    fn compute_properties(input: &Arc<dyn ExecutionPlan>,schema:SchemaRef) -> Result<PlanProperties> {
+    fn compute_properties(
+        input: &Arc<dyn ExecutionPlan>,
+        schema: SchemaRef,
+    ) -> Result<PlanProperties> {
         let eq_properties = EquivalenceProperties::new(schema);
         Ok(PlanProperties::new(
             eq_properties,
@@ -110,7 +116,7 @@ impl ExecutionPlan for PartitionExec {
                 self.partition_expr.clone(),
                 self.partition_col_name.clone(),
             )
-                .map_err(QueryError::into_datafusion_execution_error)?,
+            .map_err(QueryError::into_datafusion_execution_error)?,
         ))
     }
 
@@ -181,7 +187,7 @@ impl Stream for PartitionStream {
                         vec![Arc::new(hash_arr) as ArrayRef],
                         batch.columns().to_owned(),
                     ]
-                        .concat(),
+                    .concat(),
                 )?;
                 Poll::Ready(Some(Ok(result)))
             }

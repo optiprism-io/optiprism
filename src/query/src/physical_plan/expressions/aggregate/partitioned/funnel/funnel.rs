@@ -1,13 +1,15 @@
 use std::collections::HashMap;
 use std::result;
 use std::sync::Arc;
+
 use ahash::RandomState;
 use arrow::array::ArrayRef;
 use arrow::array::Decimal128Builder;
 use arrow::array::Int64Array;
 use arrow::array::Int64Builder;
 use arrow::array::TimestampMillisecondArray;
-use arrow::compute::{concat, take};
+use arrow::compute::concat;
+use arrow::compute::take;
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
 use arrow::datatypes::Schema;
@@ -24,8 +26,10 @@ use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 use datafusion::physical_expr::PhysicalExprRef;
 use datafusion_common::ScalarValue;
-use num_traits::{FromPrimitive, ToPrimitive};
+use num_traits::FromPrimitive;
+use num_traits::ToPrimitive;
 use rust_decimal::Decimal;
+
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::evaluate_batch;
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::Batch;
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::Count;
@@ -140,8 +144,11 @@ impl Group {
     fn check_exclude(&self, exclude: &[Exclude], cur_row_id: usize) -> bool {
         for excl in exclude.iter() {
             // check if this exclude is relevant to current step
-            if let Some(steps) = &excl.steps{
-                if steps.from <= self.cur_step && steps.to >= self.cur_step && excl.exists.value(cur_row_id) {
+            if let Some(steps) = &excl.steps {
+                if steps.from <= self.cur_step
+                    && steps.to >= self.cur_step
+                    && excl.exists.value(cur_row_id)
+                {
                     return false;
                 }
             }
@@ -754,7 +761,7 @@ impl Funnel {
                         } else {
                             0.
                         })
-                            .unwrap()
+                        .unwrap()
                     };
                     scr.rescale(DECIMAL_SCALE as u32);
                     step_conversion_ratio[step_id].append_value(scr.mantissa());
@@ -767,7 +774,7 @@ impl Funnel {
                         } else {
                             0.
                         })
-                            .unwrap()
+                        .unwrap()
                     };
                     v.rescale(DECIMAL_SCALE as u32);
                     let mut dor = Decimal::from_f64(100. - scr.to_f64().unwrap()).unwrap();
@@ -781,7 +788,7 @@ impl Funnel {
                         } else {
                             0.
                         })
-                            .unwrap()
+                        .unwrap()
                     };
                     v.rescale(DECIMAL_SCALE as u32);
                     step_avg_time_to_convert[step_id].append_value(v.mantissa());
@@ -794,7 +801,7 @@ impl Funnel {
                         } else {
                             0.
                         })
-                            .unwrap()
+                        .unwrap()
                     };
                     v.rescale(DECIMAL_SCALE as u32);
                     step_avg_time_to_convert_from_start[step_id].append_value(v.mantissa());
@@ -873,7 +880,10 @@ impl Funnel {
             0
         };
 
-        let step0_total = res[groups_len + 1].as_any().downcast_ref::<Int64Array>().unwrap();
+        let step0_total = res[groups_len + 1]
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
         let mut idx_arr = Int64Builder::new();
         for (idx, v) in step0_total.iter().enumerate() {
             if v.unwrap() != 0 {
@@ -883,7 +893,8 @@ impl Funnel {
         let a = Arc::new(idx_arr.finish()) as ArrayRef;
         let res = res
             .iter()
-            .map(|c| take(&c, &a, None).unwrap()).collect::<Vec<_>>();
+            .map(|c| take(&c, &a, None).unwrap())
+            .collect::<Vec<_>>();
         Ok(res)
     }
 }
@@ -966,14 +977,14 @@ mod tests {
                         "1976-01-01 12:00:00 +0000",
                         "%Y-%m-%d %H:%M:%S %z",
                     )
-                        .unwrap()
-                        .with_timezone(&Utc),
+                    .unwrap()
+                    .with_timezone(&Utc),
                     to: DateTime::parse_from_str(
                         "1976-02-01 12:00:00 +0000",
                         "%Y-%m-%d %H:%M:%S %z",
                     )
-                        .unwrap()
-                        .with_timezone(&Utc),
+                    .unwrap()
+                    .with_timezone(&Utc),
                     schema: schema.clone(),
                     groups: None,
                     ts_col: Arc::new(Column::new("ts", 1)),
@@ -1017,14 +1028,14 @@ asd
                         "1976-01-01 12:00:00 +0000",
                         "%Y-%m-%d %H:%M:%S %z",
                     )
-                        .unwrap()
-                        .with_timezone(&Utc),
+                    .unwrap()
+                    .with_timezone(&Utc),
                     to: DateTime::parse_from_str(
                         "1976-02-01 12:00:00 +0000",
                         "%Y-%m-%d %H:%M:%S %z",
                     )
-                        .unwrap()
-                        .with_timezone(&Utc),
+                    .unwrap()
+                    .with_timezone(&Utc),
                     schema: schema.clone(),
                     groups: None,
                     ts_col: Arc::new(Column::new("ts", 1)),
@@ -1069,14 +1080,14 @@ asd
                         "1976-01-01 12:00:00 +0000",
                         "%Y-%m-%d %H:%M:%S %z",
                     )
-                        .unwrap()
-                        .with_timezone(&Utc),
+                    .unwrap()
+                    .with_timezone(&Utc),
                     to: DateTime::parse_from_str(
                         "1976-02-01 12:00:00 +0000",
                         "%Y-%m-%d %H:%M:%S %z",
                     )
-                        .unwrap()
-                        .with_timezone(&Utc),
+                    .unwrap()
+                    .with_timezone(&Utc),
                     schema: schema.clone(),
                     groups: None,
                     ts_col: Arc::new(Column::new("ts", 1)),

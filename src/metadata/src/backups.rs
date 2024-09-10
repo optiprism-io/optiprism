@@ -2,15 +2,26 @@ use std::path::PathBuf;
 use std::str::from_utf8;
 use std::str::pattern::Pattern;
 use std::sync::Arc;
-use chrono::{DateTime, Utc};
+
+use chrono::DateTime;
+use chrono::Utc;
 use prost::Message;
-use rocksdb::{Transaction, TransactionDB};
-use serde::{Deserialize, Serialize};
-use crate::{backup, make_data_key, make_data_value_key, make_id_seq_key, Result};
+use rocksdb::Transaction;
+use rocksdb::TransactionDB;
+use serde::Deserialize;
+use serde::Serialize;
+
+use crate::backup;
 use crate::error::MetadataError;
 use crate::index::next_seq;
-use crate::metadata::{ListResponse, ResponseMetadata};
-use crate::settings::{BackupProvider, Settings};
+use crate::make_data_key;
+use crate::make_data_value_key;
+use crate::make_id_seq_key;
+use crate::metadata::ListResponse;
+use crate::metadata::ResponseMetadata;
+use crate::settings::BackupProvider;
+use crate::settings::Settings;
+use crate::Result;
 
 const NAMESPACE: &[u8] = b"system/backups";
 
@@ -57,14 +68,24 @@ pub struct Backup {
 impl Backup {
     pub fn path(&self) -> String {
         match &self.provider {
-            Provider::Local(path) => path.join(self.created_at.format("%Y-%m-%dT%H:00:00.zip").to_string()).into_os_string().into_string().unwrap(),
+            Provider::Local(path) => path
+                .join(self.created_at.format("%Y-%m-%dT%H:00:00.zip").to_string())
+                .into_os_string()
+                .into_string()
+                .unwrap(),
             Provider::S3(s3) => {
                 let p = PathBuf::from(&s3.path);
-                p.join(self.created_at.format("%Y-%m-%dT%H:00:00.zip").to_string()).into_os_string().into_string().unwrap()
+                p.join(self.created_at.format("%Y-%m-%dT%H:00:00.zip").to_string())
+                    .into_os_string()
+                    .into_string()
+                    .unwrap()
             }
             Provider::GCP(gcp) => {
                 let p = PathBuf::from(&gcp.path);
-                p.join(self.created_at.format("%Y-%m-%dT%H:00:00.zip").to_string()).into_os_string().into_string().unwrap()
+                p.join(self.created_at.format("%Y-%m-%dT%H:00:00.zip").to_string())
+                    .into_os_string()
+                    .into_string()
+                    .unwrap()
             }
         }
     }
@@ -94,7 +115,9 @@ impl Backups {
             let list = self.list_(&tx)?;
             for backup in list.data {
                 if backup.status == Status::Idle {
-                    return Err(MetadataError::AlreadyExists("There is already an idle backup".to_string()));
+                    return Err(MetadataError::AlreadyExists(
+                        "There is already an idle backup".to_string(),
+                    ));
                 }
             }
         }
@@ -131,7 +154,10 @@ impl Backups {
         for kv in iter {
             let (key, value) = kv?;
             // check if key contains the prefix
-            if !from_utf8(&prefix).unwrap().is_prefix_of(from_utf8(&key).unwrap()) {
+            if !from_utf8(&prefix)
+                .unwrap()
+                .is_prefix_of(from_utf8(&key).unwrap())
+            {
                 break;
             }
             list.push(deserialize(&value)?);
@@ -180,9 +206,11 @@ pub struct CreateBackupRequest {
 }
 
 impl CreateBackupRequest {
-    pub fn from_settings(settings:&Settings)->Self {
+    pub fn from_settings(settings: &Settings) -> Self {
         let provider = match settings.backup_provider {
-            BackupProvider::Local => Provider::Local(PathBuf::from(settings.backup_provider_local_path.clone())),
+            BackupProvider::Local => {
+                Provider::Local(PathBuf::from(settings.backup_provider_local_path.clone()))
+            }
             BackupProvider::S3 => Provider::S3(S3Provider {
                 bucket: settings.backup_provider_s3_bucket.clone(),
                 path: settings.backup_provider_s3_path.clone(),
@@ -191,12 +219,16 @@ impl CreateBackupRequest {
             BackupProvider::GCP => Provider::GCP(GCPProvider {
                 bucket: settings.backup_provider_gcp_bucket.clone(),
                 path: settings.backup_provider_gcp_path.clone(),
-            })
+            }),
         };
 
         CreateBackupRequest {
             provider: provider.clone(),
-            password: if settings.backup_encryption_enabled { Some(settings.backup_encryption_password.clone()) } else { None },
+            password: if settings.backup_encryption_enabled {
+                Some(settings.backup_encryption_password.clone())
+            } else {
+                None
+            },
             is_encrypted: settings.backup_encryption_enabled,
             status: Status::Idle,
         }
@@ -302,7 +334,9 @@ fn deserialize(data: &[u8]) -> Result<Backup> {
     Ok(Backup {
         id: from.id,
         created_at: chrono::DateTime::from_timestamp(from.created_at, 0).unwrap(),
-        updated_at: from.updated_at.map(|t| chrono::DateTime::from_timestamp(t, 0).unwrap()),
+        updated_at: from
+            .updated_at
+            .map(|t| chrono::DateTime::from_timestamp(t, 0).unwrap()),
         provider,
         status,
         is_encrypted: from.is_encrypted,
@@ -312,8 +346,9 @@ fn deserialize(data: &[u8]) -> Result<Backup> {
 
 #[cfg(test)]
 mod tests {
-    
+
     use chrono::DateTime;
+
     use crate::backups::S3Provider;
 
     #[test]

@@ -3,13 +3,15 @@ use std::sync::Arc;
 use arrow::datatypes::DataType;
 use chrono::DateTime;
 use chrono::Utc;
+use common::group_col;
 use common::query::Breakdown;
 use common::query::EventRef;
 use common::query::PropValueFilter;
 use common::query::PropValueOperation;
 use common::query::PropertyRef;
 use common::query::QueryTime;
-use common::types::{COLUMN_EVENT, TABLE_EVENTS};
+use common::types::COLUMN_EVENT;
+use common::types::TABLE_EVENTS;
 use datafusion_common::Column;
 use datafusion_common::ExprSchema;
 use datafusion_common::ScalarValue;
@@ -21,7 +23,6 @@ use datafusion_expr::or;
 use datafusion_expr::Expr;
 use datafusion_expr::ExprSchemable;
 use datafusion_expr::Operator;
-use common::group_col;
 use metadata::dictionaries::Dictionaries;
 use metadata::properties::DictionaryType;
 use metadata::MetadataProvider;
@@ -131,14 +132,12 @@ pub fn event_filters_expression(
                     value,
                 } => {
                     let tbl = match property {
-                        PropertyRef::Group(_, g) => {
-                            group_col(*g)
-                        }
+                        PropertyRef::Group(_, g) => group_col(*g),
                         PropertyRef::Event(_) => TABLE_EVENTS.to_string(),
-                        PropertyRef::Custom(_) => unimplemented!()
+                        PropertyRef::Custom(_) => unimplemented!(),
                     };
                     property_expression(ctx, metadata, &tbl, property, operation, value.clone())
-                },
+                }
             }
         })
         .collect::<Result<Vec<Expr>>>()?;
@@ -158,8 +157,9 @@ pub fn breakdown_expr(
 ) -> crate::Result<Expr> {
     match breakdown {
         Breakdown::Property(prop_ref) => match prop_ref {
-            | PropertyRef::Group(..)
-            | PropertyRef::Event(..) => Ok(property_col(ctx, metadata, prop_ref)?),
+            PropertyRef::Group(..) | PropertyRef::Event(..) => {
+                Ok(property_col(ctx, metadata, prop_ref)?)
+            }
             PropertyRef::Custom(_) => unimplemented!(),
         },
     }
@@ -177,7 +177,8 @@ pub fn encode_property_dict_values(
     for value in values.iter() {
         if let ScalarValue::Utf8(inner) = value {
             if let Some(str_value) = inner {
-                let key = dictionaries.get_key(ctx.project_id, tbl, col_name, str_value.as_str())?;
+                let key =
+                    dictionaries.get_key(ctx.project_id, tbl, col_name, str_value.as_str())?;
 
                 let scalar_value = match dict_type {
                     DictionaryType::Int8 => ScalarValue::Int8(Some(key as i8)),

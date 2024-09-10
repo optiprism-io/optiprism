@@ -1,47 +1,69 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
-use arrow::array::{Array, Decimal128Array, Int64Array, StringArray, StringBuilder, TimestampMillisecondArray};
+
+use arrow::array::Array;
+use arrow::array::Decimal128Array;
+use arrow::array::Int64Array;
+use arrow::array::StringArray;
+use arrow::array::StringBuilder;
+use arrow::array::TimestampMillisecondArray;
 use arrow::compute::cast;
 use arrow::datatypes::DataType;
-
-use common::{DECIMAL_SCALE, group_col};
+use common::funnel::Count;
+use common::funnel::ExcludeSteps;
+use common::funnel::Filter;
+use common::funnel::Funnel;
+use common::funnel::StepOrder;
+use common::funnel::TimeWindow;
+use common::funnel::Touch;
+use common::group_col;
 // use std::time::Duration;
 use common::query::Breakdown;
 use common::query::EventRef;
 use common::query::PropValueFilter;
 use common::query::PropertyRef;
-use common::types::{COLUMN_CREATED_AT, COLUMN_EVENT, METRIC_QUERY_EXECUTION_TIME_SECONDS, METRIC_QUERY_QUERIES_TOTAL, ROUND_DIGITS, TABLE_EVENTS};
+use common::types::COLUMN_CREATED_AT;
+use common::types::COLUMN_EVENT;
 use common::types::COLUMN_PROJECT_ID;
+use common::types::METRIC_QUERY_EXECUTION_TIME_SECONDS;
+use common::types::METRIC_QUERY_QUERIES_TOTAL;
+use common::types::ROUND_DIGITS;
+use common::types::TABLE_EVENTS;
+use common::DECIMAL_SCALE;
 use datafusion_common::Column;
 use datafusion_expr::and;
 use datafusion_expr::col;
 use datafusion_expr::Extension;
 use datafusion_expr::Filter as PlanFilter;
 use datafusion_expr::LogicalPlan;
-use metrics::{counter, histogram};
-use num_traits::ToPrimitive;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
+use metrics::counter;
+use metrics::histogram;
+use num_traits::ToPrimitive;
 use rust_decimal::Decimal;
-use tracing::debug;
-use common::funnel::{Count, ExcludeSteps, Filter, Funnel, StepOrder, TimeWindow, Touch};
 use storage::db::OptiDBImpl;
+use tracing::debug;
 
-use crate::{breakdowns_to_dicts, col_name, decode_filter_single_dictionary, execute, fix_filter, initial_plan};
+use crate::breakdowns_to_dicts;
+use crate::col_name;
+use crate::decode_filter_single_dictionary;
 use crate::error::QueryError;
 use crate::error::Result;
+use crate::execute;
 use crate::expr::event_expression;
 use crate::expr::event_filters_expression;
 use crate::expr::property_col;
 use crate::expr::time_expression;
+use crate::fix_filter;
+use crate::initial_plan;
 use crate::logical_plan;
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::logical_plan::expr::multi_or;
 use crate::logical_plan::funnel::FunnelNode;
 use crate::logical_plan::SortField;
 use crate::Context;
-
 
 pub struct FunnelProvider {
     metadata: Arc<MetadataProvider>,
@@ -62,7 +84,8 @@ impl FunnelProvider {
             .map(|x| schema.index_of(x).unwrap())
             .collect();
 
-        let (session_ctx, state, plan) = initial_plan(&self.db, TABLE_EVENTS.to_string(), projection)?;
+        let (session_ctx, state, plan) =
+            initial_plan(&self.db, TABLE_EVENTS.to_string(), projection)?;
         let plan = build(ctx.clone(), self.metadata.clone(), plan, req.clone())?;
 
         println!("{plan:?}");
@@ -93,37 +116,50 @@ impl FunnelProvider {
         if let Some(breakdowns) = &req.breakdowns {
             for (idx, breakdown) in breakdowns.iter().enumerate() {
                 let prop = match breakdown {
-                    Breakdown::Property(prop) => {
-                        match prop {
-                            PropertyRef::Group(name, gid) => self.metadata.group_properties[*gid].get_by_name(ctx.project_id, name.as_ref())?,
-                            PropertyRef::Event(name) => self.metadata.event_properties.get_by_name(ctx.project_id, name.as_ref())?,
-                            PropertyRef::Custom(_) => return Err(QueryError::Unimplemented("custom properties are not implemented for breakdowns".to_string()))
+                    Breakdown::Property(prop) => match prop {
+                        PropertyRef::Group(name, gid) => self.metadata.group_properties[*gid]
+                            .get_by_name(ctx.project_id, name.as_ref())?,
+                        PropertyRef::Event(name) => self
+                            .metadata
+                            .event_properties
+                            .get_by_name(ctx.project_id, name.as_ref())?,
+                        PropertyRef::Custom(_) => {
+                            return Err(QueryError::Unimplemented(
+                                "custom properties are not implemented for breakdowns".to_string(),
+                            ));
                         }
-                    }
+                    },
                 };
                 let col = match result.column(idx + 1).data_type() {
                     DataType::Decimal128(_, _) => {
-                        let arr = result.column(idx + 1).as_any().downcast_ref::<Decimal128Array>().unwrap();
+                        let arr = result
+                            .column(idx + 1)
+                            .as_any()
+                            .downcast_ref::<Decimal128Array>()
+                            .unwrap();
                         let mut builder = StringBuilder::new();
                         for i in 0..arr.len() {
                             let v = arr.value(i);
-                            let vv = Decimal::from_i128_with_scale(
-                                v,
-                                DECIMAL_SCALE as u32,
-                            ).round_dp(ROUND_DIGITS.into());
+                            let vv = Decimal::from_i128_with_scale(v, DECIMAL_SCALE as u32)
+                                .round_dp(ROUND_DIGITS.into());
                             if vv.is_integer() {
                                 builder.append_value(vv.to_i64().unwrap().to_string());
                             } else {
                                 builder.append_value(vv.to_string());
                             }
                         }
-                        builder.finish().as_any().downcast_ref::<StringArray>().unwrap().clone()
+                        builder
+                            .finish()
+                            .as_any()
+                            .downcast_ref::<StringArray>()
+                            .unwrap()
+                            .clone()
                     }
                     _ => cast(result.column(idx + 1), &DataType::Utf8)?
                         .as_any()
                         .downcast_ref::<StringArray>()
                         .unwrap()
-                        .to_owned()
+                        .to_owned(),
                 };
 
                 group_cols.push(col);
@@ -182,20 +218,24 @@ impl FunnelProvider {
                     conversion_ratio: Decimal::from_i128_with_scale(
                         dec_val_cols[step_id * 4].value(idx),
                         DECIMAL_SCALE as u32,
-                    ).round_dp(ROUND_DIGITS.into()),
+                    )
+                    .round_dp(ROUND_DIGITS.into()),
                     avg_time_to_convert: Decimal::from_i128_with_scale(
                         dec_val_cols[step_id * 4 + 1].value(idx),
                         DECIMAL_SCALE as u32,
-                    ).round_dp(ROUND_DIGITS.into()),
+                    )
+                    .round_dp(ROUND_DIGITS.into()),
                     avg_time_to_convert_from_start: Decimal::from_i128_with_scale(
                         dec_val_cols[step_id * 4 + 2].value(idx),
                         DECIMAL_SCALE as u32,
-                    ).round_dp(ROUND_DIGITS.into()),
+                    )
+                    .round_dp(ROUND_DIGITS.into()),
                     dropped_off: int_val_cols[step_id * 4 + 1].value(idx),
                     drop_off_ratio: Decimal::from_i128_with_scale(
                         dec_val_cols[step_id * 4 + 3].value(idx),
                         DECIMAL_SCALE as u32,
-                    ).round_dp(ROUND_DIGITS.into()),
+                    )
+                    .round_dp(ROUND_DIGITS.into()),
                     time_to_convert: int_val_cols[step_id * 4 + 2].value(idx),
                     time_to_convert_from_start: int_val_cols[step_id * 4 + 3].value(idx),
                 };
@@ -449,11 +489,7 @@ pub struct Response {
     pub steps: Vec<Step>,
 }
 
-fn projection(
-    ctx: &Context,
-    req: &Funnel,
-    md: &Arc<MetadataProvider>,
-) -> Result<Vec<String>> {
+fn projection(ctx: &Context, req: &Funnel, md: &Arc<MetadataProvider>) -> Result<Vec<String>> {
     let mut fields = vec![
         COLUMN_PROJECT_ID.to_string(),
         group_col(req.group_id),
@@ -517,9 +553,10 @@ fn projection(
     Ok(fields)
 }
 
-pub fn fix_request(md: &Arc<MetadataProvider>,
-                   project_id: u64,
-                   req: common::funnel::Funnel,
+pub fn fix_request(
+    md: &Arc<MetadataProvider>,
+    project_id: u64,
+    req: common::funnel::Funnel,
 ) -> crate::Result<common::funnel::Funnel> {
     let mut out = req.clone();
 
@@ -533,8 +570,7 @@ pub fn fix_request(md: &Arc<MetadataProvider>,
         }
     }
 
-    if let Some(exclude) = &req.exclude
-    {
+    if let Some(exclude) = &req.exclude {
         if exclude.is_empty() {
             out.exclude = None;
         } else {

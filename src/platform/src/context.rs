@@ -17,6 +17,7 @@ use common::rbac::ORGANIZATION_PERMISSIONS;
 use common::rbac::PERMISSIONS;
 use common::rbac::PROJECT_PERMISSIONS;
 use metadata::settings::SettingsProvider;
+
 use crate::auth::token::parse_access_token;
 use crate::error::AuthError;
 use crate::PlatformError;
@@ -37,16 +38,16 @@ pub struct Context {
 impl Context {
     pub fn check_permission(&self, permission: Permission) -> Result<()> {
         // todo uncomment
-        /*if self.force_update_password {
-            return Err(PlatformError::Forbidden(
-                "password must be changed".to_string(),
-            ));
-        }
-        if self.force_update_email {
-            return Err(PlatformError::Forbidden(
-                "email must be changed".to_string(),
-            ));
-        }*/
+        // if self.force_update_password {
+        // return Err(PlatformError::Forbidden(
+        // "password must be changed".to_string(),
+        // ));
+        // }
+        // if self.force_update_email {
+        // return Err(PlatformError::Forbidden(
+        // "email must be changed".to_string(),
+        // ));
+        // }
         if let Some(role) = &self.role {
             for (root_role, role_permission) in PERMISSIONS.iter() {
                 if *root_role != *role {
@@ -153,8 +154,7 @@ impl Context {
 
 #[async_trait]
 impl<S> FromRequestParts<S> for Context
-where
-    S: Send + Sync,
+where S: Send + Sync
 {
     type Rejection = PlatformError;
 
@@ -167,9 +167,10 @@ where
                 .await
                 .map_err(|_err| AuthError::CantParseBearerHeader)?;
 
-        let Extension(settings) = Extension::<Arc<SettingsProvider>>::from_request_parts(parts, state)
-            .await
-            .map_err(|err| PlatformError::Internal(err.to_string()))?;
+        let Extension(settings) =
+            Extension::<Arc<SettingsProvider>>::from_request_parts(parts, state)
+                .await
+                .map_err(|err| PlatformError::Internal(err.to_string()))?;
 
         let claims = parse_access_token(bearer.token(), settings.load()?.auth_access_token)
             .map_err(|err| err.wrap_into(AuthError::CantParseAccessToken))?;

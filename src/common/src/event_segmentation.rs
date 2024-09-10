@@ -1,4 +1,3 @@
-
 use chrono::DateTime;
 use chrono::Utc;
 use serde::Deserialize;
@@ -38,7 +37,6 @@ pub struct Compare {
     pub offset: usize,
     pub unit: TimeIntervalUnit,
 }
-
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum QueryAggregatePerGroup {

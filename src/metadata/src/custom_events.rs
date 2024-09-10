@@ -4,16 +4,21 @@ use std::sync::Arc;
 
 use chrono::DateTime;
 use chrono::Utc;
+use common::query::EventRef;
+use common::query::PropValueFilter;
+use common::query::PropValueOperation;
+use common::query::PropertyRef;
+use common::types::OptionalProperty;
+use common::DECIMAL_PRECISION;
+use common::DECIMAL_SCALE;
 use datafusion_common::ScalarValue;
 use prost::Message;
-use common::query::{EventRef, PropertyRef, PropValueOperation};
-use common::query::PropValueFilter;
-use common::types::OptionalProperty;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
-use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
+
+use crate::custom_event;
 use crate::error::MetadataError;
 use crate::events::Events;
 use crate::index::check_insert_constraints;
@@ -23,11 +28,12 @@ use crate::index::get_index;
 use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
-use crate::{custom_event, make_data_key};
+use crate::make_data_key;
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
-use crate::metadata::{ListResponse, ResponseMetadata};
+use crate::metadata::ListResponse;
+use crate::metadata::ResponseMetadata;
 use crate::project_ns;
 use crate::Result;
 
@@ -190,12 +196,14 @@ impl CustomEvents {
         for kv in iter {
             let (key, value) = kv?;
             // check if key contains the prefix
-            if !from_utf8(&prefix).unwrap().is_prefix_of(from_utf8(&key).unwrap()) {
+            if !from_utf8(&prefix)
+                .unwrap()
+                .is_prefix_of(from_utf8(&key).unwrap())
+            {
                 break;
             }
             list.push(deserialize(&value)?);
         }
-
 
         Ok(ListResponse {
             data: list,
@@ -348,9 +356,12 @@ fn serialize(v: &CustomEvent) -> Result<Vec<u8>> {
 
         if let Some(filters) = &e.filters {
             for filter in filters {
-                match filter
-                {
-                    PropValueFilter::Property { property, operation, value } => {
+                match filter {
+                    PropValueFilter::Property {
+                        property,
+                        operation,
+                        value,
+                    } => {
                         let mut pvf = custom_event::PropValueFilter {
                             property_name: None,
                             property_group: None,
@@ -366,9 +377,7 @@ fn serialize(v: &CustomEvent) -> Result<Vec<u8>> {
                             PropertyRef::Event(n) => {
                                 pvf.property_name = Some(n.to_owned());
                             }
-                            PropertyRef::Custom(id) => {
-                                pvf.property_custom_id = Some(*id)
-                            }
+                            PropertyRef::Custom(id) => pvf.property_custom_id = Some(*id),
                         }
 
                         let op = match operation {
@@ -383,15 +392,19 @@ fn serialize(v: &CustomEvent) -> Result<Vec<u8>> {
                             PropValueOperation::Exists => custom_event::PropValueOperation::Exists,
                             PropValueOperation::Empty => custom_event::PropValueOperation::Empty,
                             PropValueOperation::Like => custom_event::PropValueOperation::Like,
-                            PropValueOperation::NotLike => custom_event::PropValueOperation::NotLike,
+                            PropValueOperation::NotLike => {
+                                custom_event::PropValueOperation::NotLike
+                            }
                             PropValueOperation::Regex => custom_event::PropValueOperation::Regex,
-                            PropValueOperation::NotRegex => custom_event::PropValueOperation::NotRegex,
+                            PropValueOperation::NotRegex => {
+                                custom_event::PropValueOperation::NotRegex
+                            }
                         };
                         pvf.operation = op as i32;
 
                         let v = if let Some(v) = value {
-                            v.iter().map(|v| {
-                                match v {
+                            v.iter()
+                                .map(|v| match v {
                                     ScalarValue::Boolean(v) => custom_event::Value {
                                         string: None,
                                         int8: None,
@@ -462,19 +475,21 @@ fn serialize(v: &CustomEvent) -> Result<Vec<u8>> {
                                         bool: None,
                                         timestamp: None,
                                     },
-                                    ScalarValue::TimestampMillisecond(v, _) => custom_event::Value {
-                                        string: None,
-                                        int8: None,
-                                        int16: None,
-                                        int32: None,
-                                        int64: None,
-                                        decimal: None,
-                                        bool: None,
-                                        timestamp: v.to_owned(),
-                                    },
-                                    _ => unimplemented!()
-                                }
-                            }).collect::<Vec<_>>()
+                                    ScalarValue::TimestampMillisecond(v, _) => {
+                                        custom_event::Value {
+                                            string: None,
+                                            int8: None,
+                                            int16: None,
+                                            int32: None,
+                                            int64: None,
+                                            decimal: None,
+                                            bool: None,
+                                            timestamp: v.to_owned(),
+                                        }
+                                    }
+                                    _ => unimplemented!(),
+                                })
+                                .collect::<Vec<_>>()
                         } else {
                             vec![]
                         };
@@ -489,7 +504,9 @@ fn serialize(v: &CustomEvent) -> Result<Vec<u8>> {
 
     let tags = if let Some(tags) = &v.tags {
         tags.to_vec()
-    } else { vec![] };
+    } else {
+        vec![]
+    };
     let ce = custom_event::CustomEvent {
         id: v.id,
         created_at: v.created_at.timestamp(),
@@ -512,7 +529,6 @@ fn deserialize(data: &[u8]) -> Result<CustomEvent> {
     let from = custom_event::CustomEvent::decode(data)?;
 
     let mut events = vec![];
-
 
     for event in from.events {
         let er = if let Some(f) = event.regular {
@@ -550,7 +566,7 @@ fn deserialize(data: &[u8]) -> Result<CustomEvent> {
                 12 => PropValueOperation::NotLike,
                 13 => PropValueOperation::Regex,
                 14 => PropValueOperation::NotRegex,
-                _ => unimplemented!()
+                _ => unimplemented!(),
             };
 
             let mut vals = vec![];
@@ -566,7 +582,11 @@ fn deserialize(data: &[u8]) -> Result<CustomEvent> {
                 } else if let Some(v) = value.int64 {
                     ScalarValue::Int64(Some(v))
                 } else if let Some(v) = value.decimal {
-                    ScalarValue::Decimal128(Some(i128::from_le_bytes(v.as_slice().try_into().unwrap())), DECIMAL_PRECISION, DECIMAL_SCALE)
+                    ScalarValue::Decimal128(
+                        Some(i128::from_le_bytes(v.as_slice().try_into().unwrap())),
+                        DECIMAL_PRECISION,
+                        DECIMAL_SCALE,
+                    )
                 } else if let Some(v) = value.bool {
                     ScalarValue::Boolean(Some(v != 0))
                 } else if let Some(v) = value.timestamp {
@@ -583,7 +603,14 @@ fn deserialize(data: &[u8]) -> Result<CustomEvent> {
                 value: Some(vals),
             });
         }
-        let event = Event { event: er, filters: if filters.is_empty() { None } else { Some(filters) } };
+        let event = Event {
+            event: er,
+            filters: if filters.is_empty() {
+                None
+            } else {
+                Some(filters)
+            },
+        };
         events.push(event);
     }
 
@@ -591,16 +618,22 @@ fn deserialize(data: &[u8]) -> Result<CustomEvent> {
         id: from.id,
         created_at: DateTime::from_timestamp(from.created_at, 0).unwrap(),
         created_by: from.created_by,
-        updated_at: from.updated_at.map(|t| DateTime::from_timestamp(t, 0).unwrap()),
+        updated_at: from
+            .updated_at
+            .map(|t| DateTime::from_timestamp(t, 0).unwrap()),
         updated_by: from.updated_by,
         project_id: from.project_id,
-        tags: if from.tags.is_empty() { None } else { Some(from.tags) },
+        tags: if from.tags.is_empty() {
+            None
+        } else {
+            Some(from.tags)
+        },
         name: from.name,
         description: from.description,
         status: match from.status {
             1 => Status::Enabled,
             2 => Status::Disabled,
-            _ => unimplemented!()
+            _ => unimplemented!(),
         },
         is_system: from.is_system,
         events,
@@ -612,10 +645,19 @@ fn deserialize(data: &[u8]) -> Result<CustomEvent> {
 #[cfg(test)]
 mod tests {
     use chrono::DateTime;
+    use common::query::EventRef;
+    use common::query::PropValueFilter;
+    use common::query::PropValueOperation;
+    use common::query::PropertyRef;
+    use common::DECIMAL_PRECISION;
+    use common::DECIMAL_SCALE;
     use datafusion_common::ScalarValue;
-    use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
-    use common::query::{EventRef, PropertyRef, PropValueFilter, PropValueOperation};
-    use crate::custom_events::{CustomEvent, deserialize, Event, serialize, Status};
+
+    use crate::custom_events::deserialize;
+    use crate::custom_events::serialize;
+    use crate::custom_events::CustomEvent;
+    use crate::custom_events::Event;
+    use crate::custom_events::Status;
 
     #[test]
     fn test_roundtrip() {
@@ -631,31 +673,38 @@ mod tests {
             description: Some("description".to_string()),
             status: Status::Enabled,
             is_system: true,
-            events: vec![Event {
-                event: EventRef::Regular(1),
-                filters: Some(vec![PropValueFilter::Property {
-                    property: PropertyRef::Group("group".to_string(), 1),
-                    operation: PropValueOperation::Eq,
-                    value: Some(vec![ScalarValue::Utf8(Some("value".to_string()))]),
-                }]),
-            },
-                         Event {
-                             event: EventRef::Custom(1),
-                             filters: None,
-                         },
-                         Event {
-                             event: EventRef::RegularName("sdf".to_string()),
-                             filters: Some(vec![PropValueFilter::Property {
-                                 property: PropertyRef::Event("e".to_string()),
-                                 operation: PropValueOperation::Eq,
-                                 value: Some(vec![ScalarValue::Decimal128(Some(123), DECIMAL_PRECISION, DECIMAL_SCALE)]),
-                             },
-                                                PropValueFilter::Property {
-                                                    property: PropertyRef::Event("e".to_string()),
-                                                    operation: PropValueOperation::Eq,
-                                                    value: Some(vec![ScalarValue::Boolean(Some(true))]),
-                                                }]),
-                         },
+            events: vec![
+                Event {
+                    event: EventRef::Regular(1),
+                    filters: Some(vec![PropValueFilter::Property {
+                        property: PropertyRef::Group("group".to_string(), 1),
+                        operation: PropValueOperation::Eq,
+                        value: Some(vec![ScalarValue::Utf8(Some("value".to_string()))]),
+                    }]),
+                },
+                Event {
+                    event: EventRef::Custom(1),
+                    filters: None,
+                },
+                Event {
+                    event: EventRef::RegularName("sdf".to_string()),
+                    filters: Some(vec![
+                        PropValueFilter::Property {
+                            property: PropertyRef::Event("e".to_string()),
+                            operation: PropValueOperation::Eq,
+                            value: Some(vec![ScalarValue::Decimal128(
+                                Some(123),
+                                DECIMAL_PRECISION,
+                                DECIMAL_SCALE,
+                            )]),
+                        },
+                        PropValueFilter::Property {
+                            property: PropertyRef::Event("e".to_string()),
+                            operation: PropValueOperation::Eq,
+                            value: Some(vec![ScalarValue::Boolean(Some(true))]),
+                        },
+                    ]),
+                },
             ],
         };
 
@@ -664,4 +713,3 @@ mod tests {
         assert_eq!(event, event2);
     }
 }
-

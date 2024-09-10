@@ -6,7 +6,9 @@ use axum::http::StatusCode;
 use axum::routing;
 use axum::Router;
 use common::http::Json;
-use crate::backups::{Backup, Backups};
+
+use crate::backups::Backup;
+use crate::backups::Backups;
 use crate::Context;
 use crate::ListResponse;
 use crate::Result;
@@ -15,10 +17,7 @@ async fn backup(
     ctx: Context,
     Extension(provider): Extension<Arc<Backups>>,
 ) -> Result<(StatusCode, Json<Backup>)> {
-    Ok((
-        StatusCode::NO_CONTENT,
-        Json(provider.backup(ctx).await?),
-    ))
+    Ok((StatusCode::NO_CONTENT, Json(provider.backup(ctx).await?)))
 }
 
 async fn get_by_id(
@@ -42,9 +41,6 @@ pub fn attach_routes(router: Router) -> Router {
         Router::new()
             .route("/", routing::get(list))
             .route("/backup", routing::post(backup))
-            .route(
-                "/:backup_id",
-                routing::get(get_by_id),
-            ),
+            .route("/:backup_id", routing::get(get_by_id)),
     )
 }

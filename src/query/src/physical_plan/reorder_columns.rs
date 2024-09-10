@@ -13,7 +13,7 @@ use async_trait::async_trait;
 use datafusion::execution::RecordBatchStream;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::execution::TaskContext;
-use datafusion::physical_expr::{EquivalenceProperties};
+use datafusion::physical_expr::EquivalenceProperties;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
@@ -50,7 +50,7 @@ impl ReorderColumnsExec {
         }
 
         let schema = Arc::new(Schema::new(reordered_cols));
-        let cache = Self::compute_properties(&input,schema.clone())?;
+        let cache = Self::compute_properties(&input, schema.clone())?;
         Ok(Self {
             input,
             columns,
@@ -59,7 +59,10 @@ impl ReorderColumnsExec {
         })
     }
 
-    fn compute_properties(input: &Arc<dyn ExecutionPlan>,schema:SchemaRef) -> Result<PlanProperties> {
+    fn compute_properties(
+        input: &Arc<dyn ExecutionPlan>,
+        schema: SchemaRef,
+    ) -> Result<PlanProperties> {
         let eq_properties = EquivalenceProperties::new(schema);
         Ok(PlanProperties::new(
             eq_properties,
@@ -135,7 +138,7 @@ impl Stream for ReorderColumnsStream {
 
                 Poll::Ready(Some(Ok(RecordBatch::try_new(self.schema.clone(), cols)?)))
             }
-            other =>  other,
+            other => other,
         }
     }
 }

@@ -1,17 +1,32 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
-use arrow::array::{Array, BooleanArray, Decimal128Array, Int16Array, Int32Array, Int64Array, Int8Array, StringArray, TimestampMillisecondArray};
-use arrow::datatypes::DataType;
 
+use arrow::array::Array;
+use arrow::array::BooleanArray;
+use arrow::array::Decimal128Array;
+use arrow::array::Int16Array;
+use arrow::array::Int32Array;
+use arrow::array::Int64Array;
+use arrow::array::Int8Array;
+use arrow::array::StringArray;
+use arrow::array::TimestampMillisecondArray;
+use arrow::datatypes::DataType;
+use common::group_col;
 use common::query::EventRef;
 use common::query::PropValueFilter;
 use common::query::PropertyRef;
 use common::query::QueryTime;
-use common::types::{COLUMN_CREATED_AT, COLUMN_EVENT, METRIC_QUERY_EXECUTION_TIME_SECONDS, METRIC_QUERY_QUERIES_TOTAL, TABLE_EVENTS};
+use common::types::COLUMN_CREATED_AT;
+use common::types::COLUMN_EVENT;
 use common::types::COLUMN_EVENT_ID;
 use common::types::COLUMN_PROJECT_ID;
-use common::{DECIMAL_PRECISION, DECIMAL_SCALE, group_col, GROUPS_COUNT};
+use common::types::METRIC_QUERY_EXECUTION_TIME_SECONDS;
+use common::types::METRIC_QUERY_QUERIES_TOTAL;
+use common::types::TABLE_EVENTS;
+use common::DECIMAL_PRECISION;
+use common::DECIMAL_SCALE;
+use common::GROUPS_COUNT;
 use datafusion_common::Column;
 use datafusion_common::ScalarValue;
 use datafusion_expr::and;
@@ -27,23 +42,33 @@ use datafusion_expr::LogicalPlan;
 use datafusion_expr::Operator;
 use datafusion_expr::Projection;
 use datafusion_expr::Sort;
-use metrics::{counter, histogram};
-use tracing::debug;
 use metadata::dictionaries::SingleDictionaryProvider;
+use metadata::properties::Property;
+use metadata::properties::Type;
 use metadata::MetadataProvider;
-use metadata::properties::{Property, Type};
+use metrics::counter;
+use metrics::histogram;
 use storage::db::OptiDBImpl;
+use tracing::debug;
 
+use crate::col_name;
+use crate::decode_filter_single_dictionary;
 use crate::error::QueryError;
 use crate::error::Result;
+use crate::execute;
 use crate::expr::event_expression;
 use crate::expr::event_filters_expression;
 use crate::expr::time_expression;
+use crate::fix_filter;
+use crate::initial_plan;
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::logical_plan::expr::multi_and;
 use crate::logical_plan::expr::multi_or;
 use crate::logical_plan::rename_columns::RenameColumnsNode;
-use crate::{col_name, ColumnType, Context, ColumnarDataTable, decode_filter_single_dictionary, execute, initial_plan, PropertyAndValue, fix_filter};
+use crate::ColumnType;
+use crate::ColumnarDataTable;
+use crate::Context;
+use crate::PropertyAndValue;
 
 pub struct EventRecordsProvider {
     metadata: Arc<MetadataProvider>,
@@ -55,22 +80,19 @@ impl EventRecordsProvider {
         Self { metadata, db }
     }
 
-    pub async fn get_by_id(
-        &self,
-        ctx: Context,
-        id: u64,
-    ) -> Result<EventRecord> {
+    pub async fn get_by_id(&self, ctx: Context, id: u64) -> Result<EventRecord> {
         let start = Instant::now();
         let schema = self.db.schema1(TABLE_EVENTS)?;
-        let projection =
-            (0..schema.fields.len()).collect::<Vec<_>>();
+        let projection = (0..schema.fields.len()).collect::<Vec<_>>();
 
-        let (session_ctx, state, plan) = initial_plan(&self.db, TABLE_EVENTS.to_string(), projection)?;
+        let (session_ctx, state, plan) =
+            initial_plan(&self.db, TABLE_EVENTS.to_string(), projection)?;
         let plan = build_get_by_id_plan(&ctx, self.metadata.clone(), plan, id)?;
         println!("{plan:?}");
         let result = execute(session_ctx, state, plan).await?;
         let elapsed = start.elapsed();
-        histogram!(METRIC_QUERY_EXECUTION_TIME_SECONDS, "query"=>"event_records_get_by_id").record(elapsed);
+        histogram!(METRIC_QUERY_EXECUTION_TIME_SECONDS, "query"=>"event_records_get_by_id")
+            .record(elapsed);
         counter!(METRIC_QUERY_QUERIES_TOTAL,"query"=>"event_records_get_by_id").increment(1);
         debug!("elapsed: {:?}", elapsed);
 
@@ -83,7 +105,7 @@ impl EventRecordsProvider {
                     property = Some(p);
                     break;
                 }
-            };
+            }
 
             if property.is_none() {
                 for g in 0..GROUPS_COUNT {
@@ -92,7 +114,7 @@ impl EventRecordsProvider {
                             property = Some(p);
                             break;
                         }
-                    };
+                    }
                 }
             }
 
@@ -119,23 +141,27 @@ impl EventRecordsProvider {
                         ScalarValue::Int64(Some(a.value(0).to_owned()))
                     }
                     DataType::Utf8 => {
-                        {
-                            let a = col.as_any().downcast_ref::<StringArray>().unwrap();
-                            ScalarValue::Utf8(Some(a.value(0).to_owned()))
-                        }
+                        let a = col.as_any().downcast_ref::<StringArray>().unwrap();
+                        ScalarValue::Utf8(Some(a.value(0).to_owned()))
                     }
                     DataType::Decimal128(_, _) => {
                         let a = col.as_any().downcast_ref::<Decimal128Array>().unwrap();
                         ScalarValue::Decimal128(Some(a.value(0)), DECIMAL_PRECISION, DECIMAL_SCALE)
                     }
                     DataType::Timestamp(_, _) => {
-                        let a = col.as_any().downcast_ref::<TimestampMillisecondArray>().unwrap();
+                        let a = col
+                            .as_any()
+                            .downcast_ref::<TimestampMillisecondArray>()
+                            .unwrap();
                         ScalarValue::TimestampMillisecond(Some(a.value(0)), None).to_owned()
                     }
-                    _ => unimplemented!("unimplemented {}", field.data_type().to_string())
+                    _ => unimplemented!("unimplemented {}", field.data_type().to_string()),
                 };
 
-                properties.push(PropertyAndValue { property: prop.reference(), value })
+                properties.push(PropertyAndValue {
+                    property: prop.reference(),
+                    value,
+                })
             }
         }
         let rec = EventRecord { properties };
@@ -152,10 +178,7 @@ impl EventRecordsProvider {
         let schema = self.db.schema1(TABLE_EVENTS)?;
         let mut proj = if req.properties.is_some() {
             let p = projection(&ctx, &req, &self.metadata)?;
-            p
-                .iter()
-                .map(|x| schema.index_of(x).unwrap())
-                .collect()
+            p.iter().map(|x| schema.index_of(x).unwrap()).collect()
         } else {
             (0..schema.fields.len()).collect::<Vec<_>>()
         };
@@ -169,7 +192,8 @@ impl EventRecordsProvider {
         let duration = start.elapsed();
         debug!("elapsed: {:?}", duration);
         let elapsed = start.elapsed();
-        histogram!(METRIC_QUERY_EXECUTION_TIME_SECONDS, "query"=>"event_records_search").record(elapsed);
+        histogram!(METRIC_QUERY_EXECUTION_TIME_SECONDS, "query"=>"event_records_search")
+            .record(elapsed);
         counter!(METRIC_QUERY_QUERIES_TOTAL,"query"=>"event_records_search").increment(1);
         debug!("elapsed: {:?}", elapsed);
 
@@ -283,18 +307,20 @@ pub fn build_search_plan(
         input
     } else {
         if !exprs.iter().any(|v| match v {
-            Expr::Column(c) => { c.name == *COLUMN_EVENT_ID }
-            _ => unreachable!()
+            Expr::Column(c) => c.name == *COLUMN_EVENT_ID,
+            _ => unreachable!(),
         }) {
-            exprs = [vec![
-                col(Column {
+            exprs = [
+                vec![col(Column {
                     relation: None,
                     name: COLUMN_EVENT_ID.to_string(),
-                })], exprs.to_vec()].concat();
+                })],
+                exprs.to_vec(),
+            ]
+            .concat();
         }
         LogicalPlan::Projection(Projection::try_new(exprs.clone(), Arc::new(input))?)
     };
-
 
     let input = {
         let s = Expr::Sort(expr::Sort {
@@ -339,22 +365,18 @@ pub fn build_search_plan(
         .map(|prop| {
             let col_name = prop.column_name();
             let dict = match prop.typ {
-                Type::Event => {
-                    SingleDictionaryProvider::new(
-                        ctx.project_id,
-                        TABLE_EVENTS.to_string(),
-                        col_name.clone(),
-                        metadata.dictionaries.clone(),
-                    )
-                }
-                Type::Group(g) => {
-                    SingleDictionaryProvider::new(
-                        ctx.project_id,
-                        group_col(g),
-                        col_name.clone(),
-                        metadata.dictionaries.clone(),
-                    )
-                }
+                Type::Event => SingleDictionaryProvider::new(
+                    ctx.project_id,
+                    TABLE_EVENTS.to_string(),
+                    col_name.clone(),
+                    metadata.dictionaries.clone(),
+                ),
+                Type::Group(g) => SingleDictionaryProvider::new(
+                    ctx.project_id,
+                    group_col(g),
+                    col_name.clone(),
+                    metadata.dictionaries.clone(),
+                ),
             };
             let col = Column::from_name(col_name);
             cols_hash.insert(prop.column_name(), ());
@@ -438,22 +460,18 @@ pub fn build_get_by_id_plan(
         .map(|prop| {
             let col_name = prop.column_name();
             let dict = match prop.typ {
-                Type::Event => {
-                    SingleDictionaryProvider::new(
-                        ctx.project_id,
-                        TABLE_EVENTS.to_string(),
-                        col_name.clone(),
-                        metadata.dictionaries.clone(),
-                    )
-                }
-                Type::Group(g) => {
-                    SingleDictionaryProvider::new(
-                        ctx.project_id,
-                        group_col(g).to_string(),
-                        col_name.clone(),
-                        metadata.dictionaries.clone(),
-                    )
-                }
+                Type::Event => SingleDictionaryProvider::new(
+                    ctx.project_id,
+                    TABLE_EVENTS.to_string(),
+                    col_name.clone(),
+                    metadata.dictionaries.clone(),
+                ),
+                Type::Group(g) => SingleDictionaryProvider::new(
+                    ctx.project_id,
+                    group_col(g).to_string(),
+                    col_name.clone(),
+                    metadata.dictionaries.clone(),
+                ),
             };
             let col = Column::from_name(col_name);
             cols_hash.insert(prop.column_name(), ());
@@ -513,7 +531,6 @@ fn decode_filter_dictionaries(
     }))
 }
 
-
 fn projection(
     ctx: &Context,
     req: &EventRecordsSearchRequest,
@@ -560,7 +577,8 @@ pub fn fix_search_request(
         for event in events.iter() {
             let mut of = vec![];
             if let Some(filters) = &event.filters {
-                if filters.is_empty() {} else {
+                if filters.is_empty() {
+                } else {
                     for filter in filters.iter() {
                         let f = fix_filter(md, project_id, filter)?;
                         of.push(f);
@@ -575,7 +593,6 @@ pub fn fix_search_request(
         }
         out.events = Some(oe);
     }
-
 
     if let Some(filters) = &req.filters {
         if filters.is_empty() {

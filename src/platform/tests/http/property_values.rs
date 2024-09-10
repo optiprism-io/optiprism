@@ -1,12 +1,14 @@
 #[cfg(test)]
 mod tests {
+    use platform::properties::Filter;
+    use platform::properties::ListPropertyValuesRequest;
     use platform::EventRef;
     use platform::PropValueOperation;
     use platform::PropertyRef;
     use reqwest::Client;
     use reqwest::StatusCode;
     use serde_json::Value;
-    use platform::properties::{Filter, ListPropertyValuesRequest};
+
     use crate::assert_response_status_eq;
     use crate::http::tests::create_admin_acc_and_login;
     use crate::http::tests::run_http_service;

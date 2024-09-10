@@ -1,15 +1,20 @@
 use chrono::Utc;
 use common::types::OptionalProperty;
 use common::GROUP_USER_ID;
+use platform::event_segmentation::Analysis;
+use platform::event_segmentation::ChartType;
+use platform::event_segmentation::EventSegmentationRequest;
 use platform::reports::CreateReportRequest;
 use platform::reports::Query;
 use platform::reports::Report;
 use platform::reports::Type;
 use platform::reports::UpdateReportRequest;
-use platform::{ListResponse, QueryTime, TimeIntervalUnit};
+use platform::ListResponse;
+use platform::QueryTime;
+use platform::TimeIntervalUnit;
 use reqwest::Client;
 use reqwest::StatusCode;
-use platform::event_segmentation::{Analysis, ChartType, EventSegmentationRequest};
+
 use crate::assert_response_json_eq;
 use crate::assert_response_status_eq;
 use crate::http::tests::create_admin_acc_and_login;

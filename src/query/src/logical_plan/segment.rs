@@ -5,7 +5,8 @@ use std::hash::Hasher;
 use std::sync::Arc;
 
 use common::query;
-use common::query::{PropValueOperation, QueryAggregate};
+use common::query::PropValueOperation;
+use common::query::QueryAggregate;
 use common::query::SegmentTime;
 use datafusion_common::Column;
 use datafusion_common::DFSchema;
@@ -67,7 +68,7 @@ pub enum SegmentExpr {
     Count {
         filter: Expr,
         ts_col: Column,
-        partition_col:Column,
+        partition_col: Column,
         time_range: TimeRange,
         op: Operator,
         right: i64,
@@ -77,7 +78,7 @@ pub enum SegmentExpr {
         filter: Expr,
         predicate: Column,
         ts_col: Column,
-        partition_col:Column,
+        partition_col: Column,
         time_range: TimeRange,
         agg: AggregateFunction,
         op: Operator,

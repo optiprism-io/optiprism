@@ -5,6 +5,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
+
 use arrow::array::Array;
 use arrow::array::ArrayRef;
 use arrow::array::Decimal128Array;
@@ -28,6 +29,7 @@ use datafusion_common::DataFusionError;
 use datafusion_common::Result as DFResult;
 use futures::Stream;
 use futures::StreamExt;
+
 use crate::error::QueryError;
 use crate::Result;
 
@@ -222,7 +224,6 @@ mod tests {
     use datafusion::prelude::SessionContext;
     use storage::test_util::parse_markdown_tables;
 
-    
     use crate::physical_plan::limit_groups::LimitGroupsExec;
 
     #[tokio::test]

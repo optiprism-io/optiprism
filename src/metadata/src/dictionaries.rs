@@ -25,7 +25,7 @@ fn make_key_key(project_id: u64, dict: &str, key: u64) -> Vec<u8> {
         b"keys/",
         key.to_string().as_bytes(),
     ]
-        .concat()
+    .concat()
 }
 
 fn make_value_key(project_id: u64, dict: &str, value: &str) -> Vec<u8> {
@@ -34,7 +34,7 @@ fn make_value_key(project_id: u64, dict: &str, value: &str) -> Vec<u8> {
         b"values/",
         value.as_bytes(),
     ]
-        .concat()
+    .concat()
 }
 
 pub struct Dictionaries {
@@ -66,14 +66,24 @@ impl Dictionaries {
         dict: &str,
         value: &str,
     ) -> Result<u64> {
-        let res = match tx.get(make_value_key(project_id, tbl_dict(table, dict).as_str(), value))? {
+        let res = match tx.get(make_value_key(
+            project_id,
+            tbl_dict(table, dict).as_str(),
+            value,
+        ))? {
             None => {
-                let key = make_id_seq_key(project_ns(project_id, dict_ns(tbl_dict(table, dict).as_str()).as_slice()).as_slice());
-                let id = next_seq(
-                    tx,
-                    key,
+                let key = make_id_seq_key(
+                    project_ns(
+                        project_id,
+                        dict_ns(tbl_dict(table, dict).as_str()).as_slice(),
+                    )
+                    .as_slice(),
+                );
+                let id = next_seq(tx, key)?;
+                tx.put(
+                    make_key_key(project_id, tbl_dict(table, dict).as_str(), id),
+                    value.as_bytes(),
                 )?;
-                tx.put(make_key_key(project_id, tbl_dict(table, dict).as_str(), id), value.as_bytes())?;
                 tx.put(
                     make_value_key(project_id, tbl_dict(table, dict).as_str(), value),
                     id.to_le_bytes(),
@@ -87,9 +97,19 @@ impl Dictionaries {
         res
     }
 
-    pub fn create_key(&self, project_id: u64, table: &str, dict: &str, key: u64, value: &str) -> Result<()> {
+    pub fn create_key(
+        &self,
+        project_id: u64,
+        table: &str,
+        dict: &str,
+        key: u64,
+        value: &str,
+    ) -> Result<()> {
         let tx = self.db.transaction();
-        tx.put(make_key_key(project_id, tbl_dict(table, dict).as_str(), key), value.as_bytes())?;
+        tx.put(
+            make_key_key(project_id, tbl_dict(table, dict).as_str(), key),
+            value.as_bytes(),
+        )?;
         tx.put(
             make_value_key(project_id, tbl_dict(table, dict).as_str(), value),
             key.to_le_bytes(),
@@ -98,7 +118,13 @@ impl Dictionaries {
         Ok(())
     }
 
-    pub fn get_key_or_create(&self, project_id: u64, table: &str, dict: &str, value: &str) -> Result<u64> {
+    pub fn get_key_or_create(
+        &self,
+        project_id: u64,
+        table: &str,
+        dict: &str,
+        value: &str,
+    ) -> Result<u64> {
         let tx = self.db.transaction();
         let key = self._get_key_or_create(&tx, project_id, table, dict, value)?;
         tx.commit()?;
@@ -145,7 +171,12 @@ impl Hash for SingleDictionaryProvider {
 }
 
 impl SingleDictionaryProvider {
-    pub fn new(project_id: u64, table: String, dict: String, dictionaries: Arc<Dictionaries>) -> Self {
+    pub fn new(
+        project_id: u64,
+        table: String,
+        dict: String,
+        dictionaries: Arc<Dictionaries>,
+    ) -> Self {
         Self {
             project_id,
             dict,
@@ -155,17 +186,29 @@ impl SingleDictionaryProvider {
     }
 
     pub fn get_key_or_create(&self, value: &str) -> Result<u64> {
-        self.dictionaries
-            .get_key_or_create(self.project_id, self.table.as_str(), self.dict.as_str(), value)
+        self.dictionaries.get_key_or_create(
+            self.project_id,
+            self.table.as_str(),
+            self.dict.as_str(),
+            value,
+        )
     }
 
     pub fn get_value(&self, key: u64) -> Result<String> {
-        self.dictionaries
-            .get_value(self.project_id, self.table.as_str(), self.dict.as_str(), key)
+        self.dictionaries.get_value(
+            self.project_id,
+            self.table.as_str(),
+            self.dict.as_str(),
+            key,
+        )
     }
 
     pub fn get_key(&self, _project_id: u64, _dict: &str, value: &str) -> Result<u64> {
-        self.dictionaries
-            .get_key(self.project_id, self.table.as_str(), self.dict.as_str(), value)
+        self.dictionaries.get_key(
+            self.project_id,
+            self.table.as_str(),
+            self.dict.as_str(),
+            value,
+        )
     }
 }

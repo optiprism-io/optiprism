@@ -1,5 +1,6 @@
 use std::marker::PhantomData;
 use std::sync::Mutex;
+
 use arrow::array::Array;
 use arrow::array::BooleanArray;
 use arrow::array::Int64Array;
@@ -9,6 +10,7 @@ use arrow::record_batch::RecordBatch;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
+
 use crate::error::Result;
 use crate::physical_plan::expressions::check_filter;
 use crate::physical_plan::expressions::segmentation::boolean_op::ComparisonOp;
@@ -62,13 +64,9 @@ impl<Op> Count<Op> {
 }
 
 impl<Op> SegmentExpr for Count<Op>
-where
-    Op: ComparisonOp<i64>,
+where Op: ComparisonOp<i64>
 {
-    fn evaluate(
-        &self,
-        batch: &RecordBatch,
-    ) -> Result<()> {
+    fn evaluate(&self, batch: &RecordBatch) -> Result<()> {
         let ts = self
             .ts_col
             .evaluate(batch)?
@@ -87,7 +85,10 @@ where
             .clone();
 
         let mut inner = self.inner.lock().unwrap();
-        let partition = self.partition_col.evaluate(batch)?.into_array(batch.num_rows())?
+        let partition = self
+            .partition_col
+            .evaluate(batch)?
+            .into_array(batch.num_rows())?
             .as_any()
             .downcast_ref::<Int64Array>()
             .unwrap()
@@ -155,6 +156,7 @@ where
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
+
     use datafusion::physical_expr::expressions::BinaryExpr;
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_expr::expressions::Literal;
@@ -162,6 +164,7 @@ mod tests {
     use datafusion_common::ScalarValue;
     use datafusion_expr::Operator;
     use storage::test_util::parse_markdown_tables;
+
     use crate::physical_plan::expressions::segmentation::boolean_op;
     use crate::physical_plan::expressions::segmentation::count::Count;
     use crate::physical_plan::expressions::segmentation::time_range::TimeRange;

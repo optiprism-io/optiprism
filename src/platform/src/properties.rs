@@ -1,20 +1,29 @@
 use std::sync::Arc;
-use arrow::array::ArrayRef;
 
+use arrow::array::ArrayRef;
 use chrono::DateTime;
 use chrono::Utc;
 use common::rbac::ProjectPermission;
 use common::types::DType;
 use common::types::OptionalProperty;
-use metadata::{MetadataProvider, properties};
+use metadata::properties;
+use metadata::MetadataProvider;
+use query::properties::PropertiesProvider;
+use query::properties::PropertyValues;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
-use query::properties::{PropertiesProvider, PropertyValues};
 
-use crate::{array_ref_to_json_values, Context, EventRef, json_value_to_scalar, PropertyRef, PropValueOperation, ResponseMetadata, validate_event_filter_property};
+use crate::array_ref_to_json_values;
+use crate::json_value_to_scalar;
+use crate::validate_event_filter_property;
+use crate::Context;
+use crate::EventRef;
 use crate::ListResponse;
 use crate::PlatformError;
+use crate::PropValueOperation;
+use crate::PropertyRef;
+use crate::ResponseMetadata;
 use crate::Result;
 
 pub struct Properties {
@@ -24,16 +33,32 @@ pub struct Properties {
 }
 
 impl Properties {
-    pub fn new(props: Arc<metadata::properties::Properties>, md: Arc<MetadataProvider>, prov: Arc<PropertiesProvider>) -> Self {
+    pub fn new(
+        props: Arc<metadata::properties::Properties>,
+        md: Arc<MetadataProvider>,
+        prov: Arc<PropertiesProvider>,
+    ) -> Self {
         Self { props, md, prov }
     }
-    pub fn new_group(props: Arc<metadata::properties::Properties>, md: Arc<MetadataProvider>, prov: Arc<PropertiesProvider>) -> Self {
+    pub fn new_group(
+        props: Arc<metadata::properties::Properties>,
+        md: Arc<MetadataProvider>,
+        prov: Arc<PropertiesProvider>,
+    ) -> Self {
         Self { props, md, prov }
     }
-    pub fn new_event(props: Arc<metadata::properties::Properties>, md: Arc<MetadataProvider>, prov: Arc<PropertiesProvider>) -> Self {
+    pub fn new_event(
+        props: Arc<metadata::properties::Properties>,
+        md: Arc<MetadataProvider>,
+        prov: Arc<PropertiesProvider>,
+    ) -> Self {
         Self { props, md, prov }
     }
-    pub fn new_system(props: Arc<metadata::properties::Properties>, md: Arc<MetadataProvider>, prov: Arc<PropertiesProvider>) -> Self {
+    pub fn new_system(
+        props: Arc<metadata::properties::Properties>,
+        md: Arc<MetadataProvider>,
+        prov: Arc<PropertiesProvider>,
+    ) -> Self {
         Self { props, md, prov }
     }
     pub async fn get_by_id(&self, ctx: Context, project_id: u64, id: u64) -> Result<Property> {

@@ -10,8 +10,10 @@ use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
 use clap::Parser;
-use common::{DATA_PATH_METADATA, DATA_PATH_STORAGE, group_col};
+use common::group_col;
 use common::types::TABLE_EVENTS;
+use common::DATA_PATH_METADATA;
+use common::DATA_PATH_STORAGE;
 use common::GROUPS_COUNT;
 use common::GROUP_USER_ID;
 use dateparser::DateTimeUtc;
@@ -26,6 +28,7 @@ use ingester::executor::Executor;
 use ingester::Destination;
 use ingester::Identify;
 use ingester::Track;
+use metadata::settings::BackupScheduleInterval;
 use metadata::MetadataProvider;
 use platform::projects::init_project;
 use rand::thread_rng;
@@ -35,11 +38,14 @@ use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tracing::debug;
 use tracing::info;
-use metadata::settings::BackupScheduleInterval;
+
+use crate::clenaup_fs;
 use crate::error::Error;
 use crate::error::Result;
-use crate::{init_settings, init_fs, init_ingester, clenaup_fs};
+use crate::init_fs;
+use crate::init_ingester;
 use crate::init_platform;
+use crate::init_settings;
 use crate::init_system;
 
 #[derive(Parser, Clone)]
@@ -83,7 +89,9 @@ pub async fn start(args: &Store, cfg: crate::Config) -> Result<()> {
     if args.generate {
         clenaup_fs(&cfg)?;
     }
-    let rocks = Arc::new(metadata::rocksdb::new(cfg.data.path.join(DATA_PATH_METADATA))?);
+    let rocks = Arc::new(metadata::rocksdb::new(
+        cfg.data.path.join(DATA_PATH_METADATA),
+    )?);
     let db = Arc::new(OptiDBImpl::open(
         cfg.data.path.join(DATA_PATH_STORAGE),
         Options {},
@@ -101,20 +109,21 @@ pub async fn start(args: &Store, cfg: crate::Config) -> Result<()> {
     settings.backup_schedule_start_hour = 0;
     // settings.backup_provider = BackupProvider::Local;
     // settings.backup_provider_local_path = "/tmp/optiprism/backups".to_string();
-    /*settings.backup_provider = BackupProvider::GCP;
-    settings.backup_provider_gcp_bucket = "optiprism".to_string();
-    settings.backup_provider_gcp_path = "backups".to_string();
-    settings.backup_provider_gcp_key = match env::var("GOOGLE_APPLICATION_CREDENTIALS").unwrap().as_str() {
-        "" => "".to_string(),
-        _ => {
-            fs::read_to_string(env::var("GOOGLE_APPLICATION_CREDENTIALS").unwrap())?
-        }
-    };*/
+    // settings.backup_provider = BackupProvider::GCP;
+    // settings.backup_provider_gcp_bucket = "optiprism".to_string();
+    // settings.backup_provider_gcp_path = "backups".to_string();
+    // settings.backup_provider_gcp_key = match env::var("GOOGLE_APPLICATION_CREDENTIALS").unwrap().as_str() {
+    // "" => "".to_string(),
+    // _ => {
+    // fs::read_to_string(env::var("GOOGLE_APPLICATION_CREDENTIALS").unwrap())?
+    // }
+    // };
     md.settings.save(&settings)?;
 
     if !cfg.data.ui_path.exists() {
         return Err(Error::FileNotFound(format!(
-            "ui path {:?} doesn't exist", cfg.data.ui_path
+            "ui path {:?} doesn't exist",
+            cfg.data.ui_path
         )));
     }
     debug!("ui path: {:?}", cfg.data.ui_path);
@@ -210,7 +219,13 @@ pub async fn start(args: &Store, cfg: crate::Config) -> Result<()> {
     info!("initializing platform...");
     let router = init_platform(md.clone(), db.clone(), router, cfg.clone())?;
     info!("initializing ingester...");
-    let router = init_ingester(&cfg.data.geo_city_path, &cfg.data.ua_db_path, &md, &db, router)?;
+    let router = init_ingester(
+        &cfg.data.geo_city_path,
+        &cfg.data.ua_db_path,
+        &md,
+        &db,
+        router,
+    )?;
 
     info!("listening on {}", cfg.server.host);
 
@@ -229,7 +244,7 @@ pub async fn start(args: &Store, cfg: crate::Config) -> Result<()> {
         listener,
         router.into_make_service_with_connect_info::<SocketAddr>(),
     )
-        .await?)
+    .await?)
 }
 
 pub fn gen<R>(

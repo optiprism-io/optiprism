@@ -42,10 +42,7 @@ impl And {
 }
 
 impl SegmentExpr for And {
-    fn evaluate(
-        &self,
-        batch: &RecordBatch,
-    ) -> Result<()> {
+    fn evaluate(&self, batch: &RecordBatch) -> Result<()> {
         let inner = self.inner.lock().unwrap();
         inner.left.evaluate(batch)?;
         inner.right.evaluate(batch)?;
@@ -88,10 +85,7 @@ impl Or {
 }
 
 impl SegmentExpr for Or {
-    fn evaluate(
-        &self,
-        batch: &RecordBatch,
-    ) -> Result<()> {
+    fn evaluate(&self, batch: &RecordBatch) -> Result<()> {
         let inner = self.inner.lock().unwrap();
         inner.left.evaluate(batch)?;
         inner.right.evaluate(batch)?;
@@ -111,7 +105,6 @@ mod tests {
     use std::sync::Arc;
 
     use arrow::array::Int64Array;
-    
     use arrow::datatypes::DataType;
     use arrow::datatypes::Field;
     use arrow::datatypes::Schema;
@@ -128,10 +121,7 @@ mod tests {
     }
 
     impl SegmentExpr for Test {
-        fn evaluate(
-            &self,
-            _batch: &RecordBatch,
-        ) -> Result<()> {
+        fn evaluate(&self, _batch: &RecordBatch) -> Result<()> {
             Ok(())
         }
 
@@ -154,9 +144,7 @@ mod tests {
 
         let schema = Schema::new(vec![Field::new("sdf", DataType::Boolean, true)]);
         let rb = &RecordBatch::new_empty(Arc::new(schema));
-        and
-            .evaluate(rb)
-            .unwrap();
+        and.evaluate(rb).unwrap();
         let res = and.finalize().unwrap();
         dbg!(&res);
     }
@@ -175,9 +163,7 @@ mod tests {
 
         let schema = Schema::new(vec![Field::new("sdf", DataType::Boolean, true)]);
         let rb = &RecordBatch::new_empty(Arc::new(schema));
-        and
-            .evaluate(rb)
-            .unwrap();
+        and.evaluate(rb).unwrap();
         dbg!(and.finalize().unwrap());
     }
 }

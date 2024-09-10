@@ -8,9 +8,9 @@ use metadata::reports::Reports as MDReports;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::Context;
 use crate::event_segmentation::EventSegmentationRequest;
 use crate::funnel::FunnelRequest;
+use crate::Context;
 use crate::ListResponse;
 use crate::Result;
 
@@ -146,9 +146,7 @@ pub enum Query {
 impl From<metadata::reports::Query> for Query {
     fn from(value: metadata::reports::Query) -> Self {
         match value {
-            metadata::reports::Query::EventSegmentation(es) => {
-                Query::EventSegmentation(es.into())
-            }
+            metadata::reports::Query::EventSegmentation(es) => Query::EventSegmentation(es.into()),
             metadata::reports::Query::Funnel(f) => Query::Funnel(f.into()),
         }
     }
@@ -157,9 +155,7 @@ impl From<metadata::reports::Query> for Query {
 impl From<Query> for metadata::reports::Query {
     fn from(value: Query) -> Self {
         match value {
-            Query::EventSegmentation(es) => {
-                metadata::reports::Query::EventSegmentation(es.into())
-            }
+            Query::EventSegmentation(es) => metadata::reports::Query::EventSegmentation(es.into()),
             Query::Funnel(f) => metadata::reports::Query::Funnel(f.into()),
         }
     }

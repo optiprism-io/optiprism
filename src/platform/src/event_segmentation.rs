@@ -3,29 +3,35 @@ use std::sync::Arc;
 use chrono::DateTime;
 use chrono::Utc;
 use common::event_segmentation::NamedQuery;
+use common::rbac::ProjectPermission;
 use common::GROUPS_COUNT;
 use metadata::MetadataProvider;
+use query::context::Format;
+use query::event_segmentation::fix_request;
+use query::event_segmentation::EventSegmentationProvider;
 use serde::Deserialize;
 use serde::Serialize;
-use common::rbac::ProjectPermission;
-use query::context::Format;
-use query::event_segmentation::{EventSegmentationProvider, fix_request};
 
 use crate::error::Result;
-use crate::{QueryParams, QueryResponse, QueryResponseFormat, validate_event, validate_event_filter, validate_event_property};
+use crate::validate_event;
+use crate::validate_event_filter;
+use crate::validate_event_property;
 use crate::AggregateFunction;
 use crate::Breakdown;
-use crate::PartitionedAggregateFunction;
-use crate::QueryTime;
-use crate::Segment;
-use crate::TimeIntervalUnit;
 use crate::Context;
 use crate::EventGroupedFilterGroup;
 use crate::EventGroupedFilters;
 use crate::EventRef;
+use crate::PartitionedAggregateFunction;
 use crate::PlatformError;
 use crate::PropValueFilter;
 use crate::PropertyRef;
+use crate::QueryParams;
+use crate::QueryResponse;
+use crate::QueryResponseFormat;
+use crate::QueryTime;
+use crate::Segment;
+use crate::TimeIntervalUnit;
 
 pub struct EventSegmentation {
     md: Arc<MetadataProvider>,
@@ -190,7 +196,6 @@ impl Into<Compare> for common::event_segmentation::Compare {
     }
 }
 
-
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum QueryAggregatePerGroup {
@@ -206,18 +211,10 @@ pub enum QueryAggregatePerGroup {
 impl Into<common::event_segmentation::QueryAggregatePerGroup> for QueryAggregatePerGroup {
     fn into(self) -> common::event_segmentation::QueryAggregatePerGroup {
         match self {
-            QueryAggregatePerGroup::Min => {
-                common::event_segmentation::QueryAggregatePerGroup::Min
-            }
-            QueryAggregatePerGroup::Max => {
-                common::event_segmentation::QueryAggregatePerGroup::Max
-            }
-            QueryAggregatePerGroup::Sum => {
-                common::event_segmentation::QueryAggregatePerGroup::Sum
-            }
-            QueryAggregatePerGroup::Avg => {
-                common::event_segmentation::QueryAggregatePerGroup::Avg
-            }
+            QueryAggregatePerGroup::Min => common::event_segmentation::QueryAggregatePerGroup::Min,
+            QueryAggregatePerGroup::Max => common::event_segmentation::QueryAggregatePerGroup::Max,
+            QueryAggregatePerGroup::Sum => common::event_segmentation::QueryAggregatePerGroup::Sum,
+            QueryAggregatePerGroup::Avg => common::event_segmentation::QueryAggregatePerGroup::Avg,
             QueryAggregatePerGroup::Median => {
                 common::event_segmentation::QueryAggregatePerGroup::Median
             }
@@ -238,9 +235,7 @@ pub enum QueryPerGroup {
 impl Into<common::event_segmentation::QueryPerGroup> for QueryPerGroup {
     fn into(self) -> common::event_segmentation::QueryPerGroup {
         match self {
-            QueryPerGroup::CountEvents => {
-                common::event_segmentation::QueryPerGroup::CountEvents
-            }
+            QueryPerGroup::CountEvents => common::event_segmentation::QueryPerGroup::CountEvents,
         }
     }
 }
@@ -281,12 +276,8 @@ impl Into<common::event_segmentation::Query> for &Query {
             Query::CountEvents => common::event_segmentation::Query::CountEvents,
             Query::CountUniqueGroups => common::event_segmentation::Query::CountUniqueGroups,
             Query::DailyActiveGroups => common::event_segmentation::Query::DailyActiveGroups,
-            Query::WeeklyActiveGroups => {
-                common::event_segmentation::Query::WeeklyActiveGroups
-            }
-            Query::MonthlyActiveGroups => {
-                common::event_segmentation::Query::MonthlyActiveGroups
-            }
+            Query::WeeklyActiveGroups => common::event_segmentation::Query::WeeklyActiveGroups,
+            Query::MonthlyActiveGroups => common::event_segmentation::Query::MonthlyActiveGroups,
             Query::CountPerGroup { aggregate } => {
                 common::event_segmentation::Query::CountPerGroup {
                     aggregate: aggregate.into(),
@@ -322,12 +313,8 @@ impl Into<Query> for common::event_segmentation::Query {
             common::event_segmentation::Query::CountEvents => Query::CountEvents,
             common::event_segmentation::Query::CountUniqueGroups => Query::CountUniqueGroups,
             common::event_segmentation::Query::DailyActiveGroups => Query::DailyActiveGroups,
-            common::event_segmentation::Query::WeeklyActiveGroups => {
-                Query::WeeklyActiveGroups
-            }
-            common::event_segmentation::Query::MonthlyActiveGroups => {
-                Query::MonthlyActiveGroups
-            }
+            common::event_segmentation::Query::WeeklyActiveGroups => Query::WeeklyActiveGroups,
+            common::event_segmentation::Query::MonthlyActiveGroups => Query::MonthlyActiveGroups,
             common::event_segmentation::Query::CountPerGroup { aggregate } => {
                 Query::CountPerGroup {
                     aggregate: aggregate.into(),
@@ -477,13 +464,22 @@ impl Into<common::event_segmentation::EventSegmentationRequest> for EventSegment
             analysis: self.analysis.into(),
             compare: self.compare.map(|v| v.into()),
             events: self.events.iter().map(|v| v.into()).collect::<Vec<_>>(),
-            filters: self.filters.map_or_else(|| None, |v| {
-                if v.groups[0].filters.is_empty() {
-                    None
-                } else {
-                    Some(v.groups[0].filters.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>())
-                }
-            }),
+            filters: self.filters.map_or_else(
+                || None,
+                |v| {
+                    if v.groups[0].filters.is_empty() {
+                        None
+                    } else {
+                        Some(
+                            v.groups[0]
+                                .filters
+                                .iter()
+                                .map(|v| v.to_owned().into())
+                                .collect::<Vec<_>>(),
+                        )
+                    }
+                },
+            ),
             breakdowns: self.breakdowns.map_or_else(
                 || None,
                 |v| {
@@ -528,7 +524,6 @@ impl Into<EventSegmentationRequest> for common::event_segmentation::EventSegment
                         filters: f,
                     }],
                 }
-
             }),
             breakdowns: self.breakdowns.map_or_else(
                 || None,
@@ -557,12 +552,12 @@ pub(crate) fn validate_request(
             "group id is out of range".to_string(),
         ));
     }
-    if let QueryTime::Between { from, to } =req.time {
-            if from > to {
-                return Err(PlatformError::BadRequest(
-                    "from time must be less than to time".to_string(),
-                ));
-            }
+    if let QueryTime::Between { from, to } = req.time {
+        if from > to {
+            return Err(PlatformError::BadRequest(
+                "from time must be less than to time".to_string(),
+            ));
+        }
     }
 
     if req.events.is_empty() {
@@ -643,7 +638,6 @@ pub(crate) fn validate_request(
     Ok(())
 }
 
-
 #[cfg(test)]
 mod tests {
     use chrono::DateTime;
@@ -652,13 +646,13 @@ mod tests {
     use serde_json::json;
 
     use crate::error::Result;
-    use crate::event_segmentation::{AggregateFunction, EventSegmentationRequest};
+    use crate::event_segmentation::AggregateFunction;
     use crate::event_segmentation::Analysis;
     use crate::event_segmentation::Breakdown;
     use crate::event_segmentation::ChartType;
     use crate::event_segmentation::Compare;
     use crate::event_segmentation::Event;
-    
+    use crate::event_segmentation::EventSegmentationRequest;
     use crate::event_segmentation::PartitionedAggregateFunction;
     use crate::event_segmentation::PropValueFilter;
     use crate::event_segmentation::Query;

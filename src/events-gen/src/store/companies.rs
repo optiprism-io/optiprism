@@ -11,7 +11,7 @@ use crate::error::Result;
 struct CSVCompany {
     pub name: String,
     pub staff: usize,
-    pub age:usize,
+    pub age: usize,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]

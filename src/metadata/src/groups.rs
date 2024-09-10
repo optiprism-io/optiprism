@@ -1,17 +1,18 @@
 use std::str::from_utf8;
 use std::str::pattern::Pattern;
 use std::sync::Arc;
-use prost::Message;
+
 use common::GROUPS_COUNT;
+use prost::Message;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
 
 use crate::error::MetadataError;
+use crate::group;
 use crate::index::next_seq;
 use crate::index::next_zero_seq;
-use crate::group;
 use crate::make_id_seq_key;
 use crate::metadata::ListResponse;
 use crate::metadata::ResponseMetadata;
@@ -46,7 +47,7 @@ impl Groups {
 
                 Ok(id)
             }
-            Some(key) => Ok(u64::from_le_bytes(key.try_into().unwrap()))
+            Some(key) => Ok(u64::from_le_bytes(key.try_into().unwrap())),
         }
     }
 
@@ -299,23 +300,45 @@ pub struct Group {
 fn serialize_group_values(group: &GroupValues) -> Result<Vec<u8>> {
     let v = group::GroupValues {
         id: group.id,
-        values: group.values.iter().map(|v| {
-            group::PropertyValue {
+        values: group
+            .values
+            .iter()
+            .map(|v| group::PropertyValue {
                 property_id: v.property_id,
                 value: Some(match &v.value {
-                    Value::Null => group::Value { value: Some(group::value::Value::NullValue(true)) },
-                    Value::Int8(v) => group::Value { value: Some(group::value::Value::Int8Value(v.unwrap() as i64)) },
-                    Value::Int16(v) => group::Value { value: Some(group::value::Value::Int16Value(v.unwrap() as i64)) },
-                    Value::Int32(v) => group::Value { value: Some(group::value::Value::Int32Value(v.unwrap() as i64)) },
-                    Value::Int64(v) => group::Value { value: Some(group::value::Value::Int64Value(v.unwrap())) },
-                    Value::Boolean(v) => group::Value { value: Some(group::value::Value::BoolValue(v.unwrap())) },
-                    Value::Timestamp(v) => group::Value { value: Some(group::value::Value::TimestampValue(v.unwrap())) },
-                    Value::Decimal(v) => group::Value { value: Some(group::value::Value::DecimalValue(v.unwrap().to_le_bytes().to_vec())) },
-                    Value::String(v) => group::Value { value: Some(group::value::Value::StringValue(v.clone().unwrap())) },
-                    _ => unimplemented!()
+                    Value::Null => group::Value {
+                        value: Some(group::value::Value::NullValue(true)),
+                    },
+                    Value::Int8(v) => group::Value {
+                        value: Some(group::value::Value::Int8Value(v.unwrap() as i64)),
+                    },
+                    Value::Int16(v) => group::Value {
+                        value: Some(group::value::Value::Int16Value(v.unwrap() as i64)),
+                    },
+                    Value::Int32(v) => group::Value {
+                        value: Some(group::value::Value::Int32Value(v.unwrap() as i64)),
+                    },
+                    Value::Int64(v) => group::Value {
+                        value: Some(group::value::Value::Int64Value(v.unwrap())),
+                    },
+                    Value::Boolean(v) => group::Value {
+                        value: Some(group::value::Value::BoolValue(v.unwrap())),
+                    },
+                    Value::Timestamp(v) => group::Value {
+                        value: Some(group::value::Value::TimestampValue(v.unwrap())),
+                    },
+                    Value::Decimal(v) => group::Value {
+                        value: Some(group::value::Value::DecimalValue(
+                            v.unwrap().to_le_bytes().to_vec(),
+                        )),
+                    },
+                    Value::String(v) => group::Value {
+                        value: Some(group::value::Value::StringValue(v.clone().unwrap())),
+                    },
+                    _ => unimplemented!(),
                 }),
-            }
-        }).collect::<Vec<_>>(),
+            })
+            .collect::<Vec<_>>(),
     };
 
     Ok(v.encode_to_vec())
@@ -326,24 +349,30 @@ fn deserialize_group_values(data: &[u8]) -> Result<GroupValues> {
 
     Ok(GroupValues {
         id: from.id,
-        values: from.values.iter().map(|v| {
-            let value = match v.value.clone().unwrap().value.unwrap() {
-                group::value::Value::NullValue(_) => Value::Null,
-                group::value::Value::Int8Value(v) => Value::Int8(Some(v as i8)),
-                group::value::Value::Int16Value(v) => Value::Int16(Some(v as i16)),
-                group::value::Value::Int32Value(v) => Value::Int32(Some(v as i32)),
-                group::value::Value::Int64Value(v) => Value::Int64(Some(v)),
-                group::value::Value::BoolValue(v) => Value::Boolean(Some(v)),
-                group::value::Value::TimestampValue(v) => Value::Timestamp(Some(v)),
-                group::value::Value::DecimalValue(v) => Value::Decimal(Some(i128::from_le_bytes(v.as_slice().try_into().unwrap()))),
-                group::value::Value::StringValue(v) => Value::String(Some(v.clone())),
-            };
+        values: from
+            .values
+            .iter()
+            .map(|v| {
+                let value = match v.value.clone().unwrap().value.unwrap() {
+                    group::value::Value::NullValue(_) => Value::Null,
+                    group::value::Value::Int8Value(v) => Value::Int8(Some(v as i8)),
+                    group::value::Value::Int16Value(v) => Value::Int16(Some(v as i16)),
+                    group::value::Value::Int32Value(v) => Value::Int32(Some(v as i32)),
+                    group::value::Value::Int64Value(v) => Value::Int64(Some(v)),
+                    group::value::Value::BoolValue(v) => Value::Boolean(Some(v)),
+                    group::value::Value::TimestampValue(v) => Value::Timestamp(Some(v)),
+                    group::value::Value::DecimalValue(v) => {
+                        Value::Decimal(Some(i128::from_le_bytes(v.as_slice().try_into().unwrap())))
+                    }
+                    group::value::Value::StringValue(v) => Value::String(Some(v.clone())),
+                };
 
-            PropertyValue {
-                property_id: v.property_id,
-                value,
-            }
-        }).collect::<Vec<_>>(),
+                PropertyValue {
+                    property_id: v.property_id,
+                    value,
+                }
+            })
+            .collect::<Vec<_>>(),
     })
 }
 
