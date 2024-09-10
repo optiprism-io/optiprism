@@ -20,10 +20,11 @@ use std::fmt::Debug;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+use std::sync::RwLock;
+
 use error::Result;
 use get_size::GetSize;
-use parking_lot::Mutex;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -32,7 +33,6 @@ use crate::error::StoreError;
 pub mod metadata {
     include!(concat!(env!("OUT_DIR"), "/metadata.rs"));
 }
-
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, PartialOrd, Ord, Debug, Clone, Hash, GetSize)]
 pub enum KeyValue {
@@ -128,27 +128,37 @@ pub struct Stats {
 }
 
 #[derive(Debug)]
-pub(crate) struct Fs {
+pub struct Fs {
     count: Arc<RwLock<HashMap<String, usize>>>,
+}
+
+impl Default for Fs {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Fs {
     pub fn new() -> Self {
         Self {
-            count: Default::default()
+            count: Default::default(),
         }
     }
 
     pub fn open<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let mut count = self.count.write().unwrap();
-        let c = count.entry(path.as_ref().display().to_string()).or_insert(0);
+        let c = count
+            .entry(path.as_ref().display().to_string())
+            .or_insert(0);
         *c += 1;
         Ok(())
     }
 
     pub fn close<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let mut count = self.count.write().unwrap();
-        let c = count.entry(path.as_ref().display().to_string()).or_insert(0);
+        let c = count
+            .entry(path.as_ref().display().to_string())
+            .or_insert(0);
         *c -= 1;
         Ok(())
     }
@@ -157,7 +167,7 @@ impl Fs {
         let count = self.count.read().unwrap();
         match count.get(&path.as_ref().display().to_string()) {
             None => false,
-            Some(v) => *v != 0
+            Some(v) => *v != 0,
         }
     }
     pub fn try_remove_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
@@ -171,7 +181,7 @@ impl Fs {
         Ok(fs::remove_file(path)?)
     }
 
-    pub fn try_rename<P: AsRef<Path>>(&self, from: P, to: P) -> Result<()> {
+    pub fn _try_rename<P: AsRef<Path>>(&self, from: P, to: P) -> Result<()> {
         if !self.is_opened(&from) && !self.is_opened(&to) {
             return Ok(fs::rename(from, to)?);
         }

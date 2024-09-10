@@ -1,10 +1,6 @@
 use std::any::Any;
-use std::cell::RefCell;
-use std::collections::HashMap;
 use std::fmt;
-use std::ops::Deref;
 use std::pin::Pin;
-use std::rc::Rc;
 use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
@@ -13,10 +9,7 @@ use arrow::array::Array;
 use arrow::array::ArrayRef;
 use arrow::array::Decimal128Array;
 use arrow::array::Decimal128Builder;
-use arrow::array::Int64Array;
-use arrow::array::Int64Builder;
 use arrow::array::RecordBatch;
-use arrow::array::StringArray;
 use arrow::compute::sort_to_indices;
 use arrow::compute::take;
 use arrow::compute::SortOptions;
@@ -24,15 +17,13 @@ use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
 use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
-use arrow::util::pretty::print_batches;
 use async_trait::async_trait;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 use datafusion::execution::RecordBatchStream;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::execution::TaskContext;
-use datafusion::physical_expr::{EquivalenceProperties, Partitioning};
-use datafusion::physical_expr::PhysicalSortExpr;
+use datafusion::physical_expr::EquivalenceProperties;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
@@ -42,26 +33,9 @@ use datafusion_common::DataFusionError;
 use datafusion_common::Result as DFResult;
 use futures::Stream;
 use futures::StreamExt;
-use indexmap::IndexMap;
 
 use crate::error::QueryError;
-use crate::physical_plan::merge::MergeExec;
 use crate::Result;
-
-#[derive(Debug, Clone)]
-enum Agg {
-    Sum(i128),
-    Avg(i128, i128),
-}
-
-impl Agg {
-    pub fn result(&self) -> i128 {
-        match self {
-            Agg::Sum(sum) => *sum,
-            Agg::Avg(sum, count) => *sum / *count,
-        }
-    }
-}
 
 #[derive(Debug)]
 pub struct AggregateAndSortColumnsExec {
@@ -89,7 +63,7 @@ impl AggregateAndSortColumnsExec {
             }
         }
         let schema = Arc::new(Schema::new(cols));
-        let cache = Self::compute_properties(&input,schema.clone())?;
+        let cache = Self::compute_properties(&input, schema.clone())?;
 
         Ok(Self {
             input,
@@ -99,7 +73,10 @@ impl AggregateAndSortColumnsExec {
         })
     }
 
-    fn compute_properties(input: &Arc<dyn ExecutionPlan>,schema:SchemaRef) -> Result<PlanProperties> {
+    fn compute_properties(
+        input: &Arc<dyn ExecutionPlan>,
+        schema: SchemaRef,
+    ) -> Result<PlanProperties> {
         let eq_properties = EquivalenceProperties::new(schema);
         Ok(PlanProperties::new(
             eq_properties,
@@ -138,7 +115,7 @@ impl ExecutionPlan for AggregateAndSortColumnsExec {
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
         Ok(Arc::new(
-            AggregateAndSortColumnsExec::try_new(children[0].clone(), self.groups.clone())
+            AggregateAndSortColumnsExec::try_new(children[0].clone(), self.groups)
                 .map_err(QueryError::into_datafusion_execution_error)?,
         ))
     }
@@ -179,8 +156,8 @@ impl Stream for AggregateAndSortColumnsStream {
                 for row_id in 0..batch.num_rows() {
                     let mut v = 0;
                     let mut c = 0;
-                    for arr_id in 0..arrs.len() {
-                        v += arrs[arr_id].value(row_id);
+                    for arr in &arrs {
+                        v += arr.value(row_id);
                         c += 1;
                     }
                     res.append_value(v / c);
@@ -200,7 +177,7 @@ impl Stream for AggregateAndSortColumnsStream {
                 )?) as ArrayRef;
 
                 let mut out = vec![];
-                for (idx, column) in batch.columns().into_iter().enumerate() {
+                for (idx, column) in batch.columns().iter().enumerate() {
                     out.push(column.to_owned());
                     if idx == self.groups - 1 {
                         out.push(Arc::new(avg.clone()));
@@ -216,7 +193,7 @@ impl Stream for AggregateAndSortColumnsStream {
 
                 Poll::Ready(Some(Ok(rb)))
             }
-            other => return other,
+            other => other,
         }
     }
 }

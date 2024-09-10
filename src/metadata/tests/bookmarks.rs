@@ -1,17 +1,16 @@
 use std::env::temp_dir;
 use std::sync::Arc;
 
+use common::event_segmentation::Analysis;
+use common::event_segmentation::ChartType;
+use common::event_segmentation::EventSegmentationRequest;
 use common::query::QueryTime;
 use common::query::TimeIntervalUnit;
-use common::types::OptionalProperty;
+use metadata::bookmarks::Bookmarks;
+use metadata::bookmarks::CreateBookmarkRequest;
 use metadata::error::Result;
-use metadata::reports::{CreateReportRequest, Query};
-use metadata::reports::Reports;
-use metadata::reports::Type;
-use metadata::reports::UpdateReportRequest;
+use metadata::reports::Query;
 use uuid::Uuid;
-use metadata::bookmarks::{Bookmarks, CreateBookmarkRequest};
-use common::event_segmentation::{Analysis, ChartType, EventSegmentationRequest};
 #[test]
 fn test_reports() -> Result<()> {
     let mut path = temp_dir();
@@ -40,7 +39,7 @@ fn test_reports() -> Result<()> {
 
     let b = bookmarks.create(1, create_bookmark_req)?;
     dbg!(&b);
-    let bb = bookmarks.get_by_id(1,1, &b.id)?;
+    let bb = bookmarks.get_by_id(1, 1, &b.id)?;
     dbg!(bb);
     Ok(())
 }

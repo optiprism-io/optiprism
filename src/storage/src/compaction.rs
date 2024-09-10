@@ -12,20 +12,27 @@ use std::thread;
 #[cfg(not(test))]
 use std::time::Duration;
 use std::time::Instant;
-use chrono::Utc;
+
+use common::types::METRIC_STORE_COMPACTIONS_TOTAL;
+use common::types::METRIC_STORE_COMPACTION_TIME_SECONDS;
+use common::types::METRIC_STORE_LEVEL_COMPACTION_TIME_SECONDS;
+use common::types::METRIC_STORE_MERGES_TOTAL;
+use common::types::METRIC_STORE_MERGE_TIME_SECONDS;
 use log::trace;
 use metrics::counter;
 use metrics::histogram;
 use parking_lot::RwLock;
-use common::types::{METRIC_STORE_COMPACTION_TIME_SECONDS, METRIC_STORE_COMPACTIONS_TOTAL, METRIC_STORE_LEVEL_COMPACTION_TIME_SECONDS, METRIC_STORE_MERGE_TIME_SECONDS, METRIC_STORE_MERGES_TOTAL};
-use crate::db::{part_path, write_metadata};
+
+use crate::db::part_path;
+use crate::db::write_metadata;
 use crate::error::Result;
 use crate::parquet::parquet_merger;
 use crate::parquet::parquet_merger::merge;
-use crate::{Fs, table};
+use crate::table;
 use crate::table::Level;
 use crate::table::Part;
 use crate::table::Table;
+use crate::Fs;
 use crate::FsOp;
 
 #[derive(Clone, Debug)]
@@ -35,7 +42,7 @@ pub enum CompactorMessage {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-struct ToCompact {
+pub struct ToCompact {
     level: usize,
     part: usize,
 }
@@ -47,7 +54,7 @@ impl ToCompact {
 }
 
 #[derive(Debug, Clone)]
-struct CompactResult {
+pub struct CompactResult {
     l0_remove: Vec<usize>,
     levels: Vec<Level>,
     fs_ops: Vec<FsOp>,
@@ -218,7 +225,6 @@ pub(crate) fn determine_compaction(
                         to_compact.push(ToCompact::new(level_id, part.id));
                     }
                 }
-                break;
                 to_compact.push(ToCompact::new(level_id, part.id));
             }
         }
@@ -331,9 +337,15 @@ fn compact(
                     merge_max_page_size: opts.merge_max_page_size,
                     max_part_size_bytes: Some(max_part_size_bytes),
                 };
-                let ms = Instant::now();
-                let merge_result =
-                    merge(rdrs, fs.clone(), out_path, out_part_id, tbl_name, level_id, merger_opts)?;
+                let merge_result = merge(
+                    rdrs,
+                    fs.clone(),
+                    out_path,
+                    out_part_id,
+                    tbl_name,
+                    level_id,
+                    merger_opts,
+                )?;
                 counter!(METRIC_STORE_MERGES_TOTAL,"table"=>tbl_name.to_string()).increment(1);
                 histogram!(METRIC_STORE_MERGE_TIME_SECONDS,"table"=>tbl_name.to_string(),"level"=>level_id.to_string()).record(start_time.elapsed());
                 for f in merge_result {
@@ -388,22 +400,12 @@ fn compact(
 #[cfg(test)]
 mod test {
     use crate::compaction::determine_compaction;
+    use crate::table::Level;
+    use crate::table::Part;
     use crate::KeyValue;
-    use crate::table::{Level, Part};
 
     #[test]
     fn test_compaction() {
-        let l0 = Level {
-            part_id: 1,
-            parts: vec![Part {
-                id: 1,
-                size_bytes: 100,
-                values: 100,
-                min: vec![KeyValue::Int64(1)],
-                max: vec![KeyValue::Int64(10)],
-            }],
-        };
-
         let l1 = Level {
             part_id: 2,
             parts: vec![Part {
@@ -414,7 +416,6 @@ mod test {
                 max: vec![KeyValue::Int64(10)],
             }],
         };
-
 
         let l2 = Level {
             part_id: 2,

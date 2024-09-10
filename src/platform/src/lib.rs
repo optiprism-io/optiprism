@@ -7,9 +7,13 @@ pub mod context;
 pub mod custom_events;
 pub mod dashboards;
 // pub mod datatype;
+mod backups;
+mod bookmarks;
 pub mod error;
 pub mod event_records;
+pub mod event_segmentation;
 pub mod events;
+mod funnel;
 mod group_records;
 mod groups;
 pub mod http;
@@ -17,11 +21,7 @@ pub mod organizations;
 pub mod projects;
 pub mod properties;
 pub mod reports;
-pub mod event_segmentation;
-mod funnel;
-mod bookmarks;
 mod settings;
-mod backups;
 // pub mod stub;
 
 use std::fmt::Debug;
@@ -43,8 +43,8 @@ use arrow::array::UInt16Array;
 use arrow::array::UInt32Array;
 use arrow::array::UInt64Array;
 use arrow::array::UInt8Array;
-use arrow::datatypes::TimeUnit;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use common::config::Config;
 use common::types::DType;
 use common::types::SortDirection;
@@ -60,6 +60,9 @@ use datafusion_common::ScalarValue;
 pub use error::PlatformError;
 pub use error::Result;
 use metadata::MetadataProvider;
+use query::event_records::EventRecordsProvider;
+use query::group_records::GroupRecordsProvider;
+use query::properties::PropertiesProvider;
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use serde::Deserialize;
@@ -67,9 +70,6 @@ use serde::Serialize;
 use serde_json::json;
 use serde_json::Number;
 use serde_json::Value;
-use query::event_records::EventRecordsProvider;
-use query::group_records::GroupRecordsProvider;
-use query::properties::PropertiesProvider;
 
 use crate::accounts::Accounts;
 use crate::auth::Auth;
@@ -78,7 +78,7 @@ use crate::bookmarks::Bookmarks;
 use crate::custom_events::CustomEvents;
 use crate::dashboards::Dashboards;
 use crate::event_records::EventRecords;
-use crate::event_segmentation::{EventSegmentation};
+use crate::event_segmentation::EventSegmentation;
 use crate::events::Events;
 use crate::funnel::Funnel;
 use crate::group_records::GroupRecords;
@@ -121,19 +121,26 @@ impl PlatformProvider {
         cfg: Config,
     ) -> Self {
         let group_properties = (0..GROUPS_COUNT)
-            .map(|gid| Arc::new(Properties::new_group(md.group_properties[gid].clone(), prop_prov.clone())))
+            .map(|gid| {
+                Arc::new(Properties::new_group(
+                    md.group_properties[gid].clone(),
+                    md.clone(),
+                    prop_prov.clone(),
+                ))
+            })
             .collect::<Vec<_>>();
         Self {
             events: Arc::new(Events::new(md.events.clone())),
             custom_events: Arc::new(CustomEvents::new(md.custom_events.clone())),
             groups: Arc::new(Groups::new(md.groups.clone())),
-            event_properties: Arc::new(Properties::new_event(md.event_properties.clone(), prop_prov.clone())),
+            event_properties: Arc::new(Properties::new_event(
+                md.event_properties.clone(),
+                md.clone(),
+                prop_prov.clone(),
+            )),
             group_properties,
             accounts: Arc::new(Accounts::new(md.accounts.clone())),
-            auth: Arc::new(Auth::new(
-                md.clone(),
-                cfg.clone(),
-            )),
+            auth: Arc::new(Auth::new(md.clone(), cfg.clone())),
             event_segmentation: Arc::new(EventSegmentation::new(md.clone(), es_prov)),
             funnel: Arc::new(Funnel::new(md.clone(), funnel_prov)),
             dashboards: Arc::new(Dashboards::new(md.dashboards.clone())),
@@ -141,7 +148,7 @@ impl PlatformProvider {
             event_records: Arc::new(EventRecords::new(md.clone(), event_records_prov)),
             group_records: Arc::new(GroupRecords::new(md.clone(), group_records_prov)),
             projects: Arc::new(Projects::new(md.clone(), cfg.clone())),
-            organizations: Arc::new(Organizations::new(md.clone(), cfg.clone())),
+            organizations: Arc::new(Organizations::new(md.clone())),
             bookmarks: Arc::new(Bookmarks::new(md.bookmarks.clone())),
             backups: Arc::new(Backups::new(md.clone())),
             settings: Arc::new(SettingsProvider::new(md.settings.clone())),
@@ -169,7 +176,6 @@ macro_rules! int_arr_to_json_values {
             .collect()
     }};
 }
-
 
 pub fn scalar_to_json(v: &ScalarValue) -> Value {
     if v.is_null() {
@@ -200,7 +206,7 @@ pub fn scalar_to_json(v: &ScalarValue) -> Value {
         ScalarValue::Int64(Some(v)) => Value::Number(Number::from(*v)),
         ScalarValue::Utf8(Some(v)) => Value::String(v.to_owned()),
         ScalarValue::TimestampMillisecond(Some(v), _) => Value::Number(Number::from(*v)),
-        _ => unimplemented!()
+        _ => unimplemented!(),
     }
 }
 pub fn array_ref_to_json_values(arr: &ArrayRef) -> Vec<Value> {
@@ -279,13 +285,13 @@ impl From<metadata::metadata::ResponseMetadata> for ResponseMetadata {
 #[derive(Serialize, Deserialize, Default, Debug, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ListResponse<T>
-where
-    T: Debug,
+where T: Debug
 {
     pub data: Vec<T>,
     pub meta: ResponseMetadata,
 }
 
+#[allow(clippy::all)]
 impl<A, B> Into<ListResponse<A>> for metadata::metadata::ListResponse<B>
 where
     A: Debug,
@@ -345,6 +351,7 @@ pub enum PropValueOperation {
     NotRegex,
 }
 
+#[allow(clippy::all)]
 impl Into<common::query::PropValueOperation> for PropValueOperation {
     fn into(self) -> common::query::PropValueOperation {
         match self {
@@ -366,6 +373,7 @@ impl Into<common::query::PropValueOperation> for PropValueOperation {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<PropValueOperation> for common::query::PropValueOperation {
     fn into(self) -> PropValueOperation {
         match self {
@@ -416,6 +424,7 @@ impl From<EventRef> for common::query::EventRef {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<EventRef> for common::query::EventRef {
     fn into(self) -> EventRef {
         match self {
@@ -458,6 +467,7 @@ pub enum SortablePropertyRef {
     },
 }
 
+#[allow(clippy::all)]
 impl Into<common::query::PropertyRef> for PropertyRef {
     fn into(self) -> common::query::PropertyRef {
         match self {
@@ -473,6 +483,7 @@ impl Into<common::query::PropertyRef> for PropertyRef {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<PropertyRef> for common::query::PropertyRef {
     fn into(self) -> PropertyRef {
         match self {
@@ -505,6 +516,7 @@ pub enum PropValueFilter {
     // Group { group_id: u64 },
 }
 
+#[allow(clippy::all)]
 impl Into<common::query::PropValueFilter> for PropValueFilter {
     fn into(self) -> common::query::PropValueFilter {
         match self {
@@ -530,6 +542,7 @@ impl Into<common::query::PropValueFilter> for PropValueFilter {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<PropValueFilter> for common::query::PropValueFilter {
     fn into(self) -> PropValueFilter {
         match self {
@@ -540,10 +553,7 @@ impl Into<PropValueFilter> for common::query::PropValueFilter {
             } => PropValueFilter::Property {
                 property: property.to_owned().into(),
                 operation: operation.to_owned().into(),
-                value: match value {
-                    None => None,
-                    Some(v) => Some(v.iter().map(scalar_to_json_value).collect::<Vec<_>>()),
-                },
+                value: value.map(|v| v.iter().map(scalar_to_json_value).collect::<Vec<_>>()),
             },
         }
     }
@@ -691,9 +701,7 @@ pub struct EventGroupedFilters {
     pub groups: Vec<EventGroupedFilterGroup>,
 }
 
-
 // queries
-
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -724,6 +732,7 @@ pub enum QueryTime {
     },
 }
 
+#[allow(clippy::all)]
 impl Into<common::query::QueryTime> for QueryTime {
     fn into(self) -> common::query::QueryTime {
         match self {
@@ -737,6 +746,7 @@ impl Into<common::query::QueryTime> for QueryTime {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<QueryTime> for common::query::QueryTime {
     fn into(self) -> QueryTime {
         match self {
@@ -760,6 +770,7 @@ pub enum TimeIntervalUnit {
     Year,
 }
 
+#[allow(clippy::all)]
 impl Into<common::query::TimeIntervalUnit> for TimeIntervalUnit {
     fn into(self) -> common::query::TimeIntervalUnit {
         match self {
@@ -772,6 +783,7 @@ impl Into<common::query::TimeIntervalUnit> for TimeIntervalUnit {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<TimeIntervalUnit> for common::query::TimeIntervalUnit {
     fn into(self) -> TimeIntervalUnit {
         match self {
@@ -793,6 +805,7 @@ pub enum Breakdown {
     },
 }
 
+#[allow(clippy::all)]
 impl Into<common::query::Breakdown> for Breakdown {
     fn into(self) -> common::query::Breakdown {
         match self {
@@ -803,6 +816,7 @@ impl Into<common::query::Breakdown> for Breakdown {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<Breakdown> for common::query::Breakdown {
     fn into(self) -> Breakdown {
         match self {
@@ -880,6 +894,7 @@ pub enum DidEventAggregate {
     },
 }
 
+#[allow(clippy::all)]
 impl Into<common::query::DidEventAggregate> for DidEventAggregate {
     fn into(self) -> common::query::DidEventAggregate {
         match self {
@@ -960,6 +975,7 @@ pub enum SegmentTime {
     },
 }
 
+#[allow(clippy::all)]
 impl Into<common::query::SegmentTime> for SegmentTime {
     fn into(self) -> common::query::SegmentTime {
         match self {
@@ -1017,6 +1033,7 @@ pub struct Segment {
     conditions: Vec<Vec<SegmentCondition>>,
 }
 
+#[allow(clippy::all)]
 impl Into<common::query::SegmentCondition> for SegmentCondition {
     fn into(self) -> common::query::SegmentCondition {
         match self {
@@ -1072,12 +1089,11 @@ impl Into<common::query::SegmentCondition> for SegmentCondition {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<SegmentTime> for common::query::SegmentTime {
     fn into(self) -> SegmentTime {
         match self {
-            common::query::SegmentTime::Between { from, to } => {
-                SegmentTime::Between { from, to }
-            }
+            common::query::SegmentTime::Between { from, to } => SegmentTime::Between { from, to },
             common::query::SegmentTime::From(from) => SegmentTime::From(from),
             common::query::SegmentTime::Last { n, unit } => SegmentTime::Last {
                 last: n,
@@ -1089,16 +1105,15 @@ impl Into<SegmentTime> for common::query::SegmentTime {
                     unit: unit.into(),
                 }
             }
-            common::query::SegmentTime::Each { n, unit } => {
-                SegmentTime::WindowEach {
-                    unit: unit.into(),
-                    n,
-                }
-            }
+            common::query::SegmentTime::Each { n, unit } => SegmentTime::WindowEach {
+                unit: unit.into(),
+                n,
+            },
         }
     }
 }
 
+#[allow(clippy::all)]
 impl Into<DidEventAggregate> for common::query::DidEventAggregate {
     fn into(self) -> DidEventAggregate {
         match self {
@@ -1157,6 +1172,7 @@ impl Into<DidEventAggregate> for common::query::DidEventAggregate {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<SegmentCondition> for common::query::SegmentCondition {
     fn into(self) -> SegmentCondition {
         match self {
@@ -1220,6 +1236,7 @@ impl Into<SegmentCondition> for common::query::SegmentCondition {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<common::query::Segment> for Segment {
     fn into(self) -> common::query::Segment {
         common::query::Segment {
@@ -1233,6 +1250,7 @@ impl Into<common::query::Segment> for Segment {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<Segment> for common::query::Segment {
     fn into(self) -> Segment {
         Segment {
@@ -1246,6 +1264,7 @@ impl Into<Segment> for common::query::Segment {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<common::query::AggregateFunction> for &AggregateFunction {
     fn into(self) -> common::query::AggregateFunction {
         match self {
@@ -1259,6 +1278,7 @@ impl Into<common::query::AggregateFunction> for &AggregateFunction {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<AggregateFunction> for common::query::AggregateFunction {
     fn into(self) -> AggregateFunction {
         match self {
@@ -1287,6 +1307,7 @@ pub enum PartitionedAggregateFunction {
     // Percentile99,
 }
 
+#[allow(clippy::all)]
 impl Into<common::query::PartitionedAggregateFunction> for &PartitionedAggregateFunction {
     fn into(self) -> common::query::PartitionedAggregateFunction {
         match self {
@@ -1301,6 +1322,7 @@ impl Into<common::query::PartitionedAggregateFunction> for &PartitionedAggregate
     }
 }
 
+#[allow(clippy::all)]
 impl Into<PartitionedAggregateFunction> for common::query::PartitionedAggregateFunction {
     fn into(self) -> PartitionedAggregateFunction {
         match self {
@@ -1330,6 +1352,7 @@ pub enum QueryAggregate {
     Percentile99,
 }
 
+#[allow(clippy::all)]
 impl Into<common::query::QueryAggregate> for QueryAggregate {
     fn into(self) -> common::query::QueryAggregate {
         match self {
@@ -1338,25 +1361,16 @@ impl Into<common::query::QueryAggregate> for QueryAggregate {
             QueryAggregate::Sum => common::query::QueryAggregate::Sum,
             QueryAggregate::Avg => common::query::QueryAggregate::Avg,
             QueryAggregate::Median => common::query::QueryAggregate::Median,
-            QueryAggregate::DistinctCount => {
-                common::query::QueryAggregate::DistinctCount
-            }
-            QueryAggregate::Percentile25 => {
-                common::query::QueryAggregate::Percentile25th
-            }
-            QueryAggregate::Percentile75 => {
-                common::query::QueryAggregate::Percentile75th
-            }
-            QueryAggregate::Percentile90 => {
-                common::query::QueryAggregate::Percentile90th
-            }
-            QueryAggregate::Percentile99 => {
-                common::query::QueryAggregate::Percentile99th
-            }
+            QueryAggregate::DistinctCount => common::query::QueryAggregate::DistinctCount,
+            QueryAggregate::Percentile25 => common::query::QueryAggregate::Percentile25th,
+            QueryAggregate::Percentile75 => common::query::QueryAggregate::Percentile75th,
+            QueryAggregate::Percentile90 => common::query::QueryAggregate::Percentile90th,
+            QueryAggregate::Percentile99 => common::query::QueryAggregate::Percentile99th,
         }
     }
 }
 
+#[allow(clippy::all)]
 impl Into<QueryAggregate> for common::query::QueryAggregate {
     fn into(self) -> QueryAggregate {
         match self {
@@ -1365,25 +1379,14 @@ impl Into<QueryAggregate> for common::query::QueryAggregate {
             common::query::QueryAggregate::Sum => QueryAggregate::Sum,
             common::query::QueryAggregate::Avg => QueryAggregate::Avg,
             common::query::QueryAggregate::Median => QueryAggregate::Median,
-            common::query::QueryAggregate::DistinctCount => {
-                QueryAggregate::DistinctCount
-            }
-            common::query::QueryAggregate::Percentile25th => {
-                QueryAggregate::Percentile25
-            }
-            common::query::QueryAggregate::Percentile75th => {
-                QueryAggregate::Percentile75
-            }
-            common::query::QueryAggregate::Percentile90th => {
-                QueryAggregate::Percentile90
-            }
-            common::query::QueryAggregate::Percentile99th => {
-                QueryAggregate::Percentile99
-            }
+            common::query::QueryAggregate::DistinctCount => QueryAggregate::DistinctCount,
+            common::query::QueryAggregate::Percentile25th => QueryAggregate::Percentile25,
+            common::query::QueryAggregate::Percentile75th => QueryAggregate::Percentile75,
+            common::query::QueryAggregate::Percentile90th => QueryAggregate::Percentile90,
+            common::query::QueryAggregate::Percentile99th => QueryAggregate::Percentile99,
         }
     }
 }
-
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -1405,12 +1408,12 @@ pub fn validate_event_property(
             group,
         } => {
             md.group_properties[*group]
-                .get_by_name(project_id, &property_name)
+                .get_by_name(project_id, property_name)
                 .map_err(|err| PlatformError::BadRequest(format!("{err_prefix}: {err}")))?;
         }
         PropertyRef::Event { property_name } => {
             md.event_properties
-                .get_by_name(project_id, &property_name)
+                .get_by_name(project_id, property_name)
                 .map_err(|err| PlatformError::BadRequest(format!("{err_prefix}: {err}")))?;
         }
         _ => {
@@ -1435,11 +1438,11 @@ pub fn validate_event_filter_property(
             property_name,
             group,
         } => md.group_properties[*group]
-            .get_by_name(project_id, &property_name)
+            .get_by_name(project_id, property_name)
             .map_err(|err| PlatformError::BadRequest(format!("{err_prefix}: {err}")))?,
         PropertyRef::Event { property_name } => md
             .event_properties
-            .get_by_name(project_id, &property_name)
+            .get_by_name(project_id, property_name)
             .map_err(|err| PlatformError::BadRequest(format!("{err_prefix}: {err}")))?,
         _ => {
             return Err(PlatformError::Unimplemented(
@@ -1569,12 +1572,12 @@ pub(crate) fn validate_event(
     project_id: u64,
     event: &EventRef,
     event_id: usize,
-    err_prefix: String,
+    _err_prefix: String,
 ) -> crate::Result<()> {
     match event {
         EventRef::Regular { event_name } => {
             md.events
-                .get_by_name(project_id, &event_name)
+                .get_by_name(project_id, event_name)
                 .map_err(|err| PlatformError::BadRequest(format!("event {event_id}: {err}")))?;
         }
         EventRef::Custom { event_id } => {

@@ -1,5 +1,6 @@
 use std::fmt;
 use std::fmt::Display;
+
 use chrono::prelude::*;
 use chrono::DateTime;
 use chrono::Duration;
@@ -15,7 +16,6 @@ use serde::Serialize;
 use crate::error::CommonError;
 use crate::error::Result;
 use crate::scalar::ScalarValueRef;
-
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum QueryAggregate {
@@ -47,7 +47,6 @@ impl QueryAggregate {
         }
     }
 }
-
 
 /// Enum of all built-in aggregate functions
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -91,7 +90,7 @@ impl From<AggregateFunction> for DFAggregateFunction {
             AggregateFunction::Min => DFAggregateFunction::Min,
             AggregateFunction::Max => DFAggregateFunction::Max,
             AggregateFunction::Avg => DFAggregateFunction::Avg,
-            _=>unimplemented!()
+            _ => unimplemented!(),
         }
     }
 }
@@ -252,13 +251,13 @@ pub enum PropValueOperation {
 
 impl PropValueOperation {
     pub fn is_without_value(&self) -> bool {
-        match self {
+        matches!(
+            self,
             PropValueOperation::True
-            | PropValueOperation::False
-            | PropValueOperation::Exists
-            | PropValueOperation::Empty => true,
-            _ => false,
-        }
+                | PropValueOperation::False
+                | PropValueOperation::Exists
+                | PropValueOperation::Empty
+        )
     }
 }
 impl From<PropValueOperation> for Operator {

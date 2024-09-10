@@ -1,8 +1,11 @@
 use std::sync::Arc;
-use serde::{Deserialize, Serialize};
+
 use common::rbac::Permission;
-use crate::Context;
+use serde::Deserialize;
+use serde::Serialize;
+
 use crate::error::Result;
+use crate::Context;
 
 pub struct SettingsProvider {
     prov: Arc<metadata::settings::SettingsProvider>,
@@ -14,9 +17,7 @@ impl SettingsProvider {
     }
 
     pub async fn set(&self, ctx: Context, req: Settings) -> Result<Settings> {
-        ctx.check_permission(
-            Permission::ManageServer,
-        )?;
+        ctx.check_permission(Permission::ManageServer)?;
 
         let mut settings = self.prov.load()?;
 
@@ -40,9 +41,15 @@ impl SettingsProvider {
         }
         if let Some(v) = req.backup_provider {
             match v {
-                BackupProvider::Local => settings.backup_provider = metadata::settings::BackupProvider::Local,
-                BackupProvider::S3 => settings.backup_provider = metadata::settings::BackupProvider::S3,
-                BackupProvider::GCP => settings.backup_provider = metadata::settings::BackupProvider::GCP,
+                BackupProvider::Local => {
+                    settings.backup_provider = metadata::settings::BackupProvider::Local
+                }
+                BackupProvider::S3 => {
+                    settings.backup_provider = metadata::settings::BackupProvider::S3
+                }
+                BackupProvider::Gcp => {
+                    settings.backup_provider = metadata::settings::BackupProvider::GCP
+                }
             }
         }
         if let Some(v) = req.backup_provider_s3_bucket {
@@ -69,15 +76,13 @@ impl SettingsProvider {
 
         self.prov.save(&settings)?;
 
-        Ok(self.get(ctx).await?)
+        self.get(ctx).await
     }
 
     pub async fn get(&self, ctx: Context) -> Result<Settings> {
-        ctx.check_permission(
-            Permission::ManageServer,
-        )?;
+        ctx.check_permission(Permission::ManageServer)?;
 
-        let mut settings = self.prov.load()?;
+        let settings = self.prov.load()?;
 
         let ret = Settings {
             auth_access_token: None,
@@ -90,22 +95,30 @@ impl SettingsProvider {
             backup_provider: match settings.backup_provider {
                 metadata::settings::BackupProvider::Local => Some(BackupProvider::Local),
                 metadata::settings::BackupProvider::S3 => Some(BackupProvider::S3),
-                metadata::settings::BackupProvider::GCP => Some(BackupProvider::GCP),
+                metadata::settings::BackupProvider::GCP => Some(BackupProvider::Gcp),
             },
             backup_provider_s3_bucket: Some(settings.backup_provider_s3_bucket),
             backup_provider_s3_path: Some(settings.backup_provider_s3_path),
             backup_provider_s3_region: Some(settings.backup_provider_s3_region),
-            backup_provider_s3_access_key:Some(settings.backup_provider_s3_access_key),
+            backup_provider_s3_access_key: Some(settings.backup_provider_s3_access_key),
             backup_provider_s3_secret_key: None,
             backup_provider_gcp_bucket: Some(settings.backup_provider_gcp_bucket),
             backup_provider_gcp_path: Some(settings.backup_provider_gcp_path),
             backup_provider_gcp_key: None,
             backup_schedule_interval: Some(match settings.backup_schedule_interval {
-                metadata::settings::BackupScheduleInterval::Hourly => BackupScheduleInterval::Hourly,
+                metadata::settings::BackupScheduleInterval::Hourly => {
+                    BackupScheduleInterval::Hourly
+                }
                 metadata::settings::BackupScheduleInterval::Daily => BackupScheduleInterval::Daily,
-                metadata::settings::BackupScheduleInterval::Weekly => BackupScheduleInterval::Weekly,
-                metadata::settings::BackupScheduleInterval::Monthly => BackupScheduleInterval::Monthly,
-                metadata::settings::BackupScheduleInterval::Yearly => BackupScheduleInterval::Yearly,
+                metadata::settings::BackupScheduleInterval::Weekly => {
+                    BackupScheduleInterval::Weekly
+                }
+                metadata::settings::BackupScheduleInterval::Monthly => {
+                    BackupScheduleInterval::Monthly
+                }
+                metadata::settings::BackupScheduleInterval::Yearly => {
+                    BackupScheduleInterval::Yearly
+                }
             }),
             backup_schedule_start_hour: Some(settings.backup_schedule_start_hour),
         };
@@ -120,7 +133,7 @@ pub enum BackupProvider {
     Local,
     S3,
     #[serde(rename = "gcp")] // for some reason it is "gCP"
-    GCP,
+    Gcp,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]

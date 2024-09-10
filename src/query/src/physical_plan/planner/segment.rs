@@ -32,9 +32,7 @@ use crate::physical_plan::planner::build_filter;
 use crate::physical_plan::planner::col;
 
 fn aggregate<T>(agg: &logical_plan::segment::AggregateFunction) -> AggregateFunction<T>
-where
-    T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display,
-{
+where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display {
     match agg {
         logical_plan::segment::AggregateFunction::Sum => AggregateFunction::new_sum(),
         logical_plan::segment::AggregateFunction::Min => AggregateFunction::new_min(),
@@ -243,32 +241,32 @@ pub fn build_segment_expr(
             time_range,
             op,
             right,
-            time_window,
+            time_window: _,
         } => {
             let dfschema = schema.clone().to_dfschema()?;
             let execution_props = ExecutionProps::new();
-            let filter = build_filter(Some(filter), &dfschema, schema, &execution_props)?.unwrap();
+            let filter = build_filter(Some(filter), &dfschema, &execution_props)?.unwrap();
             let ts_col = col(ts_col, &dfschema);
             let partition_col = col(partition_col, &dfschema);
             let time_range = build_time_range(time_range);
             let expr = match op {
                 logical_plan::segment::Operator::Eq => {
-                    count!(Eq, filter, ts_col, partition_col,right, time_range)
+                    count!(Eq, filter, ts_col, partition_col, right, time_range)
                 }
                 logical_plan::segment::Operator::NotEq => {
-                    count!(NotEq, filter, ts_col, partition_col,right, time_range)
+                    count!(NotEq, filter, ts_col, partition_col, right, time_range)
                 }
                 logical_plan::segment::Operator::Lt => {
-                    count!(Lt, filter, ts_col, partition_col,right, time_range)
+                    count!(Lt, filter, ts_col, partition_col, right, time_range)
                 }
                 logical_plan::segment::Operator::LtEq => {
-                    count!(LtEq, filter, ts_col, partition_col,right, time_range)
+                    count!(LtEq, filter, ts_col, partition_col, right, time_range)
                 }
                 logical_plan::segment::Operator::Gt => {
-                    count!(Gt, filter, ts_col, partition_col,right, time_range)
+                    count!(Gt, filter, ts_col, partition_col, right, time_range)
                 }
                 logical_plan::segment::Operator::GtEq => {
-                    count!(GtEq, filter, ts_col,partition_col, right, time_range)
+                    count!(GtEq, filter, ts_col, partition_col, right, time_range)
                 }
             };
             Ok(expr)
@@ -282,11 +280,11 @@ pub fn build_segment_expr(
             agg,
             op,
             right,
-            time_window,
+            time_window: _,
         } => {
             let dfschema = schema.clone().to_dfschema()?;
             let execution_props = ExecutionProps::new();
-            let filter = build_filter(Some(filter), &dfschema, schema, &execution_props)?.unwrap();
+            let filter = build_filter(Some(filter), &dfschema, &execution_props)?.unwrap();
             let ts_col = col(ts_col, &dfschema);
             let partition_col = col(partition_col, &dfschema);
             let predicate_col = col(predicate, &dfschema);

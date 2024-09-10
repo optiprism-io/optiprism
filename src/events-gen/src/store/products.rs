@@ -1,9 +1,7 @@
 use std::collections::HashSet;
 use std::io;
-use std::sync::Arc;
 
 use common::DECIMAL_SCALE;
-use metadata::dictionaries::Dictionaries;
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
 use rand::rngs::ThreadRng;
@@ -97,14 +95,14 @@ impl ProductProvider {
             probability::calc_cubic_spline(products.len(), vec![1., 0.5, 0.3, 0.1])?;
         let product_weight_idx = WeightedIndex::new([1., 0.5, 0.3, 0.1]).unwrap();
 
-        let promoted_products = products[0..5].iter().map(|p| p.clone()).collect();
+        let promoted_products = products[0..5].to_vec();
         let promoted_product_weight_idx = WeightedIndex::new([1., 0.3, 0.2, 0.1, 0.1]).unwrap();
 
         let deal_products = products
             .iter()
             .filter(|p| p.discount_price.is_some())
-            .map(|p| p.clone())
-            .collect();
+            .cloned()
+            .collect::<Vec<_>>();
         let deal_product_weight_idx = WeightedIndex::new([1., 0.3, 0.2, 0.1, 0.1]).unwrap();
 
         let mut categories = products

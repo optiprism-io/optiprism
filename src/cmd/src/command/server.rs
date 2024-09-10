@@ -1,40 +1,45 @@
-use std::fs;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::Router;
 use common::config::Config;
 use common::rbac::Role;
-use common::{ADMIN_ID, DATA_PATH_METADATA, DATA_PATH_STORAGE};
-use rand::distributions::Alphanumeric;
-use rand::Rng;
+use common::ADMIN_ID;
+use common::DATA_PATH_METADATA;
+use common::DATA_PATH_STORAGE;
 use metadata::accounts::CreateAccountRequest;
 use metadata::error::MetadataError;
 use metadata::organizations::CreateOrganizationRequest;
-use metadata::projects::CreateProjectRequest;
 use metadata::MetadataProvider;
 use platform::auth::password::make_password_hash;
+use rand::distributions::Alphanumeric;
+use rand::Rng;
 use storage::db::OptiDBImpl;
 use storage::db::Options;
-use tokio::net::TcpListener;
 use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tracing::debug;
 use tracing::info;
+
 use crate::error::Error;
 use crate::error::Result;
-use crate::{backup, init_settings, init_fs, init_ingester};
-use crate::init_metrics;
+use crate::init_fs;
+use crate::init_ingester;
 use crate::init_platform;
-use crate::init_session_cleaner;
+use crate::init_settings;
 use crate::init_system;
 
-pub async fn start(mut cfg: Config) -> Result<()> {
+pub async fn start(cfg: Config) -> Result<()> {
     debug!("db path: {:?}", cfg.data.path);
 
     init_fs(&cfg)?;
-    let rocks = Arc::new(metadata::rocksdb::new(cfg.data.path.join(DATA_PATH_METADATA))?);
-    let db = Arc::new(OptiDBImpl::open(cfg.data.path.join(DATA_PATH_STORAGE), Options {})?);
+    let rocks = Arc::new(metadata::rocksdb::new(
+        cfg.data.path.join(DATA_PATH_METADATA),
+    )?);
+    let db = Arc::new(OptiDBImpl::open(
+        cfg.data.path.join(DATA_PATH_STORAGE),
+        Options {},
+    )?);
     let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
     init_settings(&md)?;
 
@@ -42,7 +47,8 @@ pub async fn start(mut cfg: Config) -> Result<()> {
     init_system(&md, &db, &cfg).await?;
     if !cfg.data.ui_path.exists() {
         return Err(Error::FileNotFound(format!(
-            "ui path {:?} doesn't exist", cfg.data.ui_path
+            "ui path {:?} doesn't exist",
+            cfg.data.ui_path
         )));
     }
     debug!("ui path: {:?}", cfg.data.ui_path);
@@ -57,7 +63,7 @@ pub async fn start(mut cfg: Config) -> Result<()> {
                     .map(char::from)
                     .collect();
                 let mut settings = md.settings.load()?;
-                settings.auth_admin_default_password = pwd.clone();
+                settings.auth_admin_default_password.clone_from(&pwd);
                 md.settings.save(&settings)?;
                 info!("creating admin account...");
                 let acc = md.accounts.create(CreateAccountRequest {
@@ -82,15 +88,21 @@ pub async fn start(mut cfg: Config) -> Result<()> {
                 acc
             }
             other => return Err(other.into()),
-        }
+        },
     };
     let router = Router::new();
     info!("initializing ingester...");
-    let router = init_ingester(&cfg.data.geo_city_path, &cfg.data.ua_db_path, &md, &db, router)?;
+    let router = init_ingester(
+        &cfg.data.geo_city_path,
+        &cfg.data.ua_db_path,
+        &md,
+        &db,
+        router,
+    )?;
     info!("initializing platform...");
     let router = init_platform(md.clone(), db.clone(), router, cfg.clone())?;
 
-    let signal = async {
+    let _signal = async {
         let mut sig_int =
             tokio::signal::unix::signal(SignalKind::interrupt()).expect("failed to install signal");
         let mut sig_term =
@@ -103,16 +115,16 @@ pub async fn start(mut cfg: Config) -> Result<()> {
 
     info!("Web Interface: https://{}", cfg.server.host);
     if admin_acc.force_update_email {
-        info!("email: {}",admin_acc.email);
+        info!("email: {}", admin_acc.email);
     }
     if admin_acc.force_update_password {
         let pwd = md.settings.load()?.auth_admin_default_password;
-        info!("password: {}",pwd);
+        info!("password: {}", pwd);
     }
     let listener = tokio::net::TcpListener::bind(cfg.server.host).await?;
     Ok(axum::serve(
         listener,
         router.into_make_service_with_connect_info::<SocketAddr>(),
     )
-        .await?)
+    .await?)
 }

@@ -20,7 +20,7 @@ pub fn verify_password(password: impl AsRef<[u8]>, password_hash: PasswordHash) 
     Ok(password_hash.verify_password(&[&Argon2::default()], password)?)
 }
 
-pub fn check_password_complexity(password: &str,user_inputs: &[&str]) -> Result<()> {
+pub fn check_password_complexity(password: &str, user_inputs: &[&str]) -> Result<()> {
     match zxcvbn::zxcvbn(password, user_inputs) {
         Ok(ent) if ent.score() < 3 => {
             return Err(PlatformError::invalid_field(
@@ -34,5 +34,3 @@ pub fn check_password_complexity(password: &str,user_inputs: &[&str]) -> Result<
 
     Ok(())
 }
-
-

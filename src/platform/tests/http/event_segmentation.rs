@@ -3,20 +3,20 @@ mod tests {
     use chrono::DateTime;
     use chrono::Utc;
     use common::GROUP_USER_ID;
-    use platform::queries::event_segmentation::Analysis;
-    use platform::queries::event_segmentation::ChartType;
-    use platform::queries::event_segmentation::Event;
-    use platform::queries::event_segmentation::EventSegmentation;
-    use platform::queries::event_segmentation::Query;
-    use platform::queries::AggregateFunction;
-    use platform::queries::Breakdown;
-    use platform::queries::PartitionedAggregateFunction;
-    use platform::queries::QueryTime;
-    use platform::queries::TimeIntervalUnit;
+    use platform::event_segmentation::Analysis;
+    use platform::event_segmentation::ChartType;
+    use platform::event_segmentation::Event;
+    use platform::event_segmentation::EventSegmentationRequest;
+    use platform::event_segmentation::Query;
+    use platform::AggregateFunction;
+    use platform::Breakdown;
     use platform::EventRef;
+    use platform::PartitionedAggregateFunction;
     use platform::PropValueFilter;
     use platform::PropValueOperation;
     use platform::PropertyRef;
+    use platform::QueryTime;
+    use platform::TimeIntervalUnit;
     use reqwest::Client;
     use reqwest::StatusCode;
     use serde_json::Value;
@@ -41,7 +41,7 @@ mod tests {
             .unwrap()
             .with_timezone(&Utc);
 
-        let es = EventSegmentation {
+        let es = EventSegmentationRequest {
             time: QueryTime::Between { from, to },
             group: GROUP_USER_ID,
             interval_unit: TimeIntervalUnit::Hour,
@@ -56,6 +56,7 @@ mod tests {
                     filters: Some(vec![PropValueFilter::Property {
                         property: PropertyRef::Group {
                             property_name: "Is Premium".to_string(),
+                            group: 0,
                         },
                         operation: PropValueOperation::Eq,
                         value: Some(vec![Value::Bool(true)]),
@@ -63,6 +64,7 @@ mod tests {
                     breakdowns: Some(vec![Breakdown::Property {
                         property: PropertyRef::Group {
                             property_name: "Device".to_string(),
+                            group: 0,
                         },
                     }]),
                     queries: vec![Query::CountEvents],
@@ -99,6 +101,7 @@ mod tests {
             breakdowns: Some(vec![Breakdown::Property {
                 property: PropertyRef::Group {
                     property_name: "Country".to_string(),
+                    group: 0,
                 },
             }]),
             segments: None,

@@ -1,13 +1,36 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use common::GROUPS_COUNT;
+
+use chrono::DateTime;
+use chrono::Utc;
 use common::rbac::ProjectPermission;
+use common::GROUPS_COUNT;
 use metadata::MetadataProvider;
 use query::context::Format;
-use query::funnel::{fix_request, FunnelProvider};
-use crate::{Breakdown, Context, EventGroupedFilterGroup, EventGroupedFilters, EventRef, FunnelResponse, FunnelStep, FunnelStepData, PlatformError, PropertyRef, PropValueFilter, QueryParams, QueryResponseFormat, QueryTime, Segment, TimeIntervalUnit, validate_event, validate_event_filter, validate_event_property};
+use query::funnel::fix_request;
+use query::funnel::FunnelProvider;
+use serde::Deserialize;
+use serde::Serialize;
+
+use crate::validate_event;
+use crate::validate_event_filter;
+use crate::validate_event_property;
+use crate::Breakdown;
+use crate::Context;
+use crate::EventGroupedFilterGroup;
+use crate::EventGroupedFilters;
+use crate::EventRef;
+use crate::FunnelResponse;
+use crate::FunnelStep;
+use crate::FunnelStepData;
+use crate::PlatformError;
+use crate::PropValueFilter;
+use crate::PropertyRef;
+use crate::QueryParams;
+use crate::QueryResponseFormat;
+use crate::QueryTime;
+use crate::Segment;
+use crate::TimeIntervalUnit;
 
 pub struct Funnel {
     md: Arc<MetadataProvider>,
@@ -34,13 +57,9 @@ impl Funnel {
         validate_request(&self.md, project_id, &req)?;
         let req = fix_request(&self.md, project_id, req.into())?;
 
-        let lreq = req.into();
         let cur_time = match query.timestamp {
             None => Utc::now(),
-            Some(ts_sec) => DateTime::from_naive_utc_and_offset(
-                chrono::NaiveDateTime::from_timestamp_millis(ts_sec * 1000).unwrap(),
-                Utc,
-            ),
+            Some(ts_sec) => DateTime::from_timestamp_millis(ts_sec * 1000).unwrap(),
         };
         let ctx = query::Context {
             project_id,
@@ -54,10 +73,9 @@ impl Funnel {
             cur_time,
         };
 
-        let mut qdata = self.prov.funnel(ctx, lreq).await?;
+        let qdata = self.prov.funnel(ctx, req).await?;
 
-        let groups = qdata
-            .groups;
+        let groups = qdata.groups;
 
         let steps = qdata
             .steps
@@ -66,19 +84,17 @@ impl Funnel {
                 let data = step
                     .data
                     .iter()
-                    .map(|data| {
-                        FunnelStepData {
-                            groups: data.groups.clone(),
-                            ts: data.ts.clone(),
-                            total: data.total.clone(),
-                            conversion_ratio: data.conversion_ratio.clone(),
-                            avg_time_to_convert: data.avg_time_to_convert.clone(),
-                            avg_time_to_convert_from_start: data.avg_time_to_convert_from_start.clone(),
-                            dropped_off: data.dropped_off.clone(),
-                            drop_off_ratio: data.drop_off_ratio.clone(),
-                            time_to_convert: data.time_to_convert.clone(),
-                            time_to_convert_from_start: data.time_to_convert_from_start.clone(),
-                        }
+                    .map(|data| FunnelStepData {
+                        groups: data.groups.clone(),
+                        ts: data.ts,
+                        total: data.total,
+                        conversion_ratio: data.conversion_ratio,
+                        avg_time_to_convert: data.avg_time_to_convert,
+                        avg_time_to_convert_from_start: data.avg_time_to_convert_from_start,
+                        dropped_off: data.dropped_off,
+                        drop_off_ratio: data.drop_off_ratio,
+                        time_to_convert: data.time_to_convert,
+                        time_to_convert_from_start: data.time_to_convert_from_start,
                     })
                     .collect::<Vec<_>>();
                 FunnelStep {
@@ -103,15 +119,12 @@ pub(crate) fn validate_request(
         ));
     }
 
-    match req.time {
-        QueryTime::Between { from, to } => {
-            if from > to {
-                return Err(PlatformError::BadRequest(
-                    "from time must be less than to time".to_string(),
-                ));
-            }
+    if let QueryTime::Between { from, to } = req.time {
+        if from > to {
+            return Err(PlatformError::BadRequest(
+                "from time must be less than to time".to_string(),
+            ));
         }
-        _ => {}
     }
 
     if req.steps.is_empty() {
@@ -159,22 +172,19 @@ pub(crate) fn validate_request(
 
         match &step.order {
             StepOrder::Exact => {}
-            StepOrder::Any { steps } => steps
-                .iter()
-                .map(|(from, to)| {
-                    if *from >= req.steps.len() {
-                        return Err(PlatformError::BadRequest(
-                            "step_order: from step index out of range".to_string(),
-                        ));
-                    }
-                    if *to >= req.steps.len() {
-                        return Err(PlatformError::BadRequest(
-                            "step_order: to step index out of range".to_string(),
-                        ));
-                    }
-                    Ok(())
-                })
-                .collect::<crate::Result<_>>()?,
+            StepOrder::Any { steps } => steps.iter().try_for_each(|(from, to)| {
+                if *from >= req.steps.len() {
+                    return Err(PlatformError::BadRequest(
+                        "step_order: from step index out of range".to_string(),
+                    ));
+                }
+                if *to >= req.steps.len() {
+                    return Err(PlatformError::BadRequest(
+                        "step_order: to step index out of range".to_string(),
+                    ));
+                }
+                Ok(())
+            })?,
         }
     }
 
@@ -302,6 +312,7 @@ pub struct Step {
     pub order: StepOrder,
 }
 
+#[allow(clippy::all)]
 impl Into<common::funnel::Step> for Step {
     fn into(self) -> common::funnel::Step {
         common::funnel::Step {
@@ -315,6 +326,7 @@ impl Into<common::funnel::Step> for Step {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<Step> for common::funnel::Step {
     fn into(self) -> Step {
         Step {
@@ -334,6 +346,7 @@ pub enum Order {
     Exact,
 }
 
+#[allow(clippy::all)]
 impl Into<common::funnel::Order> for Order {
     fn into(self) -> common::funnel::Order {
         match self {
@@ -343,6 +356,7 @@ impl Into<common::funnel::Order> for Order {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<Order> for common::funnel::Order {
     fn into(self) -> Order {
         match self {
@@ -359,6 +373,7 @@ pub struct Event {
     pub filters: Option<Vec<PropValueFilter>>,
 }
 
+#[allow(clippy::all)]
 impl Into<common::funnel::Event> for Event {
     fn into(self) -> common::funnel::Event {
         common::funnel::Event {
@@ -370,6 +385,7 @@ impl Into<common::funnel::Event> for Event {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<Event> for common::funnel::Event {
     fn into(self) -> Event {
         Event {
@@ -387,6 +403,7 @@ pub struct TimeWindow {
     pub unit: TimeIntervalUnitSession,
 }
 
+#[allow(clippy::all)]
 impl Into<common::funnel::TimeWindow> for TimeWindow {
     fn into(self) -> common::funnel::TimeWindow {
         common::funnel::TimeWindow {
@@ -396,6 +413,7 @@ impl Into<common::funnel::TimeWindow> for TimeWindow {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<TimeWindow> for common::funnel::TimeWindow {
     fn into(self) -> TimeWindow {
         TimeWindow {
@@ -415,6 +433,7 @@ pub enum TimeIntervalUnitSession {
     Session,
 }
 
+#[allow(clippy::all)]
 impl Into<common::funnel::TimeIntervalUnitSession> for TimeIntervalUnitSession {
     fn into(self) -> common::funnel::TimeIntervalUnitSession {
         match self {
@@ -423,13 +442,12 @@ impl Into<common::funnel::TimeIntervalUnitSession> for TimeIntervalUnitSession {
             TimeIntervalUnitSession::Week => common::funnel::TimeIntervalUnitSession::Week,
             TimeIntervalUnitSession::Month => common::funnel::TimeIntervalUnitSession::Month,
             TimeIntervalUnitSession::Year => common::funnel::TimeIntervalUnitSession::Year,
-            TimeIntervalUnitSession::Session => {
-                common::funnel::TimeIntervalUnitSession::Session
-            }
+            TimeIntervalUnitSession::Session => common::funnel::TimeIntervalUnitSession::Session,
         }
     }
 }
 
+#[allow(clippy::all)]
 impl Into<TimeIntervalUnitSession> for common::funnel::TimeIntervalUnitSession {
     fn into(self) -> TimeIntervalUnitSession {
         match self {
@@ -438,9 +456,7 @@ impl Into<TimeIntervalUnitSession> for common::funnel::TimeIntervalUnitSession {
             common::funnel::TimeIntervalUnitSession::Week => TimeIntervalUnitSession::Week,
             common::funnel::TimeIntervalUnitSession::Month => TimeIntervalUnitSession::Month,
             common::funnel::TimeIntervalUnitSession::Year => TimeIntervalUnitSession::Year,
-            common::funnel::TimeIntervalUnitSession::Session => {
-                TimeIntervalUnitSession::Session
-            }
+            common::funnel::TimeIntervalUnitSession::Session => TimeIntervalUnitSession::Session,
         }
     }
 }
@@ -451,6 +467,7 @@ pub enum StepOrder {
     Any { steps: Vec<(usize, usize)> }, // any of the steps
 }
 
+#[allow(clippy::all)]
 impl Into<common::funnel::StepOrder> for StepOrder {
     fn into(self) -> common::funnel::StepOrder {
         match self {
@@ -460,6 +477,7 @@ impl Into<common::funnel::StepOrder> for StepOrder {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<StepOrder> for common::funnel::StepOrder {
     fn into(self) -> StepOrder {
         match self {
@@ -475,6 +493,7 @@ pub enum ExcludeSteps {
     Between { from: usize, to: usize },
 }
 
+#[allow(clippy::all)]
 impl Into<common::funnel::ExcludeSteps> for ExcludeSteps {
     fn into(self) -> common::funnel::ExcludeSteps {
         match self {
@@ -486,13 +505,12 @@ impl Into<common::funnel::ExcludeSteps> for ExcludeSteps {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<ExcludeSteps> for common::funnel::ExcludeSteps {
     fn into(self) -> ExcludeSteps {
         match self {
             common::funnel::ExcludeSteps::All => ExcludeSteps::All,
-            common::funnel::ExcludeSteps::Between(from, to) => {
-                ExcludeSteps::Between { from, to }
-            }
+            common::funnel::ExcludeSteps::Between(from, to) => ExcludeSteps::Between { from, to },
         }
     }
 }
@@ -505,6 +523,7 @@ pub enum Count {
     Session,
 }
 
+#[allow(clippy::all)]
 impl Into<common::funnel::Count> for Count {
     fn into(self) -> common::funnel::Count {
         match self {
@@ -515,6 +534,7 @@ impl Into<common::funnel::Count> for Count {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<Count> for common::funnel::Count {
     fn into(self) -> Count {
         match self {
@@ -534,21 +554,27 @@ pub struct Exclude {
     pub steps: Option<ExcludeSteps>,
 }
 
+#[allow(clippy::all)]
 impl Into<common::funnel::Exclude> for Exclude {
     fn into(self) -> common::funnel::Exclude {
         common::funnel::Exclude {
             event: self.event.into(),
-            filters: self.filters.map(|v| v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>()),
+            filters: self
+                .filters
+                .map(|v| v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>()),
             steps: self.steps.map(|s| s.into()),
         }
     }
 }
 
+#[allow(clippy::all)]
 impl Into<Exclude> for common::funnel::Exclude {
     fn into(self) -> Exclude {
         Exclude {
             event: self.event.into(),
-            filters: self.filters.map(|v| v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>()),
+            filters: self
+                .filters
+                .map(|v| v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>()),
             steps: self.steps.map(|s| s.into()),
         }
     }
@@ -564,26 +590,24 @@ pub enum Filter {
     TimeToConvert { from: i64, to: i64 }, // conversion should be within certain window
 }
 
+#[allow(clippy::all)]
 impl Into<common::funnel::Filter> for Filter {
     fn into(self) -> common::funnel::Filter {
         match self {
             Filter::DropOffOnAnyStep => common::funnel::Filter::DropOffOnAnyStep,
             Filter::DropOffOnStep { step } => common::funnel::Filter::DropOffOnStep(step),
-            Filter::TimeToConvert { from, to } => {
-                common::funnel::Filter::TimeToConvert(from, to)
-            }
+            Filter::TimeToConvert { from, to } => common::funnel::Filter::TimeToConvert(from, to),
         }
     }
 }
 
+#[allow(clippy::all)]
 impl Into<Filter> for common::funnel::Filter {
     fn into(self) -> Filter {
         match self {
             common::funnel::Filter::DropOffOnAnyStep => Filter::DropOffOnAnyStep,
             common::funnel::Filter::DropOffOnStep(step) => Filter::DropOffOnStep { step },
-            common::funnel::Filter::TimeToConvert(from, to) => {
-                Filter::TimeToConvert { from, to }
-            }
+            common::funnel::Filter::TimeToConvert(from, to) => Filter::TimeToConvert { from, to },
         }
     }
 }
@@ -596,6 +620,7 @@ pub enum Touch {
     Step { step: usize },
 }
 
+#[allow(clippy::all)]
 impl Into<common::funnel::Touch> for Touch {
     fn into(self) -> common::funnel::Touch {
         match self {
@@ -606,6 +631,7 @@ impl Into<common::funnel::Touch> for Touch {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<Touch> for common::funnel::Touch {
     fn into(self) -> Touch {
         match self {
@@ -643,6 +669,7 @@ impl ChartType {
         }
     }
 }
+#[allow(clippy::all)]
 impl Into<common::funnel::ChartType> for ChartType {
     fn into(self) -> common::funnel::ChartType {
         match self {
@@ -666,6 +693,7 @@ impl Into<common::funnel::ChartType> for ChartType {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<ChartType> for common::funnel::ChartType {
     fn into(self) -> ChartType {
         match self {
@@ -689,6 +717,7 @@ impl Into<ChartType> for common::funnel::ChartType {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<common::funnel::Funnel> for FunnelRequest {
     fn into(self) -> common::funnel::Funnel {
         common::funnel::Funnel {
@@ -727,6 +756,7 @@ impl Into<common::funnel::Funnel> for FunnelRequest {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<FunnelRequest> for common::funnel::Funnel {
     fn into(self) -> FunnelRequest {
         FunnelRequest {
@@ -756,14 +786,13 @@ impl Into<FunnelRequest> for common::funnel::Funnel {
                 .map(|s| s.iter().map(|s| s.to_owned().into()).collect::<Vec<_>>()),
             filters: self.filters.map(|v| {
                 let f = v.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>();
-                let r = EventGroupedFilters {
+                EventGroupedFilters {
                     groups_condition: None,
                     groups: vec![EventGroupedFilterGroup {
                         filters_condition: Default::default(),
                         filters: f,
                     }],
-                };
-                r
+                }
             }),
         }
     }

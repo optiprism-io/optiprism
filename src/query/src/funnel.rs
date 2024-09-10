@@ -1,62 +1,69 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
-use arrow::array::{Array, Decimal128Array, Int64Array, StringArray, StringBuilder, TimestampMillisecondArray};
+
+use arrow::array::Array;
+use arrow::array::Decimal128Array;
+use arrow::array::Int64Array;
+use arrow::array::StringArray;
+use arrow::array::StringBuilder;
+use arrow::array::TimestampMillisecondArray;
 use arrow::compute::cast;
 use arrow::datatypes::DataType;
-
-use chrono::DateTime;
-use chrono::Duration;
-use chrono::Utc;
-use common::{DECIMAL_SCALE, group_col};
+use common::funnel::Count;
+use common::funnel::ExcludeSteps;
+use common::funnel::Filter;
+use common::funnel::Funnel;
+use common::funnel::StepOrder;
+use common::funnel::TimeWindow;
+use common::funnel::Touch;
+use common::group_col;
 // use std::time::Duration;
 use common::query::Breakdown;
 use common::query::EventRef;
 use common::query::PropValueFilter;
 use common::query::PropertyRef;
-use common::query::QueryTime;
-use common::types::{COLUMN_CREATED_AT, COLUMN_EVENT, METRIC_QUERY_EXECUTION_TIME_SECONDS, METRIC_QUERY_QUERIES_TOTAL, ROUND_DIGITS, TABLE_EVENTS};
+use common::types::COLUMN_CREATED_AT;
+use common::types::COLUMN_EVENT;
 use common::types::COLUMN_PROJECT_ID;
+use common::types::METRIC_QUERY_EXECUTION_TIME_SECONDS;
+use common::types::METRIC_QUERY_QUERIES_TOTAL;
+use common::types::ROUND_DIGITS;
+use common::types::TABLE_EVENTS;
+use common::DECIMAL_SCALE;
 use datafusion_common::Column;
-use datafusion_common::ScalarValue;
 use datafusion_expr::and;
-use datafusion_expr::binary_expr;
 use datafusion_expr::col;
-use datafusion_expr::expr;
-use datafusion_expr::lit;
-use datafusion_expr::Expr;
 use datafusion_expr::Extension;
 use datafusion_expr::Filter as PlanFilter;
-use datafusion_expr::Limit;
 use datafusion_expr::LogicalPlan;
-use datafusion_expr::Operator;
-use datafusion_expr::Projection;
-use datafusion_expr::Sort;
-use metrics::{counter, histogram};
-use num_traits::ToPrimitive;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
+use metrics::counter;
+use metrics::histogram;
+use num_traits::ToPrimitive;
 use rust_decimal::Decimal;
-use tracing::debug;
-use common::funnel::{Count, ExcludeSteps, Filter, Funnel, StepOrder, TimeWindow, Touch};
-use metadata::properties::Property;
 use storage::db::OptiDBImpl;
+use tracing::debug;
 
-use crate::{breakdowns_to_dicts, col_name, decode_filter_single_dictionary, execute, fix_filter, initial_plan};
+use crate::breakdowns_to_dicts;
+use crate::col_name;
+use crate::decode_filter_single_dictionary;
 use crate::error::QueryError;
 use crate::error::Result;
+use crate::execute;
 use crate::expr::event_expression;
 use crate::expr::event_filters_expression;
 use crate::expr::property_col;
 use crate::expr::time_expression;
+use crate::fix_filter;
+use crate::initial_plan;
 use crate::logical_plan;
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::logical_plan::expr::multi_or;
 use crate::logical_plan::funnel::FunnelNode;
-use crate::logical_plan::rename_columns::RenameColumnsNode;
 use crate::logical_plan::SortField;
 use crate::Context;
-
 
 pub struct FunnelProvider {
     metadata: Arc<MetadataProvider>,
@@ -77,7 +84,8 @@ impl FunnelProvider {
             .map(|x| schema.index_of(x).unwrap())
             .collect();
 
-        let (session_ctx, state, plan) = initial_plan(&self.db, TABLE_EVENTS.to_string(), projection)?;
+        let (session_ctx, state, plan) =
+            initial_plan(&self.db, TABLE_EVENTS.to_string(), projection)?;
         let plan = build(ctx.clone(), self.metadata.clone(), plan, req.clone())?;
 
         println!("{plan:?}");
@@ -88,7 +96,7 @@ impl FunnelProvider {
         counter!(METRIC_QUERY_QUERIES_TOTAL,"query"=>"funnel").increment(1);
         debug!("elapsed: {:?}", duration);
         let mut group_cols: Vec<StringArray> = vec![];
-        let mut ts_col = {
+        let ts_col = {
             let idx = result.schema().index_of("ts").unwrap();
             result
                 .column(idx)
@@ -108,37 +116,50 @@ impl FunnelProvider {
         if let Some(breakdowns) = &req.breakdowns {
             for (idx, breakdown) in breakdowns.iter().enumerate() {
                 let prop = match breakdown {
-                    Breakdown::Property(prop) => {
-                        match prop {
-                            PropertyRef::Group(name, gid) => self.metadata.group_properties[*gid].get_by_name(ctx.project_id, name.as_ref())?,
-                            PropertyRef::Event(name) => self.metadata.event_properties.get_by_name(ctx.project_id, name.as_ref())?,
-                            PropertyRef::Custom(_) => return Err(QueryError::Unimplemented("custom properties are not implemented for breakdowns".to_string()))
+                    Breakdown::Property(prop) => match prop {
+                        PropertyRef::Group(name, gid) => self.metadata.group_properties[*gid]
+                            .get_by_name(ctx.project_id, name.as_ref())?,
+                        PropertyRef::Event(name) => self
+                            .metadata
+                            .event_properties
+                            .get_by_name(ctx.project_id, name.as_ref())?,
+                        PropertyRef::Custom(_) => {
+                            return Err(QueryError::Unimplemented(
+                                "custom properties are not implemented for breakdowns".to_string(),
+                            ));
                         }
-                    }
+                    },
                 };
                 let col = match result.column(idx + 1).data_type() {
                     DataType::Decimal128(_, _) => {
-                        let arr = result.column(idx + 1).as_any().downcast_ref::<Decimal128Array>().unwrap();
+                        let arr = result
+                            .column(idx + 1)
+                            .as_any()
+                            .downcast_ref::<Decimal128Array>()
+                            .unwrap();
                         let mut builder = StringBuilder::new();
                         for i in 0..arr.len() {
                             let v = arr.value(i);
-                            let vv = Decimal::from_i128_with_scale(
-                                v,
-                                DECIMAL_SCALE as u32,
-                            ).round_dp(ROUND_DIGITS.into());
+                            let vv = Decimal::from_i128_with_scale(v, DECIMAL_SCALE as u32)
+                                .round_dp(ROUND_DIGITS.into());
                             if vv.is_integer() {
                                 builder.append_value(vv.to_i64().unwrap().to_string());
                             } else {
                                 builder.append_value(vv.to_string());
                             }
                         }
-                        builder.finish().as_any().downcast_ref::<StringArray>().unwrap().clone()
+                        builder
+                            .finish()
+                            .as_any()
+                            .downcast_ref::<StringArray>()
+                            .unwrap()
+                            .clone()
                     }
                     _ => cast(result.column(idx + 1), &DataType::Utf8)?
                         .as_any()
                         .downcast_ref::<StringArray>()
                         .unwrap()
-                        .to_owned()
+                        .to_owned(),
                 };
 
                 group_cols.push(col);
@@ -193,26 +214,30 @@ impl FunnelProvider {
                 let step_data = StepData {
                     groups,
                     ts: ts_col.value(idx),
-                    total: int_val_cols[step_id * 4].value(idx) as i64,
+                    total: int_val_cols[step_id * 4].value(idx),
                     conversion_ratio: Decimal::from_i128_with_scale(
-                        dec_val_cols[step_id * 4].value(idx) as i128,
+                        dec_val_cols[step_id * 4].value(idx),
                         DECIMAL_SCALE as u32,
-                    ).round_dp(ROUND_DIGITS.into()),
+                    )
+                    .round_dp(ROUND_DIGITS.into()),
                     avg_time_to_convert: Decimal::from_i128_with_scale(
-                        dec_val_cols[step_id * 4 + 1].value(idx) as i128,
+                        dec_val_cols[step_id * 4 + 1].value(idx),
                         DECIMAL_SCALE as u32,
-                    ).round_dp(ROUND_DIGITS.into()),
+                    )
+                    .round_dp(ROUND_DIGITS.into()),
                     avg_time_to_convert_from_start: Decimal::from_i128_with_scale(
-                        dec_val_cols[step_id * 4 + 2].value(idx) as i128,
+                        dec_val_cols[step_id * 4 + 2].value(idx),
                         DECIMAL_SCALE as u32,
-                    ).round_dp(ROUND_DIGITS.into()),
-                    dropped_off: int_val_cols[step_id * 4 + 1].value(idx) as i64,
+                    )
+                    .round_dp(ROUND_DIGITS.into()),
+                    dropped_off: int_val_cols[step_id * 4 + 1].value(idx),
                     drop_off_ratio: Decimal::from_i128_with_scale(
-                        dec_val_cols[step_id * 4 + 3].value(idx) as i128,
+                        dec_val_cols[step_id * 4 + 3].value(idx),
                         DECIMAL_SCALE as u32,
-                    ).round_dp(ROUND_DIGITS.into()),
-                    time_to_convert: int_val_cols[step_id * 4 + 2].value(idx) as i64,
-                    time_to_convert_from_start: int_val_cols[step_id * 4 + 3].value(idx) as i64,
+                    )
+                    .round_dp(ROUND_DIGITS.into()),
+                    time_to_convert: int_val_cols[step_id * 4 + 2].value(idx),
+                    time_to_convert_from_start: int_val_cols[step_id * 4 + 3].value(idx),
                 };
                 step.data.push(step_data);
             }
@@ -226,18 +251,13 @@ impl FunnelProvider {
 pub fn build(
     ctx: Context,
     metadata: Arc<MetadataProvider>,
-    mut input: LogicalPlan,
+    input: LogicalPlan,
     req: Funnel,
 ) -> Result<LogicalPlan> {
     let mut cols_hash: HashMap<String, ()> = HashMap::new();
     let input = decode_filter_dictionaries(&ctx, &metadata, &req, input, &mut cols_hash)?;
 
-    let mut expr = col(Column {
-        relation: None,
-        name: COLUMN_PROJECT_ID.to_string(),
-    });
-
-    expr = time_expression(COLUMN_CREATED_AT, input.schema(), &req.time, ctx.cur_time)?;
+    let mut expr = time_expression(COLUMN_CREATED_AT, input.schema(), &req.time, ctx.cur_time)?;
     if let Some(filters) = &req.filters {
         expr = and(expr, event_filters_expression(&ctx, &metadata, filters)?)
     }
@@ -245,9 +265,8 @@ pub fn build(
 
     let (from, to) = req.time.range(ctx.cur_time);
 
-    let window = match req.time_window {
-        TimeWindow { n, unit } => unit.duration(n as i64),
-    };
+    let TimeWindow { n, unit } = req.time_window;
+    let window = unit.duration(n as i64);
 
     let steps = {
         let mut steps = vec![];
@@ -256,7 +275,7 @@ pub fn build(
             for event in step.events.iter() {
                 let mut expr = event_expression(&ctx, &metadata, &event.event)?;
                 if let Some(filters) = &event.filters {
-                    expr = and(expr, event_filters_expression(&ctx, &metadata, &filters)?);
+                    expr = and(expr, event_filters_expression(&ctx, &metadata, filters)?);
                 }
                 exprs.push(expr)
             }
@@ -276,7 +295,7 @@ pub fn build(
         for exclude in excludes {
             let mut expr = event_expression(&ctx, &metadata, &exclude.event)?;
             if let Some(filters) = &exclude.filters {
-                expr = and(expr, event_filters_expression(&ctx, &metadata, &filters)?);
+                expr = and(expr, event_filters_expression(&ctx, &metadata, filters)?);
             }
             let steps = if let Some(steps) = &exclude.steps {
                 let steps = match steps {
@@ -470,11 +489,7 @@ pub struct Response {
     pub steps: Vec<Step>,
 }
 
-fn projection(
-    ctx: &Context,
-    req: &Funnel,
-    md: &Arc<MetadataProvider>,
-) -> Result<Vec<String>> {
+fn projection(ctx: &Context, req: &Funnel, md: &Arc<MetadataProvider>) -> Result<Vec<String>> {
     let mut fields = vec![
         COLUMN_PROJECT_ID.to_string(),
         group_col(req.group_id),
@@ -538,9 +553,10 @@ fn projection(
     Ok(fields)
 }
 
-pub fn fix_request(md: &Arc<MetadataProvider>,
-                   project_id: u64,
-                   req: common::funnel::Funnel,
+pub fn fix_request(
+    md: &Arc<MetadataProvider>,
+    project_id: u64,
+    req: common::funnel::Funnel,
 ) -> crate::Result<common::funnel::Funnel> {
     let mut out = req.clone();
 
@@ -554,8 +570,7 @@ pub fn fix_request(md: &Arc<MetadataProvider>,
         }
     }
 
-    if let Some(exclude) = &req.exclude
-    {
+    if let Some(exclude) = &req.exclude {
         if exclude.is_empty() {
             out.exclude = None;
         } else {

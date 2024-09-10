@@ -6,11 +6,12 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::Router;
+use chrono::DateTime;
 use chrono::Duration;
 use chrono::DurationRound;
-use chrono::NaiveDateTime;
 use chrono::Utc;
 use clap::Parser;
+use common::config::Config;
 use common::types::DType;
 use common::types::TABLE_EVENTS;
 use common::DECIMAL_SCALE;
@@ -23,8 +24,12 @@ use metadata::util::create_event;
 use metadata::util::create_property;
 use metadata::util::CreatePropertyMainRequest;
 use metadata::MetadataProvider;
-use platform::auth;
 use platform::projects::init_project;
+use query::event_records::EventRecordsProvider;
+use query::event_segmentation::EventSegmentationProvider;
+use query::funnel::FunnelProvider;
+use query::group_records::GroupRecordsProvider;
+use query::properties::PropertiesProvider;
 use scan_dir::ScanDir;
 use storage::db::OptiDBImpl;
 use storage::db::Options;
@@ -34,13 +39,7 @@ use tokio::net::TcpListener;
 use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tracing::info;
-use common::config::Config;
-use query::event_records::EventRecordsProvider;
-use query::event_segmentation::EventSegmentationProvider;
-use query::funnel::FunnelProvider;
-use query::group_records::GroupRecordsProvider;
-use query::properties::PropertiesProvider;
-use crate::init_metrics;
+
 use crate::init_system;
 
 #[derive(Parser, Clone)]
@@ -115,9 +114,10 @@ pub async fn gen(args: &Test, cfg: Config) -> Result<(), anyhow::Error> {
 
     md.dictionaries
         .get_key_or_create(1, TABLE_EVENTS, "string_dict", "привет")?;
-    md.dictionaries.get_key_or_create(1, TABLE_EVENTS, "string_dict", "мир")?;
+    md.dictionaries
+        .get_key_or_create(1, TABLE_EVENTS, "string_dict", "мир")?;
     let e = create_event(&md, proj.id, "event".to_string())?;
-    let now = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0)
+    let now = DateTime::from_timestamp(Utc::now().timestamp(), 0)
         .unwrap()
         .duration_trunc(Duration::days(1))?;
 

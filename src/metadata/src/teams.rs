@@ -1,8 +1,9 @@
 use std::sync::Arc;
+
 use chrono::DateTime;
 use chrono::Utc;
-use prost::Message;
 use common::types::OptionalProperty;
+use prost::Message;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
@@ -15,13 +16,13 @@ use crate::index::delete_index;
 use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
-use crate::{list_data, project_ns, report, team};
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
-use crate::metadata::{ListResponse, ResponseMetadata};
+use crate::metadata::ListResponse;
+use crate::metadata::ResponseMetadata;
 use crate::org_ns;
-use crate::reports::{Report, Type};
+use crate::team;
 use crate::Result;
 
 const NAMESPACE: &[u8] = b"teams";
@@ -38,7 +39,7 @@ fn index_name_key(organization_id: u64, name: &str) -> Option<Vec<u8>> {
             IDX_NAME,
             name,
         )
-            .to_vec(),
+        .to_vec(),
     )
 }
 
@@ -92,7 +93,7 @@ impl Teams {
         let data = serialize(&team)?;
         tx.put(
             make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), team.id),
-            &data,
+            data,
         )?;
 
         insert_index(&tx, idx_keys.as_ref(), team.id)?;
@@ -145,7 +146,7 @@ impl Teams {
         if let OptionalProperty::Some(name) = &req.name {
             idx_keys.push(index_name_key(organization_id, name.as_str()));
             idx_prev_keys.push(index_name_key(organization_id, prev_team.name.as_str()));
-            team.name = name.to_owned();
+            team.name.clone_from(name);
         }
 
         check_update_constraints(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref())?;
@@ -156,7 +157,7 @@ impl Teams {
         let data = serialize(&team)?;
         tx.put(
             make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), team_id),
-            &data,
+            data,
         )?;
 
         update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), team_id)?;
@@ -219,12 +220,14 @@ fn serialize(team: &Team) -> Result<Vec<u8>> {
 }
 
 fn deserialize(data: &[u8]) -> Result<Team> {
-    let from = team::Team::decode(data.as_ref())?;
+    let from = team::Team::decode(data)?;
 
     Ok(Team {
         id: from.id,
         created_at: chrono::DateTime::from_timestamp(from.created_at, 0).unwrap(),
-        updated_at: from.updated_at.map(|t| chrono::DateTime::from_timestamp(t, 0).unwrap()),
+        updated_at: from
+            .updated_at
+            .map(|t| chrono::DateTime::from_timestamp(t, 0).unwrap()),
         created_by: from.created_by,
         updated_by: from.updated_by,
         organization_id: from.organization_id,
@@ -236,8 +239,11 @@ fn deserialize(data: &[u8]) -> Result<Team> {
 mod tests {
     #[test]
     fn test_roundtrip() {
-        use chrono::{DateTime, Utc};
-        use crate::teams::{Team, deserialize, serialize};
+        use chrono::DateTime;
+
+        use crate::teams::deserialize;
+        use crate::teams::serialize;
+        use crate::teams::Team;
 
         let team = Team {
             id: 1,

@@ -1,14 +1,11 @@
 #![feature(let_chains, concat_idents)]
-#![feature(exclusive_range_pattern)]
-#![feature(slice_group_by)]
-
 extern crate core;
 
 pub use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use arrow::array::{Array, RecordBatch};
+use arrow::array::Array;
 use arrow::array::ArrayRef;
 use arrow::array::BinaryArray;
 use arrow::array::BooleanArray;
@@ -33,6 +30,7 @@ use arrow::array::IntervalMonthDayNanoArray;
 use arrow::array::IntervalYearMonthArray;
 use arrow::array::LargeBinaryArray;
 use arrow::array::LargeStringArray;
+use arrow::array::RecordBatch;
 use arrow::array::StringArray;
 use arrow::array::Time32MillisecondArray;
 use arrow::array::Time32SecondArray;
@@ -46,44 +44,53 @@ use arrow::array::UInt16Array;
 use arrow::array::UInt32Array;
 use arrow::array::UInt64Array;
 use arrow::array::UInt8Array;
-use arrow::datatypes::{DataType, Schema};
+use arrow::datatypes::DataType;
 use arrow::datatypes::IntervalUnit;
+use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
 use arrow::datatypes::TimeUnit;
 use arrow2::array::Int128Array;
+use common::group_col;
+use common::query::PropValueFilter;
+use common::query::PropValueOperation;
+use common::query::PropertyRef;
+use common::query::Segment;
+use common::query::SegmentCondition;
+use common::types::DType;
+use common::types::COLUMN_CREATED_AT;
+use common::types::COLUMN_PROJECT_ID;
+use common::types::TABLE_EVENTS;
+pub use context::Context;
 use datafusion::execution::context::SessionState;
 use datafusion::execution::runtime_env::RuntimeEnv;
 use datafusion::physical_plan::coalesce_batches::concat_batches;
 use datafusion::physical_plan::collect;
 use datafusion::physical_plan::display::DisplayableExecutionPlan;
-use datafusion::prelude::{SessionConfig, SessionContext};
+use datafusion::prelude::SessionConfig;
+use datafusion::prelude::SessionContext;
 use datafusion_common::ScalarValue;
-use datafusion_expr::{Extension, LogicalPlan};
-use common::query::{Breakdown, PropertyRef, PropValueFilter, PropValueOperation, Segment, SegmentCondition};
-pub use context::Context;
+use datafusion_expr::Extension;
+use datafusion_expr::LogicalPlan;
 pub use error::Result;
-use indexmap::IndexMap;
-use tracing::debug;
-use common::event_segmentation::{EventSegmentationRequest, Query};
-use common::group_col;
-use common::types::{COLUMN_CREATED_AT, COLUMN_EVENT, COLUMN_PROJECT_ID, DType, TABLE_EVENTS};
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
 use storage::db::OptiDBImpl;
+use tracing::debug;
+
 use crate::error::QueryError;
 use crate::logical_plan::db_parquet::DbParquetNode;
 use crate::physical_plan::planner::QueryPlanner;
 
 pub mod context;
 pub mod error;
-pub mod expr;
-pub mod logical_plan;
-pub mod physical_plan;
 pub mod event_records;
 pub mod event_segmentation;
+pub mod expr;
 pub mod funnel;
-pub mod properties;
 pub mod group_records;
+pub mod logical_plan;
+pub mod physical_plan;
+pub mod properties;
 
 pub const DEFAULT_BATCH_SIZE: usize = 4096;
 
@@ -93,12 +100,17 @@ macro_rules! breakdowns_to_dicts {
         for breakdown in $breakdowns.iter() {
             match &breakdown {
                 Breakdown::Property(prop) => {
-                    let (p,tbl) = match prop {
-                        PropertyRef::Group(name, group) => ($md.group_properties[*group]
-                            .get_by_name($ctx.project_id, name.as_str())?,group_col(*group)),
-                        PropertyRef::Event(name) => ($md
-                            .event_properties
-                            .get_by_name($ctx.project_id, name.as_str())?,TABLE_EVENTS.to_string()),
+                    let (p, tbl) = match prop {
+                        PropertyRef::Group(name, group) => (
+                            $md.group_properties[*group]
+                                .get_by_name($ctx.project_id, name.as_str())?,
+                            group_col(*group),
+                        ),
+                        PropertyRef::Event(name) => (
+                            $md.event_properties
+                                .get_by_name($ctx.project_id, name.as_str())?,
+                            TABLE_EVENTS.to_string(),
+                        ),
                         _ => unimplemented!(),
                     };
                     if !p.is_dictionary {
@@ -388,21 +400,31 @@ pub fn initial_plan(
         SessionConfig::new().with_collect_statistics(true),
         runtime,
     )
-        .with_query_planner(Arc::new(QueryPlanner {}));
+    .with_query_planner(Arc::new(QueryPlanner {}));
 
     let exec_ctx = SessionContext::new_with_state(state.clone());
     let plan = LogicalPlan::Extension(Extension {
-        node: Arc::new(DbParquetNode::try_new(db.clone(), table, projection.clone())?),
+        node: Arc::new(DbParquetNode::try_new(
+            db.clone(),
+            table,
+            projection.clone(),
+        )?),
     });
 
     Ok((exec_ctx, state, plan))
 }
 
-fn segment_plan(db: &Arc<OptiDBImpl>,
-                table: String,
-                projection: Vec<usize>, ) -> Result<LogicalPlan> {
+fn segment_plan(
+    db: &Arc<OptiDBImpl>,
+    table: String,
+    projection: Vec<usize>,
+) -> Result<LogicalPlan> {
     let plan = LogicalPlan::Extension(Extension {
-        node: Arc::new(DbParquetNode::try_new(db.clone(), table, projection.clone())?),
+        node: Arc::new(DbParquetNode::try_new(
+            db.clone(),
+            table,
+            projection.clone(),
+        )?),
     });
 
     Ok(plan)
@@ -441,12 +463,17 @@ pub fn decode_filter_single_dictionary(
             | PropValueOperation::Regex
             | PropValueOperation::NotRegex => {
                 let (prop, tbl) = match property {
-                    PropertyRef::Group(prop_ref, group) => (metadata.group_properties[*group].get_by_name(ctx.project_id, prop_ref.as_str())?, group_col(*group)),
-                    PropertyRef::Event(prop_ref) => {
-                        (metadata
-                             .event_properties
-                             .get_by_name(ctx.project_id, prop_ref.as_str())?, TABLE_EVENTS.to_string())
-                    }
+                    PropertyRef::Group(prop_ref, group) => (
+                        metadata.group_properties[*group]
+                            .get_by_name(ctx.project_id, prop_ref.as_str())?,
+                        group_col(*group),
+                    ),
+                    PropertyRef::Event(prop_ref) => (
+                        metadata
+                            .event_properties
+                            .get_by_name(ctx.project_id, prop_ref.as_str())?,
+                        TABLE_EVENTS.to_string(),
+                    ),
                     PropertyRef::Custom(_) => unreachable!(),
                 };
 
@@ -491,18 +518,24 @@ fn segment_projection(
         for conditions in &segment.conditions {
             for condition in conditions {
                 match condition {
-                    SegmentCondition::HasPropertyValue { property, .. } => fields.push(col_name(ctx, property, md)?),
-                    SegmentCondition::HadPropertyValue { property, .. } => fields.push(col_name(ctx, property, md)?),
+                    SegmentCondition::HasPropertyValue { property, .. } => {
+                        fields.push(col_name(ctx, property, md)?)
+                    }
+                    SegmentCondition::HadPropertyValue { property, .. } => {
+                        fields.push(col_name(ctx, property, md)?)
+                    }
                     SegmentCondition::DidEvent { filters, .. } => match filters {
                         None => {}
-                        Some(filters) => for filter in filters {
-                            match filter {
-                                PropValueFilter::Property { property, .. } => {
-                                    fields.push(col_name(ctx, property, md)?)
+                        Some(filters) => {
+                            for filter in filters {
+                                match filter {
+                                    PropValueFilter::Property { property, .. } => {
+                                        fields.push(col_name(ctx, property, md)?)
+                                    }
                                 }
                             }
                         }
-                    }
+                    },
                 }
             }
         }
@@ -520,12 +553,12 @@ pub mod test_util {
     use arrow::datatypes::DataType;
     use arrow::datatypes::Field;
     use arrow::datatypes::Schema;
-    use arrow::datatypes::TimeUnit;
     use common::group_col;
-    use common::types::{DType, TABLE_EVENTS};
+    use common::types::DType;
     use common::types::COLUMN_CREATED_AT;
     use common::types::COLUMN_EVENT;
     use common::types::COLUMN_PROJECT_ID;
+    use common::types::TABLE_EVENTS;
     use common::types::TIME_UNIT;
     use common::DECIMAL_PRECISION;
     use common::DECIMAL_SCALE;
@@ -559,11 +592,10 @@ pub mod test_util {
 
     pub async fn events_provider(db: Arc<OptiDBImpl>, _proj_id: u64) -> Result<LogicalPlan> {
         let group_fields = (0..GROUPS_COUNT)
-            .into_iter()
             .map(|gid| Field::new(group_col(gid), DataType::Int64, false))
             .collect::<Vec<_>>();
         let schema = Schema::new(
-            vec![
+            [
                 vec![Field::new(COLUMN_PROJECT_ID, DataType::Int64, false)],
                 group_fields,
                 vec![
@@ -584,7 +616,7 @@ pub mod test_util {
                     ),
                 ],
             ]
-                .concat(),
+            .concat(),
         );
         let mut options = CsvReadOptions::new();
         options.schema = Some(&schema);
@@ -620,10 +652,7 @@ pub mod test_util {
         let prop = match req.typ {
             Type::Event => md.event_properties.create(proj_id, req)?,
             Type::Group(gid) => md.group_properties[gid].create(proj_id, req)?,
-            _ => unimplemented!(),
         };
-
-        // db.add_field("events", prop.column_name().as_str(), prop.data_type.clone().into(), prop.nullable)?;
 
         Ok(prop)
     }
@@ -658,8 +687,12 @@ pub mod test_util {
             dictionary_type: Some(properties::DictionaryType::Int8),
         })?;
 
-        md.dictionaries
-            .get_key_or_create(proj_id, TABLE_EVENTS, country_prop.column_name().as_str(), "spain")?;
+        md.dictionaries.get_key_or_create(
+            proj_id,
+            TABLE_EVENTS,
+            country_prop.column_name().as_str(),
+            "spain",
+        )?;
         md.dictionaries.get_key_or_create(
             proj_id,
             TABLE_EVENTS,
@@ -797,7 +830,11 @@ pub fn col_name(ctx: &Context, prop: &PropertyRef, md: &Arc<MetadataProvider>) -
     Ok(name)
 }
 
-pub fn fix_filter(md: &Arc<MetadataProvider>, project_id: u64, filter: &PropValueFilter) -> Result<PropValueFilter> {
+pub fn fix_filter(
+    md: &Arc<MetadataProvider>,
+    project_id: u64,
+    filter: &PropValueFilter,
+) -> Result<PropValueFilter> {
     match filter {
         PropValueFilter::Property {
             property,
@@ -823,24 +860,14 @@ pub fn fix_filter(md: &Arc<MetadataProvider>, project_id: u64, filter: &PropValu
                 for value in value {
                     match (&prop.data_type, value) {
                         (&DType::Timestamp, &ScalarValue::Decimal128(_, _, _)) => {
-                            match filter.clone()
-                            {
-                                PropValueFilter::Property {
-                                    value,
-                                    ..
-                                } => {
+                            match filter.clone() {
+                                PropValueFilter::Property { value, .. } => {
                                     for value in value.unwrap().iter() {
-                                        if let ScalarValue::Decimal128(
-                                            Some(ts),
-                                            _,
-                                            _,
-                                        ) = value
-                                        {
-                                            let sv =
-                                                ScalarValue::TimestampMillisecond(
-                                                    Some(*ts as i64),
-                                                    None,
-                                                );
+                                        if let ScalarValue::Decimal128(Some(ts), _, _) = value {
+                                            let sv = ScalarValue::TimestampMillisecond(
+                                                Some(*ts as i64),
+                                                None,
+                                            );
                                             ev.push(sv);
                                         } else {
                                             unreachable!()

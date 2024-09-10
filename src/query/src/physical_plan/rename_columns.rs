@@ -13,8 +13,7 @@ use async_trait::async_trait;
 use datafusion::execution::RecordBatchStream;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::execution::TaskContext;
-use datafusion::physical_expr::{EquivalenceProperties, Partitioning};
-use datafusion::physical_expr::PhysicalSortExpr;
+use datafusion::physical_expr::EquivalenceProperties;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
@@ -25,7 +24,6 @@ use futures::Stream;
 use futures::StreamExt;
 
 use crate::error::QueryError;
-use crate::physical_plan::merge::MergeExec;
 use crate::Result;
 
 #[derive(Debug)]
@@ -57,8 +55,8 @@ impl RenameColumnsExec {
                 return f.deref().clone();
             })
             .collect::<Vec<_>>();
-        let schema= Arc::new(Schema::new(fields));
-        let cache = Self::compute_properties(&input,schema.clone())?;
+        let schema = Arc::new(Schema::new(fields));
+        let cache = Self::compute_properties(&input, schema.clone())?;
         Ok(Self {
             input,
             columns,
@@ -67,7 +65,10 @@ impl RenameColumnsExec {
         })
     }
 
-    fn compute_properties(input: &Arc<dyn ExecutionPlan>, schema:SchemaRef) -> Result<PlanProperties> {
+    fn compute_properties(
+        input: &Arc<dyn ExecutionPlan>,
+        schema: SchemaRef,
+    ) -> Result<PlanProperties> {
         let eq_properties = EquivalenceProperties::new(schema);
 
         Ok(PlanProperties::new(
@@ -119,7 +120,7 @@ impl ExecutionPlan for RenameColumnsExec {
         let stream = self.input.execute(partition, context)?;
         Ok(Box::pin(RenameColumnsStream {
             stream,
-            columns: self.columns.clone(),
+            _columns: self.columns.clone(),
             schema: self.schema.clone(),
         }))
     }
@@ -127,7 +128,7 @@ impl ExecutionPlan for RenameColumnsExec {
 
 struct RenameColumnsStream {
     stream: SendableRecordBatchStream,
-    columns: Vec<(String, String)>,
+    _columns: Vec<(String, String)>,
     schema: SchemaRef,
 }
 
@@ -135,9 +136,7 @@ impl Stream for RenameColumnsStream {
     type Item = DFResult<RecordBatch>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        return match self.stream.poll_next_unpin(cx) {
-            v => v,
-        };
+        self.stream.poll_next_unpin(cx)
     }
 }
 

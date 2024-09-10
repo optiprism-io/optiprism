@@ -17,5 +17,6 @@ fn main() {
             "src/pb/settings.proto",
         ],
         &["src"],
-    ).unwrap();
+    )
+    .unwrap();
 }

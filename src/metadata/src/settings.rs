@@ -1,20 +1,11 @@
-use std::path::PathBuf;
-use std::str::from_utf8;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
-use chrono::Utc;
+use std::sync::Arc;
+
 use prost::Message;
-use rocksdb::{Transaction, TransactionDB};
-use rust_decimal::Decimal;
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-use common::types::OptionalProperty;
+use rocksdb::TransactionDB;
+
 use crate::error::MetadataError;
-use crate::reports::{CreateReportRequest, Report, UpdateReportRequest};
-use crate::{make_data_key, make_data_value_key, make_id_seq_key, pbconfig, project_ns, Result};
-use crate::dashboards::Dashboard;
-use crate::index::next_seq;
-use crate::metadata::{ListResponse, ResponseMetadata};
+use crate::pbconfig;
+use crate::Result;
 
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub enum BackupProvider {
@@ -59,7 +50,7 @@ pub struct Settings {
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings{
+        Settings {
             auth_access_token: "".to_string(),
             auth_refresh_token: "".to_string(),
             auth_admin_default_password: "".to_string(),
@@ -84,17 +75,14 @@ impl Default for Settings {
 }
 impl Settings {
     fn validate(&self) -> Result<()> {
-        if self.backup_encryption_enabled {
-            if self.backup_encryption_password.is_empty() {
-                return Err(MetadataError::BadRequest(
-                    "backup encryption password is required".to_string(),
-                ));
-            }
+        if self.backup_encryption_enabled && self.backup_encryption_password.is_empty() {
+            return Err(MetadataError::BadRequest(
+                "backup encryption password is required".to_string(),
+            ));
         }
 
         match self.backup_provider {
-            BackupProvider::Local => {
-            }
+            BackupProvider::Local => {}
             BackupProvider::S3 => {
                 if self.backup_provider_s3_bucket.is_empty() {
                     return Err(MetadataError::BadRequest(
@@ -132,7 +120,6 @@ impl Settings {
         }
 
         Ok(())
-
     }
 }
 pub struct SettingsProvider {
@@ -144,16 +131,12 @@ impl SettingsProvider {
         SettingsProvider { db }
     }
 
-    pub fn load(
-        &self,
-    ) -> Result<Settings> {
+    pub fn load(&self) -> Result<Settings> {
         let tx = self.db.transaction();
         let key = "config";
 
         match tx.get(key)? {
-            None => Err(MetadataError::NotFound(
-                "config not found".to_string(),
-            )),
+            None => Err(MetadataError::NotFound("config not found".to_string())),
             Some(value) => Ok(deserialize(&value)?),
         }
     }
@@ -163,10 +146,7 @@ impl SettingsProvider {
         let tx = self.db.transaction();
         let key = "config";
         let data = serialize(settings)?;
-        tx.put(
-            key,
-            data,
-        )?;
+        tx.put(key, data)?;
 
         tx.commit()?;
         Ok(())
@@ -223,7 +203,7 @@ fn deserialize(data: &[u8]) -> Result<Settings> {
             1 => BackupProvider::Local,
             2 => BackupProvider::S3,
             3 => BackupProvider::GCP,
-            _ => panic!("Invalid backup provider")
+            _ => panic!("Invalid backup provider"),
         },
         backup_provider_local_path: c.backup_provider_local,
         backup_provider_s3_bucket: c.backup_provider_s3_bucket,
@@ -240,7 +220,7 @@ fn deserialize(data: &[u8]) -> Result<Settings> {
             3 => BackupScheduleInterval::Weekly,
             4 => BackupScheduleInterval::Monthly,
             5 => BackupScheduleInterval::Yearly,
-            _ => panic!("Invalid backup schedule interval")
+            _ => panic!("Invalid backup schedule interval"),
         },
         backup_schedule_start_hour: c.backup_schedule_start_hour as usize,
     })
@@ -248,7 +228,9 @@ fn deserialize(data: &[u8]) -> Result<Settings> {
 
 #[cfg(test)]
 mod tests {
-    use crate::settings::{BackupProvider, BackupScheduleInterval, Settings};
+    use crate::settings::BackupProvider;
+    use crate::settings::BackupScheduleInterval;
+    use crate::settings::Settings;
 
     #[test]
     fn test_roundtrip() {

@@ -1,40 +1,33 @@
-use std::any::Any;
 use std::collections::HashMap;
 use std::result;
 use std::sync::Arc;
 
 use ahash::RandomState;
-use arrow::array::{ArrayBuilder, TimestampMillisecondBuilder};
 use arrow::array::ArrayRef;
 use arrow::array::Decimal128Builder;
 use arrow::array::Int64Array;
 use arrow::array::Int64Builder;
 use arrow::array::TimestampMillisecondArray;
-use arrow::compute::{concat, take};
+use arrow::compute::concat;
+use arrow::compute::take;
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
 use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
-use arrow::datatypes::TimeUnit;
 use arrow::record_batch::RecordBatch;
-use arrow::util::pretty::print_batches;
 use arrow_row::SortField;
 use chrono::DateTime;
 use chrono::Duration;
-use chrono::DurationRound;
-use chrono::NaiveDateTime;
 use chrono::Utc;
 use common::query::date_trunc;
 use common::query::TimeIntervalUnit;
 use common::types::TIME_UNIT;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
-use datafusion::physical_expr::expressions::Column;
-use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
-use datafusion::sql::sqlparser::keywords::Keyword::DESC;
 use datafusion_common::ScalarValue;
-use num_traits::{FromPrimitive, ToPrimitive};
+use num_traits::FromPrimitive;
+use num_traits::ToPrimitive;
 use rust_decimal::Decimal;
 
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::evaluate_batch;
@@ -46,7 +39,6 @@ use crate::physical_plan::expressions::aggregate::partitioned::funnel::Filter;
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::StepOrder;
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::Touch;
 use crate::physical_plan::expressions::aggregate::Groups;
-use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
 use crate::StaticArray;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -151,20 +143,14 @@ impl Group {
 
     fn check_exclude(&self, exclude: &[Exclude], cur_row_id: usize) -> bool {
         for excl in exclude.iter() {
-            let mut to_check = false;
             // check if this exclude is relevant to current step
             if let Some(steps) = &excl.steps {
-                if steps.from <= self.cur_step && steps.to >= self.cur_step {
-                    to_check = true;
-                    break;
+                if steps.from <= self.cur_step
+                    && steps.to >= self.cur_step
+                    && excl.exists.value(cur_row_id)
+                {
+                    return false;
                 }
-            } else {
-                // check anyway
-                to_check = true;
-            }
-
-            if to_check && excl.exists.value(cur_row_id) {
-                return false;
             }
         }
 
@@ -249,17 +235,15 @@ struct Dbg {
 }
 
 impl Dbg {
+    #[allow(dead_code)]
     fn new() -> Self {
         Self {
             inner: Vec::with_capacity(100),
         }
     }
+    #[allow(dead_code)]
     fn push(&mut self, batch_id: usize, row_id: usize, step: DebugStep) {
         self.inner.push((batch_id, row_id, step));
-    }
-
-    fn inner(&self) -> &Vec<(usize, usize, DebugStep)> {
-        &self.inner
     }
 }
 
@@ -766,7 +750,7 @@ impl Funnel {
                 .collect::<Vec<_>>();
 
             // iterate over buckets and fill values to builders
-            for (ts, bucket) in buckets {
+            for bucket in buckets.values() {
                 for (step_id, step) in bucket.steps.iter().enumerate() {
                     step_total[step_id].append_value(step.total);
                     let mut scr = if step_id == 0 {
@@ -777,7 +761,7 @@ impl Funnel {
                         } else {
                             0.
                         })
-                            .unwrap()
+                        .unwrap()
                     };
                     scr.rescale(DECIMAL_SCALE as u32);
                     step_conversion_ratio[step_id].append_value(scr.mantissa());
@@ -790,10 +774,10 @@ impl Funnel {
                         } else {
                             0.
                         })
-                            .unwrap()
+                        .unwrap()
                     };
                     v.rescale(DECIMAL_SCALE as u32);
-                    let mut dor = Decimal::from_f64(100.-scr.to_f64().unwrap()).unwrap();
+                    let mut dor = Decimal::from_f64(100. - scr.to_f64().unwrap()).unwrap();
                     dor.rescale(DECIMAL_SCALE as u32);
                     step_drop_off_ratio[step_id].append_value(dor.mantissa());
                     let mut v = if step_id == 0 {
@@ -804,7 +788,7 @@ impl Funnel {
                         } else {
                             0.
                         })
-                            .unwrap()
+                        .unwrap()
                     };
                     v.rescale(DECIMAL_SCALE as u32);
                     step_avg_time_to_convert[step_id].append_value(v.mantissa());
@@ -817,7 +801,7 @@ impl Funnel {
                         } else {
                             0.
                         })
-                            .unwrap()
+                        .unwrap()
                     };
                     v.rescale(DECIMAL_SCALE as u32);
                     step_avg_time_to_convert_from_start[step_id].append_value(v.mantissa());
@@ -896,7 +880,10 @@ impl Funnel {
             0
         };
 
-        let step0_total = res[groups_len + 1].as_any().downcast_ref::<Int64Array>().unwrap();
+        let step0_total = res[groups_len + 1]
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
         let mut idx_arr = Int64Builder::new();
         for (idx, v) in step0_total.iter().enumerate() {
             if v.unwrap() != 0 {
@@ -906,7 +893,8 @@ impl Funnel {
         let a = Arc::new(idx_arr.finish()) as ArrayRef;
         let res = res
             .iter()
-            .map(|c| take(&c, &a, None).unwrap()).collect::<Vec<_>>();
+            .map(|c| take(&c, &a, None).unwrap())
+            .collect::<Vec<_>>();
         Ok(res)
     }
 }
@@ -953,8 +941,6 @@ mod tests {
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::Filter;
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::StepOrder;
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::StepOrder::Any;
-    use crate::physical_plan::expressions::aggregate::partitioned::funnel::Touch;
-    use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
 
     #[derive(Debug, Clone)]
     struct TestCase {
@@ -963,7 +949,7 @@ mod tests {
         opts: Options,
         exp_debug: Vec<(usize, usize, DebugStep)>,
         partition_exist: HashMap<i64, (), RandomState>,
-        exp: &'static str,
+        _exp: &'static str,
     }
 
     #[traced_test]
@@ -991,14 +977,14 @@ mod tests {
                         "1976-01-01 12:00:00 +0000",
                         "%Y-%m-%d %H:%M:%S %z",
                     )
-                        .unwrap()
-                        .with_timezone(&Utc),
+                    .unwrap()
+                    .with_timezone(&Utc),
                     to: DateTime::parse_from_str(
                         "1976-02-01 12:00:00 +0000",
                         "%Y-%m-%d %H:%M:%S %z",
                     )
-                        .unwrap()
-                        .with_timezone(&Utc),
+                    .unwrap()
+                    .with_timezone(&Utc),
                     schema: schema.clone(),
                     groups: None,
                     ts_col: Arc::new(Column::new("ts", 1)),
@@ -1021,7 +1007,7 @@ mod tests {
                     (0, 2, DebugStep::Complete),
                 ],
                 partition_exist: HashMap::from_iter([(1, ())]),
-                exp: r#"
+                _exp: r#"
 asd
                 "#,
             },
@@ -1042,14 +1028,14 @@ asd
                         "1976-01-01 12:00:00 +0000",
                         "%Y-%m-%d %H:%M:%S %z",
                     )
-                        .unwrap()
-                        .with_timezone(&Utc),
+                    .unwrap()
+                    .with_timezone(&Utc),
                     to: DateTime::parse_from_str(
                         "1976-02-01 12:00:00 +0000",
                         "%Y-%m-%d %H:%M:%S %z",
                     )
-                        .unwrap()
-                        .with_timezone(&Utc),
+                    .unwrap()
+                    .with_timezone(&Utc),
                     schema: schema.clone(),
                     groups: None,
                     ts_col: Arc::new(Column::new("ts", 1)),
@@ -1073,7 +1059,7 @@ asd
                     (0, 3, DebugStep::NextRow),
                 ],
                 partition_exist: HashMap::from_iter([(1, ()), (2, ())]),
-                exp: r#"
+                _exp: r#"
 asd
                 "#,
             },
@@ -1094,14 +1080,14 @@ asd
                         "1976-01-01 12:00:00 +0000",
                         "%Y-%m-%d %H:%M:%S %z",
                     )
-                        .unwrap()
-                        .with_timezone(&Utc),
+                    .unwrap()
+                    .with_timezone(&Utc),
                     to: DateTime::parse_from_str(
                         "1976-02-01 12:00:00 +0000",
                         "%Y-%m-%d %H:%M:%S %z",
                     )
-                        .unwrap()
-                        .with_timezone(&Utc),
+                    .unwrap()
+                    .with_timezone(&Utc),
                     schema: schema.clone(),
                     groups: None,
                     ts_col: Arc::new(Column::new("ts", 1)),
@@ -1131,7 +1117,7 @@ asd
                     (0, 5, DebugStep::Complete),
                 ],
                 partition_exist: HashMap::from_iter([(1, ()), (2, ())]),
-                exp: r#"
+                _exp: r#"
 asd
                 "#,
             },
@@ -1170,7 +1156,7 @@ asd
                     (1, 1, DebugStep::Complete),
                 ],
                 partition_exist: HashMap::from_iter([(1, ())]),
-                exp: r#"
+                _exp: r#"
             asd
             "#,
             },
@@ -1212,7 +1198,7 @@ asd
                     (0, 3, DebugStep::Complete),
                 ],
                 partition_exist: HashMap::from_iter([(1, ())]),
-                exp: r#"
+                _exp: r#"
             asd
             "#,
             },
@@ -1254,7 +1240,7 @@ asd
                     (0, 2, DebugStep::Complete),
                 ],
                 partition_exist: HashMap::from_iter([(1, ())]),
-                exp: r#"
+                _exp: r#"
             asd
             "#,
             },
@@ -1294,7 +1280,7 @@ asd
                     (0, 2, DebugStep::NextRow),
                 ],
                 partition_exist: HashMap::from_iter([(1, ())]),
-                exp: r#"
+                _exp: r#"
             asd
             "#,
             },
@@ -1343,7 +1329,7 @@ asd
                     (0, 4, DebugStep::Complete),
                 ],
                 partition_exist: HashMap::from_iter([(1, ())]),
-                exp: r#"
+                _exp: r#"
             asd
             "#,
             },
@@ -1402,7 +1388,7 @@ asd
                     (0, 6, DebugStep::Complete),
                 ],
                 partition_exist: HashMap::from_iter([(1, ())]),
-                exp: r#"
+                _exp: r#"
             asd
             "#,
             },
@@ -1496,7 +1482,7 @@ asd
                     (0, 2, DebugStep::Complete),
                 ],
                 partition_exist: HashMap::from_iter([(1, ())]),
-                exp: r#"
+                _exp: r#"
             asd
             "#,
             },
@@ -1547,7 +1533,7 @@ asd
                     (0, 5, DebugStep::Complete),
                 ],
                 partition_exist: HashMap::from_iter([(1, ()), (2, ())]),
-                exp: r#"
+                _exp: r#"
             asd
             "#,
             },
@@ -1595,7 +1581,7 @@ asd
                     (0, 5, DebugStep::Complete),
                 ],
                 partition_exist: HashMap::from_iter([(1, ()), (2, ())]),
-                exp: r#"
+                _exp: r#"
             asd
             "#,
             },
@@ -1633,7 +1619,7 @@ asd
                     (0, 2, DebugStep::NextRow),
                 ],
                 partition_exist: HashMap::from_iter([(1, ())]),
-                exp: r#"
+                _exp: r#"
             asd
             "#,
             },
@@ -1671,7 +1657,7 @@ asd
                     (0, 2, DebugStep::NextRow),
                 ],
                 partition_exist: HashMap::from_iter([(1, ())]),
-                exp: r#"
+                _exp: r#"
             asd
             "#,
             },
@@ -1696,7 +1682,7 @@ asd
             }
             let res = f.finalize()?;
             let rb = RecordBatch::try_new(f.schema(), res).unwrap();
-            let res = pretty_format_batches(&[rb]).unwrap();
+            let _res = pretty_format_batches(&[rb]).unwrap();
             assert_eq!(f.debug.inner, case.exp_debug);
             // assert_eq!(format!("{}", res), case.exp);
             println!("PASSED");
@@ -1743,7 +1729,7 @@ asd
             (Arc::new(expr) as PhysicalExprRef, StepOrder::Exact)
         };
 
-        let ex = {
+        let _ex = {
             let l = Column::new_with_schema("v", &schema).unwrap();
             let r = Literal::new(ScalarValue::Int64(Some(4)));
             let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));

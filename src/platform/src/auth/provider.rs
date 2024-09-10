@@ -1,21 +1,20 @@
 use std::sync::Arc;
 
-use chrono::Duration;
 use common::config::Config;
+use common::rbac::OrganizationPermission;
 use common::types::OptionalProperty;
 use common::ADMIN_ID;
-use common::GROUP_USER_ID;
-use metadata::accounts::Accounts;
 use metadata::accounts::CreateAccountRequest;
 use metadata::accounts::UpdateAccountRequest;
 use metadata::error::MetadataError;
+use metadata::MetadataProvider;
 use password_hash::PasswordHash;
 use serde::Deserialize;
 use serde::Serialize;
 use validator::validate_email;
-use common::rbac::OrganizationPermission;
-use metadata::MetadataProvider;
-use super::password::{check_password_complexity, make_password_hash};
+
+use super::password::check_password_complexity;
+use super::password::make_password_hash;
 use super::password::verify_password;
 use super::token::make_access_token;
 use super::token::make_refresh_token;
@@ -23,14 +22,12 @@ use super::token::parse_refresh_token;
 use crate::accounts::Account;
 use crate::error::AuthError;
 use crate::Context;
-use crate::organizations::Organizations;
 use crate::PlatformError;
 use crate::Result;
-use metadata::organizations::Organizations as MDOrganizations;
 
 #[derive(Clone)]
 pub struct Auth {
-    md:Arc<MetadataProvider>,
+    md: Arc<MetadataProvider>,
     cfg: Config,
 }
 
@@ -40,21 +37,21 @@ impl Auth {
     }
 
     fn make_tokens(&self, account_id: u64, organisation_id: u64) -> Result<TokensResponse> {
-        let settings =self.md.settings.load()?;
+        let settings = self.md.settings.load()?;
         Ok(TokensResponse {
             access_token: make_access_token(
                 account_id,
                 organisation_id,
-                self.cfg.auth.access_token_duration.clone(),
+                self.cfg.auth.access_token_duration,
                 settings.auth_access_token,
             )
-                .map_err(|err| err.wrap_into(AuthError::CantMakeAccessToken))?,
+            .map_err(|err| err.wrap_into(AuthError::CantMakeAccessToken))?,
             refresh_token: make_refresh_token(
                 account_id,
-                self.cfg.auth.refresh_token_duration.clone(),
+                self.cfg.auth.refresh_token_duration,
                 settings.auth_refresh_token,
             )
-                .map_err(|err| err.wrap_into(AuthError::CantMakeRefreshToken))?,
+            .map_err(|err| err.wrap_into(AuthError::CantMakeRefreshToken))?,
         })
     }
 
@@ -63,7 +60,7 @@ impl Auth {
             return Err(PlatformError::invalid_field("email", "invalid email"));
         }
 
-        check_password_complexity(&req.password, &vec![req.email.as_str()])?;
+        check_password_complexity(&req.password, &[req.email.as_str()])?;
 
         let password_hash = make_password_hash(req.password.as_str())
             .map_err(|err| err.wrap_into(AuthError::InvalidPasswordHashing))?;
@@ -102,7 +99,8 @@ impl Auth {
         }
 
         let account = self
-            .md.accounts
+            .md
+            .accounts
             .get_by_email(&req.email)
             .map_err(|_err| AuthError::InvalidCredentials)?;
 
@@ -110,7 +108,7 @@ impl Auth {
             req.password,
             PasswordHash::new(account.password_hash.as_str())?,
         )
-            .map_err(|_err| AuthError::InvalidCredentials)?;
+        .map_err(|_err| AuthError::InvalidCredentials)?;
 
         // if org_id is provided, check if the account is a member of the org
         let org_id = if let Some(org_id) = org_id {
@@ -123,14 +121,8 @@ impl Auth {
         } else {
             // find first organization
             let orgs = self.md.organizations.list()?;
-            let org = orgs.data.iter().find(|org| {
-                org.is_member(account.id)
-            });
-            if let Some(org) = org {
-                org.id
-            } else {
-                0
-            }
+            let org = orgs.data.iter().find(|org| org.is_member(account.id));
+            if let Some(org) = org { org.id } else { 0 }
         };
 
         let tokens = self.make_tokens(account.id, org_id)?;
@@ -139,8 +131,9 @@ impl Auth {
     }
 
     pub async fn refresh_token(&self, ctx: Context, refresh_token: &str) -> Result<TokensResponse> {
-        let refresh_claims = parse_refresh_token(refresh_token, self.md.settings.load()?.auth_refresh_token)
-            .map_err(|err| err.wrap_into(AuthError::InvalidRefreshToken))?;
+        let refresh_claims =
+            parse_refresh_token(refresh_token, self.md.settings.load()?.auth_refresh_token)
+                .map_err(|err| err.wrap_into(AuthError::InvalidRefreshToken))?;
         let tokens = self.make_tokens(refresh_claims.account_id, ctx.organization_id)?;
 
         Ok(tokens)
@@ -236,12 +229,12 @@ impl Auth {
             &req.password,
             PasswordHash::new(account.password_hash.as_str())?,
         )
-            .is_err()
+        .is_err()
         {
             return Err(PlatformError::invalid_field("password", "invalid password"));
         }
 
-        check_password_complexity(&req.new_password, &vec![])?;
+        check_password_complexity(&req.new_password, &[])?;
 
         let password_hash = make_password_hash(req.new_password.as_str())
             .map_err(|err| err.wrap_into(AuthError::InvalidPasswordHashing))?;
@@ -276,7 +269,7 @@ impl Auth {
             return Err(PlatformError::Forbidden("forbidden".to_string()));
         }
 
-        check_password_complexity(&req.password, &vec![])?;
+        check_password_complexity(&req.password, &[])?;
 
         let password_hash = make_password_hash(req.password.as_str())
             .map_err(|err| err.wrap_into(AuthError::InvalidPasswordHashing))?;
@@ -301,11 +294,7 @@ impl Auth {
         Ok(tokens)
     }
 
-    pub async fn set_email(
-        &self,
-        ctx: Context,
-        req: SetEmailRequest,
-    ) -> Result<TokensResponse> {
+    pub async fn set_email(&self, ctx: Context, req: SetEmailRequest) -> Result<TokensResponse> {
         let account = self.md.accounts.get_by_id(ctx.account_id)?;
         if !account.force_update_email {
             return Err(PlatformError::Forbidden("forbidden".to_string()));
@@ -330,11 +319,7 @@ impl Auth {
         Ok(tokens)
     }
 
-    pub async fn switch_organization(
-        &self,
-        ctx: Context,
-        org_id: u64,
-    ) -> Result<TokensResponse> {
+    pub async fn switch_organization(&self, ctx: Context, org_id: u64) -> Result<TokensResponse> {
         ctx.check_organization_permission(org_id, OrganizationPermission::ViewOrganization)?;
         self.md.organizations.get_by_id(org_id)?;
         let tokens = self.make_tokens(ctx.account_id, org_id)?;

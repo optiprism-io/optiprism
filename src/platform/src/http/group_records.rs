@@ -1,17 +1,18 @@
 use std::sync::Arc;
 
-use axum::extract::{Extension, Query};
+use axum::extract::Extension;
 use axum::extract::Path;
+use axum::extract::Query;
 use axum::routing;
 use axum::Router;
 use common::http::Json;
 
-use crate::{group_records, QueryParams, QueryResponse};
-use crate::group_records::{GroupRecord, GroupRecords, GroupRecordsSearchRequest};
-use crate::group_records::UpdateGroupRecordRequest;
+use crate::group_records::GroupRecord;
+use crate::group_records::GroupRecords;
+use crate::group_records::GroupRecordsSearchRequest;
 use crate::Context;
-use crate::event_records::{EventRecords, EventRecordsSearchRequest};
-use crate::ListResponse;
+use crate::QueryParams;
+use crate::QueryResponse;
 use crate::Result;
 
 async fn get_by_id(
@@ -19,7 +20,9 @@ async fn get_by_id(
     Extension(provider): Extension<Arc<GroupRecords>>,
     Path((project_id, group_id, id)): Path<(u64, usize, String)>,
 ) -> Result<Json<GroupRecord>> {
-    Ok(Json(provider.get_by_id(ctx, project_id, group_id, id).await?))
+    Ok(Json(
+        provider.get_by_id(ctx, project_id, group_id, id).await?,
+    ))
 }
 
 async fn search(
@@ -30,13 +33,9 @@ async fn search(
     Json(request): Json<GroupRecordsSearchRequest>,
 ) -> Result<Json<QueryResponse>> {
     Ok(Json(
-        provider
-            .search(ctx, project_id, request, query)
-            .await?,
+        provider.search(ctx, project_id, request, query).await?,
     ))
 }
-
-
 
 pub fn attach_routes(router: Router) -> Router {
     router.nest(

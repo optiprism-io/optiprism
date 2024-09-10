@@ -25,7 +25,6 @@ use arrow::datatypes::Field;
 use arrow::record_batch::RecordBatch;
 use arrow::row::Row;
 use arrow::row::SortField;
-use common::types::RESERVED_COLUMN_AGG_PARTITIONED_AGGREGATE;
 use common::types::RESERVED_COLUMN_COUNT;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;

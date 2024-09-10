@@ -1,13 +1,11 @@
 use std::str::from_utf8;
 use std::str::pattern::Pattern;
 use std::sync::Arc;
+
 use chrono::DateTime;
 use chrono::Utc;
-use prost::Message;
 use common::types::OptionalProperty;
-use rand::distributions::Alphanumeric;
-use rand::distributions::DistString;
-use rand::thread_rng;
+use prost::Message;
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
@@ -22,11 +20,12 @@ use crate::index::get_index;
 use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::update_index;
-use crate::{list_data, project};
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
-use crate::metadata::{ListResponse, ResponseMetadata};
+use crate::metadata::ListResponse;
+use crate::metadata::ResponseMetadata;
+use crate::project;
 use crate::Result;
 
 const NAMESPACE: &[u8] = b"projects";
@@ -87,7 +86,7 @@ impl Projects {
             events_count: 0,
         };
         let data = serialize(&project)?;
-        tx.put(make_data_value_key(NAMESPACE, project.id), &data)?;
+        tx.put(make_data_value_key(NAMESPACE, project.id), data)?;
 
         insert_index(&tx, idx_keys.as_ref(), project.id)?;
         tx.commit()?;
@@ -118,7 +117,10 @@ impl Projects {
         for kv in iter {
             let (key, value) = kv?;
             // check if key contains the prefix
-            if !from_utf8(&prefix).unwrap().is_prefix_of(from_utf8(&key).unwrap()) {
+            if !from_utf8(&prefix)
+                .unwrap()
+                .is_prefix_of(from_utf8(&key).unwrap())
+            {
                 break;
             }
             list.push(deserialize(&value)?);
@@ -141,12 +143,12 @@ impl Projects {
         if let OptionalProperty::Some(name) = &req.name {
             idx_keys.push(index_name_key(name.as_str()));
             idx_prev_keys.push(index_name_key(prev_project.name.as_str()));
-            project.name = name.to_owned();
+            project.name.clone_from(name);
         }
         if let OptionalProperty::Some(token) = &req.token {
             idx_keys.push(index_token_key(token.as_str()));
             idx_prev_keys.push(index_token_key(prev_project.token.as_str()));
-            project.token = token.to_owned();
+            project.token.clone_from(token)
         }
         check_update_constraints(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref())?;
 
@@ -164,7 +166,7 @@ impl Projects {
         }
 
         let data = serialize(&project)?;
-        tx.put(make_data_value_key(NAMESPACE, project_id), &data)?;
+        tx.put(make_data_value_key(NAMESPACE, project_id), data)?;
 
         update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), project_id)?;
         tx.commit()?;
@@ -238,8 +240,9 @@ pub struct UpdateProjectRequest {
 fn serialize(project: &Project) -> Result<Vec<u8>> {
     let tags = if let Some(tags) = &project.tags {
         tags.to_vec()
-    } else { vec![] };
-
+    } else {
+        vec![]
+    };
 
     let v = project::Project {
         id: project.id,
@@ -260,13 +263,15 @@ fn serialize(project: &Project) -> Result<Vec<u8>> {
 
 // deserialize project from protobuf
 fn deserialize(data: &[u8]) -> Result<Project> {
-    let from = project::Project::decode(data.as_ref())?;
+    let from = project::Project::decode(data)?;
 
     Ok(Project {
         id: from.id,
         created_at: chrono::DateTime::from_timestamp(from.created_at, 0).unwrap(),
         created_by: from.created_by,
-        updated_at: from.updated_at.map(|t| chrono::DateTime::from_timestamp(t, 0).unwrap()),
+        updated_at: from
+            .updated_at
+            .map(|t| chrono::DateTime::from_timestamp(t, 0).unwrap()),
         updated_by: from.updated_by,
         organization_id: from.organization_id,
         name: from.name,
@@ -285,7 +290,10 @@ fn deserialize(data: &[u8]) -> Result<Project> {
 #[cfg(test)]
 mod tests {
     use chrono::DateTime;
-    use crate::projects::{deserialize, Project, serialize};
+
+    use crate::projects::deserialize;
+    use crate::projects::serialize;
+    use crate::projects::Project;
 
     #[test]
     fn test_roundtrip() {

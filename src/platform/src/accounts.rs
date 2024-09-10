@@ -15,7 +15,6 @@ use crate::auth::password::make_password_hash;
 use crate::auth::provider::Profile;
 use crate::Context;
 use crate::ListResponse;
-use crate::PlatformError;
 use crate::Result;
 
 pub struct Accounts {
@@ -113,6 +112,7 @@ pub struct Account {
     pub teams: Option<Vec<(u64, Role)>>,
 }
 
+#[allow(clippy::all)]
 impl Into<Account> for metadata::accounts::Account {
     fn into(self) -> Account {
         Account {
@@ -133,6 +133,7 @@ impl Into<Account> for metadata::accounts::Account {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<Profile> for Account {
     fn into(self) -> Profile {
         Profile {

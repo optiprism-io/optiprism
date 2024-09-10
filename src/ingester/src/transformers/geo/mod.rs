@@ -1,11 +1,9 @@
 pub mod track;
-
 use std::sync::Arc;
 
 use common::types;
 use maxminddb;
 use maxminddb::geoip2;
-use maxminddb::MaxMindDBError;
 use metadata::properties::Properties;
 
 use crate::error::Result;

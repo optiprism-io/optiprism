@@ -1,23 +1,25 @@
 use std::fs::File;
 use std::io::BufWriter;
-use std::path::Path;
-use std::path::PathBuf;
 use std::sync::Arc;
 
-use arrow2::datatypes::{DataType, Schema, TimeUnit};
+use arrow2::datatypes::DataType;
+use arrow2::datatypes::Schema;
+use arrow2::datatypes::TimeUnit;
+use common::DECIMAL_PRECISION;
+use common::DECIMAL_SCALE;
 use lru::LruCache;
 use parking_lot::Mutex;
 use parking_lot::RwLock;
 use prost::Message;
 use serde::Deserialize;
 use serde::Serialize;
-use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
+
+use crate::error::Result;
 use crate::memtable::Memtable;
-use crate::{Fs, metadata};
+use crate::metadata;
 use crate::KeyValue;
 use crate::Stats;
 use crate::Value;
-use crate::error::Result;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Options {
@@ -59,7 +61,7 @@ impl Options {
         }
     }
 }
-pub fn print_partitions(levels: &[Level]) {
+pub(crate) fn _print_partitions(levels: &[Level]) {
     for (lid, l) in levels.iter().enumerate() {
         println!("|  +-- {}", lid);
         for part in &l.parts {
@@ -106,12 +108,6 @@ impl Level {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Partition {
-    pub(crate) id: usize,
-    pub(crate) levels: Vec<Level>,
-}
-
-#[derive(Debug, Clone)]
 pub(crate) struct Table {
     pub(crate) name: String,
     pub(crate) memtable: Arc<Mutex<Memtable>>,
@@ -139,15 +135,18 @@ pub(crate) struct SerializableTable {
 
 pub(crate) fn serialize_table(tbl: &Table) -> SerializableTable {
     SerializableTable {
-        name: tbl.name. clone(),
-        metadata:tbl.metadata.lock().clone(),
+        name: tbl.name.clone(),
+        metadata: tbl.metadata.lock().clone(),
     }
 }
 
-pub fn serialize_md(md: &Metadata) -> Result<Vec<u8>> {
+pub(crate) fn serialize_md(md: &Metadata) -> Result<Vec<u8>> {
     let schema = metadata::Schema {
-        fields: md.schema.fields.iter().map(|f| {
-            metadata::Field {
+        fields: md
+            .schema
+            .fields
+            .iter()
+            .map(|f| metadata::Field {
                 name: f.name.clone(),
                 data_type: match f.data_type {
                     DataType::Utf8 => metadata::DataType::String as i32,
@@ -158,55 +157,57 @@ pub fn serialize_md(md: &Metadata) -> Result<Vec<u8>> {
                     DataType::Decimal(_, _) => metadata::DataType::Decimal as i32,
                     DataType::Boolean => metadata::DataType::Boolean as i32,
                     DataType::Timestamp(_, _) => metadata::DataType::Timestamp as i32,
-                    _ => unimplemented!("{:?}", f.data_type)
+                    _ => unimplemented!("{:?}", f.data_type),
                 },
                 is_nullable: f.is_nullable,
-            }
-        }).collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>(),
     };
-    let levels = md.levels.iter().map(|l| {
-        metadata::Level {
+    let levels = md
+        .levels
+        .iter()
+        .map(|l| metadata::Level {
             part_id: l.part_id as u64,
-            parts: l.parts.iter().map(|p| {
-                let min_max = |kv: &KeyValue| -> metadata::KeyValue{
-                    let mut int8 = None;
-                    let mut int16 = None;
-                    let mut int32 = None;
-                    let mut int64 = None;
-                    let mut string = None;
-                    let mut timestamp = None;
-                    match kv {
-                        KeyValue::Int8(v) => int8 = Some(*v as u32),
-                        KeyValue::Int16(v) => int16 = Some(*v as u32),
-                        KeyValue::Int32(v) => int32 = Some(*v as u32),
-                        KeyValue::Int64(v) => int64 = Some(*v as u64),
-                        KeyValue::String(v) => string = Some(v.clone()),
-                        KeyValue::Timestamp(v) => timestamp = Some(*v as u64),
-                    }
-                    metadata::KeyValue {
-                        int8,
-                        int16,
-                        int32,
-                        int64,
-                        string,
-                        timestamp,
-                    }
-                };
+            parts: l
+                .parts
+                .iter()
+                .map(|p| {
+                    let min_max = |kv: &KeyValue| -> metadata::KeyValue {
+                        let mut int8 = None;
+                        let mut int16 = None;
+                        let mut int32 = None;
+                        let mut int64 = None;
+                        let mut string = None;
+                        let mut timestamp = None;
+                        match kv {
+                            KeyValue::Int8(v) => int8 = Some(*v as u32),
+                            KeyValue::Int16(v) => int16 = Some(*v as u32),
+                            KeyValue::Int32(v) => int32 = Some(*v as u32),
+                            KeyValue::Int64(v) => int64 = Some(*v as u64),
+                            KeyValue::String(v) => string = Some(v.clone()),
+                            KeyValue::Timestamp(v) => timestamp = Some(*v as u64),
+                        }
+                        metadata::KeyValue {
+                            int8,
+                            int16,
+                            int32,
+                            int64,
+                            string,
+                            timestamp,
+                        }
+                    };
 
-                metadata::Part {
-                    id: p.id as u64,
-                    size_bytes: p.size_bytes,
-                    values: p.values as u64,
-                    min: p.min.iter().map(|m| {
-                        min_max(m)
-                    }).collect::<Vec<_>>(),
-                    max: p.max.iter().map(|m| {
-                        min_max(m)
-                    }).collect::<Vec<_>>(),
-                }
-            }).collect::<Vec<_>>(),
-        }
-    }).collect::<Vec<_>>();
+                    metadata::Part {
+                        id: p.id as u64,
+                        size_bytes: p.size_bytes,
+                        values: p.values as u64,
+                        min: p.min.iter().map(min_max).collect::<Vec<_>>(),
+                        max: p.max.iter().map( min_max).collect::<Vec<_>>(),
+                    }
+                })
+                .collect::<Vec<_>>(),
+        })
+        .collect::<Vec<_>>();
     let md = crate::metadata::Metadata {
         version: md.version as u32,
         log_id: md.log_id,
@@ -232,7 +233,10 @@ pub fn serialize_md(md: &Metadata) -> Result<Vec<u8>> {
             max_log_length_bytes: md.opts.max_log_length_bytes as u64,
             merge_max_l1_part_size_bytes: md.opts.merge_max_l1_part_size_bytes as u64,
             merge_part_size_multiplier: md.opts.merge_part_size_multiplier as u64,
-            merge_data_page_size_limit_bytes: md.opts.merge_data_page_size_limit_bytes.map(|v| v as u64),
+            merge_data_page_size_limit_bytes: md
+                .opts
+                .merge_data_page_size_limit_bytes
+                .map(|v| v as u64),
             merge_row_group_values_limit: md.opts.merge_row_group_values_limit as u64,
             merge_array_size: md.opts.merge_array_size as u64,
             merge_chunk_size: md.opts.merge_chunk_size as u64,
@@ -244,66 +248,74 @@ pub fn serialize_md(md: &Metadata) -> Result<Vec<u8>> {
     Ok(md.encode_to_vec())
 }
 
-pub fn deserialize_md(data: &[u8]) -> Result<Metadata> {
-    let from = metadata::Metadata::decode(data.as_ref())?;
+pub(crate) fn deserialize_md(data: &[u8]) -> Result<Metadata> {
+    let from = metadata::Metadata::decode(data)?;
 
     let md = Metadata {
         version: from.version as u64,
         log_id: from.log_id,
         table_name: from.table_name.clone(),
         schema: Schema {
-            fields: from.schema.unwrap().fields.iter().map(|f| {
-                let data_type = match f.data_type {
-                    1 => DataType::Utf8,
-                    2 => DataType::Int8,
-                    3 => DataType::Int16,
-                    4 => DataType::Int32,
-                    5 => DataType::Int64,
-                    6 => DataType::Decimal(DECIMAL_PRECISION as usize, DECIMAL_SCALE as usize),
-                    7 => DataType::Boolean,
-                    8 => DataType::Timestamp(TimeUnit::Millisecond, None),
-                    _ => unimplemented!("{:?}", f.data_type)
-                };
-                arrow2::datatypes::Field::new(&f.name, data_type, f.is_nullable)
-            }).collect::<Vec<_>>(),
+            fields: from
+                .schema
+                .unwrap()
+                .fields
+                .iter()
+                .map(|f| {
+                    let data_type = match f.data_type {
+                        1 => DataType::Utf8,
+                        2 => DataType::Int8,
+                        3 => DataType::Int16,
+                        4 => DataType::Int32,
+                        5 => DataType::Int64,
+                        6 => DataType::Decimal(DECIMAL_PRECISION as usize, DECIMAL_SCALE as usize),
+                        7 => DataType::Boolean,
+                        8 => DataType::Timestamp(TimeUnit::Millisecond, None),
+                        _ => unimplemented!("{:?}", f.data_type),
+                    };
+                    arrow2::datatypes::Field::new(&f.name, data_type, f.is_nullable)
+                })
+                .collect::<Vec<_>>(),
             metadata: Default::default(),
         },
-        levels: from.levels.iter().map(|l| {
-            Level {
+        levels: from
+            .levels
+            .iter()
+            .map(|l| Level {
                 part_id: l.part_id as usize,
-                parts: l.parts.iter().map(|p| {
-                    let min_max = |kv: &metadata::KeyValue| -> KeyValue {
-                        if let Some(v) = kv.int8 {
-                            KeyValue::Int8(v as i8)
-                        } else if let Some(v) = kv.int16 {
-                            KeyValue::Int16(v as i16)
-                        } else if let Some(v) = kv.int32 {
-                            KeyValue::Int32(v as i32)
-                        } else if let Some(v) = kv.int64 {
-                            KeyValue::Int64(v as i64)
-                        } else if let Some(v) = kv.string.clone() {
-                            KeyValue::String(v)
-                        } else if let Some(v) = kv.timestamp {
-                            KeyValue::Timestamp(v as i64)
-                        } else {
-                            unreachable!()
-                        }
-                    };
+                parts: l
+                    .parts
+                    .iter()
+                    .map(|p| {
+                        let min_max = |kv: &metadata::KeyValue| -> KeyValue {
+                            if let Some(v) = kv.int8 {
+                                KeyValue::Int8(v as i8)
+                            } else if let Some(v) = kv.int16 {
+                                KeyValue::Int16(v as i16)
+                            } else if let Some(v) = kv.int32 {
+                                KeyValue::Int32(v as i32)
+                            } else if let Some(v) = kv.int64 {
+                                KeyValue::Int64(v as i64)
+                            } else if let Some(v) = kv.string.clone() {
+                                KeyValue::String(v)
+                            } else if let Some(v) = kv.timestamp {
+                                KeyValue::Timestamp(v as i64)
+                            } else {
+                                unreachable!()
+                            }
+                        };
 
-                    Part {
-                        id: p.id as usize,
-                        size_bytes: p.size_bytes,
-                        values: p.values as usize,
-                        min: p.min.iter().map(|m| {
-                            min_max(m)
-                        }).collect::<Vec<_>>(),
-                        max: p.max.iter().map(|m| {
-                            min_max(m)
-                        }).collect::<Vec<_>>(),
-                    }
-                }).collect::<Vec<_>>(),
-            }
-        }).collect::<Vec<_>>(),
+                        Part {
+                            id: p.id as usize,
+                            size_bytes: p.size_bytes,
+                            values: p.values as usize,
+                            min: p.min.iter().map(min_max).collect::<Vec<_>>(),
+                            max: p.max.iter().map( min_max).collect::<Vec<_>>(),
+                        }
+                    })
+                    .collect::<Vec<_>>(),
+            })
+            .collect::<Vec<_>>(),
         stats: Stats {
             resident_bytes: from.stats.unwrap().resident_bytes,
             on_disk_bytes: from.stats.unwrap().on_disk_bytes,
@@ -321,10 +333,16 @@ pub fn deserialize_md(data: &[u8]) -> Result<Metadata> {
             l1_max_size_bytes: from.options.unwrap().l1_max_size_bytes as usize,
             level_size_multiplier: from.options.unwrap().level_size_multiplier as usize,
             max_log_length_bytes: from.options.unwrap().max_log_length_bytes as usize,
-            merge_max_l1_part_size_bytes: from.options.unwrap().merge_max_l1_part_size_bytes as usize,
+            merge_max_l1_part_size_bytes: from.options.unwrap().merge_max_l1_part_size_bytes
+                as usize,
             merge_part_size_multiplier: from.options.unwrap().merge_part_size_multiplier as usize,
-            merge_data_page_size_limit_bytes: from.options.unwrap().merge_data_page_size_limit_bytes.map(|v| v as usize),
-            merge_row_group_values_limit: from.options.unwrap().merge_row_group_values_limit as usize,
+            merge_data_page_size_limit_bytes: from
+                .options
+                .unwrap()
+                .merge_data_page_size_limit_bytes
+                .map(|v| v as usize),
+            merge_row_group_values_limit: from.options.unwrap().merge_row_group_values_limit
+                as usize,
             merge_array_size: from.options.unwrap().merge_array_size as usize,
             merge_chunk_size: from.options.unwrap().merge_chunk_size as usize,
             merge_array_page_size: from.options.unwrap().merge_array_page_size as usize,
@@ -337,11 +355,18 @@ pub fn deserialize_md(data: &[u8]) -> Result<Metadata> {
 
 #[cfg(test)]
 mod tests {
-    use arrow2::datatypes::{DataType, TimeUnit};
-    use chrono::{DateTime, Utc};
-    use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
+    use arrow2::datatypes::DataType;
+    use arrow2::datatypes::TimeUnit;
+    use common::DECIMAL_PRECISION;
+    use common::DECIMAL_SCALE;
+
+    use crate::table::deserialize_md;
+    use crate::table::serialize_md;
+    use crate::table::Level;
+    use crate::table::Metadata;
+    use crate::table::Options;
+    use crate::table::Part;
     use crate::KeyValue;
-    use crate::table::{deserialize_md, Level, Metadata, Options, Part, serialize_md};
 
     #[test]
     fn test_roundtrip() {
@@ -356,36 +381,40 @@ mod tests {
                     arrow2::datatypes::Field::new("c", DataType::Int32, true),
                     arrow2::datatypes::Field::new("d", DataType::Int64, true),
                     arrow2::datatypes::Field::new("e", DataType::Utf8, true),
-                    arrow2::datatypes::Field::new("f", DataType::Decimal(DECIMAL_PRECISION as usize, DECIMAL_SCALE as usize), true),
+                    arrow2::datatypes::Field::new(
+                        "f",
+                        DataType::Decimal(DECIMAL_PRECISION as usize, DECIMAL_SCALE as usize),
+                        true,
+                    ),
                     arrow2::datatypes::Field::new("g", DataType::Boolean, true),
-                    arrow2::datatypes::Field::new("h", DataType::Timestamp(TimeUnit::Millisecond, None), true),
+                    arrow2::datatypes::Field::new(
+                        "h",
+                        DataType::Timestamp(TimeUnit::Millisecond, None),
+                        true,
+                    ),
                 ],
                 metadata: Default::default(),
             },
-            levels: vec![
-                Level {
-                    part_id: 0,
-                    parts: vec![
-                        Part {
-                            id: 0,
-                            size_bytes: 100,
-                            values: 100,
-                            min: vec![
-                                KeyValue::Int32(1),
-                                KeyValue::String("a".to_string()),
-                                KeyValue::Int64(1),
-                                KeyValue::Timestamp(1),
-                            ],
-                            max: vec![
-                                KeyValue::Int32(1),
-                                KeyValue::String("a".to_string()),
-                                KeyValue::Int64(1),
-                                KeyValue::Timestamp(1),
-                            ],
-                        }
+            levels: vec![Level {
+                part_id: 0,
+                parts: vec![Part {
+                    id: 0,
+                    size_bytes: 100,
+                    values: 100,
+                    min: vec![
+                        KeyValue::Int32(1),
+                        KeyValue::String("a".to_string()),
+                        KeyValue::Int64(1),
+                        KeyValue::Timestamp(1),
                     ],
-                }
-            ],
+                    max: vec![
+                        KeyValue::Int32(1),
+                        KeyValue::String("a".to_string()),
+                        KeyValue::Int64(1),
+                        KeyValue::Timestamp(1),
+                    ],
+                }],
+            }],
             stats: Default::default(),
             opts: Options {
                 index_cols: 1,

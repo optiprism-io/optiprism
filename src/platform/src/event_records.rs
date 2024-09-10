@@ -1,22 +1,29 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
-use axum::async_trait;
-use chrono::{DateTime, Utc};
-use datafusion_common::ScalarValue;
-use serde::Deserialize;
-use serde::Serialize;
-use serde_json::{json, Value};
+use chrono::DateTime;
+use chrono::Utc;
 use common::rbac::ProjectPermission;
 use metadata::MetadataProvider;
 use query::context::Format;
-use query::{event_records, fix_filter};
+use query::event_records;
 use query::event_records::fix_search_request;
-use crate::{Context, PlatformError, PropertyAndValue, PropertyRef, QueryParams, QueryResponse, QueryResponseFormat, QueryTime, scalar_to_json, validate_event, validate_event_filter};
+use serde::Deserialize;
+use serde::Serialize;
+
+use crate::scalar_to_json;
+use crate::validate_event;
+use crate::validate_event_filter;
+use crate::Context;
 use crate::EventGroupedFilters;
 use crate::EventRef;
-use crate::ListResponse;
+use crate::PlatformError;
 use crate::PropValueFilter;
+use crate::PropertyAndValue;
+use crate::PropertyRef;
+use crate::QueryParams;
+use crate::QueryResponse;
+use crate::QueryResponseFormat;
+use crate::QueryTime;
 use crate::Result;
 
 pub struct EventRecords {
@@ -41,12 +48,18 @@ impl EventRecords {
             cur_time: Utc::now(),
         };
 
-        let mut data = self.prov.get_by_id(ctx, id).await?;
+        let data = self.prov.get_by_id(ctx, id).await?;
 
         Ok(data.into())
     }
 
-    pub async fn search(&self, ctx: Context, project_id: u64, req: EventRecordsSearchRequest, query: QueryParams) -> Result<QueryResponse> {
+    pub async fn search(
+        &self,
+        ctx: Context,
+        project_id: u64,
+        req: EventRecordsSearchRequest,
+        query: QueryParams,
+    ) -> Result<QueryResponse> {
         ctx.check_project_permission(
             ctx.organization_id,
             project_id,
@@ -56,10 +69,7 @@ impl EventRecords {
         let lreq = fix_search_request(&self.md, project_id, req.into())?;
         let cur_time = match query.timestamp {
             None => Utc::now(),
-            Some(ts_sec) => DateTime::from_naive_utc_and_offset(
-                chrono::NaiveDateTime::from_timestamp_millis(ts_sec * 1000).unwrap(),
-                Utc,
-            ),
+            Some(ts_sec) => DateTime::from_timestamp_millis(ts_sec * 1000).unwrap(),
         };
         let ctx = query::Context {
             project_id,
@@ -73,7 +83,7 @@ impl EventRecords {
             cur_time,
         };
 
-        let mut data = self.prov.search(ctx, lreq.into()).await?;
+        let mut data = self.prov.search(ctx, lreq).await?;
 
         // do empty response so it will be [] instead of [[],[],[],...]
         if !data.columns.is_empty() && data.columns[0].data.is_empty() {
@@ -97,17 +107,28 @@ pub struct EventRecord {
     pub properties: Vec<PropertyAndValue>,
 }
 
+#[allow(clippy::all)]
 impl Into<EventRecord> for query::event_records::EventRecord {
     fn into(self) -> EventRecord {
-        EventRecord { properties: self.properties.iter().map(|p| p.to_owned().into()).collect::<Vec<_>>() }
+        EventRecord {
+            properties: self
+                .properties
+                .iter()
+                .map(|p| p.to_owned().into())
+                .collect::<Vec<_>>(),
+        }
     }
 }
 
+#[allow(clippy::all)]
 impl Into<PropertyAndValue> for query::PropertyAndValue {
     fn into(self) -> PropertyAndValue {
         let value = scalar_to_json(&self.value);
 
-        PropertyAndValue { property: self.property.into(), value }
+        PropertyAndValue {
+            property: self.property.into(),
+            value,
+        }
     }
 }
 
@@ -127,6 +148,7 @@ pub struct EventRecordsSearchRequest {
     pub properties: Option<Vec<PropertyRef>>,
 }
 
+#[allow(clippy::all)]
 impl Into<event_records::Event> for Event {
     fn into(self) -> event_records::Event {
         event_records::Event {
@@ -141,6 +163,7 @@ impl Into<event_records::Event> for Event {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<event_records::EventRecordsSearchRequest> for EventRecordsSearchRequest {
     fn into(self) -> event_records::EventRecordsSearchRequest {
         event_records::EventRecordsSearchRequest {
@@ -151,13 +174,22 @@ impl Into<event_records::EventRecordsSearchRequest> for EventRecordsSearchReques
                     .map(|event| event.into())
                     .collect::<Vec<_>>()
             }),
-            filters: self.filters.map_or_else(|| None, |v| {
-                if v.groups[0].filters.is_empty() {
-                    None
-                } else {
-                    Some(v.groups[0].filters.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>())
-                }
-            }),
+            filters: self.filters.map_or_else(
+                || None,
+                |v| {
+                    if v.groups[0].filters.is_empty() {
+                        None
+                    } else {
+                        Some(
+                            v.groups[0]
+                                .filters
+                                .iter()
+                                .map(|v| v.to_owned().into())
+                                .collect::<Vec<_>>(),
+                        )
+                    }
+                },
+            ),
             properties: self.properties.map(|props| {
                 props
                     .iter()
@@ -173,15 +205,12 @@ pub(crate) fn validate_search_request(
     project_id: u64,
     req: &EventRecordsSearchRequest,
 ) -> Result<()> {
-    match req.time {
-        QueryTime::Between { from, to } => {
-            if from > to {
-                return Err(PlatformError::BadRequest(
-                    "from time must be less than to time".to_string(),
-                ));
-            }
+    if let QueryTime::Between { from, to } = req.time {
+        if from > to {
+            return Err(PlatformError::BadRequest(
+                "from time must be less than to time".to_string(),
+            ));
         }
-        _ => {}
     }
 
     if let Some(events) = &req.events {
@@ -239,13 +268,13 @@ pub(crate) fn validate_search_request(
                         property_name,
                         group,
                     } => md.group_properties[*group]
-                        .get_by_name(project_id, &property_name)
+                        .get_by_name(project_id, property_name)
                         .map_err(|err| {
                             PlatformError::BadRequest(format!("property {idx}: {err}"))
                         })?,
                     PropertyRef::Event { property_name } => md
                         .event_properties
-                        .get_by_name(project_id, &property_name)
+                        .get_by_name(project_id, property_name)
                         .map_err(|err| {
                             PlatformError::BadRequest(format!("property {idx}: {err}"))
                         })?,

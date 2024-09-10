@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use chrono::Utc;
 use common::group_col;
-use common::types::DType;
 use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_EVENT_ID;
@@ -18,15 +17,11 @@ use common::types::EVENT_SESSION_BEGIN;
 use common::types::TABLE_EVENTS;
 use common::GROUPS_COUNT;
 use common::GROUP_USER_ID;
-use metadata::dictionaries::Dictionaries;
-use metadata::properties::DictionaryType;
 use metadata::MetadataProvider;
-use rust_decimal::prelude::ToPrimitive;
 use storage::db::OptiDBImpl;
 use storage::NamedValue;
 use storage::Value;
 
-use crate::error::IngesterError;
 use crate::error::Result;
 use crate::property_to_value;
 use crate::Destination;
@@ -75,7 +70,6 @@ impl Destination<Track> for Local {
         } else {
             // skip user group, i.e. skip 0
             (1..GROUPS_COUNT)
-                .into_iter()
                 .map(|v| NamedValue::new(group_col(v), Value::Int64(None))) // don't use null as primary key, only zero
                 .collect::<Vec<_>>()
         };
@@ -228,7 +222,7 @@ impl Destination<Track> for Local {
                 .get_by_name(ctx.project_id.unwrap(), EVENT_SESSION_BEGIN)?
                 .id;
 
-            let mut values = vec![
+            let values = [
                 vec![
                     NamedValue::new(
                         COLUMN_PROJECT_ID.to_string(),
@@ -261,7 +255,7 @@ impl Destination<Track> for Local {
                 ],
                 prop_values.clone(),
             ]
-                .concat();
+            .concat();
 
             self.db.insert(TABLE_EVENTS, values)?;
         }
@@ -273,7 +267,7 @@ impl Destination<Track> for Local {
 
         let event_id = req.resolved_event.as_ref().unwrap().id;
 
-        let mut values = vec![
+        let values = [
             vec![
                 NamedValue::new(
                     COLUMN_PROJECT_ID.to_string(),
@@ -301,7 +295,7 @@ impl Destination<Track> for Local {
             ],
             prop_values.clone(),
         ]
-            .concat();
+        .concat();
 
         self.db.insert(TABLE_EVENTS, values)?;
         Ok(())

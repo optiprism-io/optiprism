@@ -1,6 +1,5 @@
 use std::any::Any;
 use std::fmt;
-use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Context;
@@ -11,15 +10,12 @@ use arrow::array::ArrayRef;
 use arrow::array::RecordBatch;
 use arrow::array::StringArray;
 use arrow::array::StringBuilder;
-use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
 use async_trait::async_trait;
 use datafusion::execution::RecordBatchStream;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::execution::TaskContext;
 use datafusion::physical_expr::expressions::Column;
-use datafusion::physical_expr::Partitioning;
-use datafusion::physical_expr::PhysicalSortExpr;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
@@ -30,7 +26,6 @@ use futures::Stream;
 use futures::StreamExt;
 
 use crate::error::QueryError;
-use crate::physical_plan::merge::MergeExec;
 use crate::Result;
 
 #[derive(Debug)]
@@ -146,10 +141,10 @@ impl Stream for RenameColumnRowsStream {
                                         match self
                                             .rename
                                             .iter()
-                                            .find(|(from, to)| name == from.as_str())
+                                            .find(|(from, _to)| name == from.as_str())
                                         {
                                             None => b.append_option(v),
-                                            Some((_, to)) => b.append_value(to.to_owned()),
+                                            Some((_, to)) => b.append_value(to),
                                         }
                                     }
                                 }
@@ -160,11 +155,11 @@ impl Stream for RenameColumnRowsStream {
                         }
                     })
                     .collect::<Vec<_>>();
-                return Poll::Ready(Some(Ok(RecordBatch::try_new(
+                Poll::Ready(Some(Ok(RecordBatch::try_new(
                     self.stream.schema().clone(),
                     arrs,
                 )
-                .unwrap())));
+                .unwrap())))
             }
             other => other,
         }

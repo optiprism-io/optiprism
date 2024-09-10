@@ -1,7 +1,6 @@
 use std::any::Any;
 use std::fmt;
 use std::fmt::Debug;
-use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Context;
@@ -15,8 +14,8 @@ use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use axum::async_trait;
 use datafusion::execution::context::TaskContext;
-use datafusion::physical_expr::{EquivalenceProperties, PhysicalExpr};
-use datafusion::physical_plan::expressions::PhysicalSortExpr;
+use datafusion::physical_expr::EquivalenceProperties;
+use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_plan::hash_utils::create_hashes;
 use datafusion::physical_plan::metrics::BaselineMetrics;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
@@ -25,12 +24,11 @@ use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::physical_plan::ExecutionPlanProperties;
-use datafusion::physical_plan::Partitioning;
 use datafusion::physical_plan::PlanProperties;
 use datafusion::physical_plan::RecordBatchStream;
 use datafusion::physical_plan::SendableRecordBatchStream;
 use datafusion::physical_plan::Statistics;
-use datafusion_common::{Result as DFResult, ToDFSchema};
+use datafusion_common::Result as DFResult;
 use futures::Stream;
 use futures::StreamExt;
 
@@ -54,14 +52,13 @@ impl PartitionExec {
         partition_col_name: String,
     ) -> Result<Self> {
         let field = Field::new(partition_col_name.clone(), DataType::UInt64, false);
-        let a = input.schema();
         let mut schema = (*input.schema()).clone();
 
         schema.fields = [vec![Arc::new(field)], schema.fields.to_vec()]
             .concat()
             .into();
         let schema = Arc::new(schema);
-        let cache = Self::compute_properties(&input,schema.clone())?;
+        let cache = Self::compute_properties(&input, schema.clone())?;
         Ok(Self {
             input,
             partition_expr,
@@ -72,7 +69,10 @@ impl PartitionExec {
         })
     }
 
-    fn compute_properties(input: &Arc<dyn ExecutionPlan>,schema:SchemaRef) -> Result<PlanProperties> {
+    fn compute_properties(
+        input: &Arc<dyn ExecutionPlan>,
+        schema: SchemaRef,
+    ) -> Result<PlanProperties> {
         let eq_properties = EquivalenceProperties::new(schema);
         Ok(PlanProperties::new(
             eq_properties,
@@ -116,7 +116,7 @@ impl ExecutionPlan for PartitionExec {
                 self.partition_expr.clone(),
                 self.partition_col_name.clone(),
             )
-                .map_err(QueryError::into_datafusion_execution_error)?,
+            .map_err(QueryError::into_datafusion_execution_error)?,
         ))
     }
 
@@ -187,7 +187,7 @@ impl Stream for PartitionStream {
                         vec![Arc::new(hash_arr) as ArrayRef],
                         batch.columns().to_owned(),
                     ]
-                        .concat(),
+                    .concat(),
                 )?;
                 Poll::Ready(Some(Ok(result)))
             }

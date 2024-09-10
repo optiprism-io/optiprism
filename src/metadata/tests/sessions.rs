@@ -1,12 +1,10 @@
 use std::env::temp_dir;
-use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::Duration;
+use std::sync::Arc;
+use std::sync::Mutex;
+
 use chrono::DateTime;
-use uuid::Uuid;
-use common::types::OptionalProperty;
-use metadata::events::{CreateEventRequest, Events, Status, UpdateEventRequest};
 use metadata::sessions::Sessions;
+use uuid::Uuid;
 
 #[test]
 fn test_sessions() {
@@ -16,30 +14,40 @@ fn test_sessions() {
     let db = Arc::new(metadata::rocksdb::new(path).unwrap());
     let sessions = Box::new(Sessions::new(db.clone()));
 
-    sessions.check_for_deletion(1, |s| {
-        Ok(true)
-    }).unwrap();
+    sessions.check_for_deletion(1, |_s| Ok(true)).unwrap();
 
-    let f = sessions.set_current_time(1, 1, DateTime::from_timestamp(1, 0).unwrap()).unwrap();
+    let f = sessions
+        .set_current_time(1, 1, DateTime::from_timestamp(1, 0).unwrap())
+        .unwrap();
     assert!(f);
-    let f = sessions.set_current_time(1, 2, DateTime::from_timestamp(1, 0).unwrap()).unwrap();
+    let f = sessions
+        .set_current_time(1, 2, DateTime::from_timestamp(1, 0).unwrap())
+        .unwrap();
     assert!(f);
-    let f = sessions.set_current_time(1, 1, DateTime::from_timestamp(1, 0).unwrap()).unwrap();
+    let f = sessions
+        .set_current_time(1, 1, DateTime::from_timestamp(1, 0).unwrap())
+        .unwrap();
     assert!(!f);
 
     sessions.clear_project(1).unwrap();
 
-    let f = sessions.set_current_time(1, 1, DateTime::from_timestamp(1, 0).unwrap()).unwrap();
+    let f = sessions
+        .set_current_time(1, 1, DateTime::from_timestamp(1, 0).unwrap())
+        .unwrap();
     assert!(f);
 
     let found = Arc::new(Mutex::new(false));
-    let mut found2 = found.clone();
-    sessions.check_for_deletion(1, |s| {
-        let mut f = found2.lock().unwrap();
-        *f = true;
-        Ok(true)
-    }).unwrap();
-    assert!(found.lock().unwrap().clone());
-    let f = sessions.set_current_time(1, 1, DateTime::from_timestamp(1, 0).unwrap()).unwrap();
+    let found2 = found.clone();
+    sessions
+        .check_for_deletion(1, |_s| {
+            let mut f = found2.lock().unwrap();
+            *f = true;
+            Ok(true)
+        })
+        .unwrap();
+    assert!(*found.lock().unwrap());
+    let f = sessions
+        .set_current_time(1, 1, DateTime::from_timestamp(1, 0).unwrap())
+        .unwrap();
     assert!(f);
 }

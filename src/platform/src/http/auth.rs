@@ -1,7 +1,7 @@
-use std::num::ParseIntError;
 use std::sync::Arc;
 
-use axum::extract::{Extension, Path};
+use axum::extract::Extension;
+use axum::extract::Path;
 use axum::http::StatusCode;
 use axum::routing::get;
 use axum::routing::post;
@@ -16,9 +16,9 @@ use time::OffsetDateTime;
 use tower_cookies::Cookie;
 use tower_cookies::Cookies;
 
-use crate::accounts::Account;
-use crate::auth::provider::{LogInRequest, SetEmailRequest};
+use crate::auth::provider::LogInRequest;
 use crate::auth::provider::Profile;
+use crate::auth::provider::SetEmailRequest;
 use crate::auth::provider::SetPasswordRequest;
 use crate::auth::provider::SignUpRequest;
 use crate::auth::provider::TokensResponse;
@@ -43,7 +43,7 @@ fn set_refresh_token_cookie(cookies: &Cookies, refresh_token: &str, expires: Off
     let cookie = Cookie::build((COOKIE_NAME_REFRESH_TOKEN, refresh_token.to_owned()))
         .expires(expires)
         .http_only(true)
-        .finish();
+        .build();
     cookies.add(cookie);
 }
 
@@ -94,7 +94,7 @@ async fn log_in(
         let org_id = cookie.value().parse::<u64>();
         match org_id {
             Ok(id) => Some(id),
-            Err(_) => None
+            Err(_) => None,
         }
     } else {
         None
@@ -210,7 +210,10 @@ pub fn attach_routes(router: Router) -> Router {
         .route("/api/v1/auth/signup", post(sign_up))
         .route("/api/v1/auth/login", post(log_in))
         .route("/api/v1/auth/refresh-token", post(refresh_token))
-        .route("/api/v1/auth/switch-organization/:org_id", post(switch_organization))
+        .route(
+            "/api/v1/auth/switch-organization/:org_id",
+            post(switch_organization),
+        )
         .route("/api/v1/profile", get(get_profile))
         .route("/api/v1/profile/name", put(update_name))
         .route("/api/v1/profile/email", put(update_email))

@@ -1,8 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use common::GROUP_USER_ID;
-    use platform::queries::property_values::Filter;
-    use platform::queries::property_values::ListPropertyValuesRequest;
+    use platform::properties::Filter;
+    use platform::properties::ListPropertyValuesRequest;
     use platform::EventRef;
     use platform::PropValueOperation;
     use platform::PropertyRef;
@@ -32,7 +31,6 @@ mod tests {
                 operation: PropValueOperation::Eq,
                 value: Some(vec![Value::String("goo%".to_string())]),
             }),
-            group: GROUP_USER_ID,
         };
 
         let resp = cl

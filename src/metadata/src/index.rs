@@ -1,6 +1,3 @@
-use std::any::Any;
-use std::fmt::Debug;
-
 use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 
@@ -87,7 +84,7 @@ where
     K: AsRef<[u8]>,
 {
     match tx.get(key.as_ref())? {
-        None => Err(MetadataError::NotFound(format!("{}", err_key.to_string()))),
+        None => Err(MetadataError::NotFound(err_key.to_string())),
         Some(v) => Ok(u64::from_le_bytes(v.try_into().unwrap())),
     }
 }

@@ -9,11 +9,9 @@ use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
-use common::event_segmentation::EventSegmentationRequest;
-use common::funnel::Funnel;
-use crate::accounts::Account;
+
+use crate::bookmark;
 use crate::error::MetadataError;
-use crate::{account, bookmark, project_ns};
 use crate::reports::Query;
 use crate::Result;
 
@@ -56,18 +54,18 @@ impl Bookmarks {
         let created_at = Utc::now();
 
         let bookmark = Bookmark {
-            id:id.clone(),
+            id: id.clone(),
             created_at,
             created_by: req.created_by,
             project_id,
             query: req.query,
         };
         let data = serialize(&bookmark)?;
-        let key = format!("projects/{project_id}/{NAMESPACE}/accounts/{}/{id}", req.created_by);
-        tx.put(
-            key,
-            data,
-        )?;
+        let key = format!(
+            "projects/{project_id}/{NAMESPACE}/accounts/{}/{id}",
+            req.created_by
+        );
+        tx.put(key, data)?;
         tx.commit()?;
         Ok(bookmark)
     }
@@ -80,14 +78,13 @@ impl Bookmarks {
 
     pub fn delete(&self, project_id: u64, account_id: u64, id: &str) -> Result<Bookmark> {
         let tx = self.db.transaction();
-        let bookmark = self.get_by_id_(&tx, project_id,account_id, id)?;
+        let bookmark = self.get_by_id_(&tx, project_id, account_id, id)?;
         let key = format!("projects/{project_id}/{NAMESPACE}/accounts/{account_id}/{id}");
         tx.delete(key)?;
         tx.commit()?;
         Ok(bookmark)
     }
 }
-
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Bookmark {
@@ -105,12 +102,12 @@ pub struct CreateBookmarkRequest {
 }
 
 fn serialize(bm: &Bookmark) -> Result<Vec<u8>> {
-    let b = bookmark::Bookmark{
+    let b = bookmark::Bookmark {
         id: bm.id.clone(),
         created_at: bm.created_at.timestamp(),
         created_by: bm.created_by,
         project_id: bm.project_id,
-        query: bm.query.to_owned().map(|q|bincode::serialize(&q).unwrap()),
+        query: bm.query.to_owned().map(|q| bincode::serialize(&q).unwrap()),
     };
 
     Ok(b.encode_to_vec())
@@ -119,25 +116,28 @@ fn serialize(bm: &Bookmark) -> Result<Vec<u8>> {
 fn deserialize(data: &Vec<u8>) -> Result<Bookmark> {
     let from = bookmark::Bookmark::decode(data.as_ref())?;
 
-    Ok(Bookmark{
+    Ok(Bookmark {
         id: from.id,
         created_at: DateTime::from_timestamp(from.created_at, 0).unwrap(),
         created_by: from.created_by,
         project_id: from.project_id,
-        query: from.query.map(|q|bincode::deserialize(&q).unwrap()),
+        query: from.query.map(|q| bincode::deserialize(&q).unwrap()),
     })
 }
 
 #[cfg(test)]
 mod tests {
-    use chrono::{DateTime, Utc};
-    use crate::bookmarks::{Bookmark, deserialize, serialize};
+    use chrono::DateTime;
+
+    use crate::bookmarks::deserialize;
+    use crate::bookmarks::serialize;
+    use crate::bookmarks::Bookmark;
 
     #[test]
     fn test_roundtrip() {
         let bm = Bookmark {
             id: "test".to_string(),
-            created_at: DateTime::from_timestamp(1,0).unwrap(),
+            created_at: DateTime::from_timestamp(1, 0).unwrap(),
             created_by: 1,
             project_id: 1,
             query: None,

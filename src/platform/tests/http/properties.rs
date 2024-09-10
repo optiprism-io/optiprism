@@ -108,12 +108,7 @@ async fn test_event_properties() {
             nullable: prop1.nullable,
             is_array: prop1.is_array,
             is_dictionary: prop1.is_dictionary,
-            dictionary_type: prop1
-                .dictionary_type
-                .clone()
-                .map(|v| v.try_into())
-                .transpose()
-                .unwrap(),
+            dictionary_type: prop1.dictionary_type.clone().map(|v| v.into()),
             is_system: false,
             hidden: false,
         };

@@ -1,37 +1,35 @@
 mod accounts;
-mod auth;
+pub mod auth;
+mod backups;
+mod bookmarks;
 mod custom_events;
 mod dashboards;
 mod event_records;
+mod event_segmentation;
 mod events;
+mod funnel;
 mod group_records;
 mod groups;
 mod organizations;
 mod projects;
 mod properties;
 mod reports;
-mod event_segmentation;
-mod funnel;
-mod bookmarks;
-mod backups;
 mod settings;
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::middleware;
 use axum::Extension;
 use axum::Router;
 use common::config::Config;
-use common::http::{measure_request_response, print_request_response};
+use common::http::measure_request_response;
+use common::http::print_request_response;
 use metadata::MetadataProvider;
-use tower::ServiceBuilder;
 use tower_cookies::CookieManagerLayer;
 use tower_http::cors::Any;
 use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
 use tower_http::services::ServeFile;
 use tower_http::trace::TraceLayer;
-use tracing::info;
 
 use crate::properties::Properties;
 use crate::PlatformProvider;
@@ -69,7 +67,7 @@ pub fn attach_routes(
     router = event_segmentation::attach_routes(router);
     router = funnel::attach_routes(router);
     router = group_records::attach_routes(router);
-    let serve_dir = ServeDir::new(cfg.data.ui_path.to_owned())
+    let serve_dir = ServeDir::new(&cfg.data.ui_path)
         .not_found_service(ServeFile::new(cfg.data.ui_path.join("index.html")));
     router = router
         .nest_service("/", serve_dir.clone())

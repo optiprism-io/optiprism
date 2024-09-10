@@ -2,9 +2,8 @@
 mod tests {
     use chrono::DateTime;
     use chrono::Utc;
-    use common::GROUP_USER_ID;
-    use platform::queries::event_records_search::EventRecordsSearchRequest;
-    use platform::queries::QueryTime;
+    use platform::event_records::EventRecordsSearchRequest;
+    use platform::QueryTime;
     use reqwest::Client;
     use reqwest::StatusCode;
 
@@ -30,7 +29,6 @@ mod tests {
             events: None,
             filters: None,
             properties: None,
-            group: GROUP_USER_ID,
         };
 
         let resp = cl

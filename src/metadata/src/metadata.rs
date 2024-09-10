@@ -6,16 +6,15 @@ use serde::Deserialize;
 use serde::Serialize;
 use storage::db::OptiDBImpl;
 
-use crate::{accounts, bookmarks, settings};
+use crate::accounts;
 use crate::accounts::Accounts;
 use crate::backups::Backups;
+use crate::bookmarks;
 use crate::bookmarks::Bookmarks;
-use crate::settings::SettingsProvider;
 use crate::custom_events;
 use crate::custom_events::CustomEvents;
 use crate::dashboards;
 use crate::dashboards::Dashboards;
-use crate::dictionaries;
 use crate::dictionaries::Dictionaries;
 use crate::events;
 use crate::events::Events;
@@ -30,6 +29,8 @@ use crate::reports;
 use crate::reports::Reports;
 use crate::sessions;
 use crate::sessions::Sessions;
+use crate::settings;
+use crate::settings::SettingsProvider;
 use crate::Result;
 
 pub struct MetadataProvider {
@@ -63,16 +64,16 @@ impl MetadataProvider {
             bookmarks: Arc::new(bookmarks::Bookmarks::new(db.clone())),
             events: events.clone(),
             custom_events: Arc::new(custom_events::CustomEvents::new(db.clone(), events)),
-            properties: Arc::new(properties::Properties::new(
-                db.clone(),
-                opti_db.clone(),
-            )),
+            properties: Arc::new(properties::Properties::new(db.clone(), opti_db.clone())),
             event_properties: Arc::new(properties::Properties::new_event(
                 db.clone(),
                 opti_db.clone(),
             )),
             group_properties: properties::Properties::new_group(db.clone(), opti_db.clone()),
-            organizations: Arc::new(organizations::Organizations::new(db.clone(), accounts.clone())),
+            organizations: Arc::new(organizations::Organizations::new(
+                db.clone(),
+                accounts.clone(),
+            )),
             projects: Arc::new(projects::Projects::new(db.clone())),
             accounts: accounts.clone(),
             dictionaries: dicts.clone(),
@@ -90,16 +91,14 @@ pub struct ResponseMetadata {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ListResponse<T>
-where
-    T: Debug,
+where T: Debug
 {
     pub data: Vec<T>,
     pub meta: ResponseMetadata,
 }
 
 impl<T> ListResponse<T>
-where
-    T: Debug,
+where T: Debug
 {
     pub fn len(&self) -> usize {
         self.data.len()
@@ -111,8 +110,7 @@ where
 }
 
 impl<T> IntoIterator for ListResponse<T>
-where
-    T: Debug,
+where T: Debug
 {
     type Item = T;
     type IntoIter = std::vec::IntoIter<Self::Item>;

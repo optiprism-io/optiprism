@@ -6,10 +6,6 @@ use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
 
-use arrow::array::Array;
-use arrow::array::ArrayRef;
-use arrow::array::Int64Array;
-use arrow::compute::concat;
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
 use arrow::datatypes::Schema;
@@ -18,9 +14,8 @@ use arrow::record_batch::RecordBatch;
 use axum::async_trait;
 use datafusion::execution::context::TaskContext;
 use datafusion::physical_expr::expressions::Column;
+use datafusion::physical_expr::EquivalenceProperties;
 use datafusion::physical_expr::Partitioning::UnknownPartitioning;
-use datafusion::physical_expr::{EquivalenceProperties, PhysicalExpr};
-use datafusion::physical_plan::expressions::PhysicalSortExpr;
 use datafusion::physical_plan::metrics::BaselineMetrics;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
 use datafusion::physical_plan::metrics::MetricsSet;
@@ -28,7 +23,6 @@ use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::physical_plan::ExecutionPlanProperties;
-use datafusion::physical_plan::Partitioning;
 use datafusion::physical_plan::PlanProperties;
 use datafusion::physical_plan::RecordBatchStream;
 use datafusion::physical_plan::SendableRecordBatchStream;
@@ -69,7 +63,10 @@ impl SegmentExec {
             cache,
         })
     }
-    fn compute_properties(input: &Arc<dyn ExecutionPlan>, schema: SchemaRef) -> Result<PlanProperties> {
+    fn compute_properties(
+        input: &Arc<dyn ExecutionPlan>,
+        schema: SchemaRef,
+    ) -> Result<PlanProperties> {
         let eq_properties = EquivalenceProperties::new(schema);
         Ok(PlanProperties::new(
             eq_properties,
@@ -113,7 +110,7 @@ impl ExecutionPlan for SegmentExec {
                 self.expr.clone(),
                 self.partition_col.clone(),
             )
-                .map_err(QueryError::into_datafusion_execution_error)?,
+            .map_err(QueryError::into_datafusion_execution_error)?,
         ))
     }
 
@@ -127,7 +124,6 @@ impl ExecutionPlan for SegmentExec {
         let _baseline_metrics = BaselineMetrics::new(&self.metrics, partition);
         Ok(Box::pin(SegmentStream {
             stream,
-            partition_col: self.partition_col.clone(),
             expr: self.expr.clone(),
             schema: self.schema.clone(),
             is_ended: false,
@@ -146,7 +142,6 @@ impl ExecutionPlan for SegmentExec {
 
 struct SegmentStream {
     stream: SendableRecordBatchStream,
-    partition_col: Column,
     expr: Arc<dyn SegmentExpr>,
     schema: SchemaRef,
     is_ended: bool,

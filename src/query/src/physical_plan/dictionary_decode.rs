@@ -24,7 +24,6 @@ use axum::async_trait;
 use datafusion::execution::context::TaskContext;
 use datafusion::physical_expr::EquivalenceProperties;
 use datafusion::physical_plan::expressions::Column;
-use datafusion::physical_plan::expressions::PhysicalSortExpr;
 use datafusion::physical_plan::metrics::BaselineMetrics;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
 use datafusion::physical_plan::metrics::MetricsSet;
@@ -32,7 +31,6 @@ use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::physical_plan::ExecutionPlanProperties;
-use datafusion::physical_plan::Partitioning;
 use datafusion::physical_plan::PlanProperties;
 use datafusion::physical_plan::RecordBatchStream;
 use datafusion::physical_plan::SendableRecordBatchStream;
@@ -78,7 +76,7 @@ impl DictionaryDecodeExec {
             .collect::<Vec<_>>();
 
         let schema = Arc::new(Schema::new(fields));
-        let cache = Self::compute_properties(&input,schema.clone())?;
+        let cache = Self::compute_properties(&input, schema.clone())?;
         Ok(Self {
             input,
             decode_cols,
@@ -88,7 +86,10 @@ impl DictionaryDecodeExec {
         })
     }
 
-    fn compute_properties(input: &Arc<dyn ExecutionPlan>,schema:SchemaRef) -> Result<PlanProperties> {
+    fn compute_properties(
+        input: &Arc<dyn ExecutionPlan>,
+        schema: SchemaRef,
+    ) -> Result<PlanProperties> {
         let eq_properties = EquivalenceProperties::new(schema);
         Ok(PlanProperties::new(
             eq_properties,

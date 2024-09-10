@@ -4,7 +4,6 @@ use arrow::datatypes;
 use arrow2::datatypes::DataType as DataType2;
 use arrow_schema::DataType;
 use arrow_schema::TimeUnit;
-use lazy_static::lazy_static;
 use serde::Deserialize;
 use serde::Deserializer;
 use serde::Serialize;
@@ -75,7 +74,8 @@ pub const RESERVED_COLUMN_FUNNEL_TOTAL: &str = "total";
 pub const RESERVED_COLUMN_FUNNEL_COMPLETED: &str = "completed";
 pub const RESERVED_COLUMN_FUNNEL_CONVERSION_RATIO: &str = "conversion_ratio";
 pub const RESERVED_COLUMN_FUNNEL_AVG_TIME_TO_CONVERT: &str = "avg_time_to_convert";
-pub const RESERVED_COLUMN_FUNNEL_AVG_TIME_TO_CONVERT_FROM_START: &str = "avg_time_to_convert_from_start";
+pub const RESERVED_COLUMN_FUNNEL_AVG_TIME_TO_CONVERT_FROM_START: &str =
+    "avg_time_to_convert_from_start";
 pub const RESERVED_COLUMN_FUNNEL_DROPPED_OFF: &str = "dropped_off";
 pub const RESERVED_COLUMN_FUNNEL_DROP_OFF_RATIO: &str = "drop_off_ratio";
 pub const RESERVED_COLUMN_AGG_PARTITIONED_AGGREGATE: &str = "partitioned_agg";
@@ -99,7 +99,8 @@ pub const METRIC_STORE_TABLE_FIELDS: &str = "optiprism_store_table_fields";
 pub const METRIC_STORE_MEMTABLE_ROWS: &str = "optiprism_store_memtable_rows";
 pub const METRIC_STORE_SCAN_MEMTABLE_SECONDS: &str = "optiprism_store_scan_memtable_seconds";
 pub const METRIC_STORE_COMPACTIONS_TOTAL: &str = "optiprism_store_compactions_total";
-pub const METRIC_STORE_LEVEL_COMPACTION_TIME_SECONDS: &str = "optiprism_store_level_compaction_time_seconds";
+pub const METRIC_STORE_LEVEL_COMPACTION_TIME_SECONDS: &str =
+    "optiprism_store_level_compaction_time_seconds";
 pub const METRIC_STORE_COMPACTION_TIME_SECONDS: &str = "optiprism_store_compaction_time_seconds";
 pub const METRIC_STORE_RECOVERY_TIME_SECONDS: &str = "optiprism_store_recovery_time_seconds";
 pub const METRIC_STORE_FLUSH_TIME_SECONDS: &str = "optiprism_store_flush_time_seconds";
@@ -300,9 +301,7 @@ impl<T> OptionalProperty<T> {
     }
 
     pub fn into<X>(self) -> OptionalProperty<X>
-    where
-        T: Into<X>,
-    {
+    where T: Into<X> {
         match self {
             OptionalProperty::None => OptionalProperty::None,
             OptionalProperty::Some(v) => OptionalProperty::Some(v.into()),
@@ -310,9 +309,7 @@ impl<T> OptionalProperty<T> {
     }
 
     pub fn try_into<X>(self) -> std::result::Result<OptionalProperty<X>, <T as TryInto<X>>::Error>
-    where
-        T: TryInto<X>,
-    {
+    where T: TryInto<X> {
         Ok(match self {
             OptionalProperty::None => OptionalProperty::None,
             OptionalProperty::Some(v) => OptionalProperty::Some(v.try_into()?),
@@ -320,9 +317,7 @@ impl<T> OptionalProperty<T> {
     }
 
     pub fn map<F, U>(self, f: F) -> OptionalProperty<U>
-    where
-        F: FnOnce(T) -> U,
-    {
+    where F: FnOnce(T) -> U {
         match self {
             OptionalProperty::None => OptionalProperty::None,
             OptionalProperty::Some(v) => OptionalProperty::Some(f(v)),
@@ -331,13 +326,10 @@ impl<T> OptionalProperty<T> {
 }
 
 impl<T> Serialize for OptionalProperty<T>
-where
-    T: Serialize,
+where T: Serialize
 {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
+    where S: Serializer {
         match self {
             OptionalProperty::None => panic!("!"),
             OptionalProperty::Some(v) => serializer.serialize_some(v),
@@ -346,13 +338,10 @@ where
 }
 
 impl<'de, T> Deserialize<'de> for OptionalProperty<T>
-where
-    T: Deserialize<'de>,
+where T: Deserialize<'de>
 {
     fn deserialize<D>(de: D) -> std::result::Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
+    where D: Deserializer<'de> {
         let a = Deserialize::deserialize(de);
         a.map(OptionalProperty::Some)
     }
@@ -424,14 +413,8 @@ mod tests {
             v: Option<bool>,
         }
 
-        assert_eq!(
-            serde_json::from_str::<Test>(r#"{}"#)?.v,
-            None
-        );
-        assert_eq!(
-            serde_json::from_str::<Test>(r#"{"v":true}"#)?.v,
-            Some(true)
-        );
+        assert_eq!(serde_json::from_str::<Test>(r#"{}"#)?.v, None);
+        assert_eq!(serde_json::from_str::<Test>(r#"{"v":true}"#)?.v, Some(true));
 
         Ok(())
     }

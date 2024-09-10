@@ -1,13 +1,13 @@
-use std::sync::Arc;
 use axum::extract::Extension;
 use axum::extract::Path;
 use axum::routing;
 use axum::Router;
-use serde_json::Value;
 use common::http::Json;
+use serde_json::Value;
 
 use crate::http::PropertiesLayer;
-use crate::properties::{ListPropertyValuesRequest, Property};
+use crate::properties::ListPropertyValuesRequest;
+use crate::properties::Property;
 use crate::properties::UpdatePropertyRequest;
 use crate::Context;
 use crate::ListResponse;
@@ -128,7 +128,6 @@ async fn delete_group(
     ))
 }
 
-
 async fn list_values(
     ctx: Context,
     Extension(provider): Extension<PropertiesLayer>,
@@ -136,15 +135,14 @@ async fn list_values(
     Json(request): Json<ListPropertyValuesRequest>,
 ) -> Result<Json<ListResponse<Value>>> {
     Ok(Json(
-        provider.events.values(ctx, project_id, request).await?, // todo change from system to something common
+        provider.events.values(ctx, project_id, request).await?, /* todo change from system to something common */
     ))
 }
 
 pub fn attach_routes(router: Router) -> Router {
     router.clone().nest(
         "/api/v1/projects/:project_id",
-        Router::new()
-            .route("/property-values", routing::post(list_values))
+        Router::new().route("/property-values", routing::post(list_values)),
     )
 }
 

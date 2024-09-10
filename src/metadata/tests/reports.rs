@@ -1,6 +1,9 @@
 use std::env::temp_dir;
 use std::sync::Arc;
 
+use common::event_segmentation::Analysis;
+use common::event_segmentation::ChartType;
+use common::event_segmentation::EventSegmentationRequest;
 use common::query::QueryTime;
 use common::query::TimeIntervalUnit;
 use common::types::OptionalProperty;
@@ -11,7 +14,6 @@ use metadata::reports::Reports;
 use metadata::reports::Type;
 use metadata::reports::UpdateReportRequest;
 use uuid::Uuid;
-use common::event_segmentation::{Analysis, ChartType, EventSegmentationRequest};
 
 #[test]
 fn test_reports() -> Result<()> {

@@ -1,6 +1,5 @@
 #[cfg(test)]
 mod tests {
-
     use arrow::util::pretty::print_batches;
     use common::query::EventRef;
     use common::query::PropValueOperation;
@@ -10,9 +9,9 @@ mod tests {
     use datafusion_common::ScalarValue;
     use metadata::util::init_db;
     use query::error::Result;
-    use query::queries::property_values::Filter;
-    use query::queries::property_values::LogicalPlanBuilder;
-    use query::queries::property_values::PropertyValues;
+    use query::properties::Filter;
+    use query::properties::LogicalPlanBuilder;
+    use query::properties::PropertyValues;
     use query::test_util::create_entities;
     use query::test_util::events_provider;
     use query::test_util::run_plan;
@@ -34,7 +33,7 @@ mod tests {
         let input = events_provider(db, proj_id).await?;
 
         let req = PropertyValues {
-            property: PropertyRef::Group("Is Premium".to_string()),
+            property: PropertyRef::Group("Is Premium".to_string(), 0),
             event: Some(EventRef::RegularName("View Product".to_string())),
             filter: Some(Filter {
                 operation: PropValueOperation::True,
@@ -130,7 +129,7 @@ mod tests {
         let input = events_provider(db, proj_id).await?;
 
         let req = PropertyValues {
-            property: PropertyRef::Group("Country".to_string()),
+            property: PropertyRef::Group("Country".to_string(), 0),
             event: Some(EventRef::RegularName("View Product".to_string())),
             filter: Some(Filter {
                 operation: PropValueOperation::Like,
@@ -160,7 +159,7 @@ mod tests {
         let input = events_provider(db, proj_id).await?;
 
         let req = PropertyValues {
-            property: PropertyRef::Group("Country".to_string()),
+            property: PropertyRef::Group("Country".to_string(), 0),
             event: Some(EventRef::RegularName("View Product".to_string())),
             filter: None,
         };

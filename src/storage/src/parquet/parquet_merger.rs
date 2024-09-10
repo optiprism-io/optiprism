@@ -8,8 +8,9 @@ use std::io::BufWriter;
 use std::io::Read;
 use std::io::Seek;
 use std::os::unix::fs::MetadataExt;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
+
 use arrow2::array::new_null_array;
 use arrow2::array::Array;
 use arrow2::array::BinaryArray;
@@ -48,7 +49,8 @@ use arrow2::io::parquet::write::WriteOptions as ArrowWriteOptions;
 use arrow2::types::NativeType;
 use metrics::histogram;
 use num_traits::ToPrimitive;
-use parquet2::compression::{CompressionOptions, ZstdLevel};
+use parquet2::compression::CompressionOptions;
+use parquet2::compression::ZstdLevel;
 use parquet2::encoding::Encoding;
 use parquet2::metadata::ColumnDescriptor;
 use parquet2::metadata::SchemaDescriptor;
@@ -59,7 +61,7 @@ use parquet2::write::Version;
 use parquet2::write::WriteOptions;
 
 use crate::error::Result;
-use crate::{Fs, merge_arrays};
+use crate::merge_arrays;
 use crate::merge_arrays_inner;
 use crate::merge_list_arrays;
 use crate::merge_list_arrays_inner;
@@ -78,6 +80,7 @@ use crate::parquet::ParquetValue;
 use crate::parquet::ThreeColMergeRow;
 use crate::parquet::TmpArray;
 use crate::parquet::TwoColMergeRow;
+use crate::Fs;
 
 #[derive(Debug)]
 // Arrow chunk before being merged
@@ -715,8 +718,7 @@ pub struct Options {
 }
 
 pub struct Merger<R>
-where
-    R: Read,
+where R: Read
 {
     // list of index cols (partitions) in parquet file
     index_cols: Vec<ColumnDescriptor>,
@@ -826,8 +828,7 @@ pub fn merge<R: Read + Seek>(
 }
 
 impl<R> Merger<R>
-where
-    R: Read + Seek,
+where R: Read + Seek
 {
     // Create new merger
 
@@ -894,9 +895,9 @@ where
                 // get descriptors of index/partition columns
 
                 if first {
-                    min = chunks[0].0.min_values.clone();
+                    min.clone_from(&chunks[0].0.min_values);
                 }
-                max = chunks.last().unwrap().0.max_values.clone();
+                max.clone_from(&chunks.last().unwrap().0.max_values);
                 first = false;
                 for col_id in 0..self.index_cols.len() {
                     for chunk in chunks.iter() {
@@ -986,15 +987,12 @@ where
                         seq_writer.end(key_value_metadata)?;
 
                         let mf = MergedFile {
-                            size_bytes: f
-                                .metadata()
-                                .unwrap()
-                                .size(),
+                            size_bytes: f.metadata().unwrap().size(),
                             values: num_values,
                             id: part_id,
                             min,
                             max,
-                            path:path.to_owned(),
+                            path: path.to_owned(),
                         };
                         merged_files.push(mf);
                         continue 'l1;
@@ -1007,10 +1005,7 @@ where
                 seq_writer.end(key_value_metadata)?;
 
                 let mf = MergedFile {
-                    size_bytes: File::open(path)?
-                        .metadata()
-                        .unwrap()
-                        .size(),
+                    size_bytes: File::open(path)?.metadata().unwrap().size(),
                     values: num_values,
                     id: part_id,
                     min,

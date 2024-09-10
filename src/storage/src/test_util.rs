@@ -46,7 +46,8 @@ use arrow_array::RecordBatch;
 use chrono::NaiveDateTime;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
-use parquet2::compression::{CompressionOptions, ZstdLevel};
+use parquet2::compression::CompressionOptions;
+use parquet2::compression::ZstdLevel;
 use parquet2::encoding::Encoding;
 use parquet2::write::Version;
 use rust_decimal::Decimal;
@@ -381,7 +382,7 @@ impl Value {
                 DataType::Timestamp(_tu, _tz) => {
                     let v: i64 = data.parse().or_else(|_v| {
                         NaiveDateTime::parse_from_str(data, "%Y-%m-%d %H:%M:%S")
-                            .map(|v| v.timestamp_millis())
+                            .map(|v| v.and_utc().timestamp_millis())
                     })?;
                     Value::Int64(Some(v))
                 }

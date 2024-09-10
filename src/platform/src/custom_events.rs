@@ -11,7 +11,6 @@ use serde::Serialize;
 use crate::Context;
 use crate::EventRef;
 use crate::ListResponse;
-use crate::PlatformError;
 use crate::PropValueFilter;
 use crate::Result;
 
@@ -154,6 +153,7 @@ pub struct Event {
     pub filters: Option<Vec<PropValueFilter>>,
 }
 
+#[allow(clippy::all)]
 impl Into<metadata::custom_events::Event> for Event {
     fn into(self) -> metadata::custom_events::Event {
         metadata::custom_events::Event {
@@ -165,6 +165,7 @@ impl Into<metadata::custom_events::Event> for Event {
     }
 }
 
+#[allow(clippy::all)]
 impl Into<Event> for metadata::custom_events::Event {
     fn into(self) -> Event {
         Event {
@@ -193,6 +194,7 @@ pub struct CustomEvent {
     pub events: Vec<Event>,
 }
 
+#[allow(clippy::all)]
 impl Into<CustomEvent> for metadata::custom_events::CustomEvent {
     fn into(self) -> CustomEvent {
         CustomEvent {

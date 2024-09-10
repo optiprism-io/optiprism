@@ -1,10 +1,7 @@
 use std::any::Any;
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
-use std::ops::Deref;
 use std::pin::Pin;
-use std::rc::Rc;
 use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
@@ -12,27 +9,17 @@ use std::task::Poll;
 use arrow::array::Array;
 use arrow::array::ArrayRef;
 use arrow::array::Decimal128Array;
-use arrow::array::Decimal128Builder;
 use arrow::array::Int64Array;
 use arrow::array::Int64Builder;
 use arrow::array::RecordBatch;
 use arrow::array::StringArray;
-use arrow::compute::sort_to_indices;
 use arrow::compute::take;
-use arrow::compute::SortOptions;
 use arrow::datatypes::DataType;
-use arrow::datatypes::Field;
-use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
-use arrow::util::pretty::print_batches;
 use async_trait::async_trait;
-use common::DECIMAL_PRECISION;
-use common::DECIMAL_SCALE;
 use datafusion::execution::RecordBatchStream;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::execution::TaskContext;
-use datafusion::physical_expr::Partitioning;
-use datafusion::physical_expr::PhysicalSortExpr;
 use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
@@ -42,10 +29,8 @@ use datafusion_common::DataFusionError;
 use datafusion_common::Result as DFResult;
 use futures::Stream;
 use futures::StreamExt;
-use indexmap::IndexMap;
 
 use crate::error::QueryError;
-use crate::physical_plan::merge::MergeExec;
 use crate::Result;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -170,14 +155,14 @@ impl Stream for AggregateAndSortColumnsStream {
                             .downcast_ref::<Int64Array>()
                             .unwrap()
                             .iter()
-                            .map(|v| Value::Int64(v))
+                            .map(Value::Int64)
                             .collect::<Vec<_>>(),
                         DataType::Decimal128(_, _) => col
                             .as_any()
                             .downcast_ref::<Decimal128Array>()
                             .unwrap()
                             .iter()
-                            .map(|v| Value::Decimal(v))
+                            .map(Value::Decimal)
                             .collect::<Vec<_>>(),
                         DataType::Utf8 => col
                             .as_any()
@@ -217,7 +202,7 @@ impl Stream for AggregateAndSortColumnsStream {
                     .map_err(|e| DataFusionError::Execution(e.to_string()))?;
                 Poll::Ready(Some(Ok(rb)))
             }
-            other => return other,
+            other => other,
         }
     }
 }
@@ -239,7 +224,6 @@ mod tests {
     use datafusion::prelude::SessionContext;
     use storage::test_util::parse_markdown_tables;
 
-    use crate::physical_plan::aggregate_and_sort_columns::AggregateAndSortColumnsExec;
     use crate::physical_plan::limit_groups::LimitGroupsExec;
 
     #[tokio::test]

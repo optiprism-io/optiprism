@@ -21,11 +21,10 @@ pub fn select_intention<'a>(
     if state.session_id > 0 && !state.products_bought.is_empty() && rng.gen::<f64>() < 0.1 {
         for (product, _) in state.products_bought.iter() {
             if rng.gen::<f64>() < 0.5
-                && state
+                && !state
                     .products_refunded
                     .iter()
-                    .find(|(p, _)| p.name == product.name)
-                    .is_none()
+                    .any(|(p, _)| p.name == product.name)
             {
                 return Intention::MakeRefund(
                     products

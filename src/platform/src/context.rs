@@ -1,24 +1,12 @@
 use std::sync::Arc;
 
 use axum::async_trait;
-use axum::body::HttpBody;
 use axum::extract::Extension;
-use axum::extract::FromRequest;
 use axum::extract::FromRequestParts;
-use axum::http;
 use axum::http::request::Parts;
-use axum::http::HeaderMap;
-use axum::http::HeaderValue;
-use axum::http::Request;
-use axum::middleware::Next;
-use axum_core::body;
-use axum_core::body::Body;
-use axum_core::response::IntoResponse;
-use axum_core::response::Response;
 use axum_extra::headers::authorization::Bearer;
 use axum_extra::headers::Authorization;
 use axum_extra::TypedHeader;
-use bytes::Bytes;
 use common::rbac::OrganizationPermission;
 use common::rbac::OrganizationRole;
 use common::rbac::Permission;
@@ -28,9 +16,8 @@ use common::rbac::Role;
 use common::rbac::ORGANIZATION_PERMISSIONS;
 use common::rbac::PERMISSIONS;
 use common::rbac::PROJECT_PERMISSIONS;
-use serde_json::Value;
 use metadata::settings::SettingsProvider;
-use metadata::MetadataProvider;
+
 use crate::auth::token::parse_access_token;
 use crate::error::AuthError;
 use crate::PlatformError;
@@ -51,16 +38,16 @@ pub struct Context {
 impl Context {
     pub fn check_permission(&self, permission: Permission) -> Result<()> {
         // todo uncomment
-        /*if self.force_update_password {
-            return Err(PlatformError::Forbidden(
-                "password must be changed".to_string(),
-            ));
-        }
-        if self.force_update_email {
-            return Err(PlatformError::Forbidden(
-                "email must be changed".to_string(),
-            ));
-        }*/
+        // if self.force_update_password {
+        // return Err(PlatformError::Forbidden(
+        // "password must be changed".to_string(),
+        // ));
+        // }
+        // if self.force_update_email {
+        // return Err(PlatformError::Forbidden(
+        // "email must be changed".to_string(),
+        // ));
+        // }
         if let Some(role) = &self.role {
             for (root_role, role_permission) in PERMISSIONS.iter() {
                 if *root_role != *role {
@@ -167,8 +154,7 @@ impl Context {
 
 #[async_trait]
 impl<S> FromRequestParts<S> for Context
-where
-    S: Send + Sync,
+where S: Send + Sync
 {
     type Rejection = PlatformError;
 
@@ -181,9 +167,10 @@ where
                 .await
                 .map_err(|_err| AuthError::CantParseBearerHeader)?;
 
-        let Extension(settings) = Extension::<Arc<SettingsProvider>>::from_request_parts(parts, state)
-            .await
-            .map_err(|err| PlatformError::Internal(err.to_string()))?;
+        let Extension(settings) =
+            Extension::<Arc<SettingsProvider>>::from_request_parts(parts, state)
+                .await
+                .map_err(|err| PlatformError::Internal(err.to_string()))?;
 
         let claims = parse_access_token(bearer.token(), settings.load()?.auth_access_token)
             .map_err(|err| err.wrap_into(AuthError::CantParseAccessToken))?;

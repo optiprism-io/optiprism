@@ -1,9 +1,10 @@
 use std::net::SocketAddr;
 use std::path::PathBuf;
+
 use clap::ValueEnum;
 use serde_derive::Deserialize;
-use tracing::Level;
 use tracing::level_filters::LevelFilter;
+use tracing::Level;
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
 pub struct Server {
@@ -84,9 +85,13 @@ impl TryInto<common::config::Config> for Config {
                 access_token_duration: parse_duration(self.auth.access_token_duration.as_str())?,
                 refresh_token_duration: parse_duration(self.auth.refresh_token_duration.as_str())?,
             },
-            log: common::config::Log { level: self.log.level.into() },
+            log: common::config::Log {
+                level: self.log.level.into(),
+            },
             misc: common::config::Misc {
-                session_cleaner_interval: parse_duration(self.misc.session_cleaner_interval.as_str())?,
+                session_cleaner_interval: parse_duration(
+                    self.misc.session_cleaner_interval.as_str(),
+                )?,
                 project_default_session_duration: parse_duration(
                     self.misc.project_default_session_duration.as_str(),
                 )?,
@@ -99,7 +104,9 @@ impl TryInto<common::config::Config> for Config {
                 max_log_length_bytes: self.events_table.max_log_length_bytes,
                 merge_max_l1_part_size_bytes: self.events_table.merge_max_l1_part_size_bytes,
                 merge_part_size_multiplier: self.events_table.merge_part_size_multiplier,
-                merge_data_page_size_limit_bytes: self.events_table.merge_data_page_size_limit_bytes,
+                merge_data_page_size_limit_bytes: self
+                    .events_table
+                    .merge_data_page_size_limit_bytes,
                 merge_row_group_values_limit: self.events_table.merge_row_group_values_limit,
                 merge_array_size: self.events_table.merge_array_size,
                 merge_chunk_size: self.events_table.merge_chunk_size,
@@ -148,6 +155,6 @@ impl From<LogLevel> for LevelFilter {
             LogLevel::Warn => Level::WARN,
             LogLevel::Error => Level::ERROR,
         }
-            .into()
+        .into()
     }
 }

@@ -1,17 +1,17 @@
 use chrono::Utc;
 use common::types::OptionalProperty;
 use common::GROUP_USER_ID;
-use platform::queries::event_segmentation::Analysis;
-use platform::queries::event_segmentation::ChartType;
-use platform::queries::event_segmentation::EventSegmentation;
-use platform::queries::QueryTime;
-use platform::queries::TimeIntervalUnit;
+use platform::event_segmentation::Analysis;
+use platform::event_segmentation::ChartType;
+use platform::event_segmentation::EventSegmentationRequest;
 use platform::reports::CreateReportRequest;
 use platform::reports::Query;
 use platform::reports::Report;
 use platform::reports::Type;
 use platform::reports::UpdateReportRequest;
 use platform::ListResponse;
+use platform::QueryTime;
+use platform::TimeIntervalUnit;
 use reqwest::Client;
 use reqwest::StatusCode;
 
@@ -50,7 +50,7 @@ async fn test_reports() {
         name: "qwe".to_string(),
         description: Some("desc".to_string()),
         typ: Type::EventSegmentation,
-        query: Query::EventSegmentation(EventSegmentation {
+        query: Query::EventSegmentation(EventSegmentationRequest {
             time: QueryTime::From { from: Utc::now() },
             group: GROUP_USER_ID,
             interval_unit: TimeIntervalUnit::Day,
@@ -127,7 +127,7 @@ async fn test_reports() {
     {
         report.tags = Some(vec!["ert".to_string()]);
         report.description = Some("xcv".to_string());
-        report.query = Query::EventSegmentation(EventSegmentation {
+        report.query = Query::EventSegmentation(EventSegmentationRequest {
             time: QueryTime::Last {
                 last: 1,
                 unit: TimeIntervalUnit::Day,

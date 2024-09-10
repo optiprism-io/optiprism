@@ -1,5 +1,4 @@
 use std::any::Any;
-use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::hash::Hash;
@@ -8,7 +7,6 @@ use std::sync::Arc;
 
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
-use arrow::datatypes::TimeUnit;
 use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
@@ -16,7 +14,6 @@ use common::query::TimeIntervalUnit;
 use common::types::TIME_UNIT;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
-use datafusion::physical_plan::common::collect;
 use datafusion_common::Column;
 use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;
@@ -25,7 +22,6 @@ use datafusion_expr::LogicalPlan;
 use datafusion_expr::UserDefinedLogicalNode;
 
 use crate::error::QueryError;
-use crate::logical_plan::merge::MergeNode;
 use crate::logical_plan::SortField;
 use crate::Result;
 
@@ -57,7 +53,7 @@ impl Funnel {
         if let Some(groups) = &self.groups {
             let group_fields = groups
                 .iter()
-                .map(|(expr, name, sort_field)| {
+                .map(|(_, name, _sort_field)| {
                     let f = schema.field_with_name(None, name.as_str()).unwrap();
                     Field::new(name, f.data_type().to_owned(), f.is_nullable())
                 })
@@ -184,7 +180,7 @@ impl FunnelNode {
     ) -> Result<Self> {
         let schema = funnel.schema(input.schema());
         let segment_field = Arc::new(Field::new("segment", DataType::Int64, false));
-        let fields = vec![vec![segment_field], schema.fields().to_vec()].concat();
+        let fields = [vec![segment_field], schema.fields().to_vec()].concat();
         let fields = fields
             .iter()
             .map(|f| (None, f.to_owned()))
@@ -244,7 +240,7 @@ impl UserDefinedLogicalNode for FunnelNode {
 
     fn with_exprs_and_inputs(
         &self,
-        exprs: Vec<Expr>,
+        _exprs: Vec<Expr>,
         inputs: Vec<LogicalPlan>,
     ) -> datafusion_common::Result<Arc<dyn UserDefinedLogicalNode>> {
         Ok(Arc::new(

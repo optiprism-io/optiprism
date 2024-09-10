@@ -1,9 +1,15 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
-use metrics::{counter, histogram};
+
 use common::group_col;
-use common::types::{DType, GROUP_COLUMN_ID, METRIC_INGESTER_IDENTIFIED_TOTAL, METRIC_INGESTER_IDENTIFY_TIME_SECONDS, METRIC_INGESTER_TRACK_TIME_SECONDS, METRIC_INGESTER_TRACKED_TOTAL, TABLE_EVENTS};
+use common::types::DType;
+use common::types::GROUP_COLUMN_ID;
+use common::types::METRIC_INGESTER_IDENTIFIED_TOTAL;
+use common::types::METRIC_INGESTER_IDENTIFY_TIME_SECONDS;
+use common::types::METRIC_INGESTER_TRACKED_TOTAL;
+use common::types::METRIC_INGESTER_TRACK_TIME_SECONDS;
+use common::types::TABLE_EVENTS;
 use common::GROUP_USER_ID;
 use metadata::events;
 use metadata::events::CreateEventRequest;
@@ -13,6 +19,8 @@ use metadata::properties::DictionaryType;
 use metadata::properties::Properties;
 use metadata::properties::Status;
 use metadata::MetadataProvider;
+use metrics::counter;
+use metrics::histogram;
 use storage::db::OptiDBImpl;
 use storage::Value;
 
@@ -297,7 +305,12 @@ impl Executor<Identify> {
         let vals = if let Some(props) = &req.resolved_properties {
             let mut vals = vec![];
             for prop in props {
-                let v = property_to_value(&ctx, group_col(req.group_id as usize).as_str(), prop, &self.md.dictionaries)?;
+                let v = property_to_value(
+                    &ctx,
+                    group_col(req.group_id as usize).as_str(),
+                    prop,
+                    &self.md.dictionaries,
+                )?;
                 let vv = match v {
                     Value::Int8(v) => metadata::groups::Value::Int8(v),
                     Value::Int16(v) => metadata::groups::Value::Int16(v),
@@ -332,7 +345,6 @@ impl Executor<Identify> {
         } else {
             vec![]
         };
-
 
         let resolved_group_values = self.md.groups.create_or_update(
             ctx.project_id.unwrap(),

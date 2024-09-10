@@ -9,6 +9,7 @@ use arrow::datatypes::DataType;
 use chrono::DateTime;
 use chrono::Utc;
 use common::group_col;
+use common::query::PropertyRef;
 use common::types::DType;
 use common::types::OptionalProperty;
 use common::types::TABLE_EVENTS;
@@ -21,12 +22,10 @@ use rocksdb::Transaction;
 use rocksdb::TransactionDB;
 use serde::Deserialize;
 use serde::Serialize;
-use common::query::PropertyRef;
 use storage::db::OptiDBImpl;
 use storage::error::StoreError;
 
 use crate::error::MetadataError;
-use crate::index::check_insert_constraints;
 use crate::index::check_update_constraints;
 use crate::index::delete_index;
 use crate::index::get_index;
@@ -34,12 +33,14 @@ use crate::index::insert_index;
 use crate::index::next_seq;
 use crate::index::next_zero_seq;
 use crate::index::update_index;
-use crate::{list_data, make_data_key, property};
+use crate::make_data_key;
 use crate::make_data_value_key;
 use crate::make_id_seq_key;
 use crate::make_index_key;
-use crate::metadata::{ListResponse, ResponseMetadata};
+use crate::metadata::ListResponse;
+use crate::metadata::ResponseMetadata;
 use crate::project_ns;
+use crate::property;
 use crate::Result;
 
 const IDX_NAME: &[u8] = b"name";
@@ -56,7 +57,7 @@ fn index_keys(
         index_name_key(project_id, typ, name),
         index_display_name_key(project_id, typ, display_name),
     ]
-        .to_vec()
+    .to_vec()
 }
 
 fn index_name_key(project_id: u64, typ: &Type, name: &str) -> Option<Vec<u8>> {
@@ -66,18 +67,7 @@ fn index_name_key(project_id: u64, typ: &Type, name: &str) -> Option<Vec<u8>> {
             IDX_NAME,
             name,
         )
-            .to_vec(),
-    )
-}
-
-fn index_column_name_key(project_id: u64, typ: &Type, name: &str) -> Option<Vec<u8>> {
-    Some(
-        make_index_key(
-            project_ns(project_id, "global".as_bytes()).as_slice(),
-            IDX_COLUMN_NAME,
-            name,
-        )
-            .to_vec(),
+        .to_vec(),
     )
 }
 
@@ -92,7 +82,7 @@ fn index_display_name_key(
             IDX_DISPLAY_NAME,
             v.as_str(),
         )
-            .to_vec()
+        .to_vec()
     })
 }
 
@@ -121,8 +111,7 @@ impl Properties {
         }
     }
     pub fn new_group(db: Arc<TransactionDB>, opti_db: Arc<OptiDBImpl>) -> Vec<Arc<Self>> {
-        let props = (0..GROUPS_COUNT)
-            .into_iter()
+        (0..GROUPS_COUNT)
             .map(|gid| {
                 let id_cache = RwLock::new(LruCache::new(
                     NonZeroUsize::new(10 /* todo why 10? */).unwrap(),
@@ -138,9 +127,7 @@ impl Properties {
                     typ: Type::Group(gid),
                 })
             })
-            .collect::<Vec<_>>();
-
-        props
+            .collect::<Vec<_>>()
     }
 
     pub fn new_event(db: Arc<TransactionDB>, opti_db: Arc<OptiDBImpl>) -> Self {
@@ -159,9 +146,7 @@ impl Properties {
         }
     }
 
-    pub fn get_by_column_name_global(&self,
-                                     project_id: u64,
-                                     name: &str) -> Result<Property> {
+    pub fn get_by_column_name_global(&self, project_id: u64, name: &str) -> Result<Property> {
         let tx = self.db.transaction();
         let idx_key = make_index_key(
             project_ns(project_id, self.typ.path().as_bytes()).as_slice(),
@@ -203,7 +188,7 @@ impl Properties {
             format!("property with name \"{}\" not found", name).as_str(),
         )?;
 
-        self.get_by_id_(&tx, project_id, id)
+        self.get_by_id_(tx, project_id, id)
     }
 
     fn get_by_id_(
@@ -259,11 +244,10 @@ impl Properties {
                     project_id,
                     format!("properties/order/{}", req.data_type.short_name()).as_bytes(),
                 )
-                    .as_slice(),
+                .as_slice(),
             ),
         )?;
         let created_at = Utc::now();
-
 
         let prop = Property {
             id,
@@ -303,7 +287,7 @@ impl Properties {
             .put((project_id, id), prop.clone());
 
         let data = serialize(&prop)?;
-        tx.put(idx_key, &data)?;
+        tx.put(idx_key, data)?;
 
         idx_keys.push(Some(
             make_index_key(
@@ -311,9 +295,8 @@ impl Properties {
                 IDX_COLUMN_NAME,
                 prop.column_name().as_str(),
             )
-                .to_vec(),
+            .to_vec(),
         ));
-
 
         insert_index(tx, idx_keys.as_ref(), prop.id)?;
 
@@ -418,7 +401,10 @@ impl Properties {
         for kv in iter {
             let (key, value) = kv?;
             // check if key contains the prefix
-            if !from_utf8(&prefix).unwrap().is_prefix_of(from_utf8(&key).unwrap()) {
+            if !from_utf8(&prefix)
+                .unwrap()
+                .is_prefix_of(from_utf8(&key).unwrap())
+            {
                 break;
             }
             list.push(deserialize(&value)?);
@@ -470,7 +456,7 @@ impl Properties {
                 &self.typ,
                 prev_prop.display_name,
             ));
-            prop.display_name = display_name.to_owned();
+            display_name.clone_into(&mut prop.display_name);
         }
         check_update_constraints(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref())?;
 
@@ -522,7 +508,7 @@ impl Properties {
             .put((project_id, prop.id), prop.clone());
 
         let data = serialize(&prop)?;
-        tx.put(idx_key, &data)?;
+        tx.put(idx_key, data)?;
 
         update_index(&tx, idx_keys.as_ref(), idx_prev_keys.as_ref(), property_id)?;
         tx.commit()?;
@@ -727,7 +713,7 @@ fn serialize(prop: &Property) -> Result<Vec<u8>> {
             DType::Timestamp => property::DataType::Timestamp as i32,
             DType::Decimal => property::DataType::Decimal as i32,
             DType::String => property::DataType::String as i32,
-            _ => unreachable!()
+            _ => unreachable!(),
         },
         status: match &prop.status {
             Status::Enabled => property::Status::Enabled as i32,
@@ -755,13 +741,15 @@ fn serialize(prop: &Property) -> Result<Vec<u8>> {
 
 // deserialize property from protobuf
 fn deserialize(data: &[u8]) -> Result<Property> {
-    let from = property::Property::decode(data.as_ref())?;
+    let from = property::Property::decode(data)?;
 
     Ok(Property {
         id: from.id,
         created_at: chrono::DateTime::from_timestamp(from.created_at, 0).unwrap(),
         created_by: from.created_by,
-        updated_at: from.updated_at.map(|t| chrono::DateTime::from_timestamp(t, 0).unwrap()),
+        updated_at: from
+            .updated_at
+            .map(|t| chrono::DateTime::from_timestamp(t, 0).unwrap()),
         updated_by: from.updated_by,
         project_id: from.project_id,
         tags: if from.tags.is_empty() {
@@ -787,12 +775,12 @@ fn deserialize(data: &[u8]) -> Result<Property> {
             6 => DType::Decimal,
             7 => DType::Boolean,
             8 => DType::Timestamp,
-            _ => unreachable!()
+            _ => unreachable!(),
         },
         status: match from.status {
             1 => Status::Enabled,
             2 => Status::Disabled,
-            _ => unreachable!()
+            _ => unreachable!(),
         },
         is_system: from.is_system,
         nullable: from.nullable,
@@ -804,7 +792,7 @@ fn deserialize(data: &[u8]) -> Result<Property> {
             2 => DictionaryType::Int16,
             3 => DictionaryType::Int32,
             4 => DictionaryType::Int64,
-            _ => unreachable!()
+            _ => unreachable!(),
         }),
     })
 }
@@ -813,7 +801,13 @@ fn deserialize(data: &[u8]) -> Result<Property> {
 mod tests {
     use chrono::DateTime;
     use common::types::DType;
-    use crate::properties::{deserialize, DictionaryType, Property, serialize, Status, Type};
+
+    use crate::properties::deserialize;
+    use crate::properties::serialize;
+    use crate::properties::DictionaryType;
+    use crate::properties::Property;
+    use crate::properties::Status;
+    use crate::properties::Type;
 
     #[test]
     fn test_roundtrip() {

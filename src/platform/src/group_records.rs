@@ -1,24 +1,30 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use axum::async_trait;
-use chrono::{DateTime, Utc};
-use common::query::Segment;
-use serde::Deserialize;
-use serde::Serialize;
-use serde_json::Value;
+use chrono::DateTime;
+use chrono::Utc;
 use common::rbac::ProjectPermission;
 use metadata::MetadataProvider;
 use query::context::Format;
-use query::{event_records, group_records};
+use query::group_records;
 use query::group_records::fix_search_request;
 use query::group_records::GroupRecordsProvider;
+use serde::Deserialize;
+use serde::Serialize;
+use serde_json::Value;
 
-use crate::{Context, PlatformError, PropertyAndValue, PropertyRef, PropValueFilter, QueryParams, QueryResponse, QueryResponseFormat, QueryTime, SortablePropertyRef, validate_event, validate_event_filter};
-use crate::event_records::{EventRecord, EventRecordsSearchRequest};
+use crate::validate_event_filter;
+use crate::Context;
 use crate::EventGroupedFilters;
-use crate::ListResponse;
+use crate::PlatformError;
+use crate::PropertyAndValue;
+use crate::PropertyRef;
+use crate::QueryParams;
+use crate::QueryResponse;
+use crate::QueryResponseFormat;
+use crate::QueryTime;
 use crate::Result;
+use crate::SortablePropertyRef;
 
 pub struct GroupRecords {
     md: Arc<MetadataProvider>,
@@ -30,7 +36,13 @@ impl GroupRecords {
         Self { md, prov }
     }
 
-    pub async fn get_by_id(&self, ctx: Context, project_id: u64, group_id: usize, id: String) -> Result<GroupRecord> {
+    pub async fn get_by_id(
+        &self,
+        ctx: Context,
+        project_id: u64,
+        group_id: usize,
+        id: String,
+    ) -> Result<GroupRecord> {
         ctx.check_project_permission(
             ctx.organization_id,
             project_id,
@@ -42,12 +54,18 @@ impl GroupRecords {
             cur_time: Utc::now(),
         };
 
-        let mut data = self.prov.get_by_id(ctx, group_id, id).await?;
+        let data = self.prov.get_by_id(ctx, group_id, id).await?;
 
         Ok(data.into())
     }
 
-    pub async fn search(&self, ctx: Context, project_id: u64, req: GroupRecordsSearchRequest, query: QueryParams) -> Result<QueryResponse> {
+    pub async fn search(
+        &self,
+        ctx: Context,
+        project_id: u64,
+        req: GroupRecordsSearchRequest,
+        query: QueryParams,
+    ) -> Result<QueryResponse> {
         ctx.check_project_permission(
             ctx.organization_id,
             project_id,
@@ -57,10 +75,7 @@ impl GroupRecords {
         let lreq = fix_search_request(&self.md, project_id, req.into())?;
         let cur_time = match query.timestamp {
             None => Utc::now(),
-            Some(ts_sec) => DateTime::from_naive_utc_and_offset(
-                chrono::NaiveDateTime::from_timestamp_millis(ts_sec * 1000).unwrap(),
-                Utc,
-            ),
+            Some(ts_sec) => DateTime::from_timestamp_millis(ts_sec * 1000).unwrap(),
         };
         let ctx = query::Context {
             project_id,
@@ -74,7 +89,7 @@ impl GroupRecords {
             cur_time,
         };
 
-        let mut data = self.prov.search(ctx, lreq.into()).await?;
+        let mut data = self.prov.search(ctx, lreq).await?;
 
         // do empty response so it will be [] instead of [[],[],[],...]
         if !data.columns.is_empty() && data.columns[0].data.is_empty() {
@@ -92,19 +107,28 @@ impl GroupRecords {
     }
 }
 
-
+#[allow(clippy::all)]
 impl Into<group_records::GroupRecordsSearchRequest> for GroupRecordsSearchRequest {
     fn into(self) -> group_records::GroupRecordsSearchRequest {
         group_records::GroupRecordsSearchRequest {
             time: self.time.map(|t| t.into()),
             group_id: self.group,
-            filters: self.filters.map_or_else(|| None, |v| {
-                if v.groups[0].filters.is_empty() {
-                    None
-                } else {
-                    Some(v.groups[0].filters.iter().map(|v| v.to_owned().into()).collect::<Vec<_>>())
-                }
-            }),
+            filters: self.filters.map_or_else(
+                || None,
+                |v| {
+                    if v.groups[0].filters.is_empty() {
+                        None
+                    } else {
+                        Some(
+                            v.groups[0]
+                                .filters
+                                .iter()
+                                .map(|v| v.to_owned().into())
+                                .collect::<Vec<_>>(),
+                        )
+                    }
+                },
+            ),
             properties: self.properties.map(|props| {
                 props
                     .iter()
@@ -121,17 +145,11 @@ pub(crate) fn validate_search_request(
     project_id: u64,
     req: &GroupRecordsSearchRequest,
 ) -> Result<()> {
-    match &req.time {
-        None => {}
-        Some(time) => match time {
-            QueryTime::Between { from, to } => {
-                if from > to {
-                    return Err(PlatformError::BadRequest(
-                        "from time must be less than to time".to_string(),
-                    ));
-                }
-            }
-            _ => {}
+    if let Some(QueryTime::Between { from, to }) = &req.time {
+        if from > to {
+            return Err(PlatformError::BadRequest(
+                "from time must be less than to time".to_string(),
+            ));
         }
     }
 
@@ -170,13 +188,13 @@ pub(crate) fn validate_search_request(
                         property_name,
                         group,
                     } => md.group_properties[*group]
-                        .get_by_name(project_id, &property_name)
+                        .get_by_name(project_id, property_name)
                         .map_err(|err| {
                             PlatformError::BadRequest(format!("property {idx}: {err}"))
                         })?,
                     PropertyRef::Event { property_name } => md
                         .event_properties
-                        .get_by_name(project_id, &property_name)
+                        .get_by_name(project_id, property_name)
                         .map_err(|err| {
                             PlatformError::BadRequest(format!("property {idx}: {err}"))
                         })?,
@@ -208,9 +226,16 @@ pub struct GroupRecord {
     pub properties: Vec<PropertyAndValue>,
 }
 
+#[allow(clippy::all)]
 impl Into<GroupRecord> for query::group_records::GroupRecord {
     fn into(self) -> GroupRecord {
-        GroupRecord { properties: self.properties.iter().map(|p| p.to_owned().into()).collect::<Vec<_>>() }
+        GroupRecord {
+            properties: self
+                .properties
+                .iter()
+                .map(|p| p.to_owned().into())
+                .collect::<Vec<_>>(),
+        }
     }
 }
 

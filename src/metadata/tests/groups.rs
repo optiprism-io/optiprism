@@ -1,12 +1,7 @@
 use std::env::temp_dir;
 use std::sync::Arc;
 
-use common::types::OptionalProperty;
 use metadata::error::Result;
-use metadata::events::CreateEventRequest;
-use metadata::events::Events;
-use metadata::events::Status;
-use metadata::events::UpdateEventRequest;
 use metadata::groups::Groups;
 use metadata::groups::PropertyValue;
 use metadata::groups::Value;
@@ -48,13 +43,27 @@ fn test_groups() -> Result<()> {
         .unwrap();
     assert_eq!(group.id, 3);
 
-    groups.get_or_create_group(1, "n1".to_string(), "n1".to_string()).unwrap();
-    groups.get_or_create_group(1, "n2".to_string(), "n2".to_string()).unwrap();
-    groups.get_or_create_group(1, "n3".to_string(), "n3".to_string()).unwrap();
-    groups.get_or_create_group(1, "n4".to_string(), "n4".to_string()).unwrap();
-    groups.get_or_create_group(1, "n5".to_string(), "n6".to_string()).unwrap();
-    assert!(groups.get_or_create_group(1, "n6".to_string(), "n6".to_string()).is_err());
+    groups
+        .get_or_create_group(1, "n1".to_string(), "n1".to_string())
+        .unwrap();
+    groups
+        .get_or_create_group(1, "n2".to_string(), "n2".to_string())
+        .unwrap();
+    groups
+        .get_or_create_group(1, "n3".to_string(), "n3".to_string())
+        .unwrap();
+    groups
+        .get_or_create_group(1, "n4".to_string(), "n4".to_string())
+        .unwrap();
+    groups
+        .get_or_create_group(1, "n5".to_string(), "n6".to_string())
+        .unwrap();
+    assert!(
+        groups
+            .get_or_create_group(1, "n6".to_string(), "n6".to_string())
+            .is_err()
+    );
 
-    let resp = groups.list_groups(1).unwrap();
+    _ = groups.list_groups(1).unwrap();
     Ok(())
 }

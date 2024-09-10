@@ -33,7 +33,7 @@ impl MergeNode {
 
         schema = if let Some((col_name, _)) = names.clone() {
             let fields = [
-                vec![Arc::new(Field::new(&col_name, DataType::Utf8, false))],
+                vec![Arc::new(Field::new(col_name, DataType::Utf8, false))],
                 schema.fields().to_vec(),
             ]
             .concat();
@@ -91,7 +91,7 @@ impl UserDefinedLogicalNode for MergeNode {
 
     fn with_exprs_and_inputs(
         &self,
-        exprs: Vec<Expr>,
+        _: Vec<Expr>,
         inputs: Vec<LogicalPlan>,
     ) -> datafusion_common::Result<Arc<dyn UserDefinedLogicalNode>> {
         Ok(Arc::new(

@@ -8,26 +8,21 @@ use std::time::Duration as StdDuration;
 
 use chrono::DateTime;
 use chrono::Duration;
-use chrono::TimeZone;
 use chrono::Utc;
-use common::{ types};
-use common::types::EVENT_SESSION_BEGIN;
+use common::types;
 use common::DECIMAL_SCALE;
 use common::GROUP_USER;
 use crossbeam_channel::tick;
-use crossbeam_channel::Sender;
 use ingester::executor::Executor;
 use ingester::Campaign;
 use ingester::Context;
 use ingester::Identify;
 use ingester::Page;
 use ingester::PropValue;
-use ingester::PropertyAndValue;
 use ingester::RequestContext;
 use ingester::Track;
 use metadata::properties::Properties;
 use metadata::sessions::Sessions;
-use metadata::MetadataProvider;
 use rand::prelude::*;
 use rand::rngs::ThreadRng;
 use rust_decimal::Decimal;
@@ -38,7 +33,6 @@ use crate::generator::Generator;
 use crate::store::actions::Action;
 use crate::store::coefficients::make_coefficients;
 use crate::store::coefficients::AdSource;
-use crate::store::companies::CompanyProvider;
 use crate::store::events::Event;
 use crate::store::intention::select_intention;
 use crate::store::intention::Intention;
@@ -153,7 +147,7 @@ impl Scenario {
                 library: None,
                 page: None,
                 user_agent: None,
-                ip: profile.ip.clone(),
+                ip: profile.ip,
                 campaign: None,
             };
 
@@ -186,7 +180,7 @@ impl Scenario {
 
             let req_ctx = RequestContext {
                 project_id: Some(self.project_id),
-                client_ip: profile.ip.clone(),
+                client_ip: profile.ip,
                 token: self.token.clone(),
             };
             self.identify.execute(&req_ctx, identify)?;
@@ -205,7 +199,7 @@ impl Scenario {
 
             let req_ctx = RequestContext {
                 project_id: Some(self.project_id),
-                client_ip: profile.ip.clone(),
+                client_ip: profile.ip,
                 token: self.token.clone(),
             };
             self.identify.execute(&req_ctx, identify)?;
@@ -242,7 +236,7 @@ impl Scenario {
                 let mut prev_action: Option<Action> = None;
                 let mut action = Action::ViewIndex;
                 let mut wait_time: u64;
-                let session_start_time = DateTime::from_timestamp(state.cur_timestamp, 0).unwrap();
+                let _session_start_time = DateTime::from_timestamp(state.cur_timestamp, 0).unwrap();
                 'events: loop {
                     events_per_sec.fetch_add(1, Ordering::SeqCst);
                     match (prev_action, action, &intention) {
@@ -275,8 +269,7 @@ impl Scenario {
                                 if state
                                     .products_viewed
                                     .iter()
-                                    .find(|(p, _)| p.name == product.name)
-                                    .is_some()
+                                    .any(|(p, _)| p.name == product.name)
                                 {
                                     continue;
                                 }
@@ -294,12 +287,7 @@ impl Scenario {
                         }
                         (Some(Action::ViewIndexPromotions), Action::ViewProduct, _) => {
                             let sp = self.products.promoted_product_sample(&mut self.rng);
-                            if state
-                                .products_viewed
-                                .iter()
-                                .find(|(p, _)| p.name == sp.name)
-                                .is_some()
-                            {
+                            if state.products_viewed.iter().any(|(p, _)| p.name == sp.name) {
                                 action = Action::EndSession;
                                 continue;
                             }
@@ -371,7 +359,7 @@ impl Scenario {
 
                                 let req_ctx = RequestContext {
                                     project_id: Some(self.project_id),
-                                    client_ip: profile.ip.clone(),
+                                    client_ip: profile.ip,
                                     token: self.token.clone(),
                                 };
                                 self.identify.execute(&req_ctx, identify)?;
@@ -387,31 +375,31 @@ impl Scenario {
 
                         (_, Action::CompleteOrder, _) => {
                             for product in state.cart.iter() {
-                                state
+                                if let Some((_, v)) = state
                                     .products_bought
                                     .iter_mut()
                                     .find(|(p, _)| p.name == product.name)
-                                    .map(|(_, v)| *v += 1);
+                                {
+                                    *v += 1
+                                }
                                 state.spent_total += product.final_price();
                             }
                         }
                         (Some(Action::ViewDeals), Action::ViewProduct, _) => {
                             let sp = self.products.deal_product_sample(&mut self.rng);
-                            if state
-                                .products_viewed
-                                .iter()
-                                .find(|(p, _)| p.name == sp.name)
-                                .is_some()
-                            {
+                            if state.products_viewed.iter().any(|(p, _)| p.name == sp.name) {
                                 action = Action::EndSession;
                                 continue;
                             }
                             let _ = state.selected_product.insert(sp);
-                            state
+
+                            if let Some((_, v)) = state
                                 .products_viewed
                                 .iter_mut()
                                 .find(|(p, _)| p.name == state.selected_product.unwrap().name)
-                                .map(|(_, v)| *v += 1);
+                            {
+                                *v += 1
+                            }
                         }
                         (_, Action::ViewRelatedProduct, _) => {
                             let product = &state.selected_product.unwrap();
@@ -425,11 +413,13 @@ impl Scenario {
                                 continue;
                             }
                             state.selected_product = found;
-                            state
+                            if let Some((_, v)) = state
                                 .products_viewed
                                 .iter_mut()
                                 .find(|(p, _)| p.name == state.selected_product.unwrap().name)
-                                .map(|(_, v)| *v += 1);
+                            {
+                                *v += 1
+                            }
                         }
                         (
                             Some(Action::ViewOrders),
@@ -600,7 +590,7 @@ impl Scenario {
             library: None,
             page: Some(page),
             user_agent: None,
-            ip: profile.ip.clone(),
+            ip: profile.ip,
             campaign,
         };
 
@@ -701,7 +691,7 @@ impl Scenario {
         if !state.spent_total.is_zero() {
             properties.insert(
                 "Spent Total".to_string(),
-                PropValue::Number(state.spent_total.clone()),
+                PropValue::Number(state.spent_total),
             );
         }
         if !state.products_bought.is_empty() {
@@ -728,10 +718,7 @@ impl Scenario {
                 .map(|p| p.discount_price.unwrap_or(p.price))
                 .sum();
 
-            properties.insert(
-                "Cart Amount".to_string(),
-                PropValue::Number(cart_amount_.clone()),
-            );
+            properties.insert("Cart Amount".to_string(), PropValue::Number(cart_amount_));
             cart_amount = Some(cart_amount_);
         }
 
@@ -766,7 +753,7 @@ impl Scenario {
         };
         let req_ctx = RequestContext {
             project_id: Some(self.project_id),
-            client_ip: profile.ip.clone(),
+            client_ip: profile.ip,
             token: self.token.clone(),
         };
 

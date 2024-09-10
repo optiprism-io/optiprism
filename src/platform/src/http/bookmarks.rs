@@ -6,13 +6,11 @@ use axum::http::StatusCode;
 use axum::routing;
 use axum::Router;
 use common::http::Json;
-use crate::bookmarks::{Bookmark, Bookmarks, CreateBookmarkRequest};
-use crate::reports::CreateReportRequest;
-use crate::reports::Report;
-use crate::reports::Reports;
-use crate::reports::UpdateReportRequest;
+
+use crate::bookmarks::Bookmark;
+use crate::bookmarks::Bookmarks;
+use crate::bookmarks::CreateBookmarkRequest;
 use crate::Context;
-use crate::ListResponse;
 use crate::Result;
 
 async fn create(
@@ -40,9 +38,6 @@ pub fn attach_routes(router: Router) -> Router {
         "/api/v1/projects/:project_id/bookmarks",
         Router::new()
             .route("/", routing::post(create))
-            .route(
-                "/:project_id",
-                routing::get(get_by_id),
-            ),
+            .route("/:project_id", routing::get(get_by_id)),
     )
 }

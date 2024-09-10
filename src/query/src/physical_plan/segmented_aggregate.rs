@@ -30,15 +30,14 @@ use datafusion::execution::context::TaskContext;
 use datafusion::physical_expr::expressions::col;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::expressions::Max;
-use datafusion::physical_expr::{Distribution, EquivalenceProperties};
+use datafusion::physical_expr::Distribution;
+use datafusion::physical_expr::EquivalenceProperties;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
 use datafusion::physical_expr::PhysicalSortRequirement;
-use datafusion::physical_optimizer::PhysicalOptimizerRule;
 use datafusion::physical_plan::aggregates::AggregateExec as DFAggregateExec;
 use datafusion::physical_plan::aggregates::AggregateMode;
 use datafusion::physical_plan::aggregates::PhysicalGroupBy;
-use datafusion::physical_plan::expressions::PhysicalSortExpr;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
 use datafusion::physical_plan::metrics::MetricsSet;
@@ -47,14 +46,12 @@ use datafusion::physical_plan::DisplayAs;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::physical_plan::ExecutionPlanProperties;
-use datafusion::physical_plan::Partitioning;
 use datafusion::physical_plan::Partitioning::UnknownPartitioning;
 use datafusion::physical_plan::PlanProperties;
 use datafusion::physical_plan::RecordBatchStream;
 use datafusion::physical_plan::SendableRecordBatchStream;
 use datafusion::physical_plan::Statistics;
 use datafusion::prelude::SessionContext;
-use datafusion_common::config::ConfigOptions;
 use datafusion_common::Result as DFResult;
 use datafusion_common::ScalarValue;
 use futures::Stream;
@@ -119,25 +116,6 @@ macro_rules! combine_results {
         let result = RecordBatch::try_new($self.schema.clone(), cols)?;
         $res_batches.push(result);
     }};
-}
-struct SegmentedAggregatePartialOptimizationRule {}
-
-impl PhysicalOptimizerRule for SegmentedAggregatePartialOptimizationRule {
-    fn optimize(
-        &self,
-        _plan: Arc<dyn ExecutionPlan>,
-        _config: &ConfigOptions,
-    ) -> DFResult<Arc<dyn ExecutionPlan>> {
-        todo!()
-    }
-
-    fn name(&self) -> &str {
-        "PartitionedAggregatePartial"
-    }
-
-    fn schema_check(&self) -> bool {
-        todo!()
-    }
 }
 
 type NamedAggExpr = (Arc<Mutex<Box<dyn PartitionedAggregateExpr>>>, String);
@@ -204,7 +182,7 @@ impl SegmentedAggregatePartialExec {
         let group_fields = [vec![segment_field], group_fields].concat();
         let fields: Vec<FieldRef> = [group_fields.clone(), agg_result_fields].concat();
         let schema = Arc::new(Schema::new(fields));
-        let cache = Self::compute_properties(&input,schema.clone())?;
+        let cache = Self::compute_properties(&input, schema.clone())?;
         Ok(Self {
             input,
             segment_inputs: partition_inputs,
@@ -217,7 +195,10 @@ impl SegmentedAggregatePartialExec {
         })
     }
 
-    fn compute_properties(input: &Arc<dyn ExecutionPlan>,schema:SchemaRef) -> Result<PlanProperties> {
+    fn compute_properties(
+        input: &Arc<dyn ExecutionPlan>,
+        schema: SchemaRef,
+    ) -> Result<PlanProperties> {
         let eq_properties = EquivalenceProperties::new(schema);
         Ok(PlanProperties::new(
             eq_properties,
@@ -357,7 +338,7 @@ struct PartialAggregateStream {
     schema: SchemaRef,
     partition_col: Column,
     named_agg_expr: Vec<NamedAggExpr>,
-    #[warn(clippy::type_complexity)]
+    #[allow(clippy::type_complexity)]
     agg_expr: Vec<Vec<Arc<Mutex<Box<dyn PartitionedAggregateExpr>>>>>,
     // single partition input
     agg_schemas: Vec<SchemaRef>,

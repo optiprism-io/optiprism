@@ -8,12 +8,12 @@ mod tests {
     use chrono::DateTime;
     use chrono::Duration;
     use chrono::Utc;
-    use common::query::event_segmentation::Analysis;
-    use common::query::event_segmentation::ChartType;
-    use common::query::event_segmentation::Event;
-    use common::query::event_segmentation::EventSegmentation;
-    use common::query::event_segmentation::NamedQuery;
-    use common::query::event_segmentation::Query;
+    use common::event_segmentation::Analysis;
+    use common::event_segmentation::ChartType;
+    use common::event_segmentation::Event;
+    use common::event_segmentation::EventSegmentationRequest;
+    use common::event_segmentation::NamedQuery;
+    use common::event_segmentation::Query;
     use common::query::AggregateFunction;
     use common::query::Breakdown;
     use common::query::EventRef;
@@ -23,13 +23,13 @@ mod tests {
     use common::query::PropertyRef;
     use common::query::QueryTime;
     use common::query::TimeIntervalUnit;
-    use common::types::COLUMN_USER_ID;
+    use common::GROUP_USER_ID;
     use datafusion_common::ScalarValue;
     use metadata::custom_events;
     use metadata::custom_events::CreateCustomEventRequest;
     use metadata::util::init_db;
     use query::error::Result;
-    use query::queries::event_segmentation::event_segmentation::LogicalPlanBuilder;
+    use query::event_segmentation::LogicalPlanBuilder;
     use query::test_util::create_entities;
     use query::test_util::events_provider;
     use query::test_util::run_plan;
@@ -43,13 +43,13 @@ mod tests {
         let to = DateTime::parse_from_rfc3339("2022-08-30T15:42:29.190855+00:00")
             .unwrap()
             .with_timezone(&Utc);
-        let _es = EventSegmentation {
+        let _es = EventSegmentationRequest {
             time: QueryTime::Between {
                 from: to.sub(Duration::days(10)),
                 to,
             },
-            group_id: COLUMN_USER_ID.to_string(),
-            interval_unit: TimeIntervalUnit::Second,
+            group_id: GROUP_USER_ID,
+            interval_unit: TimeIntervalUnit::Hour,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
             compare: None,
@@ -57,12 +57,13 @@ mod tests {
                 Event::new(
                     EventRef::RegularName("View Product".to_string()),
                     Some(vec![PropValueFilter::Property {
-                        property: PropertyRef::Group("Is Premium".to_string()),
+                        property: PropertyRef::Group("Is Premium".to_string(), 0),
                         operation: PropValueOperation::Eq,
                         value: Some(vec![ScalarValue::Boolean(Some(true))]),
                     }]),
                     Some(vec![Breakdown::Property(PropertyRef::Group(
                         "Device".to_string(),
+                        0,
                     ))]),
                     vec![NamedQuery::new(
                         Query::CountEvents,
@@ -87,12 +88,12 @@ mod tests {
                             ]),
                         },
                         PropValueFilter::Property {
-                            property: PropertyRef::Group("Country".to_string()),
+                            property: PropertyRef::Group("Country".to_string(), 0),
                             operation: PropValueOperation::Empty,
                             value: None,
                         },
                         PropValueFilter::Property {
-                            property: PropertyRef::Group("Country".to_string()),
+                            property: PropertyRef::Group("Country".to_string(), 0),
                             operation: PropValueOperation::Eq,
                             value: Some(vec![
                                 ScalarValue::Utf8(Some("Spain".to_string())),
@@ -135,18 +136,19 @@ mod tests {
             ],
             filters: Some(vec![
                 PropValueFilter::Property {
-                    property: PropertyRef::Group("Device".to_string()),
+                    property: PropertyRef::Group("Device".to_string(), 0),
                     operation: PropValueOperation::Eq,
                     value: Some(vec![ScalarValue::Utf8(Some("Iphone".to_string()))]),
                 },
                 PropValueFilter::Property {
-                    property: PropertyRef::Group("Is Premium".to_string()),
+                    property: PropertyRef::Group("Is Premium".to_string(), 0),
                     operation: PropValueOperation::Eq,
                     value: Some(vec![ScalarValue::Decimal128(Some(1), 1, 0)]),
                 },
             ]),
             breakdowns: Some(vec![Breakdown::Property(PropertyRef::Group(
                 "Device".to_string(),
+                0,
             ))]),
             segments: None,
         };
@@ -189,7 +191,7 @@ mod tests {
         let _to = DateTime::parse_from_rfc3339("2021-09-08T13:48:00.000000+00:00")
             .unwrap()
             .with_timezone(&Utc);
-        let es = EventSegmentation {
+        let es = EventSegmentationRequest {
             // time: QueryTime::Between {
             // from,
             // to,
@@ -198,7 +200,7 @@ mod tests {
                 last: 20,
                 unit: TimeIntervalUnit::Day,
             },
-            group_id: COLUMN_USER_ID.to_string(),
+            group_id: GROUP_USER_ID,
             interval_unit: TimeIntervalUnit::Day,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
@@ -265,6 +267,7 @@ mod tests {
             filters: None,
             breakdowns: Some(vec![Breakdown::Property(PropertyRef::Group(
                 "Country".to_string(),
+                0,
             ))]),
             // breakdowns: None,
             segments: None,
@@ -314,12 +317,12 @@ mod tests {
                         event: EventRef::RegularName("View Product".to_string()),
                         filters: Some(vec![
                             PropValueFilter::Property {
-                                property: PropertyRef::Group("Is Premium".to_string()),
+                                property: PropertyRef::Group("Is Premium".to_string(), 0),
                                 operation: PropValueOperation::Eq,
                                 value: Some(vec![ScalarValue::Boolean(Some(true))]),
                             },
                             PropValueFilter::Property {
-                                property: PropertyRef::Group("Country".to_string()),
+                                property: PropertyRef::Group("Country".to_string(), 0),
                                 operation: PropValueOperation::Eq,
                                 value: Some(vec![
                                     ScalarValue::Utf8(Some("spain".to_string())),
@@ -342,12 +345,12 @@ mod tests {
         let _to = DateTime::parse_from_rfc3339("2021-09-08T13:48:00.000000+00:00")
             .unwrap()
             .with_timezone(&Utc);
-        let es = EventSegmentation {
+        let es = EventSegmentationRequest {
             time: QueryTime::Last {
                 last: 30,
                 unit: TimeIntervalUnit::Day,
             },
-            group_id: COLUMN_USER_ID.to_string(),
+            group_id: GROUP_USER_ID,
             interval_unit: TimeIntervalUnit::Week,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
@@ -357,6 +360,7 @@ mod tests {
                 None,
                 Some(vec![Breakdown::Property(PropertyRef::Group(
                     "Device".to_string(),
+                    0,
                 ))]),
                 vec![NamedQuery::new(
                     Query::CountEvents,
@@ -366,6 +370,7 @@ mod tests {
             filters: None,
             breakdowns: Some(vec![Breakdown::Property(PropertyRef::Group(
                 "Country".to_string(),
+                0,
             ))]),
             segments: None,
         };

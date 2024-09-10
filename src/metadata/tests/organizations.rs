@@ -1,16 +1,11 @@
 use std::env::temp_dir;
 use std::sync::Arc;
 
-use common::types::OptionalProperty;
-use metadata::error::Result;
-use metadata::events::CreateEventRequest;
-use metadata::events::Events;
-use metadata::events::Status;
-use metadata::events::UpdateEventRequest;
-use uuid::Uuid;
 use common::rbac::OrganizationRole;
 use metadata::accounts::CreateAccountRequest;
-use metadata::organizations::{CreateOrganizationRequest, Organizations};
+use metadata::organizations::CreateOrganizationRequest;
+use metadata::organizations::Organizations;
+use uuid::Uuid;
 
 #[test]
 fn test_organizations() {
@@ -34,22 +29,31 @@ fn test_organizations() {
         teams: None,
     };
 
-    let acc = accs.create(req).unwrap();
-    let req = CreateOrganizationRequest { created_by: 1, name: "org1".to_string() };
+    accs.create(req).unwrap();
+    let req = CreateOrganizationRequest {
+        created_by: 1,
+        name: "org1".to_string(),
+    };
     let org = orgs.create(req).unwrap();
 
     let org = orgs.get_by_id(org.id).unwrap();
     let acc = accs.get_by_id(org.id).unwrap();
 
     assert_eq!(org.members, vec![(acc.id, OrganizationRole::Owner)]);
-    assert_eq!(acc.organizations, Some(vec![(org.id, OrganizationRole::Owner)]));
+    assert_eq!(
+        acc.organizations,
+        Some(vec![(org.id, OrganizationRole::Owner)])
+    );
 
-    orgs.change_member_role(org.id, acc.id, OrganizationRole::Admin).unwrap();
+    orgs.change_member_role(org.id, acc.id, OrganizationRole::Admin)
+        .unwrap();
     let org = orgs.get_by_id(org.id).unwrap();
     let acc = accs.get_by_id(org.id).unwrap();
     assert_eq!(org.members, vec![(acc.id, OrganizationRole::Admin)]);
-    assert_eq!(acc.organizations, Some(vec![(org.id, OrganizationRole::Admin)]));
-
+    assert_eq!(
+        acc.organizations,
+        Some(vec![(org.id, OrganizationRole::Admin)])
+    );
 
     let req = CreateAccountRequest {
         created_by: 1,
@@ -71,10 +75,17 @@ fn test_organizations() {
     let org = orgs.get_by_id(org.id).unwrap();
     let acc = accs.get_by_id(org.id).unwrap();
 
-    assert_eq!(org.members, vec![(acc.id, OrganizationRole::Admin),(acc2.id, OrganizationRole::Admin)]);
+    assert_eq!(org.members, vec![
+        (acc.id, OrganizationRole::Admin),
+        (acc2.id, OrganizationRole::Admin)
+    ]);
 
-    orgs.change_member_role(org.id, acc.id, OrganizationRole::Admin).unwrap();
+    orgs.change_member_role(org.id, acc.id, OrganizationRole::Admin)
+        .unwrap();
     let org = orgs.get_by_id(org.id).unwrap();
     let acc = accs.get_by_id(org.id).unwrap();
-    assert_eq!(org.members, vec![(acc.id, OrganizationRole::Admin),(acc2.id, OrganizationRole::Admin)]);
+    assert_eq!(org.members, vec![
+        (acc.id, OrganizationRole::Admin),
+        (acc2.id, OrganizationRole::Admin)
+    ]);
 }

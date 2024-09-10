@@ -10,10 +10,6 @@ use arrow::datatypes::DataType::Decimal128;
 use arrow::datatypes::Field;
 use arrow::datatypes::FieldRef;
 use arrow::datatypes::Fields;
-use arrow::datatypes::TimeUnit;
-use chrono::DateTime;
-use chrono::Duration;
-use chrono::Utc;
 use common::query;
 use common::query::PartitionedAggregateFunction;
 use common::types::RESERVED_COLUMN_AGG;
@@ -51,7 +47,6 @@ impl From<&query::AggregateFunction> for AggregateFunction {
             query::AggregateFunction::Min => AggregateFunction::Min,
             query::AggregateFunction::Max => AggregateFunction::Max,
             query::AggregateFunction::Avg => AggregateFunction::Avg,
-            _ => panic!("Unsupported aggregate function: {:?}", value),
         }
     }
 }
@@ -438,16 +433,16 @@ impl UserDefinedLogicalNodeCore for PartitionedAggregatePartialNode {
 
     fn with_exprs_and_inputs(
         &self,
-        exprs: Vec<Expr>,
+        _exprs: Vec<Expr>,
         inputs: Vec<LogicalPlan>,
     ) -> datafusion_common::Result<Self> {
-        Ok(PartitionedAggregatePartialNode::try_new(
+        PartitionedAggregatePartialNode::try_new(
             inputs[0].clone(),
             self.partition_inputs.clone(),
             self.partition_col.clone(),
             self.agg_expr.clone(),
         )
-        .map_err(QueryError::into_datafusion_plan_error)?)
+        .map_err(QueryError::into_datafusion_plan_error)
     }
 }
 
@@ -550,7 +545,7 @@ impl UserDefinedLogicalNode
 
     fn with_exprs_and_inputs(
         &self,
-        exprs: Vec<Expr>,
+        _exprs: Vec<Expr>,
         inputs: Vec<LogicalPlan>,
     ) -> datafusion_common::Result<Arc<dyn UserDefinedLogicalNode>> {
         let node =

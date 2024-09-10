@@ -1,4 +1,3 @@
-use axum::http;
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::types::OptionalProperty;
@@ -63,6 +62,8 @@ async fn test_auth() {
                 password_hash: OptionalProperty::None,
                 email: OptionalProperty::None,
                 name: OptionalProperty::None,
+                force_update_password: Default::default(),
+                force_update_email: Default::default(),
                 role: OptionalProperty::None,
                 organizations: OptionalProperty::Some(Some(vec![(1, OrganizationRole::Member)])),
                 projects: OptionalProperty::Some(Some(vec![(1, ProjectRole::Reader)])),

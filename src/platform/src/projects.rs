@@ -3,11 +3,16 @@ use std::sync::Arc;
 use chrono::DateTime;
 use chrono::Utc;
 use common::config::Config;
+use common::group_col;
 use common::rbac::OrganizationPermission;
-use common::rbac::Permission;
 use common::rbac::ProjectPermission;
-use common::types::{COLUMN_CREATED_AT, COLUMN_EVENT, COLUMN_EVENT_ID, COLUMN_IP, COLUMN_PROJECT_ID, DType, GROUP_COLUMN_CREATED_AT, GROUP_COLUMN_ID, GROUP_COLUMN_PROJECT_ID, GROUP_COLUMN_VERSION, TABLE_EVENTS};
+use common::types::DType;
 use common::types::OptionalProperty;
+use common::types::COLUMN_CREATED_AT;
+use common::types::COLUMN_EVENT;
+use common::types::COLUMN_EVENT_ID;
+use common::types::COLUMN_IP;
+use common::types::COLUMN_PROJECT_ID;
 use common::types::EVENT_CLICK;
 use common::types::EVENT_PAGE;
 use common::types::EVENT_PROPERTY_CITY;
@@ -45,9 +50,13 @@ use common::types::EVENT_PROPERTY_UTM_TERM;
 use common::types::EVENT_SCREEN;
 use common::types::EVENT_SESSION_BEGIN;
 use common::types::EVENT_SESSION_END;
-use common::{group_col, GROUP_USER, GROUPS_COUNT};
-use common::GROUP_USER_ID;
-use metadata::projects::Projects as MDProjects;
+use common::types::GROUP_COLUMN_CREATED_AT;
+use common::types::GROUP_COLUMN_ID;
+use common::types::GROUP_COLUMN_PROJECT_ID;
+use common::types::GROUP_COLUMN_VERSION;
+use common::types::TABLE_EVENTS;
+use common::GROUPS_COUNT;
+use common::GROUP_USER;
 use metadata::properties::DictionaryType;
 use metadata::properties::Type;
 use metadata::util::create_event;
@@ -95,9 +104,21 @@ impl Projects {
         };
 
         let project = self.md.projects.create(md)?;
-        self.md.dictionaries.create_key(project.id, TABLE_EVENTS, "project_id", project.id, project.name.as_str())?;
+        self.md.dictionaries.create_key(
+            project.id,
+            TABLE_EVENTS,
+            "project_id",
+            project.id,
+            project.name.as_str(),
+        )?;
         for g in 0..GROUPS_COUNT {
-            self.md.dictionaries.create_key(project.id, group_col(g).as_str(), "project_id", project.id, project.name.as_str())?;
+            self.md.dictionaries.create_key(
+                project.id,
+                group_col(g).as_str(),
+                "project_id",
+                project.id,
+                project.name.as_str(),
+            )?;
         }
 
         init_project(project.id, &self.md)?;
@@ -131,7 +152,7 @@ impl Projects {
                     p.id,
                     ProjectPermission::ViewProject,
                 )
-                    .is_ok()
+                .is_ok()
             })
             .collect::<Vec<_>>();
         Ok(ListResponse {
@@ -162,9 +183,21 @@ impl Projects {
         };
 
         let project = self.md.projects.update(project_id, md_req)?;
-        self.md.dictionaries.create_key(project.id, TABLE_EVENTS, "project_id", project.id, project.name.as_str())?;
+        self.md.dictionaries.create_key(
+            project.id,
+            TABLE_EVENTS,
+            "project_id",
+            project.id,
+            project.name.as_str(),
+        )?;
         for g in 0..GROUPS_COUNT {
-            self.md.dictionaries.create_key(project.id, group_col(g).as_str(), "project_id", project.id, project.name.as_str())?;
+            self.md.dictionaries.create_key(
+                project.id,
+                group_col(g).as_str(),
+                "project_id",
+                project.id,
+                project.name.as_str(),
+            )?;
         }
 
         Ok(project.into())
@@ -250,7 +283,6 @@ pub fn init_project(project_id: u64, md: &Arc<MetadataProvider>) -> error::Resul
         dict: Some(DictionaryType::Int64),
         is_system: true,
     })?;
-
 
     for g in 0..GROUPS_COUNT {
         create_property(md, project_id, CreatePropertyMainRequest {

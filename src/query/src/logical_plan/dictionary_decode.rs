@@ -39,13 +39,11 @@ impl DictionaryDecodeNode {
                     .iter()
                     .find(|(col, _)| *field.name() == col.name)
                 {
-                    Some(_) => {
-                        Arc::new(Field::new(
-                            field.name().as_str(),
-                            DataType::Utf8,
-                            field.is_nullable(),
-                        ))
-                    },
+                    Some(_) => Arc::new(Field::new(
+                        field.name().as_str(),
+                        DataType::Utf8,
+                        field.is_nullable(),
+                    )),
                     None => field.to_owned(),
                 }
             })
@@ -137,7 +135,7 @@ impl UserDefinedLogicalNode for DictionaryDecodeNode {
 
     fn with_exprs_and_inputs(
         &self,
-        exprs: Vec<Expr>,
+        _: Vec<Expr>,
         inputs: Vec<LogicalPlan>,
     ) -> datafusion_common::Result<Arc<dyn UserDefinedLogicalNode>> {
         Ok(Arc::new(

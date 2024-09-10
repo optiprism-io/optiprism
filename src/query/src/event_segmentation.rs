@@ -2,26 +2,28 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 
-use common::group_col;
 use common::event_segmentation::Event;
 use common::event_segmentation::EventSegmentationRequest;
 use common::event_segmentation::Query;
-use common::query::{PropValueFilter, time_columns};
+use common::group_col;
+use common::query::time_columns;
 use common::query::Breakdown;
 use common::query::DidEventAggregate;
+use common::query::PropValueFilter;
 use common::query::PropertyRef;
 use common::query::SegmentCondition;
-use common::types::{COLUMN_CREATED_AT, COLUMN_IP, GROUP_COLUMN_ID, METRIC_QUERY_EXECUTION_TIME_SECONDS, METRIC_QUERY_QUERIES_TOTAL, TABLE_EVENTS};
+use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_PROJECT_ID;
 use common::types::COLUMN_SEGMENT;
+use common::types::METRIC_QUERY_EXECUTION_TIME_SECONDS;
+use common::types::METRIC_QUERY_QUERIES_TOTAL;
+use common::types::TABLE_EVENTS;
 use datafusion::functions::datetime::date_trunc::DateTruncFunc;
-use datafusion::functions::math::trunc::TruncFunc;
 use datafusion_common::Column;
 use datafusion_common::ScalarValue;
 use datafusion_expr::binary_expr;
 use datafusion_expr::col;
-use datafusion_expr::expr;
 use datafusion_expr::expr::Alias;
 use datafusion_expr::expr::ScalarFunction;
 use datafusion_expr::expr_fn::and;
@@ -33,23 +35,28 @@ use datafusion_expr::Filter;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::Operator;
 use datafusion_expr::ScalarUDF;
-use datafusion_expr::Sort;
-use metrics::{counter, histogram};
-use tracing::debug;
 use metadata::dictionaries::SingleDictionaryProvider;
 use metadata::MetadataProvider;
+use metrics::counter;
+use metrics::histogram;
 use storage::db::OptiDBImpl;
+use tracing::debug;
 
-use crate::{breakdowns_to_dicts, col_name, ColumnType, ColumnarDataTable, decode_filter_single_dictionary, execute, initial_plan, segment_projection, segment_plan, fix_filter};
+use crate::breakdowns_to_dicts;
+use crate::col_name;
 use crate::context::Format;
+use crate::decode_filter_single_dictionary;
 use crate::error::QueryError;
 use crate::error::Result;
+use crate::execute;
 use crate::expr::breakdown_expr;
 use crate::expr::event_expression;
 use crate::expr::event_filters_expression;
 use crate::expr::property_col;
 use crate::expr::property_expression;
 use crate::expr::time_expression;
+use crate::fix_filter;
+use crate::initial_plan;
 use crate::logical_plan::add_string_column::AddStringColumnNode;
 use crate::logical_plan::aggregate_columns::AggregateAndSortColumnsNode;
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
@@ -68,6 +75,10 @@ use crate::logical_plan::segment::SegmentExpr;
 use crate::logical_plan::segment::SegmentNode;
 use crate::logical_plan::unpivot::UnpivotNode;
 use crate::logical_plan::SortField;
+use crate::segment_plan;
+use crate::segment_projection;
+use crate::ColumnType;
+use crate::ColumnarDataTable;
 use crate::Context;
 
 pub const COL_AGG_NAME: &str = "agg_name";
@@ -94,30 +105,31 @@ impl EventSegmentationProvider {
             .iter()
             .map(|x| schema.index_of(x).unwrap())
             .collect();
-        let (session_ctx, state, plan) = initial_plan(&self.db, TABLE_EVENTS.to_string(), projection)?;
-        let segment_plan = if let Some(segments) = &req.segments {
-            let segment_projection = segment_projection(&ctx, segments, req.group_id, &self.metadata)?;
+        let (session_ctx, state, plan) =
+            initial_plan(&self.db, TABLE_EVENTS.to_string(), projection)?;
+        let _segment_plan = if let Some(segments) = &req.segments {
+            let segment_projection =
+                segment_projection(&ctx, segments, req.group_id, &self.metadata)?;
             let segment_projection = segment_projection
                 .iter()
                 .map(|x| schema.index_of(x).unwrap())
                 .collect();
-            Some(segment_plan(&self.db, TABLE_EVENTS.to_string(), segment_projection)?)
+            Some(segment_plan(
+                &self.db,
+                TABLE_EVENTS.to_string(),
+                segment_projection,
+            )?)
         } else {
             None
         };
 
-
-        let plan = LogicalPlanBuilder::build(
-            ctx.clone(),
-            self.metadata.clone(),
-            plan,
-            segment_plan,
-            req.clone(),
-        )?;
+        let plan =
+            LogicalPlanBuilder::build(ctx.clone(), self.metadata.clone(), plan, req.clone())?;
 
         println!("{plan:?}");
         let result = execute(session_ctx, state, plan).await?;
-        histogram!(METRIC_QUERY_EXECUTION_TIME_SECONDS, "query"=>"event_segmentation").record(start.elapsed().as_millis() as f64);
+        histogram!(METRIC_QUERY_EXECUTION_TIME_SECONDS, "query"=>"event_segmentation")
+            .record(start.elapsed().as_millis() as f64);
         counter!(METRIC_QUERY_QUERIES_TOTAL,"query"=>"event_segmentation").increment(1);
         debug!("elapsed: {:?}", start.elapsed());
 
@@ -236,7 +248,6 @@ impl LogicalPlanBuilder {
         ctx: Context,
         metadata: Arc<MetadataProvider>,
         input: LogicalPlan,
-        segment_input: Option<LogicalPlan>,
         es: EventSegmentationRequest,
     ) -> Result<LogicalPlan> {
         let events = es.events.clone();
@@ -333,7 +344,7 @@ impl LogicalPlanBuilder {
             }
         };
 
-        input = builder.decode_breakdowns_dictionaries(input, TABLE_EVENTS, &mut cols_hash)?;
+        input = builder.decode_breakdowns_dictionaries(input, &mut cols_hash)?;
 
         if ctx.format == Format::Compact {
             return Ok(input);
@@ -459,7 +470,7 @@ impl LogicalPlanBuilder {
                     &self.ctx,
                     &self.metadata,
                     TABLE_EVENTS,
-                    &property,
+                    property,
                     operation,
                     value.to_owned(),
                 )?;
@@ -467,7 +478,7 @@ impl LogicalPlanBuilder {
                 SegmentExpr::Count {
                     filter,
                     ts_col: Column::from_qualified_name(COLUMN_CREATED_AT),
-                    partition_col: col(group_col(group_id)).try_into_col()?,
+                    partition_col: col(group_col(group_id)).try_as_col().unwrap().to_owned(),
                     time_range: time.into(),
                     op: segment::Operator::GtEq,
                     right: 1,
@@ -496,7 +507,7 @@ impl LogicalPlanBuilder {
                     } => SegmentExpr::Count {
                         filter: event_expr,
                         ts_col: Column::from_qualified_name(COLUMN_CREATED_AT),
-                        partition_col: col(group_col(group_id)).try_into_col()?,
+                        partition_col: col(group_col(group_id)).try_as_col().unwrap().to_owned(),
                         time_range: time.into(),
                         op: operation.into(),
                         right: *value,
@@ -512,9 +523,11 @@ impl LogicalPlanBuilder {
                     } => SegmentExpr::Aggregate {
                         filter: event_expr,
                         predicate: property_col(&self.ctx, &self.metadata, property)?
-                            .try_into_col()?,
+                            .try_as_col()
+                            .unwrap()
+                            .clone(),
                         ts_col: Column::from_qualified_name(COLUMN_CREATED_AT),
-                        partition_col: col(group_col(group_id)).try_into_col()?,
+                        partition_col: col(group_col(group_id)).try_as_col().unwrap().clone(),
                         time_range: time.into(),
                         agg: aggregate.into(),
                         op: operation.into(),
@@ -576,18 +589,17 @@ impl LogicalPlanBuilder {
     fn decode_breakdowns_dictionaries(
         &self,
         input: LogicalPlan,
-        tbl: &str,
         cols_hash: &mut HashMap<String, ()>,
     ) -> Result<LogicalPlan> {
         let mut decode_cols: Vec<(Column, Arc<SingleDictionaryProvider>)> = Vec::new();
         for event in &self.es.events {
             if let Some(breakdowns) = &event.breakdowns {
-                breakdowns_to_dicts!(self.metadata, self.ctx,breakdowns, cols_hash, decode_cols);
+                breakdowns_to_dicts!(self.metadata, self.ctx, breakdowns, cols_hash, decode_cols);
             }
         }
 
         if let Some(breakdowns) = &self.es.breakdowns {
-            breakdowns_to_dicts!(self.metadata, self.ctx,breakdowns, cols_hash, decode_cols);
+            breakdowns_to_dicts!(self.metadata, self.ctx, breakdowns, cols_hash, decode_cols);
         }
 
         if decode_cols.is_empty() {
@@ -606,8 +618,7 @@ impl LogicalPlanBuilder {
         group_id: usize,
         segment_inputs: Option<Vec<LogicalPlan>>,
     ) -> Result<LogicalPlan> {
-        let input =
-            self.build_filter_logical_plan(input.clone(), &self.es.events[event_id], group_id)?;
+        let input = self.build_filter_logical_plan(input.clone(), &self.es.events[event_id])?;
 
         let (mut input, group_expr) = self.build_aggregate_logical_plan(
             input,
@@ -721,12 +732,7 @@ impl LogicalPlanBuilder {
     }
 
     /// builds filter plan
-    fn build_filter_logical_plan(
-        &self,
-        input: LogicalPlan,
-        event: &Event,
-        group_id: usize,
-    ) -> Result<LogicalPlan> {
+    fn build_filter_logical_plan(&self, input: LogicalPlan, event: &Event) -> Result<LogicalPlan> {
         let cur_time = self.ctx.cur_time;
         // todo add project_id filtering
         let mut expr = binary_expr(
@@ -863,8 +869,8 @@ impl LogicalPlanBuilder {
                 Query::CountEvents => AggregateExpr::Count {
                     filter: None,
                     groups: Some(group_expr.clone()),
-                    predicate: col(COLUMN_EVENT).try_into_col()?,
-                    partition_col: col(group_col(group_id)).try_into_col()?,
+                    predicate: col(COLUMN_EVENT).try_as_col().unwrap().clone(),
+                    partition_col: col(group_col(group_id)).try_as_col().unwrap().clone(),
                     distinct: false,
                 },
                 Query::CountUniqueGroups | Query::DailyActiveGroups => {
@@ -872,7 +878,7 @@ impl LogicalPlanBuilder {
                         filter: None,
                         outer_fn: partitioned_aggregate::AggregateFunction::Count,
                         groups: Some(group_expr.clone()),
-                        partition_col: col(group_col(group_id)).try_into_col()?,
+                        partition_col: col(group_col(group_id)).try_as_col().unwrap().clone(),
                         distinct: true,
                     }
                 }
@@ -882,7 +888,7 @@ impl LogicalPlanBuilder {
                     filter: None,
                     outer_fn: aggregate.into(),
                     groups: Some(group_expr.clone()),
-                    partition_col: col(group_col(group_id)).try_into_col()?,
+                    partition_col: col(group_col(group_id)).try_as_col().unwrap().clone(),
                     distinct: false,
                 },
                 Query::AggregatePropertyPerGroup {
@@ -893,9 +899,12 @@ impl LogicalPlanBuilder {
                     filter: None,
                     inner_fn: aggregate_per_group.into(),
                     outer_fn: aggregate.into(),
-                    predicate: property_col(&self.ctx, &self.metadata, property)?.try_into_col()?,
+                    predicate: property_col(&self.ctx, &self.metadata, property)?
+                        .try_as_col()
+                        .unwrap()
+                        .clone(),
                     groups: Some(group_expr.clone()),
-                    partition_col: col(group_col(group_id)).try_into_col()?,
+                    partition_col: col(group_col(group_id)).try_as_col().unwrap().clone(),
                 },
                 Query::AggregateProperty {
                     property,
@@ -903,8 +912,11 @@ impl LogicalPlanBuilder {
                 } => AggregateExpr::Aggregate {
                     filter: None,
                     groups: Some(group_expr.clone()),
-                    partition_col: col(group_col(group_id)).try_into_col()?,
-                    predicate: property_col(&self.ctx, &self.metadata, property)?.try_into_col()?,
+                    partition_col: col(group_col(group_id)).try_as_col().unwrap().clone(),
+                    predicate: property_col(&self.ctx, &self.metadata, property)?
+                        .try_as_col()
+                        .unwrap()
+                        .clone(),
                     agg: aggregate.into(),
                 },
                 Query::QueryFormula { .. } => unimplemented!(),

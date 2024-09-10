@@ -6,27 +6,21 @@ mod tests {
     use chrono::DateTime;
     use chrono::Duration;
     use chrono::Utc;
-    use common::query::funnel::ChartType;
-    use common::query::funnel::Count;
-    use common::query::funnel::Event;
-    use common::query::funnel::Exclude;
-    use common::query::funnel::Filter;
-    use common::query::funnel::Funnel;
-    use common::query::funnel::Step;
-    use common::query::funnel::StepOrder;
-    use common::query::funnel::TimeIntervalUnitSession;
-    use common::query::funnel::TimeWindow;
-    use common::query::funnel::Touch;
+    use common::funnel::ChartType;
+    use common::funnel::Count;
+    use common::funnel::Event;
+    use common::funnel::Funnel;
+    use common::funnel::Step;
+    use common::funnel::StepOrder;
+    use common::funnel::TimeIntervalUnitSession;
+    use common::funnel::TimeWindow;
+    use common::funnel::Touch;
     use common::query::Breakdown;
     use common::query::EventRef;
-    use common::query::PropValueFilter;
-    use common::query::PropValueOperation;
     use common::query::PropertyRef;
     use common::query::QueryTime;
-    use datafusion_common::ScalarValue;
     use metadata::util::init_db;
-    use query::queries::event_segmentation::event_segmentation::LogicalPlanBuilder;
-    use query::queries::funnel;
+    use query::funnel;
     use query::test_util::create_entities;
     use query::test_util::events_provider;
     use query::test_util::run_plan;
@@ -37,12 +31,6 @@ mod tests {
         let (md, db) = init_db().unwrap();
 
         let proj_id = 1;
-
-        let ctx = Context {
-            project_id: proj_id,
-            format: Default::default(),
-            cur_time: Default::default(),
-        };
 
         create_entities(md.clone(), &db, proj_id).await.unwrap();
 
@@ -55,7 +43,7 @@ mod tests {
                 from: to.sub(Duration::days(10)),
                 to,
             },
-            group: "group".to_string(),
+            group_id: 0,
             steps: vec![
                 Step {
                     events: vec![Event {
@@ -83,9 +71,7 @@ mod tests {
             chart_type: ChartType::Steps,
             count: Count::Unique,
             filter: None,
-            touch: Touch::First,
-            step_order: StepOrder::Exact,
-            attribution: Some(Touch::First),
+            touch: Some(Touch::First),
             holding_constants: None, // Some(vec![PropertyRef::User("Is Premium".to_string())])
             exclude: None,           /* Some(vec![Exclude {
                                       * event: Event {
@@ -96,6 +82,7 @@ mod tests {
                                       * }]) */
             breakdowns: Some(vec![Breakdown::Property(PropertyRef::Group(
                 "Device".to_string(),
+                0,
             ))]),
             segments: None,
             filters: None, /* Some(vec![EventFilter::Property {

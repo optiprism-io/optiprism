@@ -1,9 +1,3 @@
-
 fn main() {
-    prost_build::compile_protos(
-        &[
-            "src/pb/metadata.proto",
-        ],
-        &["src"],
-    ).unwrap();
+    prost_build::compile_protos(&["src/pb/metadata.proto"], &["src"]).unwrap();
 }

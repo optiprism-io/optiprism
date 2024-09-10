@@ -6,12 +6,11 @@ use axum::extract::Query;
 use axum::routing;
 use axum::Router;
 use common::http::Json;
-use serde_json::Value;
 
-use crate::{Context, QueryParams};
-use crate::event_segmentation::{EventSegmentation, EventSegmentationRequest};
-use crate::FunnelResponse;
-use crate::ListResponse;
+use crate::event_segmentation::EventSegmentation;
+use crate::event_segmentation::EventSegmentationRequest;
+use crate::Context;
+use crate::QueryParams;
 use crate::QueryResponse;
 use crate::Result;
 
@@ -32,10 +31,9 @@ async fn event_segmentation(
 pub fn attach_routes(router: Router) -> Router {
     router.nest(
         "/api/v1/projects/:project_id",
-        Router::new()
-            .route(
-                "/queries/event-segmentation",
-                routing::post(event_segmentation),
-            )
+        Router::new().route(
+            "/queries/event-segmentation",
+            routing::post(event_segmentation),
+        ),
     )
 }

@@ -1,18 +1,30 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
-use arrow::array::{Array, BooleanArray, Decimal128Array, Int16Array, Int32Array, Int64Array, Int8Array, StringArray, TimestampMillisecondArray, TimestampMillisecondBuilder};
-use arrow::datatypes::DataType;
-use arrow::util::pretty::print_batches;
 
-use common::query::EventRef;
+use arrow::array::Array;
+use arrow::array::BooleanArray;
+use arrow::array::Decimal128Array;
+use arrow::array::Int16Array;
+use arrow::array::Int32Array;
+use arrow::array::Int64Array;
+use arrow::array::Int8Array;
+use arrow::array::StringArray;
+use arrow::array::TimestampMillisecondArray;
+use arrow::datatypes::DataType;
+use common::group_col;
 use common::query::PropValueFilter;
 use common::query::PropertyRef;
 use common::query::QueryTime;
-use common::types::{COLUMN_CREATED_AT, COLUMN_EVENT, GROUP_COLUMN_CREATED_AT, GROUP_COLUMN_ID, GROUP_COLUMN_PROJECT_ID, GROUP_COLUMN_VERSION, METRIC_QUERY_EXECUTION_TIME_SECONDS, METRIC_QUERY_QUERIES_TOTAL, SortDirection, TABLE_EVENTS};
-use common::types::COLUMN_EVENT_ID;
-use common::types::COLUMN_PROJECT_ID;
-use common::{DECIMAL_PRECISION, DECIMAL_SCALE, group_col, GROUPS_COUNT};
+use common::types::SortDirection;
+use common::types::GROUP_COLUMN_CREATED_AT;
+use common::types::GROUP_COLUMN_ID;
+use common::types::GROUP_COLUMN_PROJECT_ID;
+use common::types::GROUP_COLUMN_VERSION;
+use common::types::METRIC_QUERY_EXECUTION_TIME_SECONDS;
+use common::types::METRIC_QUERY_QUERIES_TOTAL;
+use common::DECIMAL_PRECISION;
+use common::DECIMAL_SCALE;
 use datafusion_common::Column;
 use datafusion_common::ScalarValue;
 use datafusion_expr::and;
@@ -28,23 +40,31 @@ use datafusion_expr::LogicalPlan;
 use datafusion_expr::Operator;
 use datafusion_expr::Projection;
 use datafusion_expr::Sort;
-use metrics::{counter, histogram};
-use tracing::debug;
 use metadata::dictionaries::SingleDictionaryProvider;
-use metadata::MetadataProvider;
 use metadata::properties::Property;
+use metadata::MetadataProvider;
+use metrics::counter;
+use metrics::histogram;
 use storage::db::OptiDBImpl;
+use tracing::debug;
 
+use crate::col_name;
+use crate::decode_filter_single_dictionary;
 use crate::error::QueryError;
 use crate::error::Result;
-use crate::expr::{event_expression, property_col};
+use crate::execute;
 use crate::expr::event_filters_expression;
+use crate::expr::property_col;
 use crate::expr::time_expression;
+use crate::fix_filter;
+use crate::initial_plan;
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::logical_plan::expr::multi_and;
-use crate::logical_plan::expr::multi_or;
 use crate::logical_plan::rename_columns::RenameColumnsNode;
-use crate::{col_name, ColumnType, Context, ColumnarDataTable, decode_filter_single_dictionary, execute, initial_plan, PropertyAndValue, fix_filter};
+use crate::ColumnType;
+use crate::ColumnarDataTable;
+use crate::Context;
+use crate::PropertyAndValue;
 
 pub struct GroupRecordsProvider {
     metadata: Arc<MetadataProvider>,
@@ -64,8 +84,7 @@ impl GroupRecordsProvider {
     ) -> Result<GroupRecord> {
         let start = Instant::now();
         let schema = self.db.schema1(&group_col(group_id))?;
-        let projection =
-            (0..schema.fields.len()).collect::<Vec<_>>();
+        let projection = (0..schema.fields.len()).collect::<Vec<_>>();
 
         let (session_ctx, state, plan) = initial_plan(&self.db, group_col(group_id), projection)?;
         let plan = build_get_by_id_plan(&ctx, self.metadata.clone(), plan, group_id, id)?;
@@ -74,19 +93,23 @@ impl GroupRecordsProvider {
         let duration = start.elapsed();
         debug!("elapsed: {:?}", duration);
         let elapsed = start.elapsed();
-        histogram!(METRIC_QUERY_EXECUTION_TIME_SECONDS, "query"=>"group_records_get_by_id").record(elapsed);
+        histogram!(METRIC_QUERY_EXECUTION_TIME_SECONDS, "query"=>"group_records_get_by_id")
+            .record(elapsed);
         counter!(METRIC_QUERY_QUERIES_TOTAL,"query"=>"group_records_get_by_id").increment(1);
         debug!("elapsed: {:?}", elapsed);
         let mut properties = vec![];
 
         for (field, col) in result.schema().fields().iter().zip(result.columns().iter()) {
             let mut property = None;
-            for p in self.metadata.group_properties[group_id].list(ctx.project_id)?.data {
+            for p in self.metadata.group_properties[group_id]
+                .list(ctx.project_id)?
+                .data
+            {
                 if p.column_name() == *field.name() {
                     property = Some(p);
                     break;
                 }
-            };
+            }
 
             if let Some(prop) = property {
                 let value = match field.data_type() {
@@ -111,23 +134,27 @@ impl GroupRecordsProvider {
                         ScalarValue::Int64(Some(a.value(0).to_owned()))
                     }
                     DataType::Utf8 => {
-                        {
-                            let a = col.as_any().downcast_ref::<StringArray>().unwrap();
-                            ScalarValue::Utf8(Some(a.value(0).to_owned()))
-                        }
+                        let a = col.as_any().downcast_ref::<StringArray>().unwrap();
+                        ScalarValue::Utf8(Some(a.value(0).to_owned()))
                     }
                     DataType::Decimal128(_, _) => {
                         let a = col.as_any().downcast_ref::<Decimal128Array>().unwrap();
                         ScalarValue::Decimal128(Some(a.value(0)), DECIMAL_PRECISION, DECIMAL_SCALE)
                     }
-                    DataType::Timestamp(tu, v) => {
-                        let a = col.as_any().downcast_ref::<TimestampMillisecondArray>().unwrap();
+                    DataType::Timestamp(_, _) => {
+                        let a = col
+                            .as_any()
+                            .downcast_ref::<TimestampMillisecondArray>()
+                            .unwrap();
                         ScalarValue::TimestampMillisecond(Some(a.value(0)), None).to_owned()
                     }
-                    _ => unimplemented!("unimplemented {}", field.data_type().to_string())
+                    _ => unimplemented!("unimplemented {}", field.data_type().to_string()),
                 };
 
-                properties.push(PropertyAndValue { property: prop.reference(), value })
+                properties.push(PropertyAndValue {
+                    property: prop.reference(),
+                    value,
+                })
             }
         }
         let rec = GroupRecord { properties };
@@ -153,7 +180,8 @@ impl GroupRecordsProvider {
         };
         projection.sort();
         projection.dedup();
-        let (session_ctx, state, plan) = initial_plan(&self.db, group_col(req.group_id), projection)?;
+        let (session_ctx, state, plan) =
+            initial_plan(&self.db, group_col(req.group_id), projection)?;
         let (plan, props) = build_search_plan(ctx, self.metadata.clone(), plan, req.clone())?;
         println!("{plan:?}");
         let result = execute(session_ctx, state, plan).await?;
@@ -161,7 +189,8 @@ impl GroupRecordsProvider {
         let duration = start.elapsed();
         debug!("elapsed: {:?}", duration);
         let elapsed = start.elapsed();
-        histogram!(METRIC_QUERY_EXECUTION_TIME_SECONDS, "query"=>"group_records_search").record(elapsed);
+        histogram!(METRIC_QUERY_EXECUTION_TIME_SECONDS, "query"=>"group_records_search")
+            .record(elapsed);
         counter!(METRIC_QUERY_QUERIES_TOTAL,"query"=>"group_records_search").increment(1);
         debug!("elapsed: {:?}", elapsed);
 
@@ -254,11 +283,7 @@ pub fn build_search_plan(
     let input = if let Some((prop, sort)) = &req.sort {
         let s = Expr::Sort(expr::Sort {
             expr: Box::new(property_col(&ctx, &metadata, prop)?),
-            asc: if *sort == SortDirection::Asc {
-                true
-            } else {
-                false
-            },
+            asc: *sort == SortDirection::Asc,
             nulls_first: false,
         });
 
@@ -344,9 +369,15 @@ pub fn build_get_by_id_plan(
     group_id: usize,
     id: String,
 ) -> Result<LogicalPlan> {
-    let id_prop = metadata.group_properties[group_id].get_by_name(ctx.project_id, GROUP_COLUMN_ID)?;
-    let id_int = metadata.dictionaries.get_key(ctx.project_id, group_col(group_id).as_str(), id_prop.column_name().as_str(), id.as_str())?;
-    let mut filter_exprs = vec![
+    let id_prop =
+        metadata.group_properties[group_id].get_by_name(ctx.project_id, GROUP_COLUMN_ID)?;
+    let id_int = metadata.dictionaries.get_key(
+        ctx.project_id,
+        group_col(group_id).as_str(),
+        id_prop.column_name().as_str(),
+        id.as_str(),
+    )?;
+    let filter_exprs = vec![
         binary_expr(
             col(GROUP_COLUMN_PROJECT_ID),
             Operator::Eq,
@@ -365,7 +396,9 @@ pub fn build_get_by_id_plan(
     )?);
 
     let mut properties = vec![];
-    let mut l = metadata.group_properties[group_id].list(ctx.project_id)?.data;
+    let mut l = metadata.group_properties[group_id]
+        .list(ctx.project_id)?
+        .data;
     properties.append(&mut (l));
 
     let mut cols_hash: HashMap<String, ()> = HashMap::new();
@@ -423,7 +456,6 @@ fn decode_filter_dictionaries(
         node: Arc::new(DictionaryDecodeNode::try_new(input, decode_cols.clone())?),
     }))
 }
-
 
 fn projection(
     ctx: &Context,
