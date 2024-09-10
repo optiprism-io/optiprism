@@ -1,4 +1,3 @@
-use std::fs;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -11,25 +10,21 @@ use rand::Rng;
 use metadata::accounts::CreateAccountRequest;
 use metadata::error::MetadataError;
 use metadata::organizations::CreateOrganizationRequest;
-use metadata::projects::CreateProjectRequest;
 use metadata::MetadataProvider;
 use platform::auth::password::make_password_hash;
 use storage::db::OptiDBImpl;
 use storage::db::Options;
-use tokio::net::TcpListener;
 use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tracing::debug;
 use tracing::info;
 use crate::error::Error;
 use crate::error::Result;
-use crate::{backup, init_settings, init_fs, init_ingester};
-use crate::init_metrics;
+use crate::{init_settings, init_fs, init_ingester};
 use crate::init_platform;
-use crate::init_session_cleaner;
 use crate::init_system;
 
-pub async fn start(mut cfg: Config) -> Result<()> {
+pub async fn start(cfg: Config) -> Result<()> {
     debug!("db path: {:?}", cfg.data.path);
 
     init_fs(&cfg)?;
@@ -57,7 +52,7 @@ pub async fn start(mut cfg: Config) -> Result<()> {
                     .map(char::from)
                     .collect();
                 let mut settings = md.settings.load()?;
-                settings.auth_admin_default_password = pwd.clone();
+                settings.auth_admin_default_password.clone_from(&pwd);
                 md.settings.save(&settings)?;
                 info!("creating admin account...");
                 let acc = md.accounts.create(CreateAccountRequest {
@@ -90,7 +85,7 @@ pub async fn start(mut cfg: Config) -> Result<()> {
     info!("initializing platform...");
     let router = init_platform(md.clone(), db.clone(), router, cfg.clone())?;
 
-    let signal = async {
+    let _signal = async {
         let mut sig_int =
             tokio::signal::unix::signal(SignalKind::interrupt()).expect("failed to install signal");
         let mut sig_term =

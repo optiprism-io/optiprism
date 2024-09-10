@@ -2,14 +2,13 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use clap::Subcommand;
-use metrics::Level;
 use tracing::info;
 use tracing_subscriber::FmtSubscriber;
 use cmd::command::db_test::DbTest;
 use cmd::command::{db_test, server, store, test};
 use cmd::command::store::Store;
 use cmd::command::test::Test;
-use cmd::config::{Config, LogLevel};
+use cmd::config::Config;
 
 extern crate parse_duration;
 
@@ -84,7 +83,7 @@ async fn main() -> Result<()> {
     let subscriber = FmtSubscriber::builder()
         .with_max_level(cfg.log.level)
         .finish();
-    tracing::subscriber::set_global_default(subscriber).map_err(|e| Error::SetGlobalDefaultError(e))?;
+    tracing::subscriber::set_global_default(subscriber).map_err( Error::SetGlobalDefaultError)?;
 
     let version = env!("CARGO_PKG_VERSION");
     let hash = option_env!("BUILD_HASH").unwrap_or("dev-build");

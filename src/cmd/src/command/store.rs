@@ -1,6 +1,3 @@
-use std::collections::BTreeMap;
-use std::collections::HashMap;
-use std::{env, fs};
 use std::fs::File;
 use std::io;
 use std::net::SocketAddr;
@@ -11,66 +8,38 @@ use std::thread;
 use axum::Router;
 use chrono::DateTime;
 use chrono::Duration;
-use chrono::NaiveDateTime;
 use chrono::Utc;
 use clap::Parser;
 use common::{DATA_PATH_METADATA, DATA_PATH_STORAGE, group_col};
-use common::types::COLUMN_EVENT;
-use common::types::EVENT_PROPERTY_CITY;
-use common::types::EVENT_PROPERTY_COUNTRY;
-use common::types::EVENT_PROPERTY_DEVICE_MODEL;
-use common::types::EVENT_PROPERTY_OS;
-use common::types::EVENT_PROPERTY_OS_FAMILY;
-use common::types::EVENT_PROPERTY_OS_VERSION_MAJOR;
-use common::types::EVENT_PROPERTY_PAGE_PATH;
-use common::types::EVENT_PROPERTY_PAGE_TITLE;
-use common::types::EVENT_PROPERTY_PAGE_URL;
 use common::types::TABLE_EVENTS;
 use common::GROUPS_COUNT;
 use common::GROUP_USER_ID;
-use crossbeam_channel::bounded;
 use dateparser::DateTimeUtc;
-use enum_iterator::all;
-use pbkdf2::pbkdf2_hmac;
-use rand::prelude::StdRng;
 use events_gen::generator;
 use events_gen::generator::Generator;
 use events_gen::store::companies::CompanyProvider;
-use events_gen::store::events::Event;
 use events_gen::store::products::ProductProvider;
 use events_gen::store::profiles::ProfileProvider;
 use events_gen::store::scenario;
 use events_gen::store::scenario::Scenario;
-use ingester::error::IngesterError;
 use ingester::executor::Executor;
-use ingester::transformers::geo;
-use ingester::transformers::user_agent;
 use ingester::Destination;
 use ingester::Identify;
 use ingester::Track;
-use ingester::Transformer;
 use metadata::MetadataProvider;
 use platform::projects::init_project;
-use query::col_name;
-use rand::{SeedableRng, thread_rng};
-use sha2::Sha256;
+use rand::thread_rng;
 use storage::db::OptiDBImpl;
 use storage::db::Options;
-use storage::NamedValue;
-use storage::Value;
-use tokio::net::TcpListener;
 use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tracing::debug;
 use tracing::info;
-use uaparser::UserAgentParser;
-use metadata::settings::{BackupProvider, BackupScheduleInterval};
+use metadata::settings::BackupScheduleInterval;
 use crate::error::Error;
 use crate::error::Result;
-use crate::{get_random_key32, init_settings, init_fs, init_ingester, clenaup_fs};
-use crate::init_metrics;
+use crate::{init_settings, init_fs, init_ingester, clenaup_fs};
 use crate::init_platform;
-use crate::init_session_cleaner;
 use crate::init_system;
 
 #[derive(Parser, Clone)]
@@ -107,7 +76,7 @@ pub struct Config<R> {
     pub partitions: usize,
 }
 
-pub async fn start(args: &Store, mut cfg: crate::Config) -> Result<()> {
+pub async fn start(args: &Store, cfg: crate::Config) -> Result<()> {
     debug!("db path: {:?}", cfg.data.path);
 
     init_fs(&cfg)?;
@@ -164,9 +133,6 @@ pub async fn start(args: &Store, mut cfg: crate::Config) -> Result<()> {
 
     let duration = Duration::from_std(parse_duration::parse(
         args.duration.clone().unwrap().as_str(),
-    )?)?;
-    let future_duration = Duration::from_std(parse_duration::parse(
-        args.future_duration.clone().unwrap().as_str(),
     )?)?;
     let from_date = to_date - duration;
 
@@ -248,7 +214,7 @@ pub async fn start(args: &Store, mut cfg: crate::Config) -> Result<()> {
 
     info!("listening on {}", cfg.server.host);
 
-    let signal = async {
+    let _signal = async {
         let mut sig_int =
             tokio::signal::unix::signal(SignalKind::interrupt()).expect("failed to install signal");
         let mut sig_term =

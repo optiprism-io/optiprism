@@ -1,17 +1,10 @@
 use std::fmt::Write;
 use std::{fs, thread};
-use std::io::BufReader;
-use std::net::SocketAddr;
 use std::path::PathBuf;
-use std::pin::Pin;
 use std::sync::Arc;
-use std::task::Poll;
-use std::time::Duration;
-use arrow2::array::{Array, Int64Array};
 use clap::Parser;
-use futures::{Stream, StreamExt};
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
-use rand::{Rng, thread_rng};
+use rand::thread_rng;
 use rand::prelude::SliceRandom;
 use tokio::time::Instant;
 use common::config::Config;
@@ -21,8 +14,7 @@ use metadata::MetadataProvider;
 use metadata::settings::BackupScheduleInterval;
 use storage::db::{OptiDBImpl, Options};
 use storage::{NamedValue, table, Value};
-use storage::parquet::ArrowIteratorImpl;
-use crate::{backup, init_fs, init_metrics, init_system};
+use crate::{backup, init_fs, init_metrics};
 #[derive(Parser, Clone)]
 pub struct Gen {
     #[arg(long)]
@@ -102,9 +94,8 @@ pub async fn gen(args: &DbTest, gen: &Gen,cfg: Config) -> crate::error::Result<(
     settings.backup_provider_local_path = "/tmp/optiprism/backups".to_string();
     md.settings.save(&settings)?;
     let mut cfg = Config::default();
-    cfg.data.path = args.path.clone();
+    cfg.data.path.clone_from(&args.path);
     backup::init(md.clone(), db.clone(), cfg).await?;
-    let db_cloned = db.clone();
     /*thread::spawn(move || {
         loop {
             db_cloned.full_backup_local("/tmp/bak",|pct|{
@@ -138,10 +129,10 @@ pub async fn gen(args: &DbTest, gen: &Gen,cfg: Config) -> crate::error::Result<(
         let db_cloned = db.clone();
         let h = thread::spawn(move || {
             let mut rng = thread_rng();
-            let mut vals = (0..recs).into_iter().collect::<Vec<_>>();
+            let mut vals = (0..recs).collect::<Vec<_>>();
             vals.shuffle(&mut rng);
 
-            for j in 0..recs {
+            for _ in 0..recs {
                 // if j % 3 != i {
                 //     continue;
                 // }
@@ -172,10 +163,7 @@ pub async fn gen(args: &DbTest, gen: &Gen,cfg: Config) -> crate::error::Result<(
     Ok(())
 }
 
-pub async fn query(args: &DbTest, q: &Query) -> crate::error::Result<()> {
-    use std::fs::File;
-
-    use arrow2::array::Array;
+pub async fn query(args: &DbTest, _q: &Query) -> crate::error::Result<()> {
     /*
         let a = Instant::now();
         let i = ArrowIteratorImpl::new(BufReader::new(File::open("/tmp/storage/data/tables/t1/levels/1/31.parquet").unwrap()), vec!["f1".to_string()], 10000).unwrap();
@@ -192,15 +180,15 @@ pub async fn query(args: &DbTest, q: &Query) -> crate::error::Result<()> {
 
     let s = Instant::now();
     let mut v = 0;
-    let mut scan = db.scan("t1", vec![0])?;
+    let scan = db.scan("t1", vec![0])?;
     for i in scan.iter {
         v += i.unwrap().len();
     }
     dbg!(v);
     dbg!(s.elapsed());
     let s = Instant::now();
-    let mut v = 0;
-    let mut i = 0;
+    let v = 0;
+    let i = 0;
     /*loop {
         match scan.next().await {
             None => {

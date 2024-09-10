@@ -1,3 +1,5 @@
+#![feature(async_closure)]
+
 extern crate core;
 
 use std::fs::File;
@@ -24,41 +26,12 @@ use common::types::COLUMN_CREATED_AT;
 use common::types::COLUMN_EVENT;
 use common::types::COLUMN_EVENT_ID;
 use common::types::COLUMN_PROJECT_ID;
-use common::types::EVENT_PROPERTY_CLIENT_FAMILY;
-use common::types::EVENT_PROPERTY_CLIENT_VERSION_MAJOR;
-use common::types::EVENT_PROPERTY_CLIENT_VERSION_MINOR;
-use common::types::EVENT_PROPERTY_CLIENT_VERSION_PATCH;
-use common::types::EVENT_PROPERTY_COUNTRY;
-use common::types::EVENT_PROPERTY_DEVICE_BRAND;
-use common::types::EVENT_PROPERTY_DEVICE_FAMILY;
-use common::types::EVENT_PROPERTY_DEVICE_MODEL;
-use common::types::EVENT_PROPERTY_HREF;
-use common::types::EVENT_PROPERTY_ID;
-use common::types::EVENT_PROPERTY_NAME;
-use common::types::EVENT_PROPERTY_OS;
-use common::types::EVENT_PROPERTY_OS_FAMILY;
-use common::types::EVENT_PROPERTY_OS_VERSION_MAJOR;
-use common::types::EVENT_PROPERTY_OS_VERSION_MINOR;
-use common::types::EVENT_PROPERTY_OS_VERSION_PATCH;
-use common::types::EVENT_PROPERTY_OS_VERSION_PATCH_MINOR;
-use common::types::EVENT_PROPERTY_PAGE_PATH;
-use common::types::EVENT_PROPERTY_PAGE_REFERER;
-use common::types::EVENT_PROPERTY_PAGE_SEARCH;
-use common::types::EVENT_PROPERTY_PAGE_TITLE;
-use common::types::EVENT_PROPERTY_PAGE_URL;
 use common::types::EVENT_PROPERTY_SESSION_LENGTH;
-use common::types::EVENT_SCREEN;
-use common::types::EVENT_SESSION_BEGIN;
 use common::types::EVENT_SESSION_END;
-use common::types::GROUP_COLUMN_CREATED_AT;
-use common::types::GROUP_COLUMN_ID;
-use common::types::GROUP_COLUMN_PROJECT_ID;
-use common::types::GROUP_COLUMN_VERSION;
 use common::types::TABLE_EVENTS;
 use common::ADMIN_ID;
 use common::GROUPS_COUNT;
 use common::GROUP_USER_ID;
-use ingester::error::IngesterError;
 use ingester::executor::Executor;
 use ingester::transformers::geo;
 use ingester::transformers::user_agent;
@@ -66,24 +39,16 @@ use ingester::Destination;
 use ingester::Identify;
 use ingester::Track;
 use ingester::Transformer;
-use metadata::accounts::Account;
 use metadata::accounts::CreateAccountRequest;
 use metadata::organizations::CreateOrganizationRequest;
-use metadata::organizations::Organization;
 use metadata::projects::CreateProjectRequest;
 use metadata::projects::Project;
-use metadata::properties::DictionaryType;
-use metadata::properties::Type;
-use metadata::util::create_event;
-use metadata::util::create_property;
-use metadata::util::CreatePropertyMainRequest;
 use metadata::MetadataProvider;
 use metrics::{describe_counter, describe_gauge};
 use metrics::describe_histogram;
 use metrics::Unit;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use metrics_util::MetricKindMask;
-use platform::auth;
 use platform::auth::password::make_password_hash;
 use platform::PlatformProvider;
 use rand::distributions::Alphanumeric;
@@ -364,7 +329,6 @@ fn init_session_cleaner(
                             return Ok(false);
                         }
                         let groups = (1..GROUPS_COUNT)
-                            .into_iter()
                             .map(|gid| NamedValue::new(group_col(gid), Value::Int64(None)))
                             .collect::<Vec<_>>();
 
@@ -376,7 +340,7 @@ fn init_session_cleaner(
                             .unwrap()
                             .id;
 
-                        let values = vec![
+                        let values = [
                             vec![
                                 NamedValue::new(
                                     COLUMN_PROJECT_ID.to_string(),
@@ -425,32 +389,11 @@ fn init_session_cleaner(
 }
 
 // not for high load
-fn get_random_key128(rng: &mut StdRng) -> [u8; 128] {
-    let mut arr = [0u8; 128];
-    rng.try_fill(&mut arr[..]).unwrap();
-    return arr;
-}
-
-
-// not for high load
 fn get_random_key64(rng: &mut StdRng) -> [u8; 64] {
     let mut arr = [0u8; 64];
     rng.try_fill(&mut arr[..]).unwrap();
-    return arr;
+    arr
 }
-
-fn get_random_key32(rng: &mut StdRng) -> [u8; 32] {
-    let mut arr = [0u8; 32];
-    rng.try_fill(&mut arr[..]).unwrap();
-    return arr;
-}
-
-fn get_random_key16(rng: &mut StdRng) -> [u8; 16] {
-    let mut arr = [0u8; 16];
-    rng.try_fill(&mut arr[..]).unwrap();
-    return arr;
-}
-
 
 fn init_settings(md: &Arc<MetadataProvider>) -> Result<()> {
     let mut rng = StdRng::from_rng(rand::thread_rng())?;
