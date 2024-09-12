@@ -40,7 +40,11 @@ use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tracing::info;
 
-use crate::init_system;
+use crate::backup;
+use crate::init_metrics;
+use crate::init_session_cleaner;
+use crate::init_settings;
+use crate::init_storage;
 
 #[derive(Parser, Clone)]
 pub struct Test {
@@ -63,8 +67,15 @@ pub async fn gen(args: &Test, cfg: Config) -> Result<(), anyhow::Error> {
     let rocks = Arc::new(metadata::rocksdb::new(args.path.join("md"))?);
     let db = Arc::new(OptiDBImpl::open(args.path.join("store"), Options {})?);
     let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
-    info!("system initialization...");
-    init_system(&md, &db, &cfg).await?;
+    init_settings(&md)?;
+    info!("storage initialization...");
+    init_storage(&md, &db, &cfg)?;
+    info!("metrics initialization...");
+    init_metrics();
+    info!("initializing session cleaner...");
+    init_session_cleaner(md.clone(), db.clone(), cfg.clone())?;
+    info!("initializing backup...");
+    backup::init(md.clone(), db.clone(), cfg.clone()).await?;
 
     info!("creating org structure and admin account...");
     let proj = crate::init_test_org_structure(&md)?;

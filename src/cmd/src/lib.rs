@@ -223,7 +223,7 @@ pub fn clenaup_fs(cfg: &Config) -> Result<()> {
 
     Ok(())
 }
-pub async fn init_system(
+pub fn init_storage(
     md: &Arc<MetadataProvider>,
     db: &Arc<OptiDBImpl>,
     cfg: &Config,
@@ -283,13 +283,6 @@ pub async fn init_system(
             },
         }
     }
-
-    info!("metrics initialization...");
-    init_metrics();
-    info!("initializing session cleaner...");
-    init_session_cleaner(md.clone(), db.clone(), cfg.clone())?;
-    info!("initializing backup...");
-    backup::init(md.clone(), db.clone(), cfg.clone()).await?;
 
     Ok(())
 }

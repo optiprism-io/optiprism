@@ -1,4 +1,5 @@
 use std::time::Duration;
+
 use axum::handler::HandlerWithoutStateExt;
 use common::types::OptionalProperty;
 use platform::dashboards::CreateDashboardRequest;
@@ -10,9 +11,11 @@ use platform::ListResponse;
 use reqwest::Client;
 use reqwest::StatusCode;
 use tokio::time::sleep;
+
 use crate::assert_response_json_eq;
 use crate::assert_response_status_eq;
-use crate::http::tests::{create_admin_acc_and_login, init_settings};
+use crate::http::tests::init_settings;
+use crate::http::tests::login;
 use crate::http::tests::run_http_service;
 use crate::http::tests::EMPTY_LIST;
 
@@ -32,9 +35,7 @@ async fn test_dashboards() {
     let cl = Client::new();
 
     init_settings(&md);
-    let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts)
-        .await
-        .unwrap();
+    let admin_headers = login(&pp.auth, &md.accounts).await.unwrap();
     let mut dash = Dashboard {
         id: 0,
         created_at: Default::default(),

@@ -554,9 +554,10 @@ pub mod test_util {
     use arrow::datatypes::Field;
     use arrow::datatypes::Schema;
     use common::group_col;
-    use common::types::{COLUMN_EVENT_ID, DType};
+    use common::types::DType;
     use common::types::COLUMN_CREATED_AT;
     use common::types::COLUMN_EVENT;
+    use common::types::COLUMN_EVENT_ID;
     use common::types::COLUMN_PROJECT_ID;
     use common::types::TABLE_EVENTS;
     use common::types::TIME_UNIT;
@@ -582,11 +583,15 @@ pub mod test_util {
     use metadata::events;
     use metadata::properties;
     use metadata::properties::CreatePropertyRequest;
+    use metadata::properties::DictionaryType;
     use metadata::properties::Property;
     use metadata::properties::Type;
+    use metadata::util::CreatePropertyMainRequest;
     use metadata::MetadataProvider;
     use storage::db::OptiDBImpl;
-
+    use tracing::info;
+    use ingester::{Destination, Identify, Track};
+    use ingester::executor::Executor;
     use crate::error::Result;
     use crate::physical_plan::planner::QueryPlanner;
 
@@ -662,14 +667,61 @@ pub mod test_util {
         db: &Arc<OptiDBImpl>,
         proj_id: u64,
     ) -> Result<()> {
-        db.add_field("events", COLUMN_PROJECT_ID, DType::Int64, false)?;
-        for gid in 0..GROUPS_COUNT {
-            db.add_field("events", group_col(gid).as_str(), DType::Int64, false)?;
+        metadata::util::create_property(&md, proj_id, CreatePropertyMainRequest {
+            name: COLUMN_PROJECT_ID.to_string(),
+            display_name: Some("Project".to_string()),
+            typ: Type::Event,
+            data_type: DType::String,
+            nullable: false,
+            hidden: true,
+            dict: Some(DictionaryType::Int64),
+            is_system: true,
+        })?;
+
+        for g in 0..GROUPS_COUNT {
+            metadata::util::create_property(&md, proj_id, CreatePropertyMainRequest {
+                name: group_col(g),
+                display_name: Some(format!("Group {g}")),
+                typ: Type::Event,
+                data_type: DType::String,
+                nullable: true,
+                hidden: false,
+                dict: Some(DictionaryType::Int64),
+                is_system: true,
+            })?;
         }
-        db.add_field("events", COLUMN_CREATED_AT, DType::Timestamp, false)?;
-        db.add_field("events", COLUMN_EVENT, DType::Int64, false)?;
-        db.add_field("events", COLUMN_EVENT_ID, DType::Int64, false)?;
-        // create user props
+        metadata::util::create_property(&md, proj_id, CreatePropertyMainRequest {
+            name: COLUMN_CREATED_AT.to_string(),
+            display_name: Some("Created At".to_string()),
+            typ: Type::Event,
+            data_type: DType::Timestamp,
+            nullable: false,
+            hidden: false,
+            dict: None,
+            is_system: true,
+        })?;
+
+        metadata::util::create_property(&md, proj_id, CreatePropertyMainRequest {
+            name: COLUMN_EVENT_ID.to_string(),
+            display_name: Some("Event ID".to_string()),
+            typ: Type::Event,
+            data_type: DType::Int64,
+            nullable: false,
+            hidden: true,
+            dict: None,
+            is_system: true,
+        })?;
+
+        metadata::util::create_property(&md, proj_id, CreatePropertyMainRequest {
+            name: COLUMN_EVENT.to_string(),
+            display_name: Some("Event".to_string()),
+            typ: Type::Event,
+            data_type: DType::String,
+            nullable: false,
+            dict: Some(DictionaryType::Int64),
+            hidden: true,
+            is_system: true,
+        })?;
 
         let country_prop = create_property(&md, db, proj_id, CreatePropertyRequest {
             created_by: 0,
@@ -687,19 +739,6 @@ pub mod test_util {
             is_dictionary: true,
             dictionary_type: Some(properties::DictionaryType::Int8),
         })?;
-
-        md.dictionaries.get_key_or_create(
-            proj_id,
-            TABLE_EVENTS,
-            country_prop.column_name().as_str(),
-            "spain",
-        )?;
-        md.dictionaries.get_key_or_create(
-            proj_id,
-            TABLE_EVENTS,
-            country_prop.column_name().as_str(),
-            "german",
-        )?;
 
         create_property(&md, db, proj_id, CreatePropertyRequest {
             created_by: 0,
@@ -796,6 +835,13 @@ pub mod test_util {
             is_system: false,
             hidden: false,
         })?;
+
+        let mut track_destinations = Vec::new();
+        let track_local_dst =
+            ingester::destinations::local::track::Local::new(db.clone(), md.clone());
+        track_destinations.push(Arc::new(track_local_dst) as Arc<dyn Destination<Track>>);
+        let track_exec =
+            Executor::<Track>::new(vec![], track_destinations.clone(), db.clone(), md.clone());
 
         Ok(())
     }

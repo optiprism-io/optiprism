@@ -39,14 +39,17 @@ use tokio::signal::unix::SignalKind;
 use tracing::debug;
 use tracing::info;
 
+use crate::backup;
 use crate::clenaup_fs;
 use crate::error::Error;
 use crate::error::Result;
 use crate::init_fs;
 use crate::init_ingester;
+use crate::init_metrics;
 use crate::init_platform;
+use crate::init_session_cleaner;
 use crate::init_settings;
-use crate::init_system;
+use crate::init_storage;
 
 #[derive(Parser, Clone)]
 pub struct Store {
@@ -98,8 +101,15 @@ pub async fn start(args: &Store, cfg: crate::Config) -> Result<()> {
     )?);
     let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
     init_settings(&md)?;
-    info!("system initialization...");
-    init_system(&md, &db, &cfg).await?;
+    info!("storage initialization...");
+    init_storage(&md, &db, &cfg)?;
+    info!("metrics initialization...");
+    init_metrics();
+    info!("initializing session cleaner...");
+    init_session_cleaner(md.clone(), db.clone(), cfg.clone())?;
+    info!("initializing backup...");
+    backup::init(md.clone(), db.clone(), cfg.clone()).await?;
+
     let mut settings = md.settings.load()?;
     settings.backup_enabled = false;
     settings.backup_encryption_enabled = true;

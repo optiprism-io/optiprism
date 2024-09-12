@@ -658,7 +658,8 @@ mod tests {
     use crate::event_segmentation::Query;
     use crate::event_segmentation::QueryTime;
     use crate::event_segmentation::TimeIntervalUnit;
-    use crate::{EventGroupedFilterGroup, EventGroupedFilters};
+    use crate::EventGroupedFilterGroup;
+    use crate::EventGroupedFilters;
     use crate::EventRef;
     use crate::PropValueOperation;
     use crate::PropertyRef;
@@ -754,7 +755,7 @@ mod tests {
                         },
                         operation: PropValueOperation::Eq,
                         value: Some(vec![json!(true)]),
-                    }, ],
+                    }],
                 }],
             }),
             // filters: Some(vec![EventFilter::Property {

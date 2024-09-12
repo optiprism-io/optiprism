@@ -18,7 +18,8 @@ use reqwest::StatusCode;
 
 use crate::assert_response_json_eq;
 use crate::assert_response_status_eq;
-use crate::http::tests::{create_admin_acc_and_login, init_settings};
+use crate::http::tests::init_settings;
+use crate::http::tests::login;
 use crate::http::tests::run_http_service;
 use crate::http::tests::EMPTY_LIST;
 
@@ -29,9 +30,7 @@ async fn test_auth() {
     let cl = Client::new();
     init_settings(&md);
     // login to admin acc
-    let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts)
-        .await
-        .unwrap();
+    let admin_headers = login(&pp.auth, &md.accounts).await.unwrap();
 
     let mut headers = HeaderMap::new();
     headers.insert(

@@ -21,6 +21,7 @@ use arrow::datatypes::FieldRef;
 use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
+use arrow::util::pretty::print_batches;
 use arrow_row::SortField;
 use axum::async_trait;
 use common::types::COLUMN_PROJECT_ID;
@@ -265,7 +266,7 @@ impl ExecutionPlan for SegmentedAggregatePartialExec {
                 self.partition_col.clone(),
                 self.agg_expr.clone(),
             )
-            .map_err(QueryError::into_datafusion_execution_error)?,
+                .map_err(QueryError::into_datafusion_execution_error)?,
         ))
     }
 
@@ -441,7 +442,7 @@ impl Stream for PartialAggregateStream {
                                         &batch,
                                         Some(&self.segment_partitions.borrow()[segment]),
                                     )
-                                    .map_err(QueryError::into_datafusion_execution_error)?;
+                                        .map_err(QueryError::into_datafusion_execution_error)?;
                                 } else {
                                     agg.evaluate(&batch, None)
                                         .map_err(QueryError::into_datafusion_execution_error)?;
@@ -472,7 +473,7 @@ impl Stream for PartialAggregateStream {
                         vec![Arc::new(Field::new("segment", DataType::Int64, false))],
                         schema.fields().to_vec(),
                     ]
-                    .concat(),
+                        .concat(),
                 ));
                 let batch = RecordBatch::try_new(schema, cols)?;
                 let cols = self
@@ -880,7 +881,7 @@ impl Stream for FinalAggregateStream {
             AggregateMode::Final,
             group_by,
             aggs,
-            vec![None],
+            vec![None;self.agg_schemas.len()],
             input,
             self.schema.clone(),
         )?);
@@ -895,7 +896,6 @@ impl Stream for FinalAggregateStream {
                 other => return other,
             }
         }
-        // todo return multiple batches
         let result = concat_batches(&self.schema, &out_batches)?;
         self.finished = true;
         Poll::Ready(Some(Ok(result)))

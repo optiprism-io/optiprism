@@ -21,13 +21,16 @@ use tokio::signal::unix::SignalKind;
 use tracing::debug;
 use tracing::info;
 
+use crate::backup;
 use crate::error::Error;
 use crate::error::Result;
 use crate::init_fs;
 use crate::init_ingester;
+use crate::init_metrics;
 use crate::init_platform;
+use crate::init_session_cleaner;
 use crate::init_settings;
-use crate::init_system;
+use crate::init_storage;
 
 pub async fn start(cfg: Config) -> Result<()> {
     debug!("db path: {:?}", cfg.data.path);
@@ -43,8 +46,15 @@ pub async fn start(cfg: Config) -> Result<()> {
     let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
     init_settings(&md)?;
 
-    info!("system initialization...");
-    init_system(&md, &db, &cfg).await?;
+    info!("storage initialization...");
+    init_storage(&md, &db, &cfg)?;
+    info!("metrics initialization...");
+    init_metrics();
+    info!("initializing session cleaner...");
+    init_session_cleaner(md.clone(), db.clone(), cfg.clone())?;
+    info!("initializing backup...");
+    backup::init(md.clone(), db.clone(), cfg.clone()).await?;
+
     if !cfg.data.ui_path.exists() {
         return Err(Error::FileNotFound(format!(
             "ui path {:?} doesn't exist",
