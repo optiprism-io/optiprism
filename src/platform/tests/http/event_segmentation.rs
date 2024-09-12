@@ -23,13 +23,14 @@ mod tests {
     use tracing::debug;
 
     use crate::assert_response_status_eq;
-    use crate::http::tests::create_admin_acc_and_login;
+    use crate::http::tests::{create_admin_acc_and_login, init_settings};
     use crate::http::tests::run_http_service;
 
     #[tokio::test]
     async fn test_event_segmentation() {
         let (base_url, md, pp) = run_http_service(true).await.unwrap();
         let cl = Client::new();
+        init_settings(&md);
         let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts)
             .await
             .unwrap();

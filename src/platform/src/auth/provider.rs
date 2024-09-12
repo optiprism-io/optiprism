@@ -66,7 +66,7 @@ impl Auth {
             .map_err(|err| err.wrap_into(AuthError::InvalidPasswordHashing))?;
 
         let maybe_account = self.md.accounts.create(CreateAccountRequest {
-            created_by: ADMIN_ID, // todo make it meaningful
+            created_by: ADMIN_ID,
             password_hash,
             email: req.email,
             name: req.name,

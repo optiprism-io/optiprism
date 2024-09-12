@@ -9,7 +9,7 @@ use reqwest::Client;
 use reqwest::StatusCode;
 
 use crate::assert_response_status_eq;
-use crate::http::tests::create_admin_acc_and_login;
+use crate::http::tests::{create_admin_acc_and_login, init_settings};
 use crate::http::tests::run_http_service;
 
 fn assert(l: &Event, r: &Event) {
@@ -29,6 +29,7 @@ async fn test_events() {
     let (base_url, md, pp) = run_http_service(false).await.unwrap();
     let events_url = format!("{base_url}/projects/1/schema/events");
     let cl = Client::new();
+    init_settings(&md);
     let headers = create_admin_acc_and_login(&pp.auth, &md.accounts)
         .await
         .unwrap();

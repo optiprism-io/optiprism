@@ -658,7 +658,7 @@ mod tests {
     use crate::event_segmentation::Query;
     use crate::event_segmentation::QueryTime;
     use crate::event_segmentation::TimeIntervalUnit;
-    use crate::EventGroupedFilters;
+    use crate::{EventGroupedFilterGroup, EventGroupedFilters};
     use crate::EventRef;
     use crate::PropValueOperation;
     use crate::PropertyRef;
@@ -745,7 +745,17 @@ mod tests {
             }],
             filters: Some(EventGroupedFilters {
                 groups_condition: None,
-                groups: vec![],
+                groups: vec![EventGroupedFilterGroup {
+                    filters_condition: Default::default(),
+                    filters: vec![PropValueFilter::Property {
+                        property: PropertyRef::Group {
+                            property_name: "p1".to_string(),
+                            group: 0,
+                        },
+                        operation: PropValueOperation::Eq,
+                        value: Some(vec![json!(true)]),
+                    }, ],
+                }],
             }),
             // filters: Some(vec![EventFilter::Property {
             // property: PropertyRef::User {
@@ -765,7 +775,7 @@ mod tests {
 
         let _qes: common::event_segmentation::EventSegmentationRequest = es.clone().into();
         let j = serde_json::to_string_pretty(&es).unwrap();
-        print!("1 {}", j);
+        print!("{}", j);
 
         Ok(())
     }

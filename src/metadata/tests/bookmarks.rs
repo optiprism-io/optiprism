@@ -15,9 +15,9 @@ use uuid::Uuid;
 fn test_reports() -> Result<()> {
     let mut path = temp_dir();
     path.push(format!("{}.db", Uuid::new_v4()));
-
     let db = Arc::new(metadata::rocksdb::new(path).unwrap());
     let bookmarks: Box<Bookmarks> = Box::new(Bookmarks::new(db.clone()));
+
     let create_bookmark_req = CreateBookmarkRequest {
         created_by: 1,
         query: Some(Query::EventSegmentation(EventSegmentationRequest {
@@ -36,7 +36,6 @@ fn test_reports() -> Result<()> {
             segments: None,
         })),
     };
-
     let b = bookmarks.create(1, create_bookmark_req)?;
     dbg!(&b);
     let bb = bookmarks.get_by_id(1, 1, &b.id)?;

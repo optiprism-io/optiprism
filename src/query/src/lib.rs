@@ -554,7 +554,7 @@ pub mod test_util {
     use arrow::datatypes::Field;
     use arrow::datatypes::Schema;
     use common::group_col;
-    use common::types::DType;
+    use common::types::{COLUMN_EVENT_ID, DType};
     use common::types::COLUMN_CREATED_AT;
     use common::types::COLUMN_EVENT;
     use common::types::COLUMN_PROJECT_ID;
@@ -668,6 +668,7 @@ pub mod test_util {
         }
         db.add_field("events", COLUMN_CREATED_AT, DType::Timestamp, false)?;
         db.add_field("events", COLUMN_EVENT, DType::Int64, false)?;
+        db.add_field("events", COLUMN_EVENT_ID, DType::Int64, false)?;
         // create user props
 
         let country_prop = create_property(&md, db, proj_id, CreatePropertyRequest {

@@ -17,13 +17,15 @@ mod tests {
     use std::sync::atomic::AtomicU16;
     use std::sync::atomic::Ordering;
     use std::sync::Arc;
-
+    use axum::handler::HandlerWithoutStateExt;
     use axum::Router;
     use chrono::Duration;
     use common::config;
     use common::config::Config;
-    use common::rbac::OrganizationRole;
+    use common::rbac::{OrganizationRole, Role};
     use lazy_static::lazy_static;
+    use rand::prelude::StdRng;
+    use rand::SeedableRng;
     use metadata::accounts::Accounts;
     use metadata::MetadataProvider;
     use platform::auth::password::make_password_hash;
@@ -46,12 +48,14 @@ mod tests {
     use tokio::time::sleep;
     use tracing::level_filters::LevelFilter;
     use uuid::Uuid;
+    use metadata::error::MetadataError;
+    use metadata::util::init_db;
 
     lazy_static! {
         pub static ref EMPTY_LIST: serde_json::Value = json!({"data":[],"meta":{"next":null}});
         pub static ref AUTH_CFG: Config = Config {
             server: config::Server {
-                host: SocketAddr::from_str(":8080").unwrap()
+                host: SocketAddr::from_str("0.0.0.0:8080").unwrap()
             },
             data: config::Data {
                 path: Default::default(),
@@ -117,7 +121,7 @@ mod tests {
             name: Some("name".to_string()),
             force_update_password: false,
             force_update_email: false,
-            role: None,
+            role: Some(Role::Admin),
             organizations: Some(vec![(1, OrganizationRole::Admin)]),
             projects: None,
             teams: None,
@@ -142,6 +146,27 @@ mod tests {
         Ok(headers)
     }
 
+    pub fn init_settings(md: &Arc<MetadataProvider>) {
+        let mut settings = match md.settings.load() {
+            Ok(cfg) => cfg,
+            Err(MetadataError::NotFound(_)) => {
+                let cfg = metadata::settings::Settings::default();
+                md.settings.save(&cfg).unwrap();
+                cfg
+            }
+            Err(err) => panic!("{}", err.to_string()),
+        };
+
+        if settings.auth_access_token.is_empty() {
+            settings.auth_access_token = "test".to_string();
+        }
+        if settings.auth_refresh_token.is_empty() {
+            settings.auth_refresh_token = "test".to_string();
+        }
+
+        md.settings.save(&settings).unwrap();
+    }
+
     pub async fn run_http_service(
         create_test_data: bool,
     ) -> anyhow::Result<(
@@ -149,12 +174,7 @@ mod tests {
         Arc<metadata::MetadataProvider>,
         Arc<platform::PlatformProvider>,
     )> {
-        let mut path = temp_dir();
-        path.push(format!("{}", Uuid::new_v4()));
-        let rocks = Arc::new(metadata::rocksdb::new(path.join("md"))?);
-        let db = Arc::new(OptiDBImpl::open(path.join("store"), Options {})?);
-        let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
-        db.create_table("events".to_string(), storage::table::Options::test(false))?;
+        let (md, db) = init_db().unwrap();
 
         if create_test_data {
             create_entities(md.clone(), &db, 1).await?;
@@ -182,7 +202,7 @@ mod tests {
             axum::serve(
                 listener,
                 router.into_make_service_with_connect_info::<SocketAddr>(),
-            )
+            ).await
         });
 
         sleep(tokio::time::Duration::from_millis(100)).await;

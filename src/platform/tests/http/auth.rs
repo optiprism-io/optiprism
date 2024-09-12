@@ -18,7 +18,7 @@ use reqwest::StatusCode;
 
 use crate::assert_response_json_eq;
 use crate::assert_response_status_eq;
-use crate::http::tests::create_admin_acc_and_login;
+use crate::http::tests::{create_admin_acc_and_login, init_settings};
 use crate::http::tests::run_http_service;
 use crate::http::tests::EMPTY_LIST;
 
@@ -27,6 +27,8 @@ async fn test_auth() {
     let (base_addr, md, pp) = run_http_service(false).await.unwrap();
     let auth_addr = format!("{base_addr}/auth");
     let cl = Client::new();
+    init_settings(&md);
+    // login to admin acc
     let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts)
         .await
         .unwrap();
@@ -38,7 +40,7 @@ async fn test_auth() {
     );
 
     let user_tokens: TokensResponse = {
-        let pwd = "password".to_string();
+        let pwd = "1password123#@E".to_string();
         let req = SignUpRequest {
             email: "user@gmail.com".to_string(),
             password: pwd.clone(),
@@ -46,6 +48,7 @@ async fn test_auth() {
             name: Some("name".to_string()),
         };
 
+        // signup
         let resp = cl
             .post(format!("{auth_addr}/signup"))
             .body(serde_json::to_string(&req).unwrap())
