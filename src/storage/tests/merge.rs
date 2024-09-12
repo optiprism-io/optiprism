@@ -883,8 +883,8 @@ fn test_replacing_different_parts() -> anyhow::Result<()> {
         })
         .collect::<Vec<_>>();
 
-    fs::remove_dir_all("/tmp/merge_replacing").ok();
-    fs::create_dir_all("/tmp/merge_replacing").unwrap();
+    fs::remove_dir_all("/tmp/test_replacing_different_parts").ok();
+    fs::create_dir_all("/tmp/test_replacing_different_parts").unwrap();
     let opts = Options {
         index_cols: 2,
         is_replacing: true,
@@ -898,14 +898,14 @@ fn test_replacing_different_parts() -> anyhow::Result<()> {
     merge(
         readers,
         Arc::new(Fs::new()),
-        "/tmp/merge_replacing".into(),
+        "/tmp/test_replacing_different_parts".into(),
         1,
         "t",
         0,
         opts,
     )?;
 
-    let mut pfile = File::open("/tmp/merge_replacing/1.parquet").unwrap();
+    let mut pfile = File::open("/tmp/test_replacing_different_parts/1.parquet").unwrap();
     let final_chunk = read_parquet_as_one_chunk(&mut pfile);
 
     let exp = Chunk::new(vec![

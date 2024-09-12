@@ -351,7 +351,7 @@ impl PagesIndexChunk {
                     .and_then(|pages| {
                         pages
                             .into_iter()
-                            .map(|page| compress(page, vec![], CompressionOptions::Snappy))
+                            .map(|page| compress(page, vec![], CompressionOptions::Zstd(Some(ZstdLevel::try_new(1).unwrap()))))
                             .collect::<parquet2::error::Result<Vec<_>>>()
                             .map_err(|e| arrow2::error::Error::from_external_error(Box::new(e)))
                     })
