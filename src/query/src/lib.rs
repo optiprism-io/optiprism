@@ -400,7 +400,7 @@ pub fn initial_plan(
         SessionConfig::new().with_collect_statistics(true),
         runtime,
     )
-    .with_query_planner(Arc::new(QueryPlanner {}));
+        .with_query_planner(Arc::new(QueryPlanner {}));
 
     let exec_ctx = SessionContext::new_with_state(state.clone());
     let plan = LogicalPlan::Extension(Extension {
@@ -621,7 +621,7 @@ pub mod test_util {
                     ),
                 ],
             ]
-            .concat(),
+                .concat(),
         );
         let mut options = CsvReadOptions::new();
         options.schema = Some(&schema);
@@ -667,7 +667,8 @@ pub mod test_util {
         db: &Arc<OptiDBImpl>,
         proj_id: u64,
     ) -> Result<()> {
-        metadata::util::create_property(&md, proj_id, CreatePropertyMainRequest {
+        info!("ingester initialization...");
+        let proj_prop = metadata::util::create_property(&md, proj_id, CreatePropertyMainRequest {
             name: COLUMN_PROJECT_ID.to_string(),
             display_name: Some("Project".to_string()),
             typ: Type::Event,
@@ -678,6 +679,31 @@ pub mod test_util {
             is_system: true,
         })?;
 
+        md.dictionaries.get_key_or_create(
+            proj_id,
+            TABLE_EVENTS,
+            proj_prop.column_name().as_str(),
+            "project 1",
+        )?;
+
+        md.dictionaries.get_key_or_create(
+            proj_id,
+            TABLE_EVENTS,
+            group_col(GROUP_USER_ID).as_str(),
+            "user 1",
+        )?;
+        md.dictionaries.get_key_or_create(
+            proj_id,
+            TABLE_EVENTS,
+            group_col(GROUP_USER_ID).as_str(),
+            "user 2",
+        )?;
+        md.dictionaries.get_key_or_create(
+            proj_id,
+            TABLE_EVENTS,
+            group_col(GROUP_USER_ID).as_str(),
+            "user 3",
+        )?;
         for g in 0..GROUPS_COUNT {
             metadata::util::create_property(&md, proj_id, CreatePropertyMainRequest {
                 name: group_col(g),
@@ -739,6 +765,19 @@ pub mod test_util {
             is_dictionary: true,
             dictionary_type: Some(properties::DictionaryType::Int8),
         })?;
+
+        md.dictionaries.get_key_or_create(
+            proj_id,
+            group_col(0).as_str(),
+            country_prop.column_name().as_str(),
+            "spain",
+        )?;
+        md.dictionaries.get_key_or_create(
+            proj_id,
+            group_col(0).as_str(),
+            country_prop.column_name().as_str(),
+            "german",
+        )?;
 
         create_property(&md, db, proj_id, CreatePropertyRequest {
             created_by: 0,
@@ -835,13 +874,6 @@ pub mod test_util {
             is_system: false,
             hidden: false,
         })?;
-
-        let mut track_destinations = Vec::new();
-        let track_local_dst =
-            ingester::destinations::local::track::Local::new(db.clone(), md.clone());
-        track_destinations.push(Arc::new(track_local_dst) as Arc<dyn Destination<Track>>);
-        let track_exec =
-            Executor::<Track>::new(vec![], track_destinations.clone(), db.clone(), md.clone());
 
         Ok(())
     }

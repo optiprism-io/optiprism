@@ -1,4 +1,4 @@
-project_id,group_0,group_1,group_2,group_3,group_4,created_at,event_id,event,user_country,user_device,user_is_premium,event_product_name,event_revenue
+project_id,group_0,group_1,group_2,group_3,group_4,created_at,event_id,event,g_0_str_7,user_device,user_is_premium,event_product_name,event_revenue
 1,1,,,,,2022-08-29 00:00:00,1,1,1,iphone,true,google pixel,533
 1,1,,,,,2022-08-29 00:01:01,2,2,1,iphone,true,google pixel,533
 1,1,,,,,2022-08-29 00:02:02,3,1,1,iphone,true,samsung s9,31
