@@ -968,9 +968,9 @@ mod tests {
                 data: r#"
 | user_id(i64) | ts(ts) | event(utf8) | const(i64) |
 |--------------|--------|-------------|------------|
-| 1            | 1976-01-01 12:00:00      | e1          | 1          |
-| 1            | 1976-01-01 13:00:00      | e2          | 1          |
-| 1            | 1976-01-01 14:00:00      | e3          | 1          |
+| 1            | 1976-01-01 11:10:00      | e1          | 1          |
+| 1            | 1976-01-01 11:12:00      | e2          | 1          |
+| 1            | 1976-01-01 11:13:00      | e3          | 1          |
 "#,
                 opts: Options {
                     from: DateTime::parse_from_str(
@@ -2078,9 +2078,9 @@ asd
         };
 
         let groups = vec![(
-            Arc::new(Column::new_with_schema("device", &schema).unwrap()) as PhysicalExprRef,
+            Arc::new(Column::new_with_schema("c", &schema).unwrap()) as PhysicalExprRef,
             "device".to_string(),
-            SortField::new(DataType::Utf8),
+            SortField::new(DataType::Int64),
         )];
         let opts = Options {
             schema: schema.clone(),

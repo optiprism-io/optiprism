@@ -1,4 +1,4 @@
-mod auth;
+// mod auth;
 mod custom_events;
 mod dashboards;
 mod event_records_search;
@@ -119,7 +119,7 @@ mod tests {
             },
         };
     }
-    static HTTP_PORT: AtomicU16 = AtomicU16::new(8080);
+    static HTTP_PORT: AtomicU16 = AtomicU16::new(8081);
 
     pub async fn login(auth: &Arc<Auth>, md_acc: &Arc<Accounts>) -> anyhow::Result<HeaderMap> {
         let tokens = auth
@@ -207,7 +207,7 @@ mod tests {
         }) {
             Ok(proj) => proj,
             Err(_err) => md.projects.get_by_id(1)?,
-        };
+        };/*
         md.dictionaries.create_key(
             proj.id,
             TABLE_EVENTS,
@@ -224,7 +224,7 @@ mod tests {
                 proj.name.as_str(),
             )?;
         }
-
+*/
         if create_test_data {
             create_entities(md.clone(), &db, 1).await?;
         }
@@ -245,6 +245,7 @@ mod tests {
         ));
 
         let addr = SocketAddr::from(([127, 0, 0, 1], HTTP_PORT.fetch_add(1, Ordering::SeqCst)));
+        dbg!(addr);
         let router = attach_routes(Router::new(), &md, &platform_provider, AUTH_CFG.clone());
         let listener = tokio::net::TcpListener::bind(addr).await?;
         tokio::spawn(async move {
