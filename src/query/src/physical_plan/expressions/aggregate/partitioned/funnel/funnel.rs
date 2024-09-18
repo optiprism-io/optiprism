@@ -143,14 +143,20 @@ impl Group {
 
     fn check_exclude(&self, exclude: &[Exclude], cur_row_id: usize) -> bool {
         for excl in exclude.iter() {
+            let mut to_check = false;
             // check if this exclude is relevant to current step
             if let Some(steps) = &excl.steps {
-                if steps.from <= self.cur_step
-                    && steps.to >= self.cur_step
-                    && excl.exists.value(cur_row_id)
-                {
-                    return false;
+                if steps.from <= self.cur_step && steps.to >= self.cur_step {
+                    to_check = true;
+                    break;
                 }
+            } else {
+                // check anyway
+                to_check = true;
+            }
+
+            if to_check && excl.exists.value(cur_row_id) {
+                return false;
             }
         }
 

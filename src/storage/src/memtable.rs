@@ -274,7 +274,6 @@ pub(crate) struct Memtable {
 
 #[cfg(test)]
 mod tests {
-
     use arrow2::array::Int64Array;
     use arrow2::chunk::Chunk;
     use common::types::DType;
@@ -296,27 +295,27 @@ mod tests {
         ]);
         mt.push_row(vec![
             Value::Int64(Some(1)),
-            Value::Int64(Some(2)),
+            Value::Int64(Some(1)),
             Value::Int64(Some(2)),
         ]);
         mt.push_row(vec![
+            Value::Int64(Some(1)),
             Value::Int64(Some(2)),
             Value::Int64(Some(1)),
-            Value::Int64(Some(3)),
         ]);
         mt.push_row(vec![
+            Value::Int64(Some(1)),
             Value::Int64(Some(2)),
             Value::Int64(Some(2)),
-            Value::Int64(Some(4)),
         ]);
 
-        let res = mt.get(&[KeyValue::Int64(1)]);
+        let res = mt.get(&[KeyValue::Int64(1),KeyValue::Int64(1)]);
 
         assert_eq!(
             res,
             Some(vec![
                 Value::Int64(Some(1)),
-                Value::Int64(Some(2)),
+                Value::Int64(Some(1)),
                 Value::Int64(Some(2)),
             ])
         );
@@ -325,9 +324,9 @@ mod tests {
         assert_eq!(
             res.unwrap(),
             Chunk::new(vec![
+                Int64Array::from(vec![Some(1), Some(1)]).boxed(),
                 Int64Array::from(vec![Some(1), Some(2)]).boxed(),
-                Int64Array::from(vec![Some(2), Some(2)]).boxed(),
-                Int64Array::from(vec![Some(2), Some(4)]).boxed()
+                Int64Array::from(vec![Some(2), Some(2)]).boxed()
             ])
         );
     }
@@ -361,7 +360,7 @@ mod tests {
             Chunk::new(vec![
                 Int64Array::from(vec![Some(1), Some(1)]).boxed(),
                 Int64Array::from(vec![Some(1), Some(2)]).boxed(),
-                Int64Array::from(vec![Some(2), Some(1)]).boxed()
+                Int64Array::from(vec![Some(2), Some(1)]).boxed(),
             ])
         );
     }

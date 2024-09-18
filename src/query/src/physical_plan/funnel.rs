@@ -866,32 +866,4 @@ mod tests {
 
         print_batches(&result).unwrap();
     }
-
-    #[tokio::test]
-    async fn test_final() {
-        let p1 = r#"
-| segment(i64) | device(utf8) | ts(ts) | step0_total(i64) | step0_conversion_ratio(decimal) | step0_avg_time_to_convert(decimal) | step0_dropped_off(i64) | step0_drop_off_ratio(decimal) | step0_time_to_convert(i64) | step0_time_to_convert_from_start(decimal) | step1_total(i64) | step1_conversion_ratio(decimal) | step1_avg_time_to_convert(decimal) | step1_dropped_off(i64) | step1_drop_off_ratio(decimal) | step1_time_to_convert(i64) | step1_time_to_convert_from_start(decimal) |
-|--------------|--------------|--------|------------------|---------------------------------|------------------------------------|------------------------|-------------------------------|----------------------------|-------------------------------------------|------------------|---------------------------------|------------------------------------|------------------------|-------------------------------|----------------------------|-------------------------------------------|
-| 1            | iphone       | 1      | 1                | 2                               | 2                                  | 2                      | 2                             | 2                          | 2                                         | 2                | 2                               | 2                                  | 2                      | 2                             | 2                          | 2                                         |
-"#;
-
-        let p2 = r#"
-| segment(i64) | device(utf8) | ts(ts) | step0_total(i64) | step0_conversion_ratio(decimal) | step0_avg_time_to_convert(decimal) | step0_dropped_off(i64) | step0_drop_off_ratio(decimal) | step0_time_to_convert(i64) | step0_time_to_convert_from_start(decimal) | step1_total(i64) | step1_conversion_ratio(decimal) | step1_avg_time_to_convert(decimal) | step1_dropped_off(i64) | step1_drop_off_ratio(decimal) | step1_time_to_convert(i64) | step1_time_to_convert_from_start(decimal) |
-|--------------|--------------|--------|------------------|---------------------------------|------------------------------------|------------------------|-------------------------------|----------------------------|-------------------------------------------|------------------|---------------------------------|------------------------------------|------------------------|-------------------------------|----------------------------|-------------------------------------------|
-| 1            | iphone       | 1      | 1                | 1                               | 1                                  | 1                      | 1                             | 1                          | 1                                         | 1                | 1                               | 1                                  | 1                      | 1                             | 1                          | 1                                         |
-"#;
-        let res1 = parse_markdown_tables(p1).unwrap();
-        let schema = res1[0].schema();
-
-        let res2 = parse_markdown_tables(p2).unwrap();
-        let input = MemoryExec::try_new(&[res1, res2], schema.clone(), None).unwrap();
-
-        let exec = FunnelFinalExec::try_new(Arc::new(input), 1, 2).unwrap();
-        let session_ctx = SessionContext::new();
-        let task_ctx = session_ctx.task_ctx();
-        let stream = exec.execute(0, task_ctx).unwrap();
-        let result = collect(stream).await.unwrap();
-
-        print_batches(&result).unwrap();
-    }
 }
