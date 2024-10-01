@@ -880,7 +880,7 @@ impl Stream for FinalAggregateStream {
             AggregateMode::Final,
             group_by,
             aggs,
-            vec![None],
+            vec![None; self.agg_schemas.len()],
             input,
             self.schema.clone(),
         )?);
@@ -895,7 +895,6 @@ impl Stream for FinalAggregateStream {
                 other => return other,
             }
         }
-        // todo return multiple batches
         let result = concat_batches(&self.schema, &out_batches)?;
         self.finished = true;
         Poll::Ready(Some(Ok(result)))

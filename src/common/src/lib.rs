@@ -21,8 +21,8 @@ pub fn group_col(group_id: usize) -> String {
     format!("group_{group_id}")
 }
 
-pub const DATA_PATH_METADATA: &str = "md/data";
-pub const DATA_PATH_STORAGE: &str = "data";
-pub const DATA_PATH_BACKUP_TMP: &str = "backup_tmp";
-pub const DATA_PATH_BACKUPS: &str = "backups";
-pub const DATA_PATH_RECOVERS: &str = "recovers";
+pub const DATA_PATH_METADATA: &str = "data/md";
+pub const DATA_PATH_STORAGE: &str = "data/storage";
+pub const DATA_PATH_BACKUP_TMP: &str = "data/backup_tmp";
+pub const DATA_PATH_BACKUPS: &str = "data/backups";
+pub const DATA_PATH_RECOVERS: &str = "data/recovers";

@@ -165,7 +165,7 @@ fn gc(tables: Arc<RwLock<Vec<Table>>>, path: PathBuf, fs: Arc<Fs>) {
         thread::sleep(Duration::from_secs(1));
         let tbl = tables.read().clone();
         for tbl in tbl {
-            let md = tbl.metadata.lock().clone();
+            let md = tbl.metadata.lock();
             let dir =
                 fs::read_dir(path.join("tables").join(tbl.name.clone())).expect("read_dir failed");
             for f in dir {
@@ -441,7 +441,7 @@ fn recover<P: AsRef<Path>>(path: P, opts: Options) -> Result<OptiDBImpl> {
     })
 }
 
-fn write_level0(metadata: &Metadata, memtable: &Memtable, path: PathBuf) -> Result<Part> {
+fn write_level0(metadata: &Metadata, memtable: &Memtable, path: &Path) -> Result<Part> {
     let chunk = memtable
         .chunk(None, metadata.opts.index_cols, metadata.opts.is_replacing)?
         .unwrap();
@@ -469,7 +469,7 @@ fn write_level0(metadata: &Metadata, memtable: &Memtable, path: PathBuf) -> Resu
     )?;
 
     let path = part_path(
-        &path,
+        path,
         metadata.table_name.as_str(),
         0,
         metadata.levels[0].part_id,
@@ -498,7 +498,7 @@ fn flush_log_(
     fs: &Fs,
     memtable: &mut Memtable,
     metadata: &mut Metadata,
-    path: &PathBuf,
+    path: &Path,
 ) -> Result<File> {
     let start_time = Instant::now();
     // swap memtable
@@ -511,7 +511,15 @@ fn flush_log_(
     let empty_memtable = memtable.create_empty();
     let memtable = mem::replace(memtable, empty_memtable);
 
-    let part = write_level0(metadata, &memtable, path.to_owned())?;
+    let ppath = part_path(
+        path,
+        metadata.table_name.as_str(),
+        0,
+        metadata.levels[0].part_id,
+    );
+    fs.open(&ppath)?;
+
+    let part = write_level0(metadata, &memtable, path)?;
     metadata.levels[0].parts.push(part.clone());
     // increment table id
     metadata.levels[0].part_id += 1;
@@ -520,6 +528,8 @@ fn flush_log_(
     metadata.stats.logged_bytes = 0;
     // increment log id
     metadata.log_id += 1;
+
+    fs.close(&ppath)?;
 
     // create new log
     trace!("creating new log file {:?}", log_name(metadata.log_id));
@@ -872,9 +882,9 @@ impl OptiDBImpl {
             let mut parts = level.parts.clone();
             parts.reverse();
             for part in parts.iter() {
-                let offset = if metadata.opts.is_replacing { 1 } else { 0 };
-                if key >= part.min[..part.min.len() - offset].to_vec()
-                    && key <= part.max[..part.max.len() - offset].to_vec()
+                let _offset = if metadata.opts.is_replacing { 1 } else { 0 };
+                if key >= part.min[..part.min.len()].to_vec()
+                    && key <= part.max[..part.max.len()].to_vec()
                 {
                     let path = part_path(&self.path, tbl_name, level_id, part.id);
                     let mut rdr = File::open(path)?;
@@ -897,7 +907,6 @@ impl OptiDBImpl {
                                 .unwrap();
                             // assume we have only one value
                             let minv = min.value(0);
-
                             let max = statistics
                                 .max_value
                                 .as_any()
@@ -905,7 +914,6 @@ impl OptiDBImpl {
                                 .unwrap();
                             // assume we have only one value
                             let maxv = max.value(0);
-
                             if let KeyValue::Int64(v) = key[field_id] {
                                 if v < minv || v > maxv {
                                     continue 'g;
@@ -914,7 +922,6 @@ impl OptiDBImpl {
                                 unreachable!();
                             }
                         }
-
                         found = Some(row_group_id);
                         break;
                     }
@@ -942,7 +949,6 @@ impl OptiDBImpl {
 
                     for chunk in chunks {
                         let chunk = chunk?;
-
                         let mut idx_cols = vec![];
                         for field_id in 0..key.len() {
                             idx_cols.push(
@@ -1343,7 +1349,7 @@ impl OptiDBImpl {
         let _g = self.backup_lock.lock();
         let start_time = Instant::now();
         let lock = self.global_lock.write();
-        let tables = self.tables.read().clone();
+        let tables = self.tables.read();
         let mut mds = vec![];
         for tbl in tables.iter() {
             let log_path = log_path(&self.path, &tbl.name, tbl.metadata.lock().log_id);
@@ -1359,6 +1365,7 @@ impl OptiDBImpl {
             }
             mds.push(md);
         }
+        let tables = tables.clone();
         drop(lock);
         // version
         writer.write_all(VERSION.to_le_bytes().as_slice())?;
@@ -1491,6 +1498,7 @@ impl OptiDBImpl {
         }
 
         let db = recover(path, Options {})?;
+        // todo prevent the start of gc/compaction before tables are copied
         let from = db.tables.read().clone();
         let mut to = self.tables.write();
         *to = from;
@@ -1626,7 +1634,7 @@ mod tests {
             NamedValue::new("f3".to_string(), Value::Int64(Some(3))),
         ]);
 
-        assert!(r.is_err());
+        assert!(r.is_ok());
     }
     #[test]
     fn test_get() {
@@ -1743,8 +1751,8 @@ mod tests {
     }
 
     #[test]
-    fn test_update() {
-        let path = PathBuf::from("/tmp/update");
+    fn test_update_replacing() {
+        let path = PathBuf::from("/tmp/update_replacing");
         fs::remove_dir_all(&path).ok();
         fs::create_dir_all(&path).unwrap();
         let opts = Options {};
@@ -1778,19 +1786,13 @@ mod tests {
         .unwrap();
         db.insert("t1", vec![
             NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
-            NamedValue::new("f2".to_string(), Value::Int64(Some(2))),
+            NamedValue::new("f2".to_string(), Value::Int64(Some(1))),
             NamedValue::new("f3".to_string(), Value::Int64(Some(2))),
         ])
         .unwrap();
         db.insert("t1", vec![
             NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
-            NamedValue::new("f2".to_string(), Value::Int64(Some(3))),
-            NamedValue::new("f3".to_string(), Value::Int64(Some(3))),
-        ])
-        .unwrap();
-        db.insert("t1", vec![
-            NamedValue::new("f1".to_string(), Value::Int64(Some(2))),
-            NamedValue::new("f2".to_string(), Value::Int64(Some(1))),
+            NamedValue::new("f2".to_string(), Value::Int64(Some(2))),
             NamedValue::new("f3".to_string(), Value::Int64(Some(1))),
         ])
         .unwrap();
@@ -1802,7 +1804,7 @@ mod tests {
             .unwrap();
         assert!(r.is_some());
         let r = db
-            .get("t1", vec![KeyValue::Int64(1), KeyValue::Int64(3)])
+            .get("t1", vec![KeyValue::Int64(1), KeyValue::Int64(2)])
             .unwrap();
         assert!(r.is_some());
 
@@ -1813,65 +1815,101 @@ mod tests {
 
         db.flush("t1").unwrap();
 
-        let r = db.get("t1", vec![KeyValue::Int64(1)]).unwrap();
+        let r = db
+            .get("t1", vec![KeyValue::Int64(1), KeyValue::Int64(1)])
+            .unwrap();
         assert_eq!(
             r,
             Some(vec![
                 Value::Int64(Some(1)),
-                Value::Int64(Some(3)),
-                Value::Int64(Some(3)),
+                Value::Int64(Some(1)),
+                Value::Int64(Some(2)),
             ])
         );
 
-        let r = db.get("t1", vec![KeyValue::Int64(2)]).unwrap();
+        let r = db
+            .get("t1", vec![KeyValue::Int64(1), KeyValue::Int64(2)])
+            .unwrap();
         assert!(r.is_some());
 
         let r = db.get("t1", vec![KeyValue::Int64(3)]).unwrap();
         assert!(r.is_none());
+    }
 
+    #[test]
+    fn test_update() {
+        let path = PathBuf::from("/tmp/update");
+        fs::remove_dir_all(&path).ok();
+        fs::create_dir_all(&path).unwrap();
+        let opts = Options {};
+        let db = OptiDBImpl::open(path, opts).unwrap();
+        let topts = table::Options {
+            levels: 7,
+            merge_array_size: 10000,
+            index_cols: 2,
+            l1_max_size_bytes: 1024 * 1024 * 10,
+            level_size_multiplier: 10,
+            l0_max_parts: 4,
+            max_log_length_bytes: 1024 * 1024 * 100,
+            merge_array_page_size: 10000,
+            merge_data_page_size_limit_bytes: Some(1024 * 1024),
+            merge_max_l1_part_size_bytes: 1024 * 1024,
+            merge_part_size_multiplier: 10,
+            merge_row_group_values_limit: 1000,
+            merge_chunk_size: 1024 * 8 * 8,
+            merge_max_page_size: 1024 * 1024,
+            is_replacing: false,
+        };
+        db.create_table("t1".to_string(), topts).unwrap();
+        db.add_field("t1", "f1", DType::Int64, false).unwrap();
+        db.add_field("t1", "f2", DType::Int64, false).unwrap();
+        db.add_field("t1", "f3", DType::Int64, false).unwrap();
         db.insert("t1", vec![
-            NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
-            NamedValue::new("f2".to_string(), Value::Int64(Some(4))),
-            NamedValue::new("f3".to_string(), Value::Int64(Some(4))),
+            NamedValue::new("f1".to_string(), Value::Int64(Some(1))), // pk
+            NamedValue::new("f2".to_string(), Value::Int64(Some(1))), // version
+            NamedValue::new("f3".to_string(), Value::Int64(Some(1))), // counter
         ])
         .unwrap();
-
-        db.flush("t1").unwrap();
-
         db.insert("t1", vec![
             NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
-            NamedValue::new("f2".to_string(), Value::Int64(Some(5))),
-            NamedValue::new("f3".to_string(), Value::Int64(Some(5))),
-        ])
-        .unwrap();
-        db.flush("t1").unwrap();
-
-        db.insert("t1", vec![
-            NamedValue::new("f1".to_string(), Value::Int64(Some(2))),
-            NamedValue::new("f2".to_string(), Value::Int64(Some(2))),
+            NamedValue::new("f2".to_string(), Value::Int64(Some(1))),
             NamedValue::new("f3".to_string(), Value::Int64(Some(2))),
         ])
         .unwrap();
-
-        db.flush("t1").unwrap();
-
         db.insert("t1", vec![
-            NamedValue::new("f1".to_string(), Value::Int64(Some(2))),
-            NamedValue::new("f2".to_string(), Value::Int64(Some(3))),
-            NamedValue::new("f3".to_string(), Value::Int64(Some(3))),
+            NamedValue::new("f1".to_string(), Value::Int64(Some(1))),
+            NamedValue::new("f2".to_string(), Value::Int64(Some(2))),
+            NamedValue::new("f3".to_string(), Value::Int64(Some(1))),
         ])
         .unwrap();
 
-        db.flush("t1").unwrap();
-        db.compact();
-
         let r = db.get("t1", vec![KeyValue::Int64(1)]).unwrap();
+        assert!(r.is_some());
+        let r = db
+            .get("t1", vec![KeyValue::Int64(1), KeyValue::Int64(1)])
+            .unwrap();
+        assert!(r.is_some());
+        let r = db
+            .get("t1", vec![KeyValue::Int64(1), KeyValue::Int64(2)])
+            .unwrap();
+        assert!(r.is_some());
+
+        let r = db
+            .get("t1", vec![KeyValue::Int64(1), KeyValue::Int64(4)])
+            .unwrap();
+        assert!(r.is_none());
+
+        db.flush("t1").unwrap();
+
+        let r = db
+            .get("t1", vec![KeyValue::Int64(1), KeyValue::Int64(1)])
+            .unwrap();
         assert_eq!(
             r,
             Some(vec![
                 Value::Int64(Some(1)),
-                Value::Int64(Some(5)),
-                Value::Int64(Some(5)),
+                Value::Int64(Some(1)),
+                Value::Int64(Some(1)),
             ])
         );
     }
@@ -2041,7 +2079,7 @@ mod tests {
 
     #[test]
     fn test_backup_restore() {
-        let path = PathBuf::from("/tmp").join("recovery");
+        let path = PathBuf::from("/tmp").join("back_restore");
         fs::remove_dir_all(&path).unwrap();
         let opts = Options {};
         let db = OptiDBImpl::open(path, opts).unwrap();
@@ -2084,6 +2122,7 @@ mod tests {
             // write second part. this way we got part in l1
             db.flush(&tn).unwrap();
             db.compact();
+            // thread::sleep(Duration::from_millis(1));
             db.insert(&tn, vec![NamedValue::new(
                 "f1".to_string(),
                 Value::Int64(Some(3)),
@@ -2108,9 +2147,10 @@ mod tests {
             res.push(i.unwrap());
         }
 
-        let exp1 = Chunk::new(vec![Int64Array::from_vec(vec![1, 2, 3]).boxed()]);
-        let exp2 = Chunk::new(vec![Int64Array::from_vec(vec![4]).boxed()]);
-        assert_eq!(res, vec![exp1, exp2]);
+        let exp1 = Chunk::new(vec![Int64Array::from_vec(vec![1, 2]).boxed()]);
+        let exp2 = Chunk::new(vec![Int64Array::from_vec(vec![3]).boxed()]);
+        let exp3 = Chunk::new(vec![Int64Array::from_vec(vec![4]).boxed()]);
+        assert_eq!(res, [exp1, exp2, exp3]);
     }
 
     // integration test is placed here and not in separate crate because conditional #[cfg(test)] is used

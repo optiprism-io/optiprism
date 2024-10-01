@@ -23,7 +23,7 @@ use crate::error::AuthError;
 use crate::PlatformError;
 use crate::Result;
 
-#[derive(Default, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct Context {
     pub account_id: u64,
     pub organization_id: u64,

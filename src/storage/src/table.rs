@@ -202,7 +202,7 @@ pub(crate) fn serialize_md(md: &Metadata) -> Result<Vec<u8>> {
                         size_bytes: p.size_bytes,
                         values: p.values as u64,
                         min: p.min.iter().map(min_max).collect::<Vec<_>>(),
-                        max: p.max.iter().map( min_max).collect::<Vec<_>>(),
+                        max: p.max.iter().map(min_max).collect::<Vec<_>>(),
                     }
                 })
                 .collect::<Vec<_>>(),
@@ -310,7 +310,7 @@ pub(crate) fn deserialize_md(data: &[u8]) -> Result<Metadata> {
                             size_bytes: p.size_bytes,
                             values: p.values as usize,
                             min: p.min.iter().map(min_max).collect::<Vec<_>>(),
-                            max: p.max.iter().map( min_max).collect::<Vec<_>>(),
+                            max: p.max.iter().map(min_max).collect::<Vec<_>>(),
                         }
                     })
                     .collect::<Vec<_>>(),

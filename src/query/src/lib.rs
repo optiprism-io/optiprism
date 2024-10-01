@@ -545,6 +545,82 @@ fn segment_projection(
     Ok(fields)
 }
 
+pub fn col_name(ctx: &Context, prop: &PropertyRef, md: &Arc<MetadataProvider>) -> Result<String> {
+    let name = match prop {
+        PropertyRef::Group(v, group) => md.group_properties[*group]
+            .get_by_name(ctx.project_id, v)?
+            .column_name(),
+        PropertyRef::Event(v) => md
+            .event_properties
+            .get_by_name(ctx.project_id, v)?
+            .column_name(),
+        _ => unimplemented!(),
+    };
+
+    Ok(name)
+}
+
+pub fn fix_filter(
+    md: &Arc<MetadataProvider>,
+    project_id: u64,
+    filter: &PropValueFilter,
+) -> Result<PropValueFilter> {
+    match filter {
+        PropValueFilter::Property {
+            property,
+            operation,
+            value,
+        } => {
+            let prop = match property {
+                PropertyRef::Group(name, group) => {
+                    md.group_properties[*group].get_by_name(project_id, name.as_str())?
+                }
+                PropertyRef::Event(name) => {
+                    md.event_properties.get_by_name(project_id, name.as_str())?
+                }
+                _ => {
+                    return Err(QueryError::Unimplemented(
+                        "invalid property type".to_string(),
+                    ));
+                }
+            };
+
+            let mut ev = vec![];
+            if let Some(value) = value {
+                for value in value {
+                    match (&prop.data_type, value) {
+                        (&DType::Timestamp, &ScalarValue::Decimal128(_, _, _)) => {
+                            match filter.clone() {
+                                PropValueFilter::Property { value, .. } => {
+                                    for value in value.unwrap().iter() {
+                                        if let ScalarValue::Decimal128(Some(ts), _, _) = value {
+                                            let sv = ScalarValue::TimestampMillisecond(
+                                                Some(*ts as i64),
+                                                None,
+                                            );
+                                            ev.push(sv);
+                                        } else {
+                                            unreachable!()
+                                        }
+                                    }
+                                }
+                            };
+                        }
+                        _ => ev.push(value.to_owned()),
+                    }
+                }
+            }
+
+            let filter = common::query::PropValueFilter::Property {
+                property: property.to_owned(),
+                operation: operation.to_owned(),
+                value: Some(ev),
+            };
+            Ok(filter)
+        }
+    }
+}
+
 pub mod test_util {
     use std::path::PathBuf;
     use std::sync::Arc;
@@ -557,6 +633,7 @@ pub mod test_util {
     use common::types::DType;
     use common::types::COLUMN_CREATED_AT;
     use common::types::COLUMN_EVENT;
+    use common::types::COLUMN_EVENT_ID;
     use common::types::COLUMN_PROJECT_ID;
     use common::types::TABLE_EVENTS;
     use common::types::TIME_UNIT;
@@ -582,10 +659,13 @@ pub mod test_util {
     use metadata::events;
     use metadata::properties;
     use metadata::properties::CreatePropertyRequest;
+    use metadata::properties::DictionaryType;
     use metadata::properties::Property;
     use metadata::properties::Type;
+    use metadata::util::CreatePropertyMainRequest;
     use metadata::MetadataProvider;
     use storage::db::OptiDBImpl;
+    use tracing::info;
 
     use crate::error::Result;
     use crate::physical_plan::planner::QueryPlanner;
@@ -662,13 +742,87 @@ pub mod test_util {
         db: &Arc<OptiDBImpl>,
         proj_id: u64,
     ) -> Result<()> {
-        db.add_field("events", COLUMN_PROJECT_ID, DType::Int64, false)?;
-        for gid in 0..GROUPS_COUNT {
-            db.add_field("events", group_col(gid).as_str(), DType::Int64, false)?;
+        info!("ingester initialization...");
+        let proj_prop = metadata::util::create_property(&md, proj_id, CreatePropertyMainRequest {
+            name: COLUMN_PROJECT_ID.to_string(),
+            display_name: Some("Project".to_string()),
+            typ: Type::Event,
+            data_type: DType::String,
+            nullable: false,
+            hidden: true,
+            dict: Some(DictionaryType::Int64),
+            is_system: true,
+        })?;
+
+        md.dictionaries.get_key_or_create(
+            proj_id,
+            TABLE_EVENTS,
+            proj_prop.column_name().as_str(),
+            "project 1",
+        )?;
+
+        md.dictionaries.get_key_or_create(
+            proj_id,
+            TABLE_EVENTS,
+            group_col(GROUP_USER_ID).as_str(),
+            "user 1",
+        )?;
+        md.dictionaries.get_key_or_create(
+            proj_id,
+            TABLE_EVENTS,
+            group_col(GROUP_USER_ID).as_str(),
+            "user 2",
+        )?;
+        md.dictionaries.get_key_or_create(
+            proj_id,
+            TABLE_EVENTS,
+            group_col(GROUP_USER_ID).as_str(),
+            "user 3",
+        )?;
+        for g in 0..GROUPS_COUNT {
+            metadata::util::create_property(&md, proj_id, CreatePropertyMainRequest {
+                name: group_col(g),
+                display_name: Some(format!("Group {g}")),
+                typ: Type::Event,
+                data_type: DType::String,
+                nullable: true,
+                hidden: false,
+                dict: Some(DictionaryType::Int64),
+                is_system: true,
+            })?;
         }
-        db.add_field("events", COLUMN_CREATED_AT, DType::Timestamp, false)?;
-        db.add_field("events", COLUMN_EVENT, DType::Int64, false)?;
-        // create user props
+        metadata::util::create_property(&md, proj_id, CreatePropertyMainRequest {
+            name: COLUMN_CREATED_AT.to_string(),
+            display_name: Some("Created At".to_string()),
+            typ: Type::Event,
+            data_type: DType::Timestamp,
+            nullable: false,
+            hidden: false,
+            dict: None,
+            is_system: true,
+        })?;
+
+        metadata::util::create_property(&md, proj_id, CreatePropertyMainRequest {
+            name: COLUMN_EVENT_ID.to_string(),
+            display_name: Some("Event ID".to_string()),
+            typ: Type::Event,
+            data_type: DType::Int64,
+            nullable: false,
+            hidden: true,
+            dict: None,
+            is_system: true,
+        })?;
+
+        metadata::util::create_property(&md, proj_id, CreatePropertyMainRequest {
+            name: COLUMN_EVENT.to_string(),
+            display_name: Some("Event".to_string()),
+            typ: Type::Event,
+            data_type: DType::String,
+            nullable: false,
+            dict: Some(DictionaryType::Int64),
+            hidden: true,
+            is_system: true,
+        })?;
 
         let country_prop = create_property(&md, db, proj_id, CreatePropertyRequest {
             created_by: 0,
@@ -689,13 +843,13 @@ pub mod test_util {
 
         md.dictionaries.get_key_or_create(
             proj_id,
-            TABLE_EVENTS,
+            group_col(0).as_str(),
             country_prop.column_name().as_str(),
             "spain",
         )?;
         md.dictionaries.get_key_or_create(
             proj_id,
-            TABLE_EVENTS,
+            group_col(0).as_str(),
             country_prop.column_name().as_str(),
             "german",
         )?;
@@ -812,81 +966,5 @@ pub mod test_util {
         let physical_plan = session_state.create_physical_plan(&plan).await?;
 
         Ok(collect(physical_plan, exec_ctx.task_ctx()).await?)
-    }
-}
-
-pub fn col_name(ctx: &Context, prop: &PropertyRef, md: &Arc<MetadataProvider>) -> Result<String> {
-    let name = match prop {
-        PropertyRef::Group(v, group) => md.group_properties[*group]
-            .get_by_name(ctx.project_id, v)?
-            .column_name(),
-        PropertyRef::Event(v) => md
-            .event_properties
-            .get_by_name(ctx.project_id, v)?
-            .column_name(),
-        _ => unimplemented!(),
-    };
-
-    Ok(name)
-}
-
-pub fn fix_filter(
-    md: &Arc<MetadataProvider>,
-    project_id: u64,
-    filter: &PropValueFilter,
-) -> Result<PropValueFilter> {
-    match filter {
-        PropValueFilter::Property {
-            property,
-            operation,
-            value,
-        } => {
-            let prop = match property {
-                PropertyRef::Group(name, group) => {
-                    md.group_properties[*group].get_by_name(project_id, name.as_str())?
-                }
-                PropertyRef::Event(name) => {
-                    md.event_properties.get_by_name(project_id, name.as_str())?
-                }
-                _ => {
-                    return Err(QueryError::Unimplemented(
-                        "invalid property type".to_string(),
-                    ));
-                }
-            };
-
-            let mut ev = vec![];
-            if let Some(value) = value {
-                for value in value {
-                    match (&prop.data_type, value) {
-                        (&DType::Timestamp, &ScalarValue::Decimal128(_, _, _)) => {
-                            match filter.clone() {
-                                PropValueFilter::Property { value, .. } => {
-                                    for value in value.unwrap().iter() {
-                                        if let ScalarValue::Decimal128(Some(ts), _, _) = value {
-                                            let sv = ScalarValue::TimestampMillisecond(
-                                                Some(*ts as i64),
-                                                None,
-                                            );
-                                            ev.push(sv);
-                                        } else {
-                                            unreachable!()
-                                        }
-                                    }
-                                }
-                            };
-                        }
-                        _ => ev.push(value.to_owned()),
-                    }
-                }
-            }
-
-            let filter = common::query::PropValueFilter::Property {
-                property: property.to_owned(),
-                operation: operation.to_owned(),
-                value: Some(ev),
-            };
-            Ok(filter)
-        }
     }
 }

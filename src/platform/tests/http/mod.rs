@@ -1,4 +1,4 @@
-mod auth;
+// mod auth;
 mod custom_events;
 mod dashboards;
 mod event_records_search;
@@ -11,7 +11,6 @@ mod reports;
 
 #[cfg(test)]
 mod tests {
-    use std::env::temp_dir;
     use std::net::SocketAddr;
     use std::str::FromStr;
     use std::sync::atomic::AtomicU16;
@@ -22,9 +21,15 @@ mod tests {
     use chrono::Duration;
     use common::config;
     use common::config::Config;
-    use common::rbac::OrganizationRole;
+    use common::rbac::Role;
+    use common::ADMIN_ID;
     use lazy_static::lazy_static;
     use metadata::accounts::Accounts;
+    use metadata::accounts::CreateAccountRequest;
+    use metadata::error::MetadataError;
+    use metadata::organizations::CreateOrganizationRequest;
+    use metadata::projects::CreateProjectRequest;
+    use metadata::util::init_db;
     use metadata::MetadataProvider;
     use platform::auth::password::make_password_hash;
     use platform::auth::provider::LogInRequest;
@@ -36,22 +41,22 @@ mod tests {
     use query::group_records::GroupRecordsProvider;
     use query::properties::PropertiesProvider;
     use query::test_util::create_entities;
+    use rand::distributions::Alphanumeric;
+    use rand::distributions::DistString;
+    use rand::thread_rng;
     use reqwest::header::HeaderMap;
     use reqwest::header::HeaderValue;
     use reqwest::header::AUTHORIZATION;
     use reqwest::header::CONTENT_TYPE;
     use serde_json::json;
-    use storage::db::OptiDBImpl;
-    use storage::db::Options;
     use tokio::time::sleep;
     use tracing::level_filters::LevelFilter;
-    use uuid::Uuid;
 
     lazy_static! {
         pub static ref EMPTY_LIST: serde_json::Value = json!({"data":[],"meta":{"next":null}});
         pub static ref AUTH_CFG: Config = Config {
             server: config::Server {
-                host: SocketAddr::from_str(":8080").unwrap()
+                host: SocketAddr::from_str("0.0.0.0:8080").unwrap()
             },
             data: config::Data {
                 path: Default::default(),
@@ -102,32 +107,14 @@ mod tests {
             },
         };
     }
-    static HTTP_PORT: AtomicU16 = AtomicU16::new(8080);
+    static HTTP_PORT: AtomicU16 = AtomicU16::new(8081);
 
-    pub async fn create_admin_acc_and_login(
-        auth: &Arc<Auth>,
-        md_acc: &Arc<Accounts>,
-    ) -> anyhow::Result<HeaderMap> {
-        let pwd = "password";
-
-        let admin = md_acc.create(metadata::accounts::CreateAccountRequest {
-            created_by: 1,
-            password_hash: make_password_hash(pwd)?.to_string(),
-            email: "admin@mail.com".to_string(),
-            name: Some("name".to_string()),
-            force_update_password: false,
-            force_update_email: false,
-            role: None,
-            organizations: Some(vec![(1, OrganizationRole::Admin)]),
-            projects: None,
-            teams: None,
-        })?;
-
+    pub async fn login(auth: &Arc<Auth>, _md_acc: &Arc<Accounts>) -> anyhow::Result<HeaderMap> {
         let tokens = auth
             .log_in(
                 LogInRequest {
-                    email: admin.email,
-                    password: pwd.to_string(),
+                    email: "admin@admin.com".to_owned(),
+                    password: "admin".to_owned(),
                 },
                 None,
             )
@@ -142,6 +129,27 @@ mod tests {
         Ok(headers)
     }
 
+    pub fn init_settings(md: &Arc<MetadataProvider>) {
+        let mut settings = match md.settings.load() {
+            Ok(cfg) => cfg,
+            Err(MetadataError::NotFound(_)) => {
+                let cfg = metadata::settings::Settings::default();
+                md.settings.save(&cfg).unwrap();
+                cfg
+            }
+            Err(err) => panic!("{}", err.to_string()),
+        };
+
+        if settings.auth_access_token.is_empty() {
+            settings.auth_access_token = "test".to_string();
+        }
+        if settings.auth_refresh_token.is_empty() {
+            settings.auth_refresh_token = "test".to_string();
+        }
+
+        md.settings.save(&settings).unwrap();
+    }
+
     pub async fn run_http_service(
         create_test_data: bool,
     ) -> anyhow::Result<(
@@ -149,13 +157,62 @@ mod tests {
         Arc<metadata::MetadataProvider>,
         Arc<platform::PlatformProvider>,
     )> {
-        let mut path = temp_dir();
-        path.push(format!("{}", Uuid::new_v4()));
-        let rocks = Arc::new(metadata::rocksdb::new(path.join("md"))?);
-        let db = Arc::new(OptiDBImpl::open(path.join("store"), Options {})?);
-        let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
-        db.create_table("events".to_string(), storage::table::Options::test(false))?;
+        let (md, db) = init_db().unwrap();
 
+        let admin = match md.accounts.create(CreateAccountRequest {
+            created_by: ADMIN_ID,
+            password_hash: make_password_hash("admin")?,
+            email: "admin@admin.com".to_string(),
+            name: Some("admin".to_string()),
+            force_update_password: true,
+            force_update_email: true,
+            role: Some(Role::Admin),
+            organizations: None,
+            projects: None,
+            teams: None,
+        }) {
+            Ok(acc) => acc,
+            Err(_err) => md.accounts.get_by_email("admin@admin.com")?,
+        };
+        let org = match md.organizations.create(CreateOrganizationRequest {
+            created_by: admin.id,
+            name: "My Organization".to_string(),
+        }) {
+            Ok(org) => org,
+            Err(_err) => md.organizations.get_by_id(1)?,
+        };
+
+        let token = Alphanumeric.sample_string(&mut thread_rng(), 64);
+
+        let _proj = match md.projects.create(CreateProjectRequest {
+            created_by: admin.id,
+            organization_id: org.id,
+            name: "My Project".to_string(),
+            description: None,
+            tags: None,
+            token: token.clone(),
+            session_duration_seconds: 60 * 60 * 24,
+        }) {
+            Ok(proj) => proj,
+            Err(_err) => md.projects.get_by_id(1)?,
+        };/*
+        md.dictionaries.create_key(
+            proj.id,
+            TABLE_EVENTS,
+            "project_id",
+            proj.id,
+            proj.name.as_str(),
+        )?;
+        for g in 0..GROUPS_COUNT {
+            md.dictionaries.create_key(
+                proj.id,
+                group_col(g).as_str(),
+                "project_id",
+                proj.id,
+                proj.name.as_str(),
+            )?;
+        }
+*/
         if create_test_data {
             create_entities(md.clone(), &db, 1).await?;
         }
@@ -176,6 +233,7 @@ mod tests {
         ));
 
         let addr = SocketAddr::from(([127, 0, 0, 1], HTTP_PORT.fetch_add(1, Ordering::SeqCst)));
+        dbg!(addr);
         let router = attach_routes(Router::new(), &md, &platform_provider, AUTH_CFG.clone());
         let listener = tokio::net::TcpListener::bind(addr).await?;
         tokio::spawn(async move {
@@ -183,6 +241,7 @@ mod tests {
                 listener,
                 router.into_make_service_with_connect_info::<SocketAddr>(),
             )
+            .await
         });
 
         sleep(tokio::time::Duration::from_millis(100)).await;

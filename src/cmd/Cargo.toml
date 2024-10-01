@@ -1,12 +1,10 @@
 [package]
 name = "cmd"
-version = "0.7.3"
+version = "0.7.7"
 edition = "2021"
 
 [profile.release]
 debug = true
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 
 [dependencies]
 config = "0.14.0"

@@ -12,7 +12,8 @@ use reqwest::Client;
 use reqwest::StatusCode;
 
 use crate::assert_response_status_eq;
-use crate::http::tests::create_admin_acc_and_login;
+use crate::http::tests::init_settings;
+use crate::http::tests::login;
 use crate::http::tests::run_http_service;
 
 fn assert(l: &Property, r: &Property) {
@@ -34,9 +35,8 @@ async fn test_event_properties() {
     let (base_url, md, pp) = run_http_service(false).await.unwrap();
     let prop_url = format!("{base_url}/projects/1/schema/event-properties");
     let cl = Client::new();
-    let headers = create_admin_acc_and_login(&pp.auth, &md.accounts)
-        .await
-        .unwrap();
+    init_settings(&md);
+    let headers = login(&pp.auth, &md.accounts).await.unwrap();
 
     let mut prop1 = Property {
         id: 1,

@@ -23,16 +23,16 @@ mod tests {
     use tracing::debug;
 
     use crate::assert_response_status_eq;
-    use crate::http::tests::create_admin_acc_and_login;
+    use crate::http::tests::init_settings;
+    use crate::http::tests::login;
     use crate::http::tests::run_http_service;
 
     #[tokio::test]
     async fn test_event_segmentation() {
         let (base_url, md, pp) = run_http_service(true).await.unwrap();
         let cl = Client::new();
-        let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts)
-            .await
-            .unwrap();
+        init_settings(&md);
+        let admin_headers = login(&pp.auth, &md.accounts).await.unwrap();
 
         let from = DateTime::parse_from_rfc3339("2021-09-08T13:42:00.000000+00:00")
             .unwrap()

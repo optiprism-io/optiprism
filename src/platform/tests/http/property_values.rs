@@ -10,16 +10,16 @@ mod tests {
     use serde_json::Value;
 
     use crate::assert_response_status_eq;
-    use crate::http::tests::create_admin_acc_and_login;
+    use crate::http::tests::init_settings;
+    use crate::http::tests::login;
     use crate::http::tests::run_http_service;
 
     #[tokio::test]
     async fn test_property_values() {
         let (base_url, md, pp) = run_http_service(true).await.unwrap();
         let cl = Client::new();
-        let headers = create_admin_acc_and_login(&pp.auth, &md.accounts)
-            .await
-            .unwrap();
+        init_settings(&md);
+        let headers = login(&pp.auth, &md.accounts).await.unwrap();
         let req = ListPropertyValuesRequest {
             property: PropertyRef::Event {
                 property_name: "Product Name".to_string(),

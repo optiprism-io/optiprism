@@ -10,7 +10,6 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/home/root/app/target \
     --mount=type=ssh \
     cargo build --release
-RUN ls -al /app/target/release/main
 
 FROM debian:stable-slim AS runtime
 RUN groupadd -r optiprism --gid=101 && useradd -r -g optiprism --uid=101 --home-dir=/var/lib/optiprism --shell=/bin/bash optiprism

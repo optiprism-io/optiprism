@@ -211,7 +211,6 @@ pub fn init_fs(cfg: &Config) -> Result<()> {
     fs::create_dir_all(cfg.data.path.join(DATA_PATH_BACKUP_TMP))?;
     fs::create_dir_all(cfg.data.path.join(DATA_PATH_BACKUPS))?;
     fs::create_dir_all(cfg.data.path.join(DATA_PATH_RECOVERS))?;
-
     Ok(())
 }
 
@@ -224,11 +223,7 @@ pub fn clenaup_fs(cfg: &Config) -> Result<()> {
 
     Ok(())
 }
-pub async fn init_system(
-    md: &Arc<MetadataProvider>,
-    db: &Arc<OptiDBImpl>,
-    cfg: &Config,
-) -> error::Result<()> {
+pub fn init_storage(db: &Arc<OptiDBImpl>, cfg: &Config) -> error::Result<()> {
     let events_table = TableOptions {
         levels: cfg.events_table.levels,
         merge_array_size: cfg.events_table.merge_array_size,
@@ -284,13 +279,6 @@ pub async fn init_system(
             },
         }
     }
-
-    info!("metrics initialization...");
-    init_metrics();
-    info!("initializing session cleaner...");
-    init_session_cleaner(md.clone(), db.clone(), cfg.clone())?;
-    info!("initializing backup...");
-    backup::init(md.clone(), db.clone(), cfg.clone()).await?;
 
     Ok(())
 }
@@ -474,7 +462,7 @@ fn init_settings(md: &Arc<MetadataProvider>) -> Result<()> {
     Ok(())
 }
 
-fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<Project> {
+pub fn init_test_org_structure(md: &Arc<MetadataProvider>) -> crate::error::Result<Project> {
     let admin = match md.accounts.create(CreateAccountRequest {
         created_by: ADMIN_ID,
         password_hash: make_password_hash("admin")?,

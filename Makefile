@@ -15,7 +15,7 @@ cargo-lint:
 	cargo clippy --workspace --all-targets -- -D warnings
 
 cargo-test:
-	cargo nextest run
+	cargo nextest run -- --test-threads=1
 
 cargo-udeps:
 	cargo  udeps --all-targets
