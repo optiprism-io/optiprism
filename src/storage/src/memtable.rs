@@ -309,7 +309,7 @@ mod tests {
             Value::Int64(Some(2)),
         ]);
 
-        let res = mt.get(&[KeyValue::Int64(1),KeyValue::Int64(1)]);
+        let res = mt.get(&[KeyValue::Int64(1), KeyValue::Int64(1)]);
 
         assert_eq!(
             res,

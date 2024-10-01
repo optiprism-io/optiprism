@@ -223,11 +223,7 @@ pub fn clenaup_fs(cfg: &Config) -> Result<()> {
 
     Ok(())
 }
-pub fn init_storage(
-    md: &Arc<MetadataProvider>,
-    db: &Arc<OptiDBImpl>,
-    cfg: &Config,
-) -> error::Result<()> {
+pub fn init_storage(db: &Arc<OptiDBImpl>, cfg: &Config) -> error::Result<()> {
     let events_table = TableOptions {
         levels: cfg.events_table.levels,
         merge_array_size: cfg.events_table.merge_array_size,

@@ -769,7 +769,6 @@ mod tests {
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::ExcludeExpr;
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::StepOrder;
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::Touch;
-    use crate::physical_plan::funnel::FunnelFinalExec;
     use crate::physical_plan::funnel::FunnelPartialExec;
 
     #[tokio::test]

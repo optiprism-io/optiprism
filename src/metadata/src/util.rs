@@ -29,7 +29,7 @@ pub fn init_db() -> anyhow::Result<(Arc<MetadataProvider>, Arc<OptiDBImpl>)> {
     let opts = TableOptions::test(false);
     db.create_table(TABLE_EVENTS.to_string(), opts.clone())
         .unwrap();
-    let mut opts = TableOptions::test(true);
+    let opts = TableOptions::test(true);
     for i in 0..GROUPS_COUNT {
         db.create_table(group_col(i), opts.clone()).unwrap()
     }

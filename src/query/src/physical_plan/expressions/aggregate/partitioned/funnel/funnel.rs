@@ -141,6 +141,7 @@ impl Group {
         }
     }
 
+    #[allow(unused_assignments)]
     fn check_exclude(&self, exclude: &[Exclude], cur_row_id: usize) -> bool {
         for excl in exclude.iter() {
             let mut to_check = false;

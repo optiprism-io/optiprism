@@ -400,7 +400,7 @@ pub fn initial_plan(
         SessionConfig::new().with_collect_statistics(true),
         runtime,
     )
-        .with_query_planner(Arc::new(QueryPlanner {}));
+    .with_query_planner(Arc::new(QueryPlanner {}));
 
     let exec_ctx = SessionContext::new_with_state(state.clone());
     let plan = LogicalPlan::Extension(Extension {
@@ -545,6 +545,82 @@ fn segment_projection(
     Ok(fields)
 }
 
+pub fn col_name(ctx: &Context, prop: &PropertyRef, md: &Arc<MetadataProvider>) -> Result<String> {
+    let name = match prop {
+        PropertyRef::Group(v, group) => md.group_properties[*group]
+            .get_by_name(ctx.project_id, v)?
+            .column_name(),
+        PropertyRef::Event(v) => md
+            .event_properties
+            .get_by_name(ctx.project_id, v)?
+            .column_name(),
+        _ => unimplemented!(),
+    };
+
+    Ok(name)
+}
+
+pub fn fix_filter(
+    md: &Arc<MetadataProvider>,
+    project_id: u64,
+    filter: &PropValueFilter,
+) -> Result<PropValueFilter> {
+    match filter {
+        PropValueFilter::Property {
+            property,
+            operation,
+            value,
+        } => {
+            let prop = match property {
+                PropertyRef::Group(name, group) => {
+                    md.group_properties[*group].get_by_name(project_id, name.as_str())?
+                }
+                PropertyRef::Event(name) => {
+                    md.event_properties.get_by_name(project_id, name.as_str())?
+                }
+                _ => {
+                    return Err(QueryError::Unimplemented(
+                        "invalid property type".to_string(),
+                    ));
+                }
+            };
+
+            let mut ev = vec![];
+            if let Some(value) = value {
+                for value in value {
+                    match (&prop.data_type, value) {
+                        (&DType::Timestamp, &ScalarValue::Decimal128(_, _, _)) => {
+                            match filter.clone() {
+                                PropValueFilter::Property { value, .. } => {
+                                    for value in value.unwrap().iter() {
+                                        if let ScalarValue::Decimal128(Some(ts), _, _) = value {
+                                            let sv = ScalarValue::TimestampMillisecond(
+                                                Some(*ts as i64),
+                                                None,
+                                            );
+                                            ev.push(sv);
+                                        } else {
+                                            unreachable!()
+                                        }
+                                    }
+                                }
+                            };
+                        }
+                        _ => ev.push(value.to_owned()),
+                    }
+                }
+            }
+
+            let filter = common::query::PropValueFilter::Property {
+                property: property.to_owned(),
+                operation: operation.to_owned(),
+                value: Some(ev),
+            };
+            Ok(filter)
+        }
+    }
+}
+
 pub mod test_util {
     use std::path::PathBuf;
     use std::sync::Arc;
@@ -590,8 +666,7 @@ pub mod test_util {
     use metadata::MetadataProvider;
     use storage::db::OptiDBImpl;
     use tracing::info;
-    use ingester::{Destination, Identify, Track};
-    use ingester::executor::Executor;
+
     use crate::error::Result;
     use crate::physical_plan::planner::QueryPlanner;
 
@@ -621,7 +696,7 @@ pub mod test_util {
                     ),
                 ],
             ]
-                .concat(),
+            .concat(),
         );
         let mut options = CsvReadOptions::new();
         options.schema = Some(&schema);
@@ -891,81 +966,5 @@ pub mod test_util {
         let physical_plan = session_state.create_physical_plan(&plan).await?;
 
         Ok(collect(physical_plan, exec_ctx.task_ctx()).await?)
-    }
-}
-
-pub fn col_name(ctx: &Context, prop: &PropertyRef, md: &Arc<MetadataProvider>) -> Result<String> {
-    let name = match prop {
-        PropertyRef::Group(v, group) => md.group_properties[*group]
-            .get_by_name(ctx.project_id, v)?
-            .column_name(),
-        PropertyRef::Event(v) => md
-            .event_properties
-            .get_by_name(ctx.project_id, v)?
-            .column_name(),
-        _ => unimplemented!(),
-    };
-
-    Ok(name)
-}
-
-pub fn fix_filter(
-    md: &Arc<MetadataProvider>,
-    project_id: u64,
-    filter: &PropValueFilter,
-) -> Result<PropValueFilter> {
-    match filter {
-        PropValueFilter::Property {
-            property,
-            operation,
-            value,
-        } => {
-            let prop = match property {
-                PropertyRef::Group(name, group) => {
-                    md.group_properties[*group].get_by_name(project_id, name.as_str())?
-                }
-                PropertyRef::Event(name) => {
-                    md.event_properties.get_by_name(project_id, name.as_str())?
-                }
-                _ => {
-                    return Err(QueryError::Unimplemented(
-                        "invalid property type".to_string(),
-                    ));
-                }
-            };
-
-            let mut ev = vec![];
-            if let Some(value) = value {
-                for value in value {
-                    match (&prop.data_type, value) {
-                        (&DType::Timestamp, &ScalarValue::Decimal128(_, _, _)) => {
-                            match filter.clone() {
-                                PropValueFilter::Property { value, .. } => {
-                                    for value in value.unwrap().iter() {
-                                        if let ScalarValue::Decimal128(Some(ts), _, _) = value {
-                                            let sv = ScalarValue::TimestampMillisecond(
-                                                Some(*ts as i64),
-                                                None,
-                                            );
-                                            ev.push(sv);
-                                        } else {
-                                            unreachable!()
-                                        }
-                                    }
-                                }
-                            };
-                        }
-                        _ => ev.push(value.to_owned()),
-                    }
-                }
-            }
-
-            let filter = common::query::PropValueFilter::Property {
-                property: property.to_owned(),
-                operation: operation.to_owned(),
-                value: Some(ev),
-            };
-            Ok(filter)
-        }
     }
 }

@@ -1,6 +1,5 @@
 #[cfg(test)]
 mod tests {
-    use metadata::util::init_db;
     use reqwest::Client;
     use reqwest::StatusCode;
 

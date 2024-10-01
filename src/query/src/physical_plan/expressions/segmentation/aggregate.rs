@@ -370,7 +370,7 @@ mod tests {
             );
 
             for b in res {
-            let _res = agg.evaluate(&b).unwrap();
+                agg.evaluate(&b).unwrap();
             }
             let res = agg.finalize().unwrap();
             let exp = Int64Array::from(vec![None, Some(1), None]);

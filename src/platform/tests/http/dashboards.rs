@@ -1,6 +1,3 @@
-use std::time::Duration;
-
-use axum::handler::HandlerWithoutStateExt;
 use common::types::OptionalProperty;
 use platform::dashboards::CreateDashboardRequest;
 use platform::dashboards::Dashboard;
@@ -10,7 +7,6 @@ use platform::dashboards::UpdateDashboardRequest;
 use platform::ListResponse;
 use reqwest::Client;
 use reqwest::StatusCode;
-use tokio::time::sleep;
 
 use crate::assert_response_json_eq;
 use crate::assert_response_status_eq;

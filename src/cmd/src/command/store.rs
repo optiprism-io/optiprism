@@ -102,7 +102,7 @@ pub async fn start(args: &Store, cfg: crate::Config) -> Result<()> {
     let md = Arc::new(MetadataProvider::try_new(rocks, db.clone())?);
     init_settings(&md)?;
     info!("storage initialization...");
-    init_storage(&md, &db, &cfg)?;
+    init_storage(&db, &cfg)?;
     info!("metrics initialization...");
     init_metrics();
     info!("initializing session cleaner...");

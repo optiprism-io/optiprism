@@ -47,7 +47,7 @@ pub async fn start(cfg: Config) -> Result<()> {
     init_settings(&md)?;
 
     info!("storage initialization...");
-    init_storage(&md, &db, &cfg)?;
+    init_storage(&db, &cfg)?;
     info!("metrics initialization...");
     init_metrics();
     info!("initializing session cleaner...");

@@ -11,25 +11,18 @@ mod reports;
 
 #[cfg(test)]
 mod tests {
-    use std::env::temp_dir;
     use std::net::SocketAddr;
     use std::str::FromStr;
     use std::sync::atomic::AtomicU16;
     use std::sync::atomic::Ordering;
     use std::sync::Arc;
 
-    use axum::handler::HandlerWithoutStateExt;
     use axum::Router;
     use chrono::Duration;
     use common::config;
     use common::config::Config;
-    use common::group_col;
-    use common::rbac::OrganizationRole;
-    use common::rbac::ProjectRole;
     use common::rbac::Role;
-    use common::types::TABLE_EVENTS;
     use common::ADMIN_ID;
-    use common::GROUPS_COUNT;
     use lazy_static::lazy_static;
     use metadata::accounts::Accounts;
     use metadata::accounts::CreateAccountRequest;
@@ -50,19 +43,14 @@ mod tests {
     use query::test_util::create_entities;
     use rand::distributions::Alphanumeric;
     use rand::distributions::DistString;
-    use rand::prelude::StdRng;
     use rand::thread_rng;
-    use rand::SeedableRng;
     use reqwest::header::HeaderMap;
     use reqwest::header::HeaderValue;
     use reqwest::header::AUTHORIZATION;
     use reqwest::header::CONTENT_TYPE;
     use serde_json::json;
-    use storage::db::OptiDBImpl;
-    use storage::db::Options;
     use tokio::time::sleep;
     use tracing::level_filters::LevelFilter;
-    use uuid::Uuid;
 
     lazy_static! {
         pub static ref EMPTY_LIST: serde_json::Value = json!({"data":[],"meta":{"next":null}});
@@ -121,7 +109,7 @@ mod tests {
     }
     static HTTP_PORT: AtomicU16 = AtomicU16::new(8081);
 
-    pub async fn login(auth: &Arc<Auth>, md_acc: &Arc<Accounts>) -> anyhow::Result<HeaderMap> {
+    pub async fn login(auth: &Arc<Auth>, _md_acc: &Arc<Accounts>) -> anyhow::Result<HeaderMap> {
         let tokens = auth
             .log_in(
                 LogInRequest {
@@ -196,7 +184,7 @@ mod tests {
 
         let token = Alphanumeric.sample_string(&mut thread_rng(), 64);
 
-        let proj = match md.projects.create(CreateProjectRequest {
+        let _proj = match md.projects.create(CreateProjectRequest {
             created_by: admin.id,
             organization_id: org.id,
             name: "My Project".to_string(),

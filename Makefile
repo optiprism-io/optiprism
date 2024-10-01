@@ -43,7 +43,7 @@ clean:
 	yarn cache clean
 
 docker-build:
-	docker buildx build  --build-arg="GIT_SHA=$(GIT_TAG)" --ssh default --load --file docker/Dockerfile --platform=linux/amd64 --progress plain -t $(IMAGE) .
+	docker buildx build  --no-cache --build-arg="GIT_SHA=$(GIT_TAG)" --ssh default --load --file docker/Dockerfile --platform=linux/amd64 --progress plain -t $(IMAGE) .
 
 docker-publish:
 	$(pushing pushing $(IMAGE) docker image...)

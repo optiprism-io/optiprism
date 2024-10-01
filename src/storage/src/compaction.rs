@@ -168,8 +168,8 @@ impl Compactor {
                                     }
                                     FsOp::Delete(path) => {
                                         trace!("deleting {:?}", &path);
-                                        self.fs.remove_file(&path).unwrap();
                                         self.fs.close(&path).expect("close failed");
+                                        self.fs.try_remove_file(&path).unwrap();
                                     }
                                 }
                             }
@@ -309,7 +309,8 @@ fn compact(
                     if tc.level == 0 {
                         l0_rem.push(tc.part);
                     }
-                    tomerge.push(part_path(path, tbl_name, tc.level, tc.part));
+                    let merge_part = part_path(path, tbl_name, tc.level, tc.part);
+                    tomerge.push(merge_part.clone());
                     tmp_levels[tc.level].parts = tmp_levels[tc.level]
                         .clone()
                         .parts
@@ -320,6 +321,7 @@ fn compact(
 
                 let out_part_id = tmp_levels[level_id + 1].part_id + 1;
                 let out_path = path.join(format!("tables/{}/levels/{}", tbl_name, level_id + 1));
+
                 let rdrs = tomerge
                     .iter()
                     .map(File::open)
